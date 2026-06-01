@@ -1,0 +1,147 @@
+{
+  "info": {
+    "name": "Church_Hub API",
+    "description": "Church community management platform",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000/api/v1" },
+    { "key": "accessToken", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register Church",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"churchName\": \"Grace Church\",\n  \"churchSlug\": \"grace-church\",\n  \"email\": \"admin@grace.church\",\n  \"password\": \"SecurePass123!\",\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Pastor\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const res = pm.response.json();",
+                "if (res.accessToken) pm.collectionVariables.set('accessToken', res.accessToken);"
+              ]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@demo.church\",\n  \"password\": \"ChurchHub123!\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Membership",
+      "item": [
+        {
+          "name": "List Members",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/membership/members"
+          }
+        },
+        {
+          "name": "Create Member",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/membership/members",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Visitor\",\n  \"phone\": \"+15551234567\",\n  \"status\": \"VISITOR\",\n  \"roles\": [\"ADULT\"]\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Outreach",
+      "item": [
+        {
+          "name": "Capture Contact",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/outreach/capture",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Maria\",\n  \"phone\": \"+15559876543\",\n  \"latitude\": 40.7128,\n  \"longitude\": -74.006,\n  \"locationLabel\": \"Central Park\",\n  \"photoConsent\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Sync Offline Queue",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/outreach/sync",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{\n    \"clientId\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"entityType\": \"OUTREACH_CAPTURE\",\n    \"payload\": { \"firstName\": \"Offline\", \"phone\": \"+15550001111\" },\n    \"capturedAt\": \"2026-05-26T12:00:00.000Z\"\n  }]\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bus",
+      "item": [
+        {
+          "name": "Optimize Route",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/bus/routes/optimize",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"startLat\": 40.7128,\n  \"startLng\": -74.006,\n  \"stops\": [\n    { \"id\": \"1\", \"lat\": 40.72, \"lng\": -74.01, \"label\": \"Stop A\" },\n    { \"id\": \"2\", \"lat\": 40.73, \"lng\": -74.02, \"label\": \"Stop B\" }\n  ]\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Dashboard Metrics",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/admin/dashboard"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: churchhub-web
+  labels:
+    app: churchhub-web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: churchhub-web
+  template:
+    metadata:
+      labels:
+        app: churchhub-web
+    spec:
+      containers:
+        - name: web
+          image: churchhub-web:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NEXT_PUBLIC_API_URL
+              value: "https://api.churchhub.example.com"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: churchhub-web
+spec:
+  selector:
+    app: churchhub-web
+  ports:
+    - port: 80
+      targetPort: 3000
+  type: LoadBalancer

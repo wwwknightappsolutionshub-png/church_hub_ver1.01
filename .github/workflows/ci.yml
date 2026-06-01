@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: churchhub
+          POSTGRES_PASSWORD: churchhub
+          POSTGRES_DB: churchhub
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared packages
+        run: pnpm --filter @church-hub/shared-types build
+
+      - name: Generate Prisma client
+        run: pnpm --filter @church-hub/api exec prisma generate
+        env:
+          DATABASE_URL: postgresql://churchhub:churchhub@localhost:5432/churchhub
+
+      - name: Run migrations
+        run: pnpm --filter @church-hub/api exec prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://churchhub:churchhub@localhost:5432/churchhub
+
+      - name: Type check
+        run: pnpm type-check
+
+      - name: API unit tests
+        run: pnpm --filter @church-hub/api test
+        env:
+          DATABASE_URL: postgresql://churchhub:churchhub@localhost:5432/churchhub
+          JWT_ACCESS_SECRET: test-access-secret-min-32-characters-long
+          JWT_REFRESH_SECRET: test-refresh-secret-min-32-characters-long
+          REDIS_ENABLED: 'false'
+
+      - name: Web unit tests
+        run: pnpm --filter @church-hub/web test
+
+      - name: Seed database for E2E
+        run: pnpm --filter @church-hub/api prisma:seed
+        env:
+          DATABASE_URL: postgresql://churchhub:churchhub@localhost:5432/churchhub
+
+      - name: API E2E (health + devotional hub)
+        run: pnpm --filter @church-hub/api test:e2e
+        env:
+          DATABASE_URL: postgresql://churchhub:churchhub@localhost:5432/churchhub
+          JWT_ACCESS_SECRET: test-access-secret-min-32-characters-long
+          JWT_REFRESH_SECRET: test-refresh-secret-min-32-characters-long
+          REDIS_ENABLED: 'false'
+
+      - name: Build API
+        run: pnpm --filter @church-hub/api build
+
+      - name: Build Web
+        run: pnpm --filter @church-hub/web build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:4000
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build API Docker image
+        run: docker build -f infra/docker/Dockerfile.api -t churchhub-api:${{ github.sha }} .
+
+      - name: Build Web Docker image
+        run: docker build -f infra/docker/Dockerfile.web -t churchhub-web:${{ github.sha }} .

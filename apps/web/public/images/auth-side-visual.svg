@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1200" fill="none" role="img" aria-label="Church community gathering">
+  <defs>
+    <linearGradient id="sky" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e2a5e"/>
+      <stop offset="45%" stop-color="#2d4a7a"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#d4a853" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#d4a853" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="floor" cx="50%" cy="100%" r="70%">
+      <stop offset="0%" stop-color="#3d4fbf" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="1200" fill="url(#sky)"/>
+  <rect width="800" height="600" fill="url(#glow)"/>
+  <ellipse cx="400" cy="1050" rx="420" ry="180" fill="url(#floor)"/>
+  <!-- Abstract congregation silhouettes -->
+  <g opacity="0.92" fill="#e2e8f0">
+    <ellipse cx="400" cy="720" rx="200" ry="28" fill="#94a3b8" opacity="0.2"/>
+    <circle cx="280" cy="640" r="36"/>
+    <rect x="248" y="676" width="64" height="120" rx="32"/>
+    <circle cx="400" cy="620" r="42"/>
+    <rect x="358" y="662" width="84" height="140" rx="42"/>
+    <circle cx="520" cy="645" r="34"/>
+    <rect x="492" y="679" width="56" height="115" rx="28"/>
+    <circle cx="340" cy="680" r="28"/>
+    <rect x="316" y="708" width="48" height="90" rx="24"/>
+    <circle cx="460" cy="685" r="26"/>
+    <rect x="438" y="711" width="44" height="85" rx="22"/>
+  </g>
+  <!-- Warm light beams -->
+  <path d="M400 80 L200 900 L600 900 Z" fill="#d4a853" opacity="0.08"/>
+  <path d="M400 120 L280 850 L520 850 Z" fill="#fff" opacity="0.06"/>
+  <!-- Subtle arch / sanctuary hint -->
+  <path d="M120 400 Q400 180 680 400" stroke="#d4a853" stroke-width="2" opacity="0.35" fill="none"/>
+  <path d="M160 420 Q400 240 640 420" stroke="#94a3b8" stroke-width="1" opacity="0.2" fill="none"/>
+</svg>

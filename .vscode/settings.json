@@ -1,0 +1,14 @@
+{
+  "remote.autoForwardPorts": true,
+  "remote.autoForwardPortsSource": "output",
+  "ports.attributes": {
+    "3001": {
+      "label": "Church Hub Web",
+      "onAutoForward": "openBrowser"
+    },
+    "4000": {
+      "label": "Church Hub API"
+    }
+  },
+  "simpleBrowser.focusLockIndicator.enabled": true
+}

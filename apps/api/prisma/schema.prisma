@@ -1,0 +1,5073 @@
+// Church_Hub — Multi-tenant church management database schema
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Multi-tenant & Auth ─────────────────────────────────────
+
+model Church {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  timezone  String   @default("UTC")
+  address   String?
+  city      String?
+  country   String?
+  logoUrl   String?
+  settings  Json     @default("{}")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users              User[]
+  members            Member[]
+  families           Family[]
+  followUps          FollowUp[]
+  followUpTemplates  FollowUpTemplate[]
+  pastoralNotes      PastoralNote[]
+  outreachContacts   OutreachContact[]
+  evangelistQrCodes  EvangelistQrCode[]
+  syncQueueItems     SyncQueueItem[]
+  syncConflicts      SyncConflict[]
+  youthGroups        YouthGroup[]
+  youthEvents        YouthEvent[]
+  youthResources     YouthResource[]
+  youthHelpRequests  YouthHelpRequest[]
+  youthPosts         YouthPost[]
+  youthSermonClips   YouthSermonClip[]
+  youthMedia         YouthMedia[]
+  youthReactions     YouthReaction[]
+  youthAchievements  YouthAchievement[]
+  youthPointLedgers  YouthPointLedger[]
+  youthQuestions     YouthQuestion[]
+  youthPrayerRequests YouthPrayerRequest[]
+  youthChallenges    YouthChallenge[]
+  youthRewards       YouthReward[]
+  youthContentReports YouthContentReport[]
+  serviceUnits       ServiceUnit[]
+  serviceUnitMeetings ServiceUnitMeeting[]
+  serviceUnitMeetingSummaries ServiceUnitMeetingSummary[]
+  serviceUnitJoinRequests ServiceUnitJoinRequest[]
+  businessProfiles   BusinessProfile[]
+  marketplaceItems   MarketplaceItem[]
+  jobPostings        JobPosting[]
+  communitySupportRequests CommunitySupportRequest[]
+  konnectEvents      KonnectNetworkingEvent[]
+  mentorshipLinks    MentorshipLink[]
+  mentorApplications MentorApplication[]
+  konnectMentorProfiles KonnectMentorProfile[]
+  menteeMentorRequests MenteeMentorRequest[]
+  hubIdeas           HubIdea[]
+  busRoutes          BusRoute[]
+  buses              Bus[]
+  rideRequests       RideRequest[]
+  announcements      Announcement[]
+  sermons            Sermon[]
+  sermonNotes        SermonNote[]
+  devotionalPlans         DevotionalPlan[]
+  devotionalGroups        DevotionalGroup[]
+  devotionalGroupInvites  DevotionalGroupInvite[]
+  devotionalJournals        DevotionalJournalEntry[]
+  devotionalPrayerLists     DevotionalPrayerList[]
+  devotionalStudyProgress   DevotionalStudyProgress[]
+  devotionalReminders       DevotionalReminder[]
+  devotionalReminderPrefs   DevotionalReminderPreference[]
+  devotionalReminderDeliveries DevotionalReminderDelivery[]
+  devotionalPdfImports    DevotionalPdfImport[]
+  devotionalMeetups       DevotionalMeetup[]
+  devotionalDiscussions   DevotionalDiscussion[]
+  devotionalActionPoints  DevotionalActionPoint[]
+  devotionalChallenges    DevotionalChallenge[]
+  devotionalPrayerStreaks DevotionalPrayerStreak[]
+  devotionalPrayerDailyLogs DevotionalPrayerDailyLog[]
+  chatChannels       ChatChannel[]
+  notifications      Notification[]
+  inAppMessages      InAppMessage[]
+  communityHubPosts  CommunityHubPost[]
+  serviceUnitEmailTemplates ServiceUnitEmailTemplate[]
+  loungePresence     LoungePresence[]
+  churchServices           ChurchService[]
+  membershipClassDefinitions MembershipClassDefinition[]
+  memberActivityLogs       MemberActivityLog[]
+  classEnrollments         ClassEnrollment[]
+  attendanceRecords        AttendanceRecord[]
+  followUpAutomationRules  FollowUpAutomationRule[]
+  counselingCases          CounselingCase[]
+  carePrayerRequests       CarePrayerRequest[]
+  communicationQueueItems  CommunicationQueueItem[]
+  conversations            Conversation[]
+  serviceUnitWeeklyReports ServiceUnitWeeklyReport[]
+  automationSettings       ChurchAutomationSettings?
+  automationRunLogs        AutomationRunLog[]
+  deptSchedules            DeptSchedule[]
+  deptAssignments          DeptAssignment[]
+  deptModuleReports        DeptModuleReport[]
+  deptInventoryItems       DeptInventoryItem[]
+  deptResources            DeptResource[]
+  deptTasks                DeptTask[]
+  deptIncidents            DeptIncident[]
+  deptMedicalTeamAttendance DeptMedicalTeamAttendance[]
+  deptChildrenDutyRosters   DeptChildrenDutyRoster[]
+  deptChildrenCurriculum    DeptChildrenCurriculum[]
+  deptChildrenClassReports  DeptChildrenClassReport[]
+  deptChildCheckIns        DeptChildCheckIn[]
+  deptPrayerItems          DeptPrayerItem[]
+  deptPrayerAssignments    DeptPrayerAssignment[]
+  deptPrayerScheduleSessions DeptPrayerScheduleSession[]
+  deptPrayerProgressNotes  DeptPrayerProgressNote[]
+  deptPrayerScriptureGuides DeptPrayerScriptureGuide[]
+  deptSkills               DeptSkill[]
+  deptChoirSongs           DeptChoirSong[]
+  deptChoirRosterEntries   DeptChoirRosterEntry[]
+  deptChoirSetlists        DeptChoirSetlist[]
+  deptChoirSongFeedback    DeptChoirSongFeedback[]
+  deptChoirAttendance      DeptChoirAttendance[]
+  deptChoirAuditions       DeptChoirAudition[]
+  deptChoirVoiceTasks      DeptChoirVoiceTask[]
+  deptChoirVocalNotes      DeptChoirVocalNote[]
+  deptCertifications       DeptCertification[]
+  deptProgressNotes        DeptProgressNote[]
+  deptPrayerChecklists     DeptPrayerChecklist[]
+  deptFollowUpLogs         DeptFollowUpLog[]
+  deptUnitFeedbacks        DeptUnitFeedback[]
+  membershipImportJobs     MembershipImportJob[]
+  wisdom365Subscriptions   Wisdom365Subscription[]
+  wisdom365ChurchAvailability Wisdom365ChurchAvailability?
+  platformMarketingDrips PlatformMarketingDrip[]
+  cellBranches              CellBranch[]
+  cellBranchMembers         CellBranchMember[]
+  cellFormDefinitions       CellFormDefinition[]
+  cellReports               CellReport[]
+  cellMeetings              CellMeeting[]
+  cellAttendance            CellAttendance[]
+  cellIncidents             CellIncident[]
+  cellTeachingResources     CellTeachingResource[]
+  cellMessages              CellMessage[]
+  cellPrayerRequests        CellPrayerRequest[]
+  cellReminders             CellReminder[]
+
+  @@map("churches")
+}
+
+/// Fixed worship/service catalog per church (Sunday AM, midweek, etc.)
+model ChurchService {
+  id          String   @id @default(uuid())
+  churchId    String
+  name        String
+  description String?
+  /// 0 = Sunday … 6 = Saturday (optional)
+  dayOfWeek   Int?
+  /// Local time label e.g. "10:00"
+  startTime   String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  church             Church              @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  attendanceRecords  AttendanceRecord[]
+
+  @@unique([churchId, name])
+  @@index([churchId, isActive, sortOrder])
+  @@map("church_services")
+}
+
+/// Configurable membership class levels per church (defaults 101–401)
+model MembershipClassDefinition {
+  id          String   @id @default(uuid())
+  churchId    String
+  code        String
+  name        String
+  description String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  church      Church            @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  enrollments ClassEnrollment[]
+
+  @@unique([churchId, code])
+  @@index([churchId, isActive, sortOrder])
+  @@map("membership_class_definitions")
+}
+
+enum MemberActivityType {
+  MEMBER_CREATED
+  MEMBER_UPDATED
+  STATUS_CHANGED
+  ONBOARDING_STEP
+  ONBOARDING_COMPLETED
+  FAMILY_LINKED
+  FAMILY_CREATED
+  GUARDIAN_LINKED
+  GUARDIAN_REMOVED
+  CLASS_ENROLLED
+  CLASS_COMPLETED
+  CLASS_WITHDRAWN
+  ATTENDANCE_RECORDED
+  MEMBER_DELETED
+  MEMBER_IMPORTED
+}
+
+model MemberActivityLog {
+  id          String             @id @default(uuid())
+  churchId    String
+  memberId    String
+  actorUserId String?
+  type        MemberActivityType
+  summary     String
+  metadata    Json?
+  createdAt   DateTime           @default(now())
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  actor  User?  @relation("MemberActivityActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([churchId, memberId, createdAt])
+  @@index([memberId, createdAt])
+  @@map("member_activity_logs")
+}
+
+enum ClassEnrollmentStatus {
+  ENROLLED
+  IN_PROGRESS
+  COMPLETED
+  WITHDRAWN
+}
+
+model ClassEnrollment {
+  id                String                @id @default(uuid())
+  churchId          String
+  memberId          String
+  classDefinitionId String
+  status            ClassEnrollmentStatus @default(ENROLLED)
+  enrolledAt        DateTime              @default(now())
+  completedAt       DateTime?
+  notes             String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  church            Church                    @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member            Member                    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  classDefinition   MembershipClassDefinition @relation(fields: [classDefinitionId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, classDefinitionId])
+  @@index([churchId, classDefinitionId, status])
+  @@map("class_enrollments")
+}
+
+enum AttendanceScope {
+  SERVICE
+  FAMILY
+  DEPARTMENT
+}
+
+model AttendanceRecord {
+  id              String          @id @default(uuid())
+  churchId        String
+  memberId        String
+  churchServiceId String?
+  serviceUnitId   String?
+  familyId        String?
+  serviceDate     DateTime
+  scope           AttendanceScope
+  present         Boolean         @default(true)
+  notes           String?
+  recordedById    String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  church        Church         @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member        Member         @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  churchService ChurchService? @relation(fields: [churchServiceId], references: [id], onDelete: SetNull)
+  serviceUnit   ServiceUnit?   @relation(fields: [serviceUnitId], references: [id], onDelete: SetNull)
+  family        Family?        @relation(fields: [familyId], references: [id], onDelete: SetNull)
+  recordedBy    User?          @relation("AttendanceRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  @@index([churchId, serviceDate])
+  @@index([memberId, churchServiceId, serviceDate, scope])
+  @@index([churchId, churchServiceId, serviceDate])
+  @@index([familyId, serviceDate])
+  @@index([serviceUnitId, serviceDate])
+  @@map("attendance_records")
+}
+
+model User {
+  id           String    @id @default(uuid())
+  /// Null for SaaS platform operators (PLATFORM_ADMIN) who are not tied to one church.
+  churchId     String?
+  email        String
+  passwordHash String
+  firstName    String
+  lastName     String
+  nickname     String?
+  phone        String?
+  avatarUrl    String?
+  isActive             Boolean   @default(true)
+  mustChangePassword   Boolean   @default(false)
+  lastLoginAt          DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  church       Church?   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member       Member?
+  roles        UserRole[]
+  refreshTokens RefreshToken[]
+  assignedFollowUps FollowUp[] @relation("AssignedFollowUps")
+  pastoralNotes PastoralNote[] @relation("PastoralNoteAuthor")
+  counselingAssigned CounselingCase[] @relation("CounselingAssignee")
+  counselingSessionsAuthored CounselingSession[] @relation("CounselingSessionAuthor")
+  carePrayerAssigned CarePrayerRequest[] @relation("CarePrayerAssignee")
+  assignedHelpRequests YouthHelpRequest[] @relation("HelpAssignee")
+  assignedYouthQuestions YouthQuestion[] @relation("YouthQuestionAssignee")
+  youthAnswers YouthAnswer[] @relation("YouthAnswerAuthor")
+  helpResponses YouthHelpResponse[] @relation("HelpResponder")
+  sentMessages Message[] @relation("MessageSender")
+  sentInAppMessages InAppMessage[] @relation("InAppSender")
+  receivedInAppMessages InAppMessage[] @relation("InAppRecipient")
+  notifications Notification[]
+  youthMessageReads YouthMessageReadReceipt[] @relation("YouthMessageReadBy")
+  driverProfile DriverProfile?
+  reviewedServiceUnitJoins ServiceUnitJoinRequest[] @relation("ServiceUnitJoinReviewer")
+  communitySupportApprovals CommunitySupportRequest[] @relation("CommunitySupportApprover")
+  mentorApplicationApprovals MentorApplication[] @relation("MentorApplicationApprover")
+  devotionalPlansCreated   DevotionalPlan[]        @relation("DevotionalPlanCreator")
+  devotionalPdfsUploaded   DevotionalPdfImport[]   @relation("DevotionalPdfUploader")
+  communityHubLikes        CommunityHubLike[]
+  communityHubComments     CommunityHubComment[]
+  memberActivitiesAuthored MemberActivityLog[] @relation("MemberActivityActor")
+  attendanceRecorded       AttendanceRecord[]  @relation("AttendanceRecordedBy")
+  membershipImportsUploaded MembershipImportJob[] @relation("MembershipImportUploader")
+  sermonNotesCreated        SermonNote[]          @relation("SermonNoteCreator")
+  deptUnitFeedbacksAuthored DeptUnitFeedback[]    @relation("DeptUnitFeedbackUser")
+  wisdom365Subscriptions  Wisdom365Subscription[] @relation("Wisdom365Subscriber")
+  wisdom365LicenseAssignments Wisdom365LicenseAssignment[] @relation("Wisdom365LicenseUser")
+  wisdom365LicenseAssignmentsCreated Wisdom365LicenseAssignment[] @relation("Wisdom365LicenseAssigner")
+  wisdom365KidsGrantsParent Wisdom365KidsGrant[] @relation("Wisdom365KidsParent")
+  wisdom365MemberProgress   Wisdom365MemberProgress[]
+  wisdom365MemberPrefs      Wisdom365MemberPrefs[]
+  platformMarketingDrips    PlatformMarketingDrip[]
+  cellBranchesLed           CellBranch[]       @relation("CellBranchLeader")
+  cellReportsSubmitted      CellReport[]       @relation("CellReportSubmitter")
+  cellAttendanceRecorded    CellAttendance[]   @relation("CellAttendanceRecorder")
+  cellIncidentsReported     CellIncident[]     @relation("CellIncidentReporter")
+  cellMessagesSent          CellMessage[]      @relation("CellMessageFrom")
+  cellMessagesReceived      CellMessage[]      @relation("CellMessageTo")
+  cellPrayersCreated        CellPrayerRequest[] @relation("CellPrayerCreator")
+
+  @@unique([churchId, email])
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  permissions Permission[]
+  users       UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id       String @id @default(uuid())
+  roleId   String
+  resource String
+  action   String
+
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, resource, action])
+  @@map("permissions")
+}
+
+model UserRole {
+  userId String
+  roleId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  revokedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// ─── Membership ──────────────────────────────────────────────
+
+enum MemberStatus {
+  VISITOR
+  NEW_MEMBER
+  ACTIVE_MEMBER
+  DISCIPLED
+}
+
+enum MemberRoleType {
+  YOUTH
+  ADULT
+  LEADER
+  DRIVER
+  EVANGELIST
+  ADMIN
+  PASTOR
+}
+
+model Family {
+  id           String   @id @default(uuid())
+  churchId     String
+  name         String
+  headMemberId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  church            Church             @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  members           Member[]
+  attendanceRecords AttendanceRecord[]
+
+  @@map("families")
+}
+
+enum MembershipImportJobStatus {
+  UPLOADED
+  PREVIEWED
+  COMMITTED
+  FAILED
+}
+
+enum MembershipImportRowAction {
+  CREATE
+  UPDATE
+  SKIP
+  ERROR
+}
+
+enum MembershipImportMode {
+  MEMBERS
+  LEADS
+}
+
+model MembershipImportJob {
+  id               String                    @id @default(uuid())
+  churchId         String
+  uploadedByUserId String
+  status           MembershipImportJobStatus @default(UPLOADED)
+  mode             MembershipImportMode      @default(MEMBERS)
+  sourceFilename   String?
+  columnMapping    Json                      @default("{}")
+  options          Json                      @default("{}")
+  rowCounts        Json                      @default("{}")
+  summary          Json                      @default("{}")
+  errorMessage     String?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  committedAt      DateTime?
+
+  church     Church                 @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  uploadedBy User                   @relation("MembershipImportUploader", fields: [uploadedByUserId], references: [id], onDelete: Cascade)
+  rows       MembershipImportJobRow[]
+
+  @@index([churchId, status, createdAt])
+  @@map("membership_import_jobs")
+}
+
+model MembershipImportJobRow {
+  id        String                     @id @default(uuid())
+  jobId     String
+  rowIndex  Int
+  raw       Json
+  mapped    Json                       @default("{}")
+  action    MembershipImportRowAction?
+  error     String?
+  memberId  String?
+  familyId  String?
+  createdAt DateTime                   @default(now())
+  updatedAt DateTime                   @updatedAt
+
+  job    MembershipImportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  member Member?             @relation(fields: [memberId], references: [id], onDelete: SetNull)
+
+  @@unique([jobId, rowIndex])
+  @@index([jobId, action])
+  @@map("membership_import_job_rows")
+}
+
+model Member {
+  id                String         @id @default(uuid())
+  churchId          String
+  userId            String?        @unique
+  familyId          String?
+  firstName         String
+  lastName          String
+  nickname          String?
+  email             String?
+  phone             String?
+  dateOfBirth       DateTime?
+  status            MemberStatus   @default(VISITOR)
+  roles             MemberRoleType[]
+  ministryInterests String[]
+  address           String?
+  city              String?
+  avatarUrl         String?
+  onboardingStep    Int            @default(0)
+  notes             String?
+  bornAgain              Boolean?
+  baptizedInHolySpirit Boolean?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  church            Church              @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  user              User?               @relation(fields: [userId], references: [id])
+  family            Family?             @relation(fields: [familyId], references: [id])
+  followUps         FollowUp[]
+  pastoralNotes     PastoralNote[]
+  youthMemberships  YouthGroupMember[]
+  serviceUnitMemberships ServiceUnitMember[]
+  serviceUnitLeaderships ServiceUnitLeader[]
+  serviceUnitPosts       ServiceUnitPost[]       @relation("ServiceUnitPostAuthor")
+  serviceUnitPostReplies ServiceUnitPostReply[]  @relation("ServiceUnitReplyAuthor")
+  serviceUnitPresence    ServiceUnitPresence[]
+  serviceUnitJoinRequests ServiceUnitJoinRequest[]
+  meetingSummariesAuthored ServiceUnitMeetingSummary[] @relation("MeetingSummaryAuthor")
+  parentLinks       ParentGuardianLink[] @relation("ParentMember")
+  childLinks        ParentGuardianLink[] @relation("ChildMember")
+  gamification           MemberGamification?
+  youthUserLevel         YouthUserLevel?
+  rideRequests      RideRequest[]
+  hubIdeas          HubIdea[]
+  hubIdeaMessages   HubIdeaMessage[]
+  youthHelpRequests YouthHelpRequest[]
+  youthPosts          YouthPost[]
+  youthComments       YouthComment[]
+  youthReactions      YouthReaction[]
+  youthMedia          YouthMedia[]
+  youthSermonClips    YouthSermonClip[]
+  youthQuestions      YouthQuestion[]
+  youthEventRsvps     YouthEventRsvp[]
+  youthPrayerRequests YouthPrayerRequest[]
+  youthPrayerSupports YouthPrayerSupport[]
+  youthPointLedgers   YouthPointLedger[]
+  youthMemberAchievements YouthMemberAchievement[]
+  youthChallengeProgress YouthChallengeProgress[]
+  youthChannelMemberships YouthChannelMember[]
+  youthMessageReactions YouthMessageReaction[]
+  youthDirectMessagesSent YouthDirectMessage[] @relation("DmSender")
+  youthDirectMessagesReceived YouthDirectMessage[] @relation("DmRecipient")
+  youthContentReports YouthContentReport[]
+  youthAttendance   YouthAttendance[]
+  businessProfile   BusinessProfile?
+  konnectEventRsvps KonnectEventRsvp[]
+  mentorLinks       MentorshipLink[]    @relation("MentorMember")
+  menteeLinks       MentorshipLink[]    @relation("MenteeMember")
+  hostedKonnectEvents KonnectNetworkingEvent[] @relation("KonnectEventHost")
+  outreachContacts  OutreachContact[]   @relation("EvangelistMember")
+  convertedFromOutreach OutreachContact[] @relation("OutreachConvertedMember")
+  communityHubPosts CommunityHubPost[]
+  communityHubComments CommunityHubComment[]
+  bio               String?
+  loungePresence    LoungePresence[]
+  devotionalGroupMemberships DevotionalGroupMember[]
+  devotionalJournals         DevotionalJournalEntry[]
+  devotionalPrayerLists      DevotionalPrayerList[]
+  devotionalStudyProgress    DevotionalStudyProgress[]
+  devotionalReminders        DevotionalReminder[]
+  devotionalReminderPreference DevotionalReminderPreference?
+  devotionalReminderDeliveries DevotionalReminderDelivery[]
+  devotionalMeetupRsvps      DevotionalMeetupAttendee[]
+  devotionalDiscussionPosts  DevotionalDiscussion[]
+  devotionalGroupsCreated    DevotionalGroup[]      @relation("DevotionalGroupCreator")
+  devotionalGroupsLed        DevotionalGroup[]      @relation("DevotionalGroupLeader")
+  devotionalGroupInvitesSent DevotionalGroupInvite[] @relation("DevotionalGroupInviteSender")
+  devotionalGroupInvitesReceived DevotionalGroupInvite[] @relation("DevotionalGroupInviteTarget")
+  devotionalJournalComments      DevotionalJournalComment[]
+  devotionalJournalReactions     DevotionalJournalReaction[]
+  devotionalJournalsPinned       DevotionalJournalEntry[] @relation("DevotionalJournalPinnedBy")
+  devotionalJournalsEdited       DevotionalJournalEntry[] @relation("DevotionalJournalLastEditedBy")
+  devotionalGroupInvitesMade DevotionalGroupMember[] @relation("DevotionalGroupInvitedBy")
+  devotionalMeetupsHosted    DevotionalMeetup[]     @relation("DevotionalMeetupHost")
+  devotionalMeetupsCreated   DevotionalMeetup[]     @relation("DevotionalMeetupCreator")
+  devotionalMeetupReminders  DevotionalMeetupReminder[]
+  devotionalActionPoints     DevotionalActionPoint[]
+  devotionalChallengesCreated DevotionalChallenge[] @relation("DevotionalChallengeCreator")
+  devotionalChallengeMemberships DevotionalChallengeMember[]
+  devotionalChallengeBadgesEarned DevotionalChallengeBadgeEarned[]
+  devotionalPrayerStreak         DevotionalPrayerStreak?
+  devotionalPrayerDailyLogs      DevotionalPrayerDailyLog[]
+  communitySupportRequests       CommunitySupportRequest[]
+  mentorApplications             MentorApplication[]
+  konnectMentorProfile           KonnectMentorProfile?
+  menteeMentorRequests           MenteeMentorRequest[]
+  activityLogs                   MemberActivityLog[]
+  classEnrollments               ClassEnrollment[]
+  attendanceRecords              AttendanceRecord[]
+  counselingCases                CounselingCase[]
+  carePrayerRequests             CarePrayerRequest[]
+  deptSchedulesAssigned          DeptSchedule[]       @relation("DeptScheduleAssignee")
+  deptAssignments                DeptAssignment[]     @relation("DeptAssignmentMember")
+  deptModuleReportsAuthored      DeptModuleReport[]   @relation("DeptReportAuthor")
+  deptResourcesAuthored          DeptResource[]       @relation("DeptResourceAuthor")
+  deptTasksAssigned              DeptTask[]           @relation("DeptTaskAssignee")
+  deptIncidentsReported          DeptIncident[]       @relation("DeptIncidentReporter")
+  deptIncidentsSubject           DeptIncident[]       @relation("DeptIncidentSubject")
+  deptMedicalTeamServed          DeptMedicalTeamAttendance[] @relation("DeptMedicalTeamMember")
+  deptMedicalTeamRecorded        DeptMedicalTeamAttendance[] @relation("DeptMedicalTeamRecorder")
+  deptMedicalRecoveryAuthored    DeptMedicalRecoveryLog[]    @relation("DeptMedicalRecoveryAuthor")
+  deptChildrenDutyTeaching       DeptChildrenDutyRoster[]    @relation("DeptChildrenTeacher")
+  deptChildrenDutyAssisting      DeptChildrenDutyRoster[]    @relation("DeptChildrenAssistant")
+  deptChildrenCurriculumAuthored DeptChildrenCurriculum[]    @relation("DeptChildrenCurriculumAuthor")
+  deptChildrenReportsAuthored    DeptChildrenClassReport[]   @relation("DeptChildrenReportTeacher")
+  deptCheckInsAsChild            DeptChildCheckIn[]   @relation("DeptCheckInChild")
+  deptCheckInsAsGuardian         DeptChildCheckIn[]   @relation("DeptCheckInGuardian")
+  deptPrayerAssignments          DeptPrayerItem[]     @relation("DeptPrayerAssignee")
+  deptPrayerBoardAssignments     DeptPrayerAssignment[] @relation("DeptPrayerBoardAssignee")
+  deptPrayerBoardRelated         DeptPrayerAssignment[] @relation("DeptPrayerBoardRelated")
+  deptPrayerIntakeSubmitted      DeptPrayerItem[]     @relation("DeptPrayerIntakeSubmitter")
+  deptPrayerIntakeRelated        DeptPrayerItem[]     @relation("DeptPrayerIntakeRelated")
+  deptPrayerScheduleAttendance   DeptPrayerScheduleAttendance[] @relation("DeptPrayerScheduleAttendee")
+  deptPrayerProgressAuthored     DeptPrayerProgressNote[] @relation("DeptPrayerProgressAuthor")
+  deptSkills                     DeptSkill[]          @relation("DeptSkillMember")
+  deptCertifications             DeptCertification[]  @relation("DeptCertificationMember")
+  deptProgressNotesAsChild       DeptProgressNote[]   @relation("DeptProgressChild")
+  deptProgressNotesAuthored      DeptProgressNote[]   @relation("DeptProgressAuthor")
+  deptPrayerChecklists           DeptPrayerChecklist[] @relation("DeptChecklistMember")
+  deptFollowUpsSubject           DeptFollowUpLog[]    @relation("DeptFollowUpSubject")
+  deptFollowUpsAuthored          DeptFollowUpLog[]    @relation("DeptFollowUpAuthor")
+  deptUnitFeedbacksAuthored      DeptUnitFeedback[]   @relation("DeptUnitFeedbackMember")
+  deptChoirRosterEntries         DeptChoirRosterEntry[] @relation("DeptChoirRosterMember")
+  deptChoirFeedback              DeptChoirSongFeedback[] @relation("DeptChoirFeedbackMember")
+  deptChoirAttendance            DeptChoirAttendance[] @relation("DeptChoirAttendanceMember")
+  deptChoirAuditions             DeptChoirAudition[]  @relation("DeptChoirAuditionMember")
+  deptChoirVoiceTasks            DeptChoirVoiceTask[] @relation("DeptChoirVoiceTaskMember")
+  deptChoirVocalNotes            DeptChoirVocalNote[] @relation("DeptChoirVocalNoteMember")
+  deptChoirVocalNotesAuthored    DeptChoirVocalNote[] @relation("DeptChoirVocalNoteAuthor")
+  membershipImportRows           MembershipImportJobRow[]
+  wisdom365KidsGrantsChild       Wisdom365KidsGrant[] @relation("Wisdom365KidsChild")
+  wisdom365KidsLicenseAssignments Wisdom365LicenseAssignment[] @relation("Wisdom365KidsChildMember")
+  cellBranchMembership           CellBranchMember?
+  cellPrayerRequests             CellPrayerRequest[]
+
+  @@index([churchId, status])
+  @@index([churchId, lastName, firstName])
+  @@map("members")
+}
+
+// ─── Follow-Up & Discipleship ────────────────────────────────
+
+enum FollowUpStage {
+  NEW_LEAD
+  CONTACTED
+  VISITED
+  ATTENDED
+  JOINED_GROUP
+}
+
+model FollowUp {
+  id           String        @id @default(uuid())
+  churchId     String
+  memberId     String?
+  contactName  String
+  contactPhone String?
+  contactEmail String?
+  stage        FollowUpStage @default(NEW_LEAD)
+  assignedToId String?
+  dueAt        DateTime?
+  completedAt  DateTime?
+  notes        String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  church     Church  @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member     Member? @relation(fields: [memberId], references: [id])
+  assignedTo User?   @relation("AssignedFollowUps", fields: [assignedToId], references: [id])
+  outreachContact OutreachContact?
+  reminders  FollowUpReminder[]
+  pastoralNotes PastoralNote[]
+  counselingCases CounselingCase[]
+  carePrayerRequests CarePrayerRequest[]
+  automationRuns FollowUpAutomationRun[]
+
+  @@index([churchId, stage])
+  @@index([assignedToId, dueAt])
+  @@map("follow_ups")
+}
+
+model FollowUpReminder {
+  id         String   @id @default(uuid())
+  followUpId String
+  remindAt   DateTime
+  sentAt     DateTime?
+  channel    String   @default("WHATSAPP")
+  message    String?
+
+  followUp FollowUp @relation(fields: [followUpId], references: [id], onDelete: Cascade)
+
+  @@map("follow_up_reminders")
+}
+
+model FollowUpTemplate {
+  id        String   @id @default(uuid())
+  churchId  String
+  name      String
+  channel   String
+  subject   String?
+  body      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@index([churchId, channel])
+  @@map("follow_up_templates")
+}
+
+model PastoralNote {
+  id             String   @id @default(uuid())
+  churchId       String
+  memberId       String?
+  followUpId     String?
+  authorId       String
+  content        String
+  isConfidential Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  church   Church    @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member   Member?   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  followUp FollowUp? @relation(fields: [followUpId], references: [id], onDelete: Cascade)
+  author   User      @relation("PastoralNoteAuthor", fields: [authorId], references: [id])
+
+  @@index([memberId])
+  @@index([followUpId])
+  @@map("pastoral_notes")
+}
+
+enum FollowUpAutomationTrigger {
+  NEW_LEAD
+  STAGE_ENTER
+  OVERDUE
+}
+
+model FollowUpAutomationRule {
+  id           String                  @id @default(uuid())
+  churchId     String
+  name         String
+  trigger      FollowUpAutomationTrigger
+  stage        FollowUpStage?
+  delayHours   Int                     @default(24)
+  channel      String                  @default("WHATSAPP")
+  message      String?
+  templateId   String?
+  notifyAssignee Boolean               @default(true)
+  isActive     Boolean                 @default(true)
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  runs   FollowUpAutomationRun[]
+
+  @@index([churchId, trigger, isActive])
+  @@map("follow_up_automation_rules")
+}
+
+model FollowUpAutomationRun {
+  id         String   @id @default(uuid())
+  ruleId     String
+  followUpId String
+  ranAt      DateTime @default(now())
+
+  rule     FollowUpAutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  followUp FollowUp             @relation(fields: [followUpId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleId, followUpId])
+  @@map("follow_up_automation_runs")
+}
+
+enum CounselingCaseStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum CounselingCategory {
+  COUNSELING
+  PRAYER
+  CRISIS
+  MARRIAGE
+  GRIEF
+  OTHER
+}
+
+model CounselingCase {
+  id             String               @id @default(uuid())
+  churchId       String
+  memberId       String?
+  followUpId     String?
+  title          String
+  category       CounselingCategory   @default(COUNSELING)
+  status         CounselingCaseStatus @default(OPEN)
+  assignedToId   String?
+  isConfidential Boolean              @default(true)
+  summary        String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  church       Church              @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member       Member?             @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  followUp     FollowUp?           @relation(fields: [followUpId], references: [id], onDelete: SetNull)
+  assignedTo   User?               @relation("CounselingAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  sessions     CounselingSession[]
+
+  @@index([churchId, status])
+  @@index([assignedToId])
+  @@map("counseling_cases")
+}
+
+model CounselingSession {
+  id          String    @id @default(uuid())
+  caseId      String
+  authorId    String
+  scheduledAt DateTime?
+  notes       String
+  outcome     String?
+  createdAt   DateTime  @default(now())
+
+  case   CounselingCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  author User           @relation("CounselingSessionAuthor", fields: [authorId], references: [id])
+
+  @@index([caseId, scheduledAt])
+  @@map("counseling_sessions")
+}
+
+enum CarePrayerStatus {
+  OPEN
+  PRAYING
+  ANSWERED
+  ARCHIVED
+}
+
+model CarePrayerRequest {
+  id             String           @id @default(uuid())
+  churchId       String
+  memberId       String?
+  followUpId     String?
+  title          String
+  details        String
+  status         CarePrayerStatus @default(OPEN)
+  assignedToId   String?
+  isAnonymous    Boolean          @default(false)
+  isConfidential Boolean          @default(true)
+  answeredAt     DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  church     Church    @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member     Member?   @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  followUp   FollowUp? @relation(fields: [followUpId], references: [id], onDelete: SetNull)
+  assignedTo User?     @relation("CarePrayerAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  @@index([churchId, status])
+  @@map("care_prayer_requests")
+}
+
+// ─── Evangelism & Outreach ───────────────────────────────────
+
+model EvangelistQrCode {
+  id         String   @id @default(uuid())
+  churchId   String
+  memberId   String
+  code       String   @unique
+  nfcUrl     String?
+  scanCount  Int      @default(0)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  church   Church            @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  contacts OutreachContact[]
+
+  @@map("evangelist_qr_codes")
+}
+
+enum OutreachConvertStage {
+  CAPTURED
+  CONTACTED
+  VISITED
+  READY_FOR_MEMBERSHIP
+  CONVERTED
+  ARCHIVED
+}
+
+model OutreachContact {
+  id            String   @id @default(uuid())
+  churchId      String
+  clientId      String?  @unique
+  evangelistId  String?
+  qrCodeId      String?
+  firstName     String
+  lastName      String?
+  phone         String?
+  email         String?
+  latitude      Float?
+  longitude     Float?
+  locationLabel String?
+  photoConsent  Boolean  @default(false)
+  photoUrl      String?
+  notes         String?
+  voiceNotes    String?
+  convertStage  OutreachConvertStage @default(CAPTURED)
+  needsBusPickup Boolean @default(false)
+  pickupAddress String?
+  busPickupNotes String?
+  followUpId    String?  @unique
+  memberId      String?
+  convertedAt   DateTime?
+  welcomeSentAt DateTime?
+  syncStatus    SyncStatus @default(SYNCED)
+  capturedAt    DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  church     Church            @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  evangelist Member?           @relation("EvangelistMember", fields: [evangelistId], references: [id])
+  qrCode     EvangelistQrCode? @relation(fields: [qrCodeId], references: [id])
+  followUp   FollowUp?         @relation(fields: [followUpId], references: [id], onDelete: SetNull)
+  member     Member?           @relation("OutreachConvertedMember", fields: [memberId], references: [id], onDelete: SetNull)
+  syncConflicts SyncConflict[]
+
+  @@index([churchId, capturedAt])
+  @@index([churchId, convertStage])
+  @@index([evangelistId])
+  @@map("outreach_contacts")
+}
+
+enum SyncStatus {
+  PENDING
+  SYNCING
+  SYNCED
+  CONFLICT
+  FAILED
+}
+
+model SyncQueueItem {
+  id         String     @id @default(uuid())
+  churchId   String
+  clientId   String
+  entityType String
+  payload    Json
+  status     SyncStatus @default(PENDING)
+  attempts   Int        @default(0)
+  lastError  String?
+  capturedAt DateTime
+  syncedAt   DateTime?
+  createdAt  DateTime   @default(now())
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@unique([churchId, clientId, entityType])
+  @@index([status, createdAt])
+  @@map("sync_queue_items")
+}
+
+enum SyncConflictStatus {
+  OPEN
+  RESOLVED
+}
+
+enum SyncConflictResolution {
+  CLIENT_WINS
+  SERVER_WINS
+  MERGED
+}
+
+model SyncConflict {
+  id                String                  @id @default(uuid())
+  churchId          String
+  clientId          String
+  entityType        String
+  outreachContactId String?
+  serverPayload     Json
+  clientPayload     Json
+  mergedPayload     Json?
+  status            SyncConflictStatus      @default(OPEN)
+  resolution        SyncConflictResolution?
+  resolvedByUserId  String?
+  resolvedAt        DateTime?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  church          Church           @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  outreachContact OutreachContact? @relation(fields: [outreachContactId], references: [id], onDelete: SetNull)
+
+  @@unique([churchId, clientId, entityType])
+  @@index([churchId, status])
+  @@map("sync_conflicts")
+}
+
+// ─── Youth Community Module — Phase 2 Prisma Schema ──────────
+// Deliverable map (docs/youth/PHASE2-SCHEMA.md):
+//   Post→YouthPost | Comment→YouthComment | Reaction→YouthReaction | Media→YouthMedia
+//   ChatChannel→ChatChannel | ChatMessage→Message | Event→YouthEvent | RSVP→YouthEventRsvp
+//   SermonClip→YouthSermonClip | PrayerRequest→YouthPrayerRequest | PrayerSupport→YouthPrayerSupport
+//   Question→YouthQuestion | Answer→YouthAnswer
+//   Badge→Badge | Achievement→YouthAchievement | PointLedger→YouthPointLedger
+//   Challenge→YouthChallenge | UserLevel→YouthUserLevel (+ MemberGamification)
+// ─── Youth Community ─────────────────────────────────────────
+
+model YouthGroup {
+  id          String   @id @default(uuid())
+  churchId    String
+  name        String
+  description String?
+  leaderId    String?
+  minAge      Int?
+  maxAge      Int?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  church   Church             @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  members   YouthGroupMember[]
+  events    YouthEvent[]
+  channels  ChatChannel[]
+  resources YouthResource[]
+  posts     YouthPost[]
+
+  @@map("youth_groups")
+}
+
+model YouthGroupMember {
+  id           String   @id @default(uuid())
+  youthGroupId String
+  memberId     String
+  joinedAt     DateTime @default(now())
+
+  youthGroup YouthGroup @relation(fields: [youthGroupId], references: [id], onDelete: Cascade)
+  member     Member     @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([youthGroupId, memberId])
+  @@map("youth_group_members")
+}
+
+model YouthEvent {
+  id           String   @id @default(uuid())
+  churchId     String
+  youthGroupId String?
+  busRouteId   String?
+  title        String
+  description  String?
+  location     String?
+  coverImageUrl String?
+  startsAt     DateTime
+  endsAt       DateTime?
+  maxAttendees Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  church     Church        @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  youthGroup YouthGroup?   @relation(fields: [youthGroupId], references: [id])
+  busRoute   BusRoute?     @relation(fields: [busRouteId], references: [id])
+  rsvps        YouthEventRsvp[]
+  attendance   YouthAttendance[]
+  media        YouthEventMedia[]
+  feedMedia    YouthMedia[]
+
+  @@index([churchId, startsAt])
+  @@map("youth_events")
+}
+
+model YouthEventMedia {
+  id        String   @id @default(uuid())
+  eventId   String
+  url       String
+  caption   String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  event YouthEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@map("youth_event_media")
+}
+
+model YouthEventRsvp {
+  id        String   @id @default(uuid())
+  eventId   String
+  memberId  String
+  status    String   @default("GOING")
+  visibility String  @default("PUBLIC")
+  createdAt DateTime @default(now())
+
+  event  YouthEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  member Member     @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, memberId])
+  @@index([eventId, status])
+  @@map("youth_event_rsvps")
+}
+
+model YouthAttendance {
+  id        String   @id @default(uuid())
+  eventId   String
+  memberId  String
+  checkedAt DateTime @default(now())
+
+  event  YouthEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  member Member     @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, memberId])
+  @@map("youth_attendance")
+}
+
+enum YouthResourceCategory {
+  DEVOTIONAL
+  VIDEO
+  GUIDE
+  EVENT_RECAP
+  SAFETY
+  WORSHIP
+}
+
+model YouthResource {
+  id           String                @id @default(uuid())
+  churchId     String
+  youthGroupId String?
+  title        String
+  description  String?
+  category     YouthResourceCategory   @default(GUIDE)
+  url          String?
+  content      String?
+  isPublished  Boolean               @default(true)
+  sortOrder    Int                   @default(0)
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  church     Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  youthGroup YouthGroup? @relation(fields: [youthGroupId], references: [id])
+
+  @@index([churchId, category])
+  @@map("youth_resources")
+}
+
+enum HelpRequestStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum HelpRequestCategory {
+  COUNSELING
+  BULLYING
+  FAITH
+  FAMILY
+  MENTAL_HEALTH
+  OTHER
+}
+
+model YouthHelpRequest {
+  id           String              @id @default(uuid())
+  churchId     String
+  memberId     String?
+  alias        String?
+  category     HelpRequestCategory @default(OTHER)
+  message      String
+  status       HelpRequestStatus   @default(OPEN)
+  isAnonymous  Boolean             @default(true)
+  assignedToId String?
+  resolvedAt   DateTime?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  church    Church              @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member    Member?             @relation(fields: [memberId], references: [id])
+  assignedTo User?              @relation("HelpAssignee", fields: [assignedToId], references: [id])
+  responses YouthHelpResponse[]
+
+  @@index([churchId, status])
+  @@map("youth_help_requests")
+}
+
+model YouthHelpResponse {
+  id         String   @id @default(uuid())
+  requestId  String
+  authorId   String
+  body       String
+  isInternal Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  request YouthHelpRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  author  User             @relation("HelpResponder", fields: [authorId], references: [id])
+
+  @@map("youth_help_responses")
+}
+
+// ─── 1. Feed (Post, Comment, Reaction, Media) ────────────────
+
+enum YouthPostStatus {
+  PUBLISHED
+  HIDDEN
+  FLAGGED
+  REMOVED
+}
+
+enum YouthMediaKind {
+  IMAGE
+  VIDEO
+  GIF
+}
+
+enum YouthReactionType {
+  LIKE
+  LOVE
+  AMEN
+  FIRE
+  SAVE
+}
+
+enum YouthReactionTarget {
+  POST
+  COMMENT
+  SERMON_CLIP
+}
+
+model YouthPost {
+  id              String          @id @default(uuid())
+  churchId        String
+  authorMemberId  String
+  youthGroupId    String?
+  content         String
+  hashtags        String[]        @default([])
+  reactionCount   Int             @default(0)
+  commentCount    Int             @default(0)
+  shareCount      Int             @default(0)
+  engagementScore Float           @default(0)
+  status          YouthPostStatus @default(PUBLISHED)
+  isYouthOnly     Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  church     Church              @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  author     Member              @relation(fields: [authorMemberId], references: [id], onDelete: Cascade)
+  youthGroup YouthGroup?         @relation(fields: [youthGroupId], references: [id])
+  media      YouthMedia[]
+  comments   YouthComment[]
+  reactions  YouthReaction[]
+  reports    YouthContentReport[]
+
+  @@index([churchId, createdAt])
+  @@index([churchId, engagementScore])
+  @@index([churchId, status])
+  @@map("youth_posts")
+}
+
+model YouthComment {
+  id             String   @id @default(uuid())
+  postId         String
+  authorMemberId String
+  parentId       String?
+  content        String
+  reactionCount  Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  post      YouthPost       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    Member          @relation(fields: [authorMemberId], references: [id], onDelete: Cascade)
+  parent    YouthComment?   @relation("CommentThread", fields: [parentId], references: [id])
+  replies   YouthComment[]  @relation("CommentThread")
+  reactions YouthReaction[]
+
+  @@index([postId, createdAt])
+  @@map("youth_comments")
+}
+
+model YouthReaction {
+  id         String              @id @default(uuid())
+  churchId   String
+  memberId   String
+  targetType YouthReactionTarget
+  reactionType YouthReactionType @default(LIKE)
+  postId     String?
+  commentId  String?
+  sermonClipId String?
+  createdAt  DateTime            @default(now())
+
+  church     Church        @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member     Member        @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  post       YouthPost?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment    YouthComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  sermonClip YouthSermonClip? @relation(fields: [sermonClipId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, postId, reactionType])
+  @@unique([memberId, commentId, reactionType])
+  @@unique([memberId, sermonClipId, reactionType])
+  @@index([churchId, targetType])
+  @@map("youth_reactions")
+}
+
+model YouthMedia {
+  id               String         @id @default(uuid())
+  churchId         String
+  postId           String?
+  eventId          String?
+  uploaderMemberId String
+  url              String
+  thumbnailUrl     String?
+  mimeType         String?
+  kind             YouthMediaKind @default(IMAGE)
+  sortOrder        Int            @default(0)
+  width            Int?
+  height           Int?
+  durationSec      Int?
+  createdAt        DateTime       @default(now())
+
+  church   Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  post     YouthPost?  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  event    YouthEvent? @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  uploader Member    @relation(fields: [uploaderMemberId], references: [id], onDelete: Cascade)
+
+  @@index([postId, sortOrder])
+  @@index([eventId, sortOrder])
+  @@map("youth_media")
+}
+
+enum ContentReportStatus {
+  OPEN
+  REVIEWED
+  ACTIONED
+  DISMISSED
+}
+
+model YouthContentReport {
+  id               String              @id @default(uuid())
+  churchId         String
+  reporterMemberId String
+  postId           String?
+  messageId        String?
+  sermonClipId     String?
+  reason           String
+  status           ContentReportStatus @default(OPEN)
+  createdAt        DateTime            @default(now())
+
+  church   Church          @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  reporter Member          @relation(fields: [reporterMemberId], references: [id], onDelete: Cascade)
+  post     YouthPost?      @relation(fields: [postId], references: [id], onDelete: SetNull)
+
+  @@index([churchId, status])
+  @@map("youth_content_reports")
+}
+
+model YouthDirectMessage {
+  id                String    @id @default(uuid())
+  churchId          String
+  senderMemberId    String
+  recipientMemberId String
+  content           String
+  readAt            DateTime?
+  createdAt         DateTime  @default(now())
+
+  sender    Member @relation("DmSender", fields: [senderMemberId], references: [id], onDelete: Cascade)
+  recipient Member @relation("DmRecipient", fields: [recipientMemberId], references: [id], onDelete: Cascade)
+
+  @@index([recipientMemberId, readAt])
+  @@map("youth_direct_messages")
+}
+
+// ─── 5. SermonClip (short-form vertical video) ───────────────
+
+enum YouthSermonClipCategory {
+  FAITH
+  RELATIONSHIPS
+  MOTIVATION
+  WORSHIP
+  OTHER
+}
+
+model YouthSermonClip {
+  id             String                  @id @default(uuid())
+  churchId       String
+  authorMemberId String?
+  title          String
+  videoUrl       String
+  thumbnailUrl   String?
+  category       YouthSermonClipCategory @default(FAITH)
+  durationSec    Int?
+  reactionCount  Int                     @default(0)
+  viewCount      Int                     @default(0)
+  isPublished    Boolean                 @default(true)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  church    Church          @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  author    Member?         @relation(fields: [authorMemberId], references: [id])
+  reactions YouthReaction[]
+
+  @@index([churchId, createdAt])
+  @@index([churchId, category])
+  @@map("youth_sermon_clips")
+}
+
+// ─── 6. Q&A (Question, Answer) ───────────────────────────────
+
+enum YouthQuestionCategory {
+  FAITH
+  LIFE
+  RELATIONSHIPS
+  SCHOOL
+  OTHER
+}
+
+enum YouthQuestionStatus {
+  OPEN
+  ASSIGNED
+  ANSWERED
+  PUBLIC
+  HIDDEN
+}
+
+model YouthQuestion {
+  id             String                @id @default(uuid())
+  churchId       String
+  memberId       String?
+  alias          String?
+  category       YouthQuestionCategory @default(OTHER)
+  question       String
+  isAnonymous    Boolean               @default(true)
+  status         YouthQuestionStatus   @default(OPEN)
+  assignedToId   String?
+  isPublicAnswer Boolean               @default(false)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  church     Church                @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member     Member?               @relation(fields: [memberId], references: [id])
+  assignedTo User?                 @relation("YouthQuestionAssignee", fields: [assignedToId], references: [id])
+  answers    YouthAnswer[]
+
+  @@index([churchId, status])
+  @@map("youth_questions")
+}
+
+model YouthAnswer {
+  id         String   @id @default(uuid())
+  questionId String
+  authorId   String
+  body       String
+  isPublic   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  question YouthQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  author   User          @relation("YouthAnswerAuthor", fields: [authorId], references: [id])
+
+  @@index([questionId, createdAt])
+  @@map("youth_answers")
+}
+
+// ─── 7. Prayer Wall (PrayerRequest, PrayerSupport) ─────────
+
+enum YouthPrayerCategory {
+  HEALTH
+  FAMILY
+  SCHOOL
+  GUIDANCE
+  THANKSGIVING
+  OTHER
+}
+
+enum YouthPrayerSupportType {
+  PRAY
+  ENCOURAGEMENT
+}
+
+model YouthPrayerRequest {
+  id             String              @id @default(uuid())
+  churchId       String
+  memberId       String?
+  alias          String?
+  category       YouthPrayerCategory @default(OTHER)
+  content        String
+  isAnonymous    Boolean             @default(true)
+  prayCount      Int                 @default(0)
+  allowComments  Boolean             @default(true)
+  status         String              @default("ACTIVE")
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  church   Church              @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member   Member?             @relation(fields: [memberId], references: [id])
+  supports YouthPrayerSupport[]
+
+  @@index([churchId, createdAt])
+  @@index([churchId, status])
+  @@map("youth_prayer_requests")
+}
+
+model YouthPrayerSupport {
+  id        String                 @id @default(uuid())
+  prayerId  String
+  memberId  String
+  supportType YouthPrayerSupportType
+  body      String?
+  createdAt DateTime               @default(now())
+
+  prayer YouthPrayerRequest @relation(fields: [prayerId], references: [id], onDelete: Cascade)
+  member Member             @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([prayerId, memberId, supportType])
+  @@index([prayerId, supportType])
+  @@map("youth_prayer_supports")
+}
+
+// ─── 4. Gamification (Badge, Achievement, PointLedger, Challenge, UserLevel) ─
+
+enum YouthPointSource {
+  ATTENDANCE
+  RSVP
+  POST
+  COMMENT
+  REACTION
+  CHALLENGE
+  DEVOTIONAL
+  INVITE
+  SERVE
+  MANUAL
+  REDEMPTION
+}
+
+model YouthUserLevel {
+  memberId       String   @id
+  level          Int      @default(1)
+  xp             Int      @default(0)
+  xpToNextLevel  Int      @default(100)
+  tierTitle      String   @default("Spark")
+  updatedAt      DateTime @updatedAt
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@map("youth_user_levels")
+}
+
+model YouthPointLedger {
+  id           String           @id @default(uuid())
+  churchId     String
+  memberId     String
+  delta        Int
+  balanceAfter Int
+  reason       String
+  source       YouthPointSource
+  sourceId     String?
+  createdAt    DateTime         @default(now())
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId, createdAt])
+  @@index([churchId, source])
+  @@map("youth_point_ledger")
+}
+
+model YouthAchievement {
+  id           String   @id @default(uuid())
+  churchId     String
+  key          String
+  name         String
+  description  String?
+  iconUrl      String?
+  badgeId      String?
+  pointsAward  Int      @default(0)
+  criteria     Json     @default("{}")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  church   Church                  @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  badge    Badge?                  @relation(fields: [badgeId], references: [id])
+  members  YouthMemberAchievement[]
+
+  @@unique([churchId, key])
+  @@map("youth_achievements")
+}
+
+model YouthMemberAchievement {
+  memberId      String
+  achievementId String
+  unlockedAt    DateTime @default(now())
+
+  member      Member           @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  achievement YouthAchievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@id([memberId, achievementId])
+  @@map("youth_member_achievements")
+}
+
+model YouthChallenge {
+  id            String   @id @default(uuid())
+  churchId      String
+  title         String
+  description   String?
+  points        Int      @default(25)
+  challengeType String   @default("CUSTOM")
+  targetCount   Int      @default(1)
+  isActive      Boolean  @default(true)
+  startsAt      DateTime?
+  endsAt        DateTime?
+  createdAt     DateTime @default(now())
+
+  church   Church                   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  progress YouthChallengeProgress[]
+
+  @@index([churchId, isActive])
+  @@map("youth_challenges")
+}
+
+model YouthChallengeProgress {
+  memberId    String
+  challengeId String
+  progress    Int       @default(0)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  member    Member         @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  challenge YouthChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  @@id([memberId, challengeId])
+  @@map("youth_challenge_progress")
+}
+
+model YouthReward {
+  id          String   @id @default(uuid())
+  churchId    String
+  title       String
+  description String?
+  pointsCost  Int
+  stock       Int?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@map("youth_rewards")
+}
+
+// ─── Service Unit Hub ────────────────────────────────────────
+
+enum DepartmentCode {
+  USHERING
+  CHOIR
+  EVANGELISM
+  YOUTH
+  TEENS
+  CHILDREN
+  PROTOCOL
+  PRAYER
+  MEDIA
+  MEDICAL
+  OTHER
+}
+
+model ServiceUnit {
+  id             String          @id @default(uuid())
+  churchId       String
+  name           String
+  description    String?
+  activities     String?
+  imageUrl       String?
+  departmentCode DepartmentCode?
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  church    Church                 @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  members   ServiceUnitMember[]
+  leaders   ServiceUnitLeader[]
+  meetings  ServiceUnitMeeting[]
+  meetingSummaries ServiceUnitMeetingSummary[]
+  posts     ServiceUnitPost[]
+  presence  ServiceUnitPresence[]
+  joinRequests ServiceUnitJoinRequest[]
+  emailTemplates ServiceUnitEmailTemplate[]
+  chatChannels ChatChannel[]
+  attendanceRecords AttendanceRecord[]
+  communicationQueueItems CommunicationQueueItem[]
+  weeklyReports ServiceUnitWeeklyReport[]
+  deptSchedules       DeptSchedule[]
+  deptAssignments     DeptAssignment[]
+  deptModuleReports   DeptModuleReport[]
+  deptInventoryItems  DeptInventoryItem[]
+  deptResources       DeptResource[]
+  deptTasks           DeptTask[]
+  deptIncidents       DeptIncident[]
+  deptMedicalTeamAttendance DeptMedicalTeamAttendance[]
+  deptChildrenDutyRosters DeptChildrenDutyRoster[]
+  deptChildrenCurriculum  DeptChildrenCurriculum[]
+  deptChildrenClassReports DeptChildrenClassReport[]
+  deptChildCheckIns   DeptChildCheckIn[]
+  deptPrayerItems     DeptPrayerItem[]
+  deptPrayerAssignments DeptPrayerAssignment[]
+  deptPrayerScheduleSessions DeptPrayerScheduleSession[]
+  deptPrayerProgressNotes DeptPrayerProgressNote[]
+  deptPrayerScriptureGuides DeptPrayerScriptureGuide[]
+  deptSkills          DeptSkill[]
+  deptChoirSongs      DeptChoirSong[]
+  deptChoirRosterEntries DeptChoirRosterEntry[]
+  deptChoirSetlists   DeptChoirSetlist[]
+  deptChoirSongFeedback DeptChoirSongFeedback[]
+  deptChoirAttendance DeptChoirAttendance[]
+  deptChoirAuditions  DeptChoirAudition[]
+  deptChoirVoiceTasks DeptChoirVoiceTask[]
+  deptChoirVocalNotes DeptChoirVocalNote[]
+  deptCertifications  DeptCertification[]
+  deptProgressNotes   DeptProgressNote[]
+  deptPrayerChecklists DeptPrayerChecklist[]
+  deptFollowUpLogs    DeptFollowUpLog[]
+  deptUnitFeedbacks   DeptUnitFeedback[]
+
+  @@index([churchId, isActive])
+  @@index([churchId, departmentCode])
+  @@map("service_units")
+}
+
+model ServiceUnitWeeklyReport {
+  id            String   @id @default(uuid())
+  churchId      String
+  serviceUnitId String
+  weekStart     DateTime
+  body          String
+  stats         Json     @default("{}")
+  emailedAt     DateTime?
+  createdAt     DateTime @default(now())
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceUnitId, weekStart])
+  @@index([churchId, weekStart])
+  @@map("service_unit_weekly_reports")
+}
+
+model ServiceUnitMember {
+  id            String   @id @default(uuid())
+  serviceUnitId String
+  memberId      String
+  joinedAt      DateTime @default(now())
+
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  member      Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceUnitId, memberId])
+  @@map("service_unit_members")
+}
+
+model ServiceUnitLeader {
+  id            String   @id @default(uuid())
+  serviceUnitId String
+  memberId      String
+  role          String   @default("LEADER")
+  isModerator   Boolean  @default(true)
+  isUnitAdmin   Boolean  @default(false)
+  assignedAt    DateTime @default(now())
+
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  member      Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceUnitId, memberId])
+  @@map("service_unit_leaders")
+}
+
+enum ServiceUnitJoinStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model ServiceUnitJoinRequest {
+  id            String                @id @default(uuid())
+  churchId      String
+  serviceUnitId String
+  memberId      String?
+  requesterUserId String?
+  firstName     String
+  lastName      String
+  email         String?
+  phone         String?
+  motivation    String?
+  status        ServiceUnitJoinStatus @default(PENDING)
+  reviewedById  String?
+  reviewedAt    DateTime?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  member      Member?     @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  reviewer    User?       @relation("ServiceUnitJoinReviewer", fields: [reviewedById], references: [id])
+
+  @@index([serviceUnitId, status])
+  @@map("service_unit_join_requests")
+}
+
+model ServiceUnitMeetingSummary {
+  id            String    @id @default(uuid())
+  serviceUnitId String
+  churchId      String
+  meetingId     String?
+  title         String
+  body          String
+  meetingDate   DateTime?
+  authorId      String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  serviceUnit ServiceUnit         @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  church      Church              @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  meeting     ServiceUnitMeeting? @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+  author      Member              @relation("MeetingSummaryAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([serviceUnitId, meetingDate])
+  @@map("service_unit_meeting_summaries")
+}
+
+model ServiceUnitMeeting {
+  id            String    @id @default(uuid())
+  serviceUnitId String
+  churchId      String
+  title         String
+  description   String?
+  location      String?
+  startsAt      DateTime
+  endsAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  summaries   ServiceUnitMeetingSummary[]
+
+  @@index([serviceUnitId, startsAt])
+  @@map("service_unit_meetings")
+}
+
+model ServiceUnitPost {
+  id            String   @id @default(uuid())
+  serviceUnitId String
+  authorId      String
+  title         String?
+  body          String
+  isPinned      Boolean  @default(false)
+  isLocked      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  serviceUnit ServiceUnit            @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  author      Member                 @relation("ServiceUnitPostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  replies     ServiceUnitPostReply[]
+
+  @@index([serviceUnitId, createdAt])
+  @@map("service_unit_posts")
+}
+
+model ServiceUnitPostReply {
+  id        String   @id @default(uuid())
+  postId    String
+  authorId  String
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  post   ServiceUnitPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author Member          @relation("ServiceUnitReplyAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@map("service_unit_post_replies")
+}
+
+model ServiceUnitPresence {
+  id            String   @id @default(uuid())
+  serviceUnitId String
+  memberId      String
+  lastSeenAt    DateTime @default(now())
+  isOnline      Boolean  @default(true)
+
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  member      Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceUnitId, memberId])
+  @@map("service_unit_presence")
+}
+
+// ─── Department feature modules (Medical, Media, Children, Choir, Prayer) ───
+
+enum DeptScheduleType {
+  VOLUNTEER_SHIFT
+  SERVICE_DUTY
+  REHEARSAL
+  VIGIL
+  TRAINING
+  TEACHING
+  MEDIA_PRODUCTION
+  EMERGENCY_STANDBY
+}
+
+enum DeptAssignmentStatus {
+  OPEN
+  ASSIGNED
+  COMPLETED
+  CANCELLED
+}
+
+enum DeptTaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum DeptPrayerItemStatus {
+  NEW
+  ASSIGNED
+  IN_PROGRESS
+  ANSWERED
+}
+
+enum PrayerBurdenType {
+  WEEKLY_BURDEN
+  CHURCH_WIDE
+  MEMBER_NEED
+}
+
+enum PrayerConfidentiality {
+  PUBLIC
+  LEADERS_ONLY
+  PASTORS_ONLY
+  INTERCESSORS_ONLY
+}
+
+enum PrayerIntakeCategory {
+  URGENT
+  HEALING
+  FAMILY
+  FINANCIAL
+  SALVATION
+  THANKSGIVING
+  OTHER
+}
+
+enum PrayerScheduleType {
+  MIDNIGHT_CHAIN
+  DAILY_WATCH
+  WEEKLY_MEETING
+}
+
+enum DeptReportCategory {
+  WEEKLY_COVERAGE
+  INCIDENT_SUMMARY
+  VOLUNTEER_AVAILABILITY
+  SERVICE_COVERAGE
+  EQUIPMENT_STATUS
+  PRODUCTION_BACKLOG
+  WEEKLY_ATTENDANCE
+  TEACHER_PERFORMANCE
+  CHILD_ENGAGEMENT
+  REHEARSAL_PARTICIPATION
+  SERVICE_PERFORMANCE
+  VOCAL_ATTENDANCE
+  PRAYER_REQUEST_STATUS
+  INTERCESSOR_ACTIVITY
+  PRAYER_MEETING_ATTENDANCE
+  GENERAL
+}
+
+model DeptSchedule {
+  id               String           @id @default(uuid())
+  churchId         String
+  serviceUnitId    String
+  type             DeptScheduleType
+  title            String
+  description      String?
+  location         String?
+  startsAt         DateTime
+  endsAt           DateTime?
+  assignedMemberId String?
+  metadata         Json             @default("{}")
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  church         Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit    ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  assignedMember Member?     @relation("DeptScheduleAssignee", fields: [assignedMemberId], references: [id], onDelete: SetNull)
+
+  @@index([serviceUnitId, startsAt])
+  @@map("dept_schedules")
+}
+
+model DeptAssignment {
+  id            String               @id @default(uuid())
+  churchId      String
+  serviceUnitId String
+  title         String
+  role          String?
+  memberId      String?
+  dueAt         DateTime?
+  status        DeptAssignmentStatus @default(OPEN)
+  metadata      Json                 @default("{}")
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  member      Member?     @relation("DeptAssignmentMember", fields: [memberId], references: [id], onDelete: SetNull)
+
+  @@index([serviceUnitId, status])
+  @@map("dept_assignments")
+}
+
+model DeptModuleReport {
+  id            String             @id @default(uuid())
+  churchId      String
+  serviceUnitId String
+  category      DeptReportCategory @default(GENERAL)
+  title         String
+  body          String
+  stats         Json               @default("{}")
+  authorId      String
+  submittedAt   DateTime           @default(now())
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  author      Member      @relation("DeptReportAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([serviceUnitId, submittedAt])
+  @@map("dept_module_reports")
+}
+
+model DeptInventoryItem {
+  id            String    @id @default(uuid())
+  churchId      String
+  serviceUnitId String
+  name          String
+  quantity      Int       @default(0)
+  minQuantity   Int?
+  expiryDate    DateTime?
+  location      String?
+  category      String?
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+
+  @@index([serviceUnitId])
+  @@map("dept_inventory_items")
+}
+
+model DeptResource {
+  id            String   @id @default(uuid())
+  churchId      String
+  serviceUnitId String
+  category      String
+  title         String
+  fileUrl       String?
+  body          String?
+  tags          Json     @default("[]")
+  authorId      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  author      Member?     @relation("DeptResourceAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([serviceUnitId, category])
+  @@map("dept_resources")
+}
+
+model DeptTask {
+  id            String         @id @default(uuid())
+  churchId      String
+  serviceUnitId String
+  title         String
+  status        DeptTaskStatus @default(TODO)
+  column        String         @default("backlog")
+  sortOrder     Int            @default(0)
+  assigneeId    String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  assignee    Member?     @relation("DeptTaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  @@index([serviceUnitId, column, sortOrder])
+  @@map("dept_tasks")
+}
+
+enum MedicalIncidentCategory {
+  DIZZINESS
+  FAINTING
+  INJURY
+  ASTHMA_CRISIS
+  ALLERGIC_REACTION
+  CHEST_PAIN
+  SEIZURE
+  HYPERTENSION
+  NAUSEA
+  OTHER
+}
+
+enum MedicalRecoveryStatus {
+  NOT_APPLICABLE
+  MONITORING
+  IMPROVING
+  STABLE
+  RECOVERED
+  CRITICAL
+}
+
+model DeptIncident {
+  id                 String                  @id @default(uuid())
+  churchId           String
+  serviceUnitId      String
+  reporterId         String
+  subjectMemberId    String?
+  title              String
+  description        String
+  category           MedicalIncidentCategory @default(OTHER)
+  severity           String                  @default("LOW")
+  followUpRequired   Boolean                 @default(false)
+  recoveryStatus     MedicalRecoveryStatus   @default(NOT_APPLICABLE)
+  prayerTeamRequested Boolean                @default(false)
+  leadershipNotifiedAt DateTime?
+  occurredAt         DateTime
+  resolvedAt         DateTime?
+  recoveryUpdatedAt  DateTime?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  church         Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit    ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  reporter       Member      @relation("DeptIncidentReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  subjectMember  Member?     @relation("DeptIncidentSubject", fields: [subjectMemberId], references: [id], onDelete: SetNull)
+  recoveryLogs   DeptMedicalRecoveryLog[]
+
+  @@index([serviceUnitId, occurredAt])
+  @@index([churchId, category])
+  @@index([subjectMemberId])
+  @@map("dept_incidents")
+}
+
+model DeptMedicalTeamAttendance {
+  id              String   @id @default(uuid())
+  churchId        String
+  serviceUnitId   String
+  memberId        String
+  serviceDate     DateTime
+  role            String?
+  notes           String?
+  recordedById    String
+  createdAt       DateTime @default(now())
+
+  church       Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit  ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  member       Member      @relation("DeptMedicalTeamMember", fields: [memberId], references: [id], onDelete: Cascade)
+  recordedBy   Member      @relation("DeptMedicalTeamRecorder", fields: [recordedById], references: [id], onDelete: Cascade)
+
+  @@unique([serviceUnitId, memberId, serviceDate])
+  @@index([serviceUnitId, serviceDate])
+  @@map("dept_medical_team_attendance")
+}
+
+model DeptMedicalRecoveryLog {
+  id          String                @id @default(uuid())
+  incidentId  String
+  status      MedicalRecoveryStatus
+  note        String?
+  authorId    String
+  createdAt   DateTime              @default(now())
+
+  incident DeptIncident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  author   Member       @relation("DeptMedicalRecoveryAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([incidentId, createdAt])
+  @@map("dept_medical_recovery_logs")
+}
+
+model DeptChildCheckIn {
+  id               String    @id @default(uuid())
+  churchId         String
+  serviceUnitId    String
+  childMemberId    String
+  guardianMemberId String?
+  classGroup       String?
+  checkedInAt      DateTime  @default(now())
+  checkedOutAt     DateTime?
+  notes            String?
+  createdAt        DateTime  @default(now())
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  child       Member      @relation("DeptCheckInChild", fields: [childMemberId], references: [id], onDelete: Cascade)
+  guardian    Member?     @relation("DeptCheckInGuardian", fields: [guardianMemberId], references: [id], onDelete: SetNull)
+
+  @@index([serviceUnitId, checkedInAt])
+  @@map("dept_child_check_ins")
+}
+
+enum ChildrenClassGroup {
+  AGES_3_5
+  AGES_6_9
+  AGES_10_12
+}
+
+enum ChildrenCurriculumSource {
+  OFFICIAL_WEEKLY
+  CUSTOM_UPLOAD
+}
+
+model DeptChildrenDutyRoster {
+  id                String             @id @default(uuid())
+  churchId          String
+  serviceUnitId     String
+  weekStart         DateTime
+  classGroup        ChildrenClassGroup
+  teacherMemberId   String
+  assistantMemberId String?
+  notes             String?
+  reminderSentAt    DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  church          Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit     ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  teacher         Member      @relation("DeptChildrenTeacher", fields: [teacherMemberId], references: [id], onDelete: Cascade)
+  assistant       Member?     @relation("DeptChildrenAssistant", fields: [assistantMemberId], references: [id], onDelete: SetNull)
+
+  @@unique([serviceUnitId, weekStart, classGroup])
+  @@index([serviceUnitId, weekStart])
+  @@map("dept_children_duty_rosters")
+}
+
+model DeptChildrenCurriculum {
+  id               String                   @id @default(uuid())
+  churchId         String
+  serviceUnitId    String
+  weekStart        DateTime?
+  title            String
+  fileUrl          String?
+  body             String?
+  source           ChildrenCurriculumSource @default(CUSTOM_UPLOAD)
+  targetClassGroup ChildrenClassGroup?
+  simplifiedLesson String?
+  authorId         String?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  author      Member?     @relation("DeptChildrenCurriculumAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  reports     DeptChildrenClassReport[]
+
+  @@index([serviceUnitId, weekStart])
+  @@index([serviceUnitId, source])
+  @@map("dept_children_curriculum")
+}
+
+model DeptChildrenClassReport {
+  id                   String             @id @default(uuid())
+  churchId             String
+  serviceUnitId        String
+  classGroup           ChildrenClassGroup
+  serviceDate          DateTime
+  teacherMemberId      String
+  curriculumId         String?
+  lessonTaught         String
+  behaviorNotes        String?
+  attentionNotes       String?
+  escalatePastoralCare Boolean            @default(false)
+  pastoralNotifiedAt   DateTime?
+  createdAt            DateTime           @default(now())
+
+  church       Church                  @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit  ServiceUnit             @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  teacher      Member                  @relation("DeptChildrenReportTeacher", fields: [teacherMemberId], references: [id], onDelete: Cascade)
+  curriculum   DeptChildrenCurriculum? @relation(fields: [curriculumId], references: [id], onDelete: SetNull)
+
+  @@index([serviceUnitId, serviceDate])
+  @@map("dept_children_class_reports")
+}
+
+model DeptPrayerItem {
+  id                  String               @id @default(uuid())
+  churchId            String
+  serviceUnitId       String
+  requesterName       String?
+  content             String
+  status              DeptPrayerItemStatus @default(NEW)
+  assignedMemberId    String?
+  isAnonymous         Boolean              @default(false)
+  isAnswered          Boolean              @default(false)
+  answeredAt          DateTime?
+  answeredNote        String?
+  intakeCategory      PrayerIntakeCategory?
+  confidentiality     PrayerConfidentiality @default(LEADERS_ONLY)
+  submittedByMemberId String?
+  relatedMemberId     String?
+  escalatedToPastorAt DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  church            Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit       ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  assignedMember    Member?     @relation("DeptPrayerAssignee", fields: [assignedMemberId], references: [id], onDelete: SetNull)
+  submittedByMember Member?     @relation("DeptPrayerIntakeSubmitter", fields: [submittedByMemberId], references: [id], onDelete: SetNull)
+  relatedMember     Member?     @relation("DeptPrayerIntakeRelated", fields: [relatedMemberId], references: [id], onDelete: SetNull)
+  progressNotes     DeptPrayerProgressNote[]
+
+  @@index([serviceUnitId, status])
+  @@index([serviceUnitId, intakeCategory])
+  @@map("dept_prayer_items")
+}
+
+model DeptPrayerAssignment {
+  id               String                @id @default(uuid())
+  churchId         String
+  serviceUnitId    String
+  weekStart        DateTime
+  burdenType       PrayerBurdenType
+  confidentiality  PrayerConfidentiality @default(LEADERS_ONLY)
+  title            String
+  content          String
+  relatedMemberId  String?
+  assignedMemberId String?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  church         Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit    ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  relatedMember  Member?     @relation("DeptPrayerBoardRelated", fields: [relatedMemberId], references: [id], onDelete: SetNull)
+  assignedMember Member?     @relation("DeptPrayerBoardAssignee", fields: [assignedMemberId], references: [id], onDelete: SetNull)
+  progressNotes  DeptPrayerProgressNote[]
+
+  @@index([serviceUnitId, weekStart])
+  @@index([serviceUnitId, burdenType])
+  @@map("dept_prayer_assignments")
+}
+
+model DeptPrayerScheduleSession {
+  id            String             @id @default(uuid())
+  churchId      String
+  serviceUnitId String
+  eventType     PrayerScheduleType
+  title         String?
+  startsAt      DateTime
+  endsAt        DateTime?
+  notes         String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  church      Church                       @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit                  @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  attendance  DeptPrayerScheduleAttendance[]
+
+  @@index([serviceUnitId, startsAt])
+  @@map("dept_prayer_schedule_sessions")
+}
+
+model DeptPrayerScheduleAttendance {
+  id        String   @id @default(uuid())
+  sessionId String
+  memberId  String
+  attended  Boolean  @default(true)
+  notes     String?
+  createdAt DateTime @default(now())
+
+  session DeptPrayerScheduleSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  member  Member                    @relation("DeptPrayerScheduleAttendee", fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, memberId])
+  @@map("dept_prayer_schedule_attendance")
+}
+
+model DeptPrayerProgressNote {
+  id           String                @id @default(uuid())
+  churchId     String
+  serviceUnitId String
+  prayerItemId String?
+  assignmentId String?
+  authorId     String
+  body         String
+  statusAfter  DeptPrayerItemStatus?
+  createdAt    DateTime              @default(now())
+
+  church      Church                @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit           @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  prayerItem  DeptPrayerItem?       @relation(fields: [prayerItemId], references: [id], onDelete: Cascade)
+  assignment  DeptPrayerAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  author      Member                @relation("DeptPrayerProgressAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([prayerItemId])
+  @@index([assignmentId])
+  @@map("dept_prayer_progress_notes")
+}
+
+model DeptPrayerScriptureGuide {
+  id            String   @id @default(uuid())
+  churchId      String
+  serviceUnitId String
+  serviceDate   DateTime
+  scriptureRef  String
+  prayerPoints  String
+  devotionTieIn String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceUnitId, serviceDate])
+  @@map("dept_prayer_scripture_guides")
+}
+
+model DeptSkill {
+  id            String   @id @default(uuid())
+  churchId      String
+  serviceUnitId String
+  memberId      String
+  skill         String
+  level         String?
+  createdAt     DateTime @default(now())
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  member      Member      @relation("DeptSkillMember", fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceUnitId, memberId, skill])
+  @@map("dept_skills")
+}
+
+enum ChoirVoicePart {
+  SOPRANO
+  TENOR
+  ALTO
+  BASS
+}
+
+enum ChoirRosterEventType {
+  SUNDAY_MINISTRY
+  MIDWEEK_REHEARSAL
+}
+
+enum ChoirAttendanceEventType {
+  REHEARSAL
+  SUNDAY_MINISTRY
+}
+
+enum ChoirAuditionStatus {
+  SCHEDULED
+  PASSED
+  DEFERRED
+  DECLINED
+}
+
+model DeptChoirSong {
+  id              String   @id @default(uuid())
+  churchId        String
+  serviceUnitId   String
+  title           String
+  musicalKey      String?
+  tempoBpm        Int?
+  vocalParts      Json     @default("{}")
+  lyrics          String?
+  recordingUrl    String?
+  audioSampleUrl  String?
+  sheetUrl        String?
+  chordChart      String?
+  practiceTrackUrl String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  church       Church                @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit  ServiceUnit           @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  setlistItems DeptChoirSetlistItem[]
+  feedback     DeptChoirSongFeedback[]
+
+  @@index([serviceUnitId])
+  @@map("dept_choir_songs")
+}
+
+model DeptChoirRosterEntry {
+  id             String               @id @default(uuid())
+  churchId       String
+  serviceUnitId  String
+  eventType      ChoirRosterEventType
+  startsAt       DateTime
+  voicePart      ChoirVoicePart
+  memberId       String
+  notes          String?
+  reminderSentAt DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  member      Member      @relation("DeptChoirRosterMember", fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([serviceUnitId, startsAt])
+  @@index([serviceUnitId, eventType])
+  @@map("dept_choir_roster_entries")
+}
+
+model DeptChoirSetlist {
+  id            String   @id @default(uuid())
+  churchId      String
+  serviceUnitId String
+  title         String
+  serviceDate   DateTime
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  church      Church                 @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit            @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  items       DeptChoirSetlistItem[]
+  feedback    DeptChoirSongFeedback[]
+
+  @@index([serviceUnitId, serviceDate])
+  @@map("dept_choir_setlists")
+}
+
+model DeptChoirSetlistItem {
+  id         String   @id @default(uuid())
+  setlistId  String
+  songId     String
+  sortOrder  Int      @default(0)
+  musicalKey String?
+  tempoBpm   Int?
+  notes      String?
+
+  setlist DeptChoirSetlist @relation(fields: [setlistId], references: [id], onDelete: Cascade)
+  song    DeptChoirSong    @relation(fields: [songId], references: [id], onDelete: Cascade)
+
+  @@unique([setlistId, songId])
+  @@index([setlistId, sortOrder])
+  @@map("dept_choir_setlist_items")
+}
+
+model DeptChoirSongFeedback {
+  id              String   @id @default(uuid())
+  churchId        String
+  serviceUnitId   String
+  songId          String
+  setlistId       String?
+  memberId        String
+  rating          Int?
+  difficultyScore Int?
+  comment         String?
+  createdAt       DateTime @default(now())
+
+  church      Church            @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit       @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  song        DeptChoirSong     @relation(fields: [songId], references: [id], onDelete: Cascade)
+  setlist     DeptChoirSetlist? @relation(fields: [setlistId], references: [id], onDelete: SetNull)
+  member      Member            @relation("DeptChoirFeedbackMember", fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([songId])
+  @@index([setlistId])
+  @@map("dept_choir_song_feedback")
+}
+
+model DeptChoirAttendance {
+  id             String                   @id @default(uuid())
+  churchId       String
+  serviceUnitId  String
+  eventType      ChoirAttendanceEventType
+  eventDate      DateTime
+  memberId       String
+  attended       Boolean                  @default(true)
+  arrivedAt      DateTime?
+  minutesLate    Int                      @default(0)
+  followUpSentAt DateTime?
+  notes          String?
+  createdAt      DateTime                 @default(now())
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  member      Member      @relation("DeptChoirAttendanceMember", fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceUnitId, eventType, eventDate, memberId])
+  @@index([serviceUnitId, eventDate])
+  @@map("dept_choir_attendance")
+}
+
+model DeptChoirAudition {
+  id            String              @id @default(uuid())
+  churchId      String
+  serviceUnitId String
+  memberId      String
+  status        ChoirAuditionStatus @default(SCHEDULED)
+  voicePart     ChoirVoicePart?
+  auditionDate  DateTime?
+  recordingUrl  String?
+  notes         String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  member      Member      @relation("DeptChoirAuditionMember", fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([serviceUnitId, status])
+  @@map("dept_choir_auditions")
+}
+
+model DeptChoirVoiceTask {
+  id            String    @id @default(uuid())
+  churchId      String
+  serviceUnitId String
+  memberId      String
+  title         String
+  description   String?
+  dueDate       DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  member      Member      @relation("DeptChoirVoiceTaskMember", fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([serviceUnitId, memberId])
+  @@map("dept_choir_voice_tasks")
+}
+
+model DeptChoirVocalNote {
+  id            String   @id @default(uuid())
+  churchId      String
+  serviceUnitId String
+  memberId      String
+  authorId      String
+  body          String
+  improvementTag String?
+  createdAt     DateTime @default(now())
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  member      Member      @relation("DeptChoirVocalNoteMember", fields: [memberId], references: [id], onDelete: Cascade)
+  author      Member      @relation("DeptChoirVocalNoteAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([serviceUnitId, memberId])
+  @@map("dept_choir_vocal_notes")
+}
+
+model DeptCertification {
+  id            String    @id @default(uuid())
+  churchId      String
+  serviceUnitId String
+  memberId      String
+  title         String
+  issuedAt      DateTime?
+  expiresAt     DateTime?
+  notes         String?
+  createdAt     DateTime  @default(now())
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  member      Member      @relation("DeptCertificationMember", fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([serviceUnitId, memberId])
+  @@map("dept_certifications")
+}
+
+model DeptProgressNote {
+  id            String   @id @default(uuid())
+  churchId      String
+  serviceUnitId String
+  childMemberId String
+  authorId      String
+  body          String
+  behaviorTag   String?
+  createdAt     DateTime @default(now())
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  child       Member      @relation("DeptProgressChild", fields: [childMemberId], references: [id], onDelete: Cascade)
+  author      Member      @relation("DeptProgressAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([serviceUnitId, childMemberId])
+  @@map("dept_progress_notes")
+}
+
+model DeptPrayerChecklist {
+  id            String   @id @default(uuid())
+  churchId      String
+  serviceUnitId String
+  checklistDate DateTime
+  itemKey       String
+  completed     Boolean  @default(false)
+  memberId      String?
+  updatedAt     DateTime @updatedAt
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  member      Member?     @relation("DeptChecklistMember", fields: [memberId], references: [id], onDelete: SetNull)
+
+  @@unique([serviceUnitId, checklistDate, itemKey])
+  @@map("dept_prayer_checklists")
+}
+
+model DeptFollowUpLog {
+  id            String   @id @default(uuid())
+  churchId      String
+  serviceUnitId String
+  memberId      String
+  body          String
+  followedAt    DateTime @default(now())
+  authorId      String
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  member      Member      @relation("DeptFollowUpSubject", fields: [memberId], references: [id], onDelete: Cascade)
+  author      Member      @relation("DeptFollowUpAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([serviceUnitId, followedAt])
+  @@map("dept_follow_up_logs")
+}
+
+enum DeptUnitFeedbackAuthorRole {
+  PASTOR
+  ADMIN
+  UNIT_LEADER
+}
+
+/// Pastor/admin ↔ unit leadership messages and replies (Feedbacks tab).
+model DeptUnitFeedback {
+  id             String                     @id @default(uuid())
+  churchId       String
+  serviceUnitId  String
+  parentId       String?
+  subject        String?
+  body           String                     @db.Text
+  authorUserId   String?
+  authorMemberId String?
+  authorRole     DeptUnitFeedbackAuthorRole
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  church       Church             @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit  ServiceUnit        @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  parent       DeptUnitFeedback?  @relation("DeptUnitFeedbackThread", fields: [parentId], references: [id], onDelete: Cascade)
+  replies      DeptUnitFeedback[] @relation("DeptUnitFeedbackThread")
+  authorUser   User?              @relation("DeptUnitFeedbackUser", fields: [authorUserId], references: [id], onDelete: SetNull)
+  authorMember Member?            @relation("DeptUnitFeedbackMember", fields: [authorMemberId], references: [id], onDelete: SetNull)
+
+  @@index([serviceUnitId, createdAt])
+  @@index([parentId])
+  @@map("dept_unit_feedbacks")
+}
+
+model ParentGuardianLink {
+  id       String @id @default(uuid())
+  parentId String
+  childId  String
+  relation String @default("PARENT")
+
+  parent Member @relation("ParentMember", fields: [parentId], references: [id], onDelete: Cascade)
+  child  Member @relation("ChildMember", fields: [childId], references: [id], onDelete: Cascade)
+
+  @@unique([parentId, childId])
+  @@map("parent_guardian_links")
+}
+
+model MemberGamification {
+  id               String    @id @default(uuid())
+  memberId         String    @unique
+  points           Int       @default(0)
+  xp               Int       @default(0)
+  level            Int       @default(1)
+  attendanceStreak Int       @default(0)
+  lastAttendance   DateTime?
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  badges MemberBadge[]
+
+  @@map("member_gamification")
+}
+
+model Badge {
+  id             String @id @default(uuid())
+  name           String
+  description    String?
+  iconUrl        String?
+  pointsRequired Int    @default(0)
+
+  members       MemberBadge[]
+  achievements  YouthAchievement[]
+
+  @@map("badges")
+}
+
+model MemberBadge {
+  id        String   @id @default(uuid())
+  memberId  String
+  badgeId   String
+  awardedAt DateTime @default(now())
+
+  gamification MemberGamification @relation(fields: [memberId], references: [memberId], onDelete: Cascade)
+  badge        Badge              @relation(fields: [badgeId], references: [id])
+
+  @@unique([memberId, badgeId])
+  @@map("member_badges")
+}
+
+// ─── Adult Business Community ────────────────────────────────
+
+enum BusinessVerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum MarketplaceItemType {
+  SERVICE
+  PRODUCT
+}
+
+enum MentorshipStatus {
+  REQUESTED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model BusinessProfile {
+  id                 String                     @id @default(uuid())
+  churchId           String
+  memberId           String                     @unique
+  businessName       String
+  tagline            String?
+  description        String?
+  category           String?
+  servicesOffered    String[]                   @default([])
+  website            String?
+  phone              String?
+  email              String?
+  address            String?
+  logoUrl            String?
+  verificationStatus BusinessVerificationStatus @default(PENDING)
+  rejectionNote      String?
+  verifiedAt         DateTime?
+  isFeatured         Boolean                    @default(false)
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+
+  church       Church            @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member       Member            @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  listings     MarketplaceItem[]
+  jobPostings  JobPosting[]
+  hostedEvents KonnectNetworkingEvent[]
+
+  @@index([churchId, verificationStatus])
+  @@index([churchId, category])
+  @@map("business_profiles")
+}
+
+model MarketplaceItem {
+  id          String              @id @default(uuid())
+  churchId    String
+  businessId  String
+  title       String
+  description String?
+  itemType    MarketplaceItemType @default(SERVICE)
+  price       Decimal?            @db.Decimal(10, 2)
+  currency    String              @default("GBP")
+  imageUrl    String?
+  isActive    Boolean             @default(true)
+  sortOrder   Int                 @default(0)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  church   Church          @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  business BusinessProfile @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([churchId, itemType, isActive])
+  @@map("marketplace_items")
+}
+
+model JobPosting {
+  id           String    @id @default(uuid())
+  churchId     String
+  businessId   String?
+  title        String
+  description  String
+  location     String?
+  jobType      String?
+  salaryRange  String?
+  contactEmail String?
+  isActive     Boolean   @default(true)
+  expiresAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  church   Church           @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  business BusinessProfile? @relation(fields: [businessId], references: [id])
+
+  @@index([churchId, isActive])
+  @@map("job_postings")
+}
+
+enum CommunitySupportRequestType {
+  JOB_SEARCH
+  BUSINESS_SEARCH
+}
+
+enum CommunitySupportStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model CommunitySupportRequest {
+  id           String                      @id @default(uuid())
+  churchId     String
+  memberId     String
+  requestType  CommunitySupportRequestType
+  title        String
+  description  String
+  location     String?
+  contactEmail String?
+  contactPhone String?
+  skills       String?
+  status       CommunitySupportStatus      @default(PENDING)
+  approvedAt   DateTime?
+  approvedById String?
+  validUntil   DateTime?
+  rejectedAt   DateTime?
+  rejectionNote String?
+  createdAt    DateTime                    @default(now())
+  updatedAt    DateTime                    @updatedAt
+
+  church   Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  approvedBy User? @relation("CommunitySupportApprover", fields: [approvedById], references: [id])
+
+  @@index([churchId, status])
+  @@index([memberId, status])
+  @@map("community_support_requests")
+}
+
+model KonnectNetworkingEvent {
+  id           String   @id @default(uuid())
+  churchId     String
+  hostMemberId String?
+  businessId   String?
+  title        String
+  description  String?
+  location     String?
+  startsAt     DateTime
+  endsAt       DateTime?
+  maxAttendees Int?
+  isPublished  Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  church   Church              @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  host     Member?             @relation("KonnectEventHost", fields: [hostMemberId], references: [id])
+  business BusinessProfile?    @relation(fields: [businessId], references: [id])
+  rsvps    KonnectEventRsvp[]
+
+  @@index([churchId, startsAt])
+  @@map("konnect_networking_events")
+}
+
+model KonnectEventRsvp {
+  id        String   @id @default(uuid())
+  eventId   String
+  memberId  String
+  status    String   @default("GOING")
+  createdAt DateTime @default(now())
+
+  event  KonnectNetworkingEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  member Member                 @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, memberId])
+  @@map("konnect_event_rsvps")
+}
+
+enum MentorApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model MentorApplication {
+  id               String                  @id @default(uuid())
+  churchId         String
+  memberId         String
+  specialty        String
+  missionStatement String
+  questionnaire    Json?
+  status           MentorApplicationStatus @default(PENDING)
+  approvedAt       DateTime?
+  approvedById     String?
+  rejectedAt       DateTime?
+  rejectionNote    String?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  church        Church              @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member        Member              @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  approvedBy    User?               @relation("MentorApplicationApprover", fields: [approvedById], references: [id])
+  mentorProfile KonnectMentorProfile?
+
+  @@index([churchId, status])
+  @@index([memberId])
+  @@map("mentor_applications")
+}
+
+model KonnectMentorProfile {
+  id               String   @id @default(uuid())
+  churchId         String
+  memberId         String   @unique
+  applicationId    String?  @unique
+  specialty        String
+  missionStatement String
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  church      Church             @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member      Member             @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  application MentorApplication? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+
+  @@unique([churchId, memberId])
+  @@index([churchId, isActive])
+  @@map("konnect_mentor_profiles")
+}
+
+enum MenteeMentorRequestStatus {
+  OPEN
+  MATCHED
+  CLOSED
+}
+
+model MenteeMentorRequest {
+  id                  String                    @id @default(uuid())
+  churchId            String
+  memberId            String
+  requestedMentorType String
+  goals               String
+  status              MenteeMentorRequestStatus @default(OPEN)
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([churchId, status])
+  @@map("mentee_mentor_requests")
+}
+
+model MentorshipLink {
+  id              String           @id @default(uuid())
+  churchId        String
+  mentorMemberId  String
+  menteeMemberId  String
+  focusArea       String?
+  goals           String?
+  status          MentorshipStatus @default(REQUESTED)
+  startedAt       DateTime?
+  completedAt     DateTime?
+  notes           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  mentor Member @relation("MentorMember", fields: [mentorMemberId], references: [id], onDelete: Cascade)
+  mentee Member @relation("MenteeMember", fields: [menteeMemberId], references: [id], onDelete: Cascade)
+
+  @@unique([mentorMemberId, menteeMemberId])
+  @@index([churchId, status])
+  @@map("mentorship_links")
+}
+
+enum IdeaStatus {
+  SUBMITTED
+  IN_REVIEW
+  ADVISING
+  RESOLVED
+}
+
+model HubIdea {
+  id          String     @id @default(uuid())
+  churchId    String
+  memberId    String
+  title       String
+  description String
+  category    String?
+  status      IdeaStatus @default(SUBMITTED)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  church   Church           @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member   Member           @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  messages HubIdeaMessage[]
+
+  @@index([churchId, status])
+  @@map("hub_ideas")
+}
+
+model HubIdeaMessage {
+  id        String   @id @default(uuid())
+  ideaId    String
+  authorId  String
+  body      String
+  isStaff   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  idea   HubIdea @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  author Member  @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([ideaId, createdAt])
+  @@map("hub_idea_messages")
+}
+
+// ─── Bus Ministry ────────────────────────────────────────────
+
+enum RideStatus {
+  REQUESTED
+  SCHEDULED
+  IN_TRANSIT
+  PICKED_UP
+  DROPPED_OFF
+  NO_SHOW
+  CANCELLED
+}
+
+model Bus {
+  id        String   @id @default(uuid())
+  churchId  String
+  name      String
+  capacity  Int      @default(40)
+  plateNumber String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  church  Church          @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  routes  BusRoute[]
+  rides   RideRequest[]
+
+  @@map("buses")
+}
+
+model BusRoute {
+  id        String   @id @default(uuid())
+  churchId  String
+  busId     String?
+  name      String
+  dayOfWeek Int?
+  startTime String?
+  stops     Json     @default("[]")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  church      Church       @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  bus         Bus?         @relation(fields: [busId], references: [id])
+  rides       RideRequest[]
+  youthEvents YouthEvent[]
+
+  @@map("bus_routes")
+}
+
+model DriverProfile {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  licenseNo String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  locations    DriverLocation[]
+  rideRequests RideRequest[]
+
+  @@map("driver_profiles")
+}
+
+model DriverLocation {
+  id        String   @id @default(uuid())
+  driverId  String
+  latitude  Float
+  longitude Float
+  heading   Float?
+  speed     Float?
+  recordedAt DateTime @default(now())
+
+  driver DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId, recordedAt])
+  @@map("driver_locations")
+}
+
+model RideRequest {
+  id              String     @id @default(uuid())
+  churchId        String
+  memberId        String
+  busId           String?
+  routeId         String?
+  driverId        String?
+  pickupAddress   String
+  pickupLat       Float?
+  pickupLng       Float?
+  dropoffAddress  String
+  dropoffLat      Float?
+  dropoffLng      Float?
+  scheduledAt     DateTime
+  isRecurring     Boolean    @default(false)
+  recurringRule   String?
+  status          RideStatus @default(REQUESTED)
+  pickedUpAt      DateTime?
+  droppedOffAt    DateTime?
+  noShowAt        DateTime?
+  etaMinutes      Int?
+  notes           String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  church Church         @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member Member         @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  bus    Bus?           @relation(fields: [busId], references: [id])
+  route  BusRoute?      @relation(fields: [routeId], references: [id])
+  driver DriverProfile? @relation(fields: [driverId], references: [id])
+
+  @@index([churchId, scheduledAt])
+  @@index([driverId, status])
+  @@map("ride_requests")
+}
+
+// ─── Communications ──────────────────────────────────────────
+
+model Announcement {
+  id          String   @id @default(uuid())
+  churchId    String
+  title       String
+  content     String
+  authorId    String?
+  category    String?
+  isPinned    Boolean  @default(false)
+  publishedAt DateTime @default(now())
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@index([churchId, publishedAt])
+  @@map("announcements")
+}
+
+enum ChatChannelType {
+  CHURCH
+  YOUTH
+  SERVICE_UNIT
+}
+
+model InAppMessage {
+  id          String    @id @default(uuid())
+  churchId    String
+  senderId    String
+  recipientId String
+  subject     String?
+  body        String
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  church    Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  sender    User   @relation("InAppSender", fields: [senderId], references: [id])
+  recipient User   @relation("InAppRecipient", fields: [recipientId], references: [id])
+
+  @@index([recipientId, readAt])
+  @@index([churchId, createdAt])
+  @@map("in_app_messages")
+}
+
+enum CommunicationQueueKind {
+  BROADCAST
+  DEPARTMENT_BROADCAST
+  ABSENTEE_FOLLOWUP
+  DEPARTMENT_ABSENTEE
+  DEPARTMENT_WEEKLY_REPORT
+  SERVICE_REMINDER
+  FIRST_TIMER_WELCOME
+  NEW_CONVERT_WELCOME
+  PASTORAL_ALERT
+  AUTOMATION_RECOMMENDATION
+  DIRECT_ALERT
+}
+
+enum AutomationWorkflowKind {
+  WEEKLY_WORKFLOW
+  ABSENTEE_TRIGGER
+  FIRST_TIMER_TRIGGER
+  NEW_CONVERT_TRIGGER
+  FOLLOW_UP_REMINDER
+  PASTORAL_ALERT
+  SYNC_ENGINE
+  RECOMMENDATION
+}
+
+enum AutomationRunStatus {
+  SUCCESS
+  PARTIAL
+  FAILED
+  SKIPPED
+}
+
+model ChurchAutomationSettings {
+  churchId                   String   @id
+  weeklyWorkflowsEnabled     Boolean  @default(true)
+  absenteeTriggersEnabled    Boolean  @default(true)
+  firstTimerTriggersEnabled  Boolean  @default(true)
+  newConvertTriggersEnabled  Boolean  @default(true)
+  followUpRemindersEnabled   Boolean  @default(true)
+  pastoralAlertsEnabled      Boolean  @default(true)
+  syncEngineEnabled          Boolean  @default(true)
+  recommendationsEnabled     Boolean  @default(true)
+  lastWeeklyRunAt            DateTime?
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@map("church_automation_settings")
+}
+
+model AutomationRunLog {
+  id         String                 @id @default(uuid())
+  churchId   String
+  workflow   AutomationWorkflowKind
+  status     AutomationRunStatus
+  summary    String
+  stats      Json                   @default("{}")
+  error      String?
+  startedAt  DateTime               @default(now())
+  finishedAt DateTime?
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@index([churchId, workflow, startedAt])
+  @@map("automation_run_logs")
+}
+
+enum CommunicationQueueStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+}
+
+/// Durable notification queue (Phase 7) — email, in-app, WhatsApp
+model CommunicationQueueItem {
+  id            String                   @id @default(uuid())
+  churchId      String
+  kind          CommunicationQueueKind
+  status        CommunicationQueueStatus @default(PENDING)
+  title         String
+  body          String
+  channels      String[]                 @default(["IN_APP"])
+  scheduledAt   DateTime                 @default(now())
+  sentAt        DateTime?
+  serviceUnitId String?
+  targetUserId  String?
+  targetMemberId String?
+  metadata      Json                     @default("{}")
+  lastError     String?
+  attempts      Int                      @default(0)
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+
+  church      Church       @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit? @relation(fields: [serviceUnitId], references: [id], onDelete: SetNull)
+
+  @@index([churchId, status, scheduledAt])
+  @@index([serviceUnitId])
+  @@map("communication_queue_items")
+}
+
+/// Staff/member conversations (Phase 7)
+model Conversation {
+  id              String   @id @default(uuid())
+  churchId        String
+  participantAId  String
+  participantBId  String
+  subject         String?
+  lastMessageAt   DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  church   Church                @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  messages ConversationMessage[]
+
+  @@unique([churchId, participantAId, participantBId])
+  @@index([churchId, lastMessageAt])
+  @@map("conversations")
+}
+
+model ConversationMessage {
+  id             String   @id @default(uuid())
+  conversationId String
+  senderId       String
+  body           String
+  readAt         DateTime?
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("conversation_messages")
+}
+
+model Sermon {
+  id          String   @id @default(uuid())
+  churchId    String
+  title       String
+  speaker     String?
+  description String?
+  audioUrl    String?
+  videoUrl    String?
+  notesUrl    String?
+  seriesName  String?
+  preachedAt  DateTime?
+  durationSec Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@index([churchId, preachedAt])
+  @@map("sermons")
+}
+
+// ─── Devotional Hub (all ages; youth-integrated) ────────────
+
+enum DevotionalAudience {
+  ALL
+  YOUTH
+  ADULT
+  FAMILY
+  LEADERS
+}
+
+enum DevotionalPlanStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum DevotionalPlanSourceType {
+  TOPICAL_BOOK
+  BIBLE_BOOK
+  CUSTOM_TOPIC
+  PDF_IMPORT
+}
+
+enum DevotionalPlanTone {
+  YOUTH
+  ADULT
+  FAMILY
+  NEW_BELIEVER
+}
+
+enum DevotionalReminderChannel {
+  IN_APP
+  EMAIL
+  PUSH
+  ALARM
+}
+
+enum DevotionalReminderFrequency {
+  HOURLY
+  DAILY
+}
+
+enum DevotionalActionPointStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
+}
+
+enum DevotionalChallengeScope {
+  INDIVIDUAL
+  GROUP
+  CHURCH
+}
+
+enum DevotionalReminderDeliveryStatus {
+  PENDING
+  SNOOZED
+  DELIVERED
+  DONE
+  DISMISSED
+}
+
+enum DevotionalAiArtifactType {
+  STUDY_OUTLINE
+  PRAYER_POINTS
+  SCRIPTURE_ASK
+  SIMPLIFIED_YOUTH
+  SIMPLIFIED_CHILD
+  SIMPLIFIED_TEEN
+  SIMPLIFIED_ADULT
+  SIMPLIFIED_NEW_BELIEVER
+  DISCUSSION_SUMMARY
+}
+
+enum DevotionalPdfImportStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum DevotionalMeetupStatus {
+  SCHEDULED
+  CANCELLED
+  COMPLETED
+}
+
+enum DevotionalMeetupRsvpStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+enum DevotionalMeetupRecurrence {
+  NONE
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+}
+
+enum DevotionalDiscussionStatus {
+  OPEN
+  CLOSED
+  ARCHIVED
+}
+
+enum DevotionalJournalVisibility {
+  PRIVATE
+  GROUP
+}
+
+enum DevotionalPrayerListScope {
+  PERSONAL
+  GROUP
+  PLAN_DAY
+}
+
+enum DevotionalGroupVisibility {
+  PRIVATE
+  FRIENDS_ONLY
+  INVITE_LINK
+}
+
+enum DevotionalGroupMemberRole {
+  ADMIN
+  CO_ADMIN
+  MEMBER
+}
+
+enum DevotionalGroupMemberStatus {
+  PENDING
+  ACTIVE
+  DECLINED
+}
+
+enum DevotionalGroupInviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  CANCELLED
+}
+
+model DevotionalPlan {
+  id            String             @id @default(uuid())
+  churchId      String
+  title         String
+  description   String?
+  startDate     DateTime
+  endDate       DateTime?
+  entries       Json               @default("[]")
+  audience      DevotionalAudience @default(ALL)
+  coverImageUrl String?
+  createdById   String?
+  isActive      Boolean            @default(true)
+  status        DevotionalPlanStatus     @default(PUBLISHED)
+  sourceType    DevotionalPlanSourceType?
+  sourceLabel   String?
+  topicalBook   String?
+  bibleBook     String?
+  customTopic   String?
+  tone          DevotionalPlanTone?
+  durationDays  Int?
+  durationWeeks Int?
+  outlineVersion Int                   @default(1)
+  pdfImportId   String?            @unique
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  church      Church                 @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  createdBy   User?                  @relation("DevotionalPlanCreator", fields: [createdById], references: [id])
+  pdfImport   DevotionalPdfImport?   @relation("PlanPrimaryPdf", fields: [pdfImportId], references: [id])
+  days        DevotionalPlanDay[]
+  groups      DevotionalGroup[]
+  pdfImports  DevotionalPdfImport[]  @relation("PlanPdfImports")
+  aiArtifacts DevotionalAiArtifact[]
+  progress    DevotionalStudyProgress[]
+  prayerLists DevotionalPrayerList[]
+  meetups     DevotionalMeetup[]
+  discussions DevotionalDiscussion[]
+  journals    DevotionalJournalEntry[]
+  outlineVersions DevotionalPlanOutlineVersion[]
+  reminders     DevotionalReminder[]
+  actionPoints  DevotionalActionPoint[]
+  sermonNoteSource SermonNote? @relation("SermonNoteDevotionalPlan")
+
+  @@index([churchId, isActive, startDate])
+  @@index([churchId, status, createdById])
+  @@map("devotional_plans")
+}
+
+model DevotionalPlanOutlineVersion {
+  id           String   @id @default(uuid())
+  planId       String
+  version      Int
+  tone         DevotionalPlanTone?
+  sourceLabel  String?
+  daysSnapshot Json
+  createdById  String?
+  createdAt    DateTime @default(now())
+
+  plan DevotionalPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, version])
+  @@index([planId, createdAt])
+  @@map("devotional_plan_outline_versions")
+}
+
+model DevotionalPlanDay {
+  id              String   @id @default(uuid())
+  planId          String
+  dayNumber       Int
+  title           String
+  scriptureRef    String?
+  scriptureText   String?
+  reflection      String?
+  prayerPrompt    String?
+  actionPoint     String?
+  simplifiedYouth String?
+  simplifiedChild String?
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  plan          DevotionalPlan           @relation(fields: [planId], references: [id], onDelete: Cascade)
+  journals      DevotionalJournalEntry[]
+  prayerItems   DevotionalPrayerListItem[]
+  aiArtifacts   DevotionalAiArtifact[]
+  progressMarks DevotionalStudyProgress[]
+  actionPoints  DevotionalActionPoint[]
+
+  @@unique([planId, dayNumber])
+  @@index([planId, sortOrder])
+  @@map("devotional_plan_days")
+}
+
+model DevotionalGroup {
+  id               String                    @id @default(uuid())
+  churchId         String
+  planId           String?
+  name             String
+  description      String?
+  profileImageUrl  String?
+  visibility       DevotionalGroupVisibility @default(INVITE_LINK)
+  createdById      String?
+  leaderId         String?
+  inviteToken      String?                   @unique
+  inviteExpiresAt  DateTime?
+  isActive         Boolean                   @default(true)
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  church       Church                    @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  plan         DevotionalPlan?           @relation(fields: [planId], references: [id])
+  createdBy    Member?                   @relation("DevotionalGroupCreator", fields: [createdById], references: [id])
+  leader       Member?                   @relation("DevotionalGroupLeader", fields: [leaderId], references: [id])
+  members      DevotionalGroupMember[]
+  invites      DevotionalGroupInvite[]
+  journals     DevotionalJournalEntry[]
+  prayerLists  DevotionalPrayerList[]
+  meetups      DevotionalMeetup[]
+  discussions  DevotionalDiscussion[]
+  actionPoints DevotionalActionPoint[]
+  challenges   DevotionalChallenge[]
+
+  @@index([churchId, isActive])
+  @@index([churchId, visibility])
+  @@map("devotional_groups")
+}
+
+model DevotionalGroupMember {
+  id          String                      @id @default(uuid())
+  groupId     String
+  memberId    String
+  role        DevotionalGroupMemberRole   @default(MEMBER)
+  status      DevotionalGroupMemberStatus @default(PENDING)
+  invitedById String?
+  joinedAt    DateTime                    @default(now())
+  updatedAt   DateTime                    @updatedAt
+
+  group     DevotionalGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  member    Member          @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  invitedBy Member?         @relation("DevotionalGroupInvitedBy", fields: [invitedById], references: [id])
+
+  @@unique([groupId, memberId])
+  @@index([groupId, status])
+  @@map("devotional_group_members")
+}
+
+model DevotionalGroupInvite {
+  id               String                    @id @default(uuid())
+  churchId         String
+  groupId          String
+  status           DevotionalGroupInviteStatus @default(PENDING)
+  inviteeEmail     String?
+  inviteePhone     String?
+  inviteeUserEmail String?
+  invitedMemberId  String?
+  inviteToken      String?                   @unique
+  invitedById      String
+  expiresAt        DateTime?
+  respondedAt      DateTime?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  church          Church          @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  group           DevotionalGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  invitedBy       Member          @relation("DevotionalGroupInviteSender", fields: [invitedById], references: [id])
+  invitedMember   Member?         @relation("DevotionalGroupInviteTarget", fields: [invitedMemberId], references: [id])
+
+  @@index([groupId, status])
+  @@index([invitedMemberId, status])
+  @@map("devotional_group_invites")
+}
+
+model DevotionalJournalEntry {
+  id              String                    @id @default(uuid())
+  churchId        String
+  memberId        String
+  planId          String?
+  dayId           String?
+  groupId         String?
+  visibility      DevotionalJournalVisibility @default(PRIVATE)
+  title           String?
+  body            String
+  contentFormat   String                    @default("html")
+  moods           Json                      @default("[]")
+  scriptureRefs   Json                      @default("[]")
+  attachments     Json                      @default("[]")
+  voiceNoteUrl    String?
+  voiceTranscript String?
+  recapPromptId   String?
+  isPinned        Boolean                   @default(false)
+  pinnedAt        DateTime?
+  pinnedById      String?
+  shareToken      String?                   @unique
+  shareExpiresAt  DateTime?
+  lastEditedById  String?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  church       Church              @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member       Member              @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  plan         DevotionalPlan?     @relation(fields: [planId], references: [id])
+  day          DevotionalPlanDay?  @relation(fields: [dayId], references: [id])
+  group        DevotionalGroup?    @relation(fields: [groupId], references: [id])
+  pinnedBy     Member?             @relation("DevotionalJournalPinnedBy", fields: [pinnedById], references: [id])
+  lastEditedBy Member?             @relation("DevotionalJournalLastEditedBy", fields: [lastEditedById], references: [id])
+  comments     DevotionalJournalComment[]
+  reactions    DevotionalJournalReaction[]
+
+  @@index([memberId, createdAt])
+  @@index([groupId, visibility, isPinned])
+  @@index([churchId, shareToken])
+  @@map("devotional_journal_entries")
+}
+
+model DevotionalJournalComment {
+  id        String   @id @default(uuid())
+  entryId   String
+  memberId  String
+  parentId  String?
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entry   DevotionalJournalEntry  @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  member  Member                  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  parent  DevotionalJournalComment? @relation("JournalCommentThread", fields: [parentId], references: [id])
+  replies DevotionalJournalComment[] @relation("JournalCommentThread")
+
+  @@index([entryId, createdAt])
+  @@index([parentId])
+  @@map("devotional_journal_comments")
+}
+
+model DevotionalJournalReaction {
+  id        String   @id @default(uuid())
+  entryId   String
+  memberId  String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  entry  DevotionalJournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  member Member                 @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([entryId, memberId, emoji])
+  @@index([entryId])
+  @@map("devotional_journal_reactions")
+}
+
+model DevotionalPrayerList {
+  id        String                  @id @default(uuid())
+  churchId  String
+  memberId  String?
+  groupId   String?
+  planId    String?
+  scope     DevotionalPrayerListScope @default(PERSONAL)
+  title     String
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+
+  church Church           @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member Member?          @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  group  DevotionalGroup? @relation(fields: [groupId], references: [id])
+  plan   DevotionalPlan?  @relation(fields: [planId], references: [id])
+  items  DevotionalPrayerListItem[]
+
+  @@index([memberId])
+  @@index([groupId])
+  @@map("devotional_prayer_lists")
+}
+
+model DevotionalPrayerListItem {
+  id          String    @id @default(uuid())
+  listId      String
+  dayId       String?
+  body        String
+  isAnswered  Boolean   @default(false)
+  answeredAt  DateTime?
+  aiBooster   Json?
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  list DevotionalPrayerList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  day  DevotionalPlanDay?   @relation(fields: [dayId], references: [id])
+
+  @@index([listId, sortOrder])
+  @@index([listId, isAnswered])
+  @@map("devotional_prayer_list_items")
+}
+
+model DevotionalPrayerStreak {
+  id            String   @id @default(uuid())
+  churchId      String
+  memberId      String   @unique
+  streakDays    Int      @default(0)
+  longestStreak Int      @default(0)
+  lastPrayedOn  DateTime?
+  updatedAt     DateTime @updatedAt
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@map("devotional_prayer_streaks")
+}
+
+model DevotionalPrayerDailyLog {
+  id        String   @id @default(uuid())
+  churchId  String
+  memberId  String
+  prayedOn  DateTime
+  createdAt DateTime @default(now())
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, prayedOn])
+  @@index([memberId, prayedOn])
+  @@map("devotional_prayer_daily_logs")
+}
+
+model DevotionalStudyProgress {
+  id           String   @id @default(uuid())
+  churchId     String
+  memberId     String
+  planId       String
+  dayId        String?
+  lastDay      Int      @default(0)
+  streakDays   Int      @default(0)
+  completedAt  DateTime?
+  lastReadAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  church Church             @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member Member             @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  plan   DevotionalPlan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  day    DevotionalPlanDay? @relation(fields: [dayId], references: [id])
+
+  @@unique([memberId, planId])
+  @@index([churchId, planId])
+  @@map("devotional_study_progress")
+}
+
+model DevotionalActionPoint {
+  id                  String                      @id @default(uuid())
+  churchId            String
+  memberId            String
+  planId              String?
+  dayId               String?
+  groupId             String?
+  challengeId         String?
+  title               String
+  notes               String?
+  dueAt               DateTime?
+  weekKey             String?
+  status              DevotionalActionPointStatus @default(PENDING)
+  completedAt         DateTime?
+  skippedAt           DateTime?
+  remindersEnabled    Boolean                     @default(false)
+  reminderFrequency   DevotionalReminderFrequency?
+  reminderChannels    Json                        @default("[]")
+  reminderHourLocal   Int                         @default(9)
+  reminderMinuteLocal Int                         @default(0)
+  reminderTimezone    String                      @default("UTC")
+  lastReminderAt      DateTime?
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+
+  church    Church              @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member    Member              @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  plan      DevotionalPlan?     @relation(fields: [planId], references: [id])
+  day       DevotionalPlanDay?  @relation(fields: [dayId], references: [id])
+  group     DevotionalGroup?    @relation(fields: [groupId], references: [id])
+  challenge DevotionalChallenge? @relation(fields: [challengeId], references: [id])
+
+  @@index([memberId, weekKey, status])
+  @@index([churchId, challengeId])
+  @@index([memberId, remindersEnabled])
+  @@map("devotional_action_points")
+}
+
+model DevotionalChallenge {
+  id          String                   @id @default(uuid())
+  churchId    String
+  groupId     String?
+  scope       DevotionalChallengeScope
+  title       String
+  description String?
+  startsAt    DateTime
+  endsAt      DateTime
+  targetCount Int?
+  isActive    Boolean                  @default(true)
+  createdById String?
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+
+  church       Church                      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  group        DevotionalGroup?            @relation(fields: [groupId], references: [id])
+  createdBy    Member?                     @relation("DevotionalChallengeCreator", fields: [createdById], references: [id])
+  members      DevotionalChallengeMember[]
+  actionPoints DevotionalActionPoint[]
+  milestones   DevotionalChallengeMilestone[]
+  badgesEarned DevotionalChallengeBadgeEarned[]
+
+  @@index([churchId, scope, isActive])
+  @@index([groupId, isActive])
+  @@index([createdById, scope])
+  @@map("devotional_challenges")
+}
+
+model DevotionalChallengeMember {
+  id            String   @id @default(uuid())
+  challengeId   String
+  memberId      String
+  progressCount Int      @default(0)
+  joinedAt      DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  challenge DevotionalChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  member    Member              @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([challengeId, memberId])
+  @@index([memberId, progressCount])
+  @@map("devotional_challenge_members")
+}
+
+model DevotionalChallengeMilestone {
+  id          String @id @default(uuid())
+  challengeId String
+  threshold   Int
+  badgeKey    String
+  title       String
+  description String?
+  sortOrder   Int    @default(0)
+
+  challenge DevotionalChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  earned    DevotionalChallengeBadgeEarned[]
+
+  @@unique([challengeId, badgeKey])
+  @@index([challengeId, threshold])
+  @@map("devotional_challenge_milestones")
+}
+
+model DevotionalChallengeBadgeEarned {
+  id          String   @id @default(uuid())
+  challengeId String
+  memberId    String
+  milestoneId String
+  earnedAt    DateTime @default(now())
+
+  challenge DevotionalChallenge         @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  member    Member                      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  milestone DevotionalChallengeMilestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+
+  @@unique([challengeId, memberId, milestoneId])
+  @@index([memberId, earnedAt])
+  @@map("devotional_challenge_badges_earned")
+}
+
+model DevotionalReminderPreference {
+  id             String   @id @default(uuid())
+  churchId       String
+  memberId       String   @unique
+  timezone       String   @default("UTC")
+  quietStartHour Int      @default(22)
+  quietEndHour   Int      @default(7)
+  syncVersion    Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@map("devotional_reminder_preferences")
+}
+
+model DevotionalReminder {
+  id          String                    @id @default(uuid())
+  churchId    String
+  memberId    String
+  planId      String?
+  channel     DevotionalReminderChannel
+  frequency   DevotionalReminderFrequency @default(DAILY)
+  hourLocal   Int                       @default(7)
+  minuteLocal Int                       @default(0)
+  timezone    String                    @default("UTC")
+  isEnabled   Boolean                   @default(true)
+  lastSentAt  DateTime?
+  snoozedUntil DateTime?
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+
+  church     Church                    @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member     Member                    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  plan       DevotionalPlan?           @relation(fields: [planId], references: [id], onDelete: Cascade)
+  deliveries DevotionalReminderDelivery[]
+
+  @@unique([memberId, planId, channel])
+  @@index([memberId, isEnabled])
+  @@index([isEnabled, snoozedUntil])
+  @@map("devotional_reminders")
+}
+
+model DevotionalReminderDelivery {
+  id           String                         @id @default(uuid())
+  churchId     String
+  memberId     String
+  userId       String
+  reminderId   String
+  planId       String?
+  planTitle    String?
+  dayNumber    Int?
+  channel      DevotionalReminderChannel
+  frequency    DevotionalReminderFrequency
+  status       DevotionalReminderDeliveryStatus @default(PENDING)
+  title        String
+  body         String
+  snoozedUntil DateTime?
+  completedAt  DateTime?
+  notificationId String?
+  firedAt      DateTime                       @default(now())
+  createdAt    DateTime                       @default(now())
+  updatedAt    DateTime                       @updatedAt
+
+  church   Church             @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member   Member             @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  reminder DevotionalReminder @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+
+  @@index([memberId, status, snoozedUntil])
+  @@index([userId, status, firedAt])
+  @@map("devotional_reminder_deliveries")
+}
+
+model DevotionalPdfImport {
+  id           String                  @id @default(uuid())
+  churchId     String
+  planId       String?
+  uploadedById String?
+  fileName     String
+  fileUrl      String
+  status       DevotionalPdfImportStatus @default(PENDING)
+  pageCount    Int?
+  chunkCount   Int                     @default(0)
+  errorMessage String?
+  metadata     Json                    @default("{}")
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  church      Church           @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  plan        DevotionalPlan?  @relation("PlanPdfImports", fields: [planId], references: [id])
+  primaryPlan DevotionalPlan?  @relation("PlanPrimaryPdf")
+  uploadedBy  User?            @relation("DevotionalPdfUploader", fields: [uploadedById], references: [id])
+  aiArtifacts DevotionalAiArtifact[]
+
+  @@index([churchId, status])
+  @@map("devotional_pdf_imports")
+}
+
+model DevotionalAiArtifact {
+  id         String                 @id @default(uuid())
+  churchId   String
+  planId     String?
+  dayId      String?
+  pdfImportId String?
+  type       DevotionalAiArtifactType
+  prompt     String?
+  content    Json
+  model      String?
+  createdAt  DateTime               @default(now())
+
+  plan      DevotionalPlan?     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  day       DevotionalPlanDay?  @relation(fields: [dayId], references: [id])
+  pdfImport DevotionalPdfImport? @relation(fields: [pdfImportId], references: [id])
+
+  @@index([planId, type])
+  @@map("devotional_ai_artifacts")
+}
+
+model DevotionalMeetup {
+  id                     String                    @id @default(uuid())
+  churchId               String
+  groupId                String?
+  planId                 String?
+  hostId                 String?
+  createdById            String?
+  title                  String
+  description            String?
+  location               String?
+  onlineLink             String?
+  locationType           String?
+  startsAt               DateTime
+  endsAt                 DateTime?
+  recurrence             DevotionalMeetupRecurrence @default(NONE)
+  recurrenceSeriesId     String?
+  duplicatedFromId       String?
+  reminderOffsetsMinutes Json                      @default("[1440,60,10]")
+  postEventSummary       String?
+  postEventPrayerPoints  String?
+  postEventActionSteps   String?
+  postEventProgressNote  String?
+  postEventCompletedAt   DateTime?
+  status                 DevotionalMeetupStatus    @default(SCHEDULED)
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+
+  church     Church                     @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  group      DevotionalGroup?           @relation(fields: [groupId], references: [id])
+  plan       DevotionalPlan?            @relation(fields: [planId], references: [id])
+  host       Member?                    @relation("DevotionalMeetupHost", fields: [hostId], references: [id])
+  createdBy  Member?                    @relation("DevotionalMeetupCreator", fields: [createdById], references: [id])
+  attendees  DevotionalMeetupAttendee[]
+  reminders  DevotionalMeetupReminder[]
+
+  @@index([churchId, startsAt])
+  @@index([groupId, status, startsAt])
+  @@index([recurrenceSeriesId])
+  @@map("devotional_meetups")
+}
+
+model DevotionalMeetupAttendee {
+  id        String                   @id @default(uuid())
+  meetupId  String
+  memberId  String
+  status    DevotionalMeetupRsvpStatus @default(PENDING)
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
+
+  meetup DevotionalMeetup @relation(fields: [meetupId], references: [id], onDelete: Cascade)
+  member Member           @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([meetupId, memberId])
+  @@map("devotional_meetup_attendees")
+}
+
+model DevotionalMeetupReminder {
+  id             String                         @id @default(uuid())
+  meetupId       String
+  memberId       String
+  offsetMinutes  Int
+  channel        DevotionalReminderChannel
+  fireAt         DateTime
+  status         DevotionalReminderDeliveryStatus @default(PENDING)
+  title          String
+  body           String
+  deliveredAt    DateTime?
+  notificationId String?
+  createdAt      DateTime                       @default(now())
+
+  meetup DevotionalMeetup @relation(fields: [meetupId], references: [id], onDelete: Cascade)
+  member Member           @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([meetupId, memberId, offsetMinutes, channel])
+  @@index([fireAt, status])
+  @@map("devotional_meetup_reminders")
+}
+
+model DevotionalDiscussion {
+  id        String                   @id @default(uuid())
+  churchId  String
+  groupId   String?
+  planId    String?
+  dayId     String?
+  memberId  String
+  title     String?
+  body      String
+  status    DevotionalDiscussionStatus @default(OPEN)
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
+
+  church      Church                        @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  group       DevotionalGroup?              @relation(fields: [groupId], references: [id])
+  plan        DevotionalPlan?               @relation(fields: [planId], references: [id])
+  member      Member                        @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  transcripts DevotionalDiscussionTranscript[]
+
+  @@index([groupId, createdAt])
+  @@map("devotional_discussions")
+}
+
+model DevotionalDiscussionTranscript {
+  id             String   @id @default(uuid())
+  discussionId   String
+  audioUrl       String?
+  transcriptText String
+  language       String   @default("en")
+  durationSec    Int?
+  createdAt      DateTime @default(now())
+
+  discussion DevotionalDiscussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+
+  @@map("devotional_discussion_transcripts")
+}
+
+// ─── 2. Chat (ChatChannel, ChatMessage) ──────────────────────
+
+enum YouthChannelRole {
+  MEMBER
+  MODERATOR
+  LEADER
+}
+
+enum ChatMessageType {
+  TEXT
+  IMAGE
+  GIF
+  SYSTEM
+}
+
+model ChatChannel {
+  id             String          @id @default(uuid())
+  churchId       String
+  channelType    ChatChannelType @default(CHURCH)
+  youthGroupId   String?
+  serviceUnitId  String?
+  name           String
+  description    String?
+  isModerated    Boolean         @default(true)
+  isArchived     Boolean         @default(false)
+  requiredRole   YouthChannelRole?
+  createdAt      DateTime        @default(now())
+
+  church      Church               @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  youthGroup  YouthGroup?          @relation(fields: [youthGroupId], references: [id])
+  serviceUnit ServiceUnit?         @relation(fields: [serviceUnitId], references: [id])
+  messages    Message[]
+  members     YouthChannelMember[]
+
+  @@index([churchId, channelType])
+  @@map("chat_channels")
+}
+
+/// ChatMessage — persisted as `Message` (shared with Communications module).
+model Message {
+  id            String          @id @default(uuid())
+  channelId     String
+  senderId      String
+  replyToId     String?
+  content       String
+  messageType   ChatMessageType @default(TEXT)
+  attachmentUrl String?
+  isPinned      Boolean         @default(false)
+  isHidden      Boolean         @default(false)
+  isFlagged     Boolean         @default(false)
+  flagReason    String?
+  moderatedById String?
+  moderatedAt   DateTime?
+  editedAt      DateTime?
+  createdAt     DateTime        @default(now())
+
+  channel     ChatChannel              @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  sender      User                     @relation("MessageSender", fields: [senderId], references: [id])
+  replyTo     Message?                 @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies     Message[]                @relation("MessageReplies")
+  readReceipts YouthMessageReadReceipt[]
+  reactions   YouthMessageReaction[]
+
+  @@index([channelId, createdAt])
+  @@index([channelId, isPinned])
+  @@map("messages")
+}
+
+model YouthMessageReaction {
+  id           String            @id @default(uuid())
+  messageId    String
+  memberId     String
+  reactionType YouthReactionType @default(LIKE)
+  createdAt    DateTime          @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  member  Member  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, memberId, reactionType])
+  @@map("youth_message_reactions")
+}
+
+model YouthChannelMember {
+  channelId  String
+  memberId   String
+  role       YouthChannelRole @default(MEMBER)
+  isMuted    Boolean          @default(false)
+  mutedUntil DateTime?
+  joinedAt   DateTime         @default(now())
+
+  channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  member  Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@id([channelId, memberId])
+  @@map("youth_channel_members")
+}
+
+model YouthMessageReadReceipt {
+  messageId String
+  userId    String
+  readAt    DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation("YouthMessageReadBy", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, userId])
+  @@map("youth_message_read_receipts")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  churchId  String
+  userId    String?
+  title     String
+  body      String
+  type      String
+  data      Json     @default("{}")
+  readAt    DateTime?
+  sentAt    DateTime @default(now())
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id])
+
+  @@index([userId, readAt])
+  @@index([churchId, sentAt])
+  @@map("notifications")
+}
+
+// ─── Service unit email templates ───────────────────────────
+
+enum ServiceUnitEmailTemplateType {
+  WELCOME
+}
+
+model ServiceUnitEmailTemplate {
+  id            String                       @id @default(uuid())
+  churchId      String
+  serviceUnitId String
+  type          ServiceUnitEmailTemplateType @default(WELCOME)
+  subject       String
+  body          String
+  updatedById   String?
+  createdAt     DateTime                     @default(now())
+  updatedAt     DateTime                     @updatedAt
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceUnitId, type])
+  @@map("service_unit_email_templates")
+}
+
+// ─── Prayer Hub & Testimony Hub (community praise posts) ─────
+
+enum CommunityHubType {
+  PRAYER
+  PRAISE
+}
+
+enum CommunityHubStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model LoungePresence {
+  id         String   @id @default(uuid())
+  churchId   String
+  memberId   String
+  lastSeenAt DateTime @default(now())
+  isOnline   Boolean  @default(true)
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([churchId, memberId])
+  @@index([churchId, isOnline])
+  @@map("lounge_presence")
+}
+
+model CommunityHubPost {
+  id              String             @id @default(uuid())
+  churchId        String
+  type            CommunityHubType
+  authorUserId    String
+  authorMemberId  String?
+  subject         String?
+  testimony       String?
+  description     String
+  displayName     String?
+  showDisplayName Boolean            @default(false)
+  status          CommunityHubStatus @default(PENDING)
+  approvedById    String?
+  approvedAt      DateTime?
+  autoApproveAt   DateTime
+  rejectedAt      DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  member Member? @relation(fields: [authorMemberId], references: [id], onDelete: SetNull)
+  likes    CommunityHubLike[]
+  comments CommunityHubComment[]
+
+  @@index([churchId, type, status, createdAt])
+  @@index([authorUserId, type])
+  @@map("community_hub_posts")
+}
+
+model CommunityHubLike {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post CommunityHubPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([postId])
+  @@map("community_hub_likes")
+}
+
+model CommunityHubComment {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  memberId  String?
+  body      String
+  createdAt DateTime @default(now())
+
+  post   CommunityHubPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  member Member?          @relation(fields: [memberId], references: [id], onDelete: SetNull)
+
+  @@index([postId, createdAt])
+  @@map("community_hub_comments")
+}
+
+// ─── Sermon Note (Pastor / Media → weekly devotional) ───────
+
+enum SermonNoteSourceType {
+  AUDIO
+  TEXT
+  PDF
+}
+
+enum SermonNoteStatus {
+  DRAFT
+  PROCESSING
+  READY
+  PUBLISHED
+}
+
+model SermonNote {
+  id               String             @id @default(uuid())
+  churchId         String
+  title            String
+  speakerName      String?
+  sundayDate       DateTime?
+  sourceType       SermonNoteSourceType
+  sourceUrl        String?
+  sourceText       String?            @db.Text
+  pastorContext    String?            @db.Text
+  transcript       String?            @db.Text
+  summary          String?            @db.Text
+  status           SermonNoteStatus   @default(DRAFT)
+  devotionalPlanId String?            @unique
+  createdById      String
+  publishedAt      DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  church         Church          @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  createdBy      User            @relation("SermonNoteCreator", fields: [createdById], references: [id])
+  devotionalPlan DevotionalPlan? @relation("SermonNoteDevotionalPlan", fields: [devotionalPlanId], references: [id])
+
+  @@index([churchId, status, createdAt])
+  @@map("sermon_notes")
+}
+
+// ─── Platform marketing email templates (SaaS owner) ──────────
+
+enum PlatformEmailTemplateCategory {
+  WELCOME
+  ONBOARDING
+  FEATURES
+  REENGAGEMENT
+  UPSELL
+}
+
+model PlatformEmailTemplate {
+  id          String                        @id @default(uuid())
+  slug        String                        @unique
+  name        String
+  category    PlatformEmailTemplateCategory
+  subject     String
+  htmlBody    String                        @db.Text
+  textBody    String?                       @db.Text
+  description String?
+  isDefault   Boolean                       @default(false)
+  createdAt   DateTime                      @default(now())
+  updatedAt   DateTime                      @updatedAt
+
+  @@index([category])
+  @@map("platform_email_templates")
+}
+
+model PlatformMarketingDrip {
+  id           String    @id @default(uuid())
+  churchId     String
+  userId       String
+  dripStep     Int
+  templateSlug String
+  scheduledAt  DateTime
+  sentAt       DateTime?
+  skippedAt    DateTime?
+  skipReason   String?
+  createdAt    DateTime  @default(now())
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dripStep])
+  @@index([scheduledAt, sentAt, skippedAt])
+  @@map("platform_marketing_drips")
+}
+
+// ─── Wisdom365+ (licensed daily wisdom journeys) ───────────────
+
+enum Wisdom365VariantSlug {
+  BUSINESS_OWNERS
+  STUDENTS
+  YOUTHS
+  KIDS
+  HUSBANDS
+  WIVES
+}
+
+enum Wisdom365ContentStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum Wisdom365SubscriptionStatus {
+  PENDING
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+}
+
+model Wisdom365Variant {
+  id                      String               @id @default(uuid())
+  slug                    Wisdom365VariantSlug @unique
+  name                    String
+  description             String               @db.Text
+  imageUrl                String
+  bibleTranslationLabel   String
+  bibleTranslationCode    String               @default("WEB")
+  requiresParentalConsent Boolean              @default(false)
+  sortOrder               Int                  @default(0)
+  isActive                Boolean              @default(true)
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+
+  contentEntries      Wisdom365ContentEntry[]
+  licenseAssignments  Wisdom365LicenseAssignment[]
+  kidsGrants          Wisdom365KidsGrant[]
+  memberProgress      Wisdom365MemberProgress[]
+  memberPrefs         Wisdom365MemberPrefs[]
+
+  @@map("wisdom365_variants")
+}
+
+model Wisdom365ContentEntry {
+  id              String                 @id @default(uuid())
+  variantId       String
+  dayOfYear       Int
+  title           String
+  reference       String
+  passage         String                 @db.Text
+  wisdom          String                 @db.Text
+  application     String                 @db.Text
+  prayer          String                 @db.Text
+  theme           String
+  imageUrl        String?
+  audioScriptHint String?                @db.Text
+  status          Wisdom365ContentStatus @default(DRAFT)
+  publishedAt     DateTime?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  variant Wisdom365Variant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([variantId, dayOfYear])
+  @@index([variantId, status, dayOfYear])
+  @@map("wisdom365_content_entries")
+}
+
+model Wisdom365ProductConfig {
+  id                          String   @id @default("default")
+  licensePricePence           Int      @default(1000)
+  multiLicenseDiscountPercent Int      @default(20)
+  multiLicenseMinCount        Int      @default(2)
+  currency                    String   @default("GBP")
+  subscriptionDurationDays    Int      @default(365)
+  stripePriceId               String?
+  isActive                    Boolean  @default(true)
+  updatedAt                   DateTime @updatedAt
+
+  @@map("wisdom365_product_config")
+}
+
+model Wisdom365ChurchAvailability {
+  id          String   @id @default(uuid())
+  churchId    String   @unique
+  isAvailable Boolean  @default(true)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@map("wisdom365_church_availability")
+}
+
+model Wisdom365Subscription {
+  id                      String                      @id @default(uuid())
+  userId                  String
+  churchId                String
+  licenseCount            Int
+  status                  Wisdom365SubscriptionStatus @default(PENDING)
+  stripeCheckoutSessionId String?                     @unique
+  stripeSubscriptionId    String?                     @unique
+  stripeCustomerId        String?
+  amountPaidPence         Int?
+  currency                String                      @default("GBP")
+  periodStart             DateTime?
+  periodEnd               DateTime?
+  createdAt               DateTime                    @default(now())
+  updatedAt               DateTime                    @updatedAt
+
+  user        User                         @relation("Wisdom365Subscriber", fields: [userId], references: [id], onDelete: Cascade)
+  church      Church                       @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  assignments Wisdom365LicenseAssignment[]
+
+  @@index([userId, status])
+  @@index([churchId, status])
+  @@map("wisdom365_subscriptions")
+}
+
+model Wisdom365LicenseAssignment {
+  id               String   @id @default(uuid())
+  subscriptionId   String
+  variantId        String
+  userId           String
+  assignedByUserId String
+  parentUserId     String?
+  childMemberId    String?
+  isActive         Boolean  @default(true)
+  assignedAt       DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  subscription Wisdom365Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  variant      Wisdom365Variant      @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  user         User                  @relation("Wisdom365LicenseUser", fields: [userId], references: [id], onDelete: Cascade)
+  assignedBy   User                  @relation("Wisdom365LicenseAssigner", fields: [assignedByUserId], references: [id], onDelete: Cascade)
+  childMember  Member?               @relation("Wisdom365KidsChildMember", fields: [childMemberId], references: [id], onDelete: SetNull)
+
+  @@unique([subscriptionId, variantId])
+  @@index([userId, isActive])
+  @@map("wisdom365_license_assignments")
+}
+
+model Wisdom365KidsGrant {
+  id               String   @id @default(uuid())
+  parentUserId     String
+  childMemberId    String
+  variantId        String
+  childDisplayName String
+  isEnabled        Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  parent      User             @relation("Wisdom365KidsParent", fields: [parentUserId], references: [id], onDelete: Cascade)
+  childMember Member           @relation("Wisdom365KidsChild", fields: [childMemberId], references: [id], onDelete: Cascade)
+  variant     Wisdom365Variant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([parentUserId, childMemberId, variantId])
+  @@map("wisdom365_kids_grants")
+}
+
+model Wisdom365MemberProgress {
+  id          String    @id @default(uuid())
+  userId      String
+  variantId   String
+  dateKey     String
+  completedAt DateTime?
+  journalText String?   @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  variant Wisdom365Variant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, variantId, dateKey])
+  @@index([userId, variantId])
+  @@map("wisdom365_member_progress")
+}
+
+model Wisdom365MemberPrefs {
+  id             String   @id @default(uuid())
+  userId         String
+  variantId      String
+  reminderHour   Int      @default(7)
+  reminderMinute Int      @default(0)
+  alarmEnabled   Boolean  @default(true)
+  timezone       String   @default("UTC")
+  streakCount    Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  variant Wisdom365Variant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, variantId])
+  @@map("wisdom365_member_prefs")
+}
+
+// ─── Ministry / Cells ────────────────────────────────────────
+
+enum CellFormKind {
+  WEEKLY_REPORT
+  INCIDENT
+  CUSTOM
+}
+
+enum CellIncidentSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum CellIncidentStatus {
+  OPEN
+  REVIEWING
+  RESOLVED
+  CLOSED
+}
+
+enum CellPrayerStatus {
+  OPEN
+  PRAYING
+  ANSWERED
+  CLOSED
+}
+
+model CellBranch {
+  id           String   @id @default(uuid())
+  churchId     String
+  name         String
+  location     String?
+  leaderUserId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  church     Church              @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  leader     User?               @relation("CellBranchLeader", fields: [leaderUserId], references: [id], onDelete: SetNull)
+  members    CellBranchMember[]
+  reports    CellReport[]
+  meetings   CellMeeting[]
+  attendance CellAttendance[]
+  incidents  CellIncident[]
+  messages   CellMessage[]
+  prayers    CellPrayerRequest[]
+  reminders  CellReminder[]
+
+  @@index([churchId, name])
+  @@index([churchId, leaderUserId])
+  @@map("cell_branches")
+}
+
+model CellBranchMember {
+  id        String   @id @default(uuid())
+  churchId  String
+  branchId  String
+  memberId  String   @unique
+  joinedAt  DateTime @default(now())
+
+  church Church     @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  branch CellBranch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  member Member     @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([churchId, memberId])
+  @@index([branchId])
+  @@map("cell_branch_members")
+}
+
+model CellFormDefinition {
+  id          String       @id @default(uuid())
+  churchId    String
+  kind        CellFormKind
+  name        String
+  description String?
+  fields      Json         @default("[]")
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  church  Church       @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  reports CellReport[]
+
+  @@index([churchId, kind, isActive])
+  @@map("cell_form_definitions")
+}
+
+model CellReport {
+  id                String   @id @default(uuid())
+  churchId          String
+  branchId          String
+  formId            String
+  submittedByUserId String
+  payload           Json     @default("{}")
+  submittedAt       DateTime @default(now())
+
+  church      Church             @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  branch      CellBranch         @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  form        CellFormDefinition @relation(fields: [formId], references: [id], onDelete: Cascade)
+  submittedBy User               @relation("CellReportSubmitter", fields: [submittedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([churchId, branchId, submittedAt])
+  @@map("cell_reports")
+}
+
+model CellMeeting {
+  id          String   @id @default(uuid())
+  churchId    String
+  branchId    String
+  meetingDate DateTime
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  church     Church           @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  branch     CellBranch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  attendance CellAttendance[]
+
+  @@index([churchId, branchId, meetingDate])
+  @@map("cell_meetings")
+}
+
+model CellAttendance {
+  id                 String   @id @default(uuid())
+  churchId           String
+  branchId           String
+  meetingId          String?
+  weekStart          DateTime
+  presentCount       Int
+  absentCount        Int?
+  notes              String?
+  recordedByUserId   String
+  createdAt          DateTime @default(now())
+
+  church     Church       @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  branch     CellBranch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  meeting    CellMeeting? @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+  recordedBy User         @relation("CellAttendanceRecorder", fields: [recordedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([churchId, branchId, weekStart])
+  @@map("cell_attendance")
+}
+
+model CellIncident {
+  id                 String               @id @default(uuid())
+  churchId           String
+  branchId           String
+  title              String
+  description        String
+  severity           CellIncidentSeverity @default(MEDIUM)
+  status             CellIncidentStatus   @default(OPEN)
+  reportedByUserId   String
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  church     Church     @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  branch     CellBranch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  reportedBy User       @relation("CellIncidentReporter", fields: [reportedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([churchId, branchId, status])
+  @@map("cell_incidents")
+}
+
+model CellTeachingResource {
+  id          String   @id @default(uuid())
+  churchId    String
+  title       String
+  description String?
+  fileUrl     String?
+  content     String?  @db.Text
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@index([churchId, sortOrder])
+  @@map("cell_teaching_resources")
+}
+
+model CellMessage {
+  id         String    @id @default(uuid())
+  churchId   String
+  branchId   String
+  fromUserId String
+  toUserId   String
+  body       String    @db.Text
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  church   Church     @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  branch   CellBranch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  fromUser User       @relation("CellMessageFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser   User       @relation("CellMessageTo", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@index([churchId, branchId, createdAt])
+  @@index([toUserId, readAt])
+  @@map("cell_messages")
+}
+
+model CellPrayerRequest {
+  id              String           @id @default(uuid())
+  churchId        String
+  branchId        String
+  memberId        String?
+  title           String
+  body            String?          @db.Text
+  status          CellPrayerStatus @default(OPEN)
+  isAnonymous     Boolean          @default(false)
+  createdByUserId String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  church    Church     @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  branch    CellBranch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  member    Member?    @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  createdBy User       @relation("CellPrayerCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+
+  @@index([churchId, branchId, status])
+  @@map("cell_prayer_requests")
+}
+
+model CellReminder {
+  id        String    @id @default(uuid())
+  churchId  String
+  branchId  String?
+  userId    String?
+  title     String
+  body      String?
+  remindAt  DateTime
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  church Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  branch CellBranch? @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@index([churchId, remindAt, sentAt])
+  @@map("cell_reminders")
+}

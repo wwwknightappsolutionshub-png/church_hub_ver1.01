@@ -1,0 +1,28 @@
+{
+  "name": "Church_Hub",
+  "short_name": "ChurchHub",
+  "description": "Church community — public welcome pages and member portal",
+  "start_url": "/",
+  "scope": "/",
+  "id": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "orientation": "any",
+  "background_color": "#3d4fbf",
+  "theme_color": "#3d4fbf",
+  "categories": ["lifestyle", "social"],
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

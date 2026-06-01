@@ -1,0 +1,20 @@
+{
+  "folders": [
+    {
+      "path": ".",
+      "name": "Church_Hub"
+    }
+  ],
+  "settings": {
+    "remote.autoForwardPorts": true,
+    "ports.attributes": {
+      "3001": {
+        "label": "Church Hub Web",
+        "onAutoForward": "openBrowser"
+      },
+      "4000": {
+        "label": "Church Hub API"
+      }
+    }
+  }
+}
