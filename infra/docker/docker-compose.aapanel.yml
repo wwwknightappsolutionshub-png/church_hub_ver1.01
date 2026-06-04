@@ -7,7 +7,7 @@
 services:
   api:
     env_file:
-      - ../../.env
+      - .env
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://churchhub:churchhub@postgres:5432/churchhub?schema=public
