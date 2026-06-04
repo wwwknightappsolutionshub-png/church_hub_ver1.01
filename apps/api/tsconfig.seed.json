@@ -10,5 +10,11 @@
     "strict": false,
     "downlevelIteration": true
   },
-  "include": ["prisma/seed.ts", "prisma/service-unit-catalog.ts"]
+  "include": [
+    "prisma/seed.ts",
+    "prisma/service-unit-catalog.ts",
+    "prisma/seed-test-users.ts",
+    "prisma/seed-platform-admin.ts",
+    "prisma/test-accounts.ts"
+  ]
 }

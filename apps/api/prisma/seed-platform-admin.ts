@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
-import { TEST_PASSWORD } from '../src/modules/auth/test-accounts';
+import { TEST_PASSWORD } from './test-accounts';
 
 export async function seedPlatformAdmin(prisma: PrismaClient) {
   const role = await prisma.role.upsert({

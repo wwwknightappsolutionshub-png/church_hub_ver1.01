@@ -1,5 +1,5 @@
 import { PrismaClient, MemberRoleType } from '@prisma/client';
-import { TEST_ACCOUNTS, TEST_PASSWORD } from '../src/modules/auth/test-accounts';
+import { TEST_ACCOUNTS, TEST_PASSWORD } from './test-accounts';
 
 type RoleMap = Record<string, { id: string }>;
 
