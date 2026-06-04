@@ -6,11 +6,15 @@ services:
     build:
       context: .
       dockerfile: infra/docker/Dockerfile.api
+      args:
+        BUILD_SHA: ${BUILD_SHA:-dev}
     image: churchhub-api:prod
     restart: unless-stopped
     # Host ports: set in docker-compose.aapanel.yml (127.0.0.1:4000)
     environment:
       NODE_ENV: production
+      BUILD_SHA: ${BUILD_SHA:-dev}
+      GIT_COMMIT: ${GIT_COMMIT:-${BUILD_SHA:-dev}}
       DATABASE_URL: postgresql://churchhub:churchhub@postgres:5432/churchhub?schema=public
       REDIS_URL: redis://redis:6379
       REDIS_HOST: redis
@@ -31,11 +35,18 @@ services:
     build:
       context: .
       dockerfile: infra/docker/Dockerfile.web
+      args:
+        BUILD_SHA: ${BUILD_SHA:-dev}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3001}
+        NEXT_PUBLIC_DEMO_MODE: ${NEXT_PUBLIC_DEMO_MODE:-false}
     image: churchhub-web:prod
     restart: unless-stopped
     # Host ports: set in docker-compose.aapanel.yml (127.0.0.1:3003)
     environment:
       NODE_ENV: production
+      BUILD_SHA: ${BUILD_SHA:-dev}
+      GIT_COMMIT: ${GIT_COMMIT:-${BUILD_SHA:-dev}}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
       # SSR fetches from the web container (e.g. /c/{slug} public pages)
       SERVER_API_URL: ${SERVER_API_URL:-http://api:4000}

@@ -337,34 +337,39 @@ The app needs **two** backends on one domain:
 
 ---
 
-## Part J — Updating the app later
+## Part J — Updating the app later (no stale builds)
+
+Use the deploy script so Docker always rebuilds images, recreates containers, and runs migrations:
 
 ```bash
-cd /www/wwwroot/churchhub
+cd /www/wwwroot/church-hub.wazconnect.com   # or your clone path
+chmod +x scripts/deploy/vps-update.sh scripts/deploy/vps-verify.sh
 git pull
-
-docker compose \
-  -f docker-compose.yml \
-  -f infra/docker/docker-compose.prod.yml \
-  -f infra/docker/docker-compose.aapanel.yml \
-  --env-file .env \
-  build
-
-docker compose \
-  -f docker-compose.yml \
-  -f infra/docker/docker-compose.prod.yml \
-  -f infra/docker/docker-compose.aapanel.yml \
-  --env-file .env \
-  up -d
-
-docker compose \
-  -f docker-compose.yml \
-  -f infra/docker/docker-compose.prod.yml \
-  -f infra/docker/docker-compose.aapanel.yml \
-  exec api npx prisma migrate deploy
+./scripts/deploy/vps-update.sh
+./scripts/deploy/vps-verify.sh
 ```
 
-If you change `NEXT_PUBLIC_*` in `.env`, you **must** run `build` again before `up -d`.
+If `git pull` fails because of server-local edits to compose files:
+
+```bash
+FORCE_GIT_RESET=1 ./scripts/deploy/vps-update.sh
+```
+
+**What the script does**
+
+1. `git pull --ff-only` (or hard reset with `FORCE_GIT_RESET=1`)
+2. `docker compose build --no-cache --pull` for **api** and **web** (re-bakes `NEXT_PUBLIC_*`)
+3. `docker compose up -d --force-recreate` (new containers, not old ones)
+4. `prisma migrate deploy`
+5. Prunes dangling images
+6. Local `curl` checks for API, login page, and auth image
+
+**After deploy**
+
+- Update aaPanel Nginx from `infra/nginx/church-hub.wazconnect.com.conf.example` if it changed (especially `/_next/`, `/images/`, and HTML `no-store` headers).
+- Hard-refresh the browser: **Ctrl+Shift+R** (or clear site data for `church-hub.wazconnect.com`).
+
+If you change `NEXT_PUBLIC_*` in `.env`, you **must** run `./scripts/deploy/vps-update.sh` (not only `up -d`).
 
 ---
 
@@ -413,6 +418,8 @@ https://church-hub.wazconnect.com  (aaPanel Nginx + SSL)
 |------|--------|
 | Public URL | https://church-hub.wazconnect.com |
 | API health | https://church-hub.wazconnect.com/api/v1/health |
-| Code on server | `/www/wwwroot/churchhub` |
-| Env file | `/www/wwwroot/churchhub/.env` |
+| Code on server | `/www/wwwroot/church-hub.wazconnect.com` |
+| Env file | `/www/wwwroot/church-hub.wazconnect.com/.env` |
+| Fresh deploy | `./scripts/deploy/vps-update.sh` |
+| Verify deploy | `./scripts/deploy/vps-verify.sh` |
 | Demo login (after seed) | admin@demo.church / ChurchHub123! |

@@ -21,6 +21,7 @@ export class HealthController {
     return {
       status: 'ok',
       service: 'church-hub-api',
+      build: process.env.GIT_COMMIT ?? process.env.BUILD_SHA ?? 'unknown',
       timestamp: new Date().toISOString(),
     };
   }
