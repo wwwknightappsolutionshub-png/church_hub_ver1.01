@@ -7,6 +7,7 @@
 const path = require('path');
 
 const root = process.env.CHURCHHUB_ROOT || path.resolve(__dirname, '../..');
+const webStandalone = path.join(root, 'apps/web/.next/standalone/apps/web');
 
 module.exports = {
   apps: [
@@ -26,9 +27,8 @@ module.exports = {
     },
     {
       name: 'church-hub-web',
-      cwd: path.join(root, 'apps/web'),
-      script: 'node_modules/next/dist/bin/next',
-      args: 'start -p 3003 -H 127.0.0.1',
+      cwd: webStandalone,
+      script: 'server.js',
       instances: 1,
       exec_mode: 'fork',
       max_memory_restart: '700M',
@@ -37,6 +37,8 @@ module.exports = {
       out_file: path.join(root, 'logs/church-hub-web-out.log'),
       env: {
         NODE_ENV: 'production',
+        PORT: '3003',
+        HOSTNAME: '127.0.0.1',
       },
     },
   ],

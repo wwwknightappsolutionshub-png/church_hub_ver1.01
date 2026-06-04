@@ -64,10 +64,18 @@ pnpm --filter @church-hub/shared-types build
 pnpm --filter @church-hub/api exec prisma generate
 pnpm --filter @church-hub/api build
 
-echo "==> Build web (NEXT_PUBLIC_* from .env)"
-# Full next start (not standalone) — matches ecosystem.config.cjs
-export NEXT_STANDALONE=0
+echo "==> Build web (NEXT_PUBLIC_* from .env, standalone output)"
 pnpm --filter @church-hub/web build
+WEB="$ROOT/apps/web"
+STANDALONE="$WEB/.next/standalone"
+if [[ ! -f "$STANDALONE/apps/web/server.js" ]]; then
+  echo "ERROR: standalone server missing at $STANDALONE/apps/web/server.js" >&2
+  exit 1
+fi
+mkdir -p "$STANDALONE/apps/web/.next"
+rsync -a "$WEB/.next/static/" "$STANDALONE/apps/web/.next/static/"
+rsync -a "$WEB/public/" "$STANDALONE/apps/web/public/"
+echo "Standalone web bundle ready"
 
 echo "==> Migrations"
 cd apps/api
