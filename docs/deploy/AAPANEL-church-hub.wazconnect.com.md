@@ -2,6 +2,8 @@
 
 Complete guide assuming you are starting from zero.
 
+> **PM2 + native Postgres/Redis (same as your other VPS apps):** see [PM2-aapanel-migration.md](./PM2-aapanel-migration.md) and `scripts/deploy/pm2-update.sh`.
+
 **What you will have when done:**  
 Visitors open **https://church-hub.wazconnect.com** in a browser and use the church app. The API runs on the same address under `/api/v1/...`.
 
