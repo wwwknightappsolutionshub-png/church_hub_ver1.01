@@ -8,7 +8,7 @@ async function main() {
     console.log('church not found');
     return;
   }
-  console.log('churchId', church.id);
+  console.log('churchId', church.id, 'isActive', church.isActive);
   const approved = await prisma.communitySupportRequest.count({
     where: { churchId: church.id, status: 'APPROVED' },
   });
@@ -23,6 +23,7 @@ async function main() {
   const youtube = sf?.youtube as { items?: unknown[] } | undefined;
   console.log('messages items', messages?.items?.length ?? 0);
   console.log('youtube items', youtube?.items?.length ?? 0);
+  console.log('landing published', landing?.published);
   console.log('communitySupport section', landing?.communitySupport);
 
   const rows = await prisma.communitySupportRequest.findMany({

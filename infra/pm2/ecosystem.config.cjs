@@ -5,9 +5,11 @@
  * Reload: pm2 reload ecosystem.config.cjs --update-env
  */
 const path = require('path');
+const { loadChurchHubEnv } = require('./load-env.cjs');
 
 const root = process.env.CHURCHHUB_ROOT || path.resolve(__dirname, '../..');
 const webStandalone = path.join(root, 'apps/web/.next/standalone/apps/web');
+const shared = loadChurchHubEnv(root);
 
 module.exports = {
   apps: [
@@ -22,7 +24,7 @@ module.exports = {
       error_file: path.join(root, 'logs/church-hub-api-error.log'),
       out_file: path.join(root, 'logs/church-hub-api-out.log'),
       env: {
-        NODE_ENV: 'production',
+        ...shared,
       },
     },
     {
@@ -36,7 +38,7 @@ module.exports = {
       error_file: path.join(root, 'logs/church-hub-web-error.log'),
       out_file: path.join(root, 'logs/church-hub-web-out.log'),
       env: {
-        NODE_ENV: 'production',
+        ...shared,
         PORT: '3003',
         HOSTNAME: '127.0.0.1',
       },
