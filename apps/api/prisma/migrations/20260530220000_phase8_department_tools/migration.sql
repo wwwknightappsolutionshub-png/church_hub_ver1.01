@@ -1,17 +1,5 @@
 -- Phase 8 — Department tools (attendance, absentee notify, weekly reports, volunteer consistency)
-
-CREATE TYPE "DepartmentCode" AS ENUM (
-  'USHERING',
-  'CHOIR',
-  'EVANGELISM',
-  'YOUTH',
-  'TEENS',
-  'CHILDREN',
-  'PROTOCOL',
-  'PRAYER',
-  'MEDIA',
-  'OTHER'
-);
+-- DepartmentCode enum created in 20260526150000_department_code_enum
 
 ALTER TABLE "service_units" ADD COLUMN IF NOT EXISTS "departmentCode" "DepartmentCode";
 
