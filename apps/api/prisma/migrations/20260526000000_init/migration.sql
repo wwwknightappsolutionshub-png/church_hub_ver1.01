@@ -1,4 +1,4 @@
-﻿-- CreateEnum
+-- CreateEnum
 CREATE TYPE "MemberStatus" AS ENUM ('VISITOR', 'NEW_MEMBER', 'ACTIVE_MEMBER', 'DISCIPLED');
 
 -- CreateEnum
