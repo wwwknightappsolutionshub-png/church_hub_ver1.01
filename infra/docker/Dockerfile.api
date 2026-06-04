@@ -17,6 +17,7 @@ COPY . .
 RUN pnpm --filter @church-hub/shared-types build
 RUN pnpm --filter @church-hub/api exec prisma generate
 RUN pnpm --filter @church-hub/api build
+RUN pnpm --filter @church-hub/api run build:seed
 
 # Debian slim: Prisma ships linux-gnu engine + OpenSSL 3 (Alpine 3.19+ dropped openssl1.1-compat)
 FROM node:20-bookworm-slim AS runner
