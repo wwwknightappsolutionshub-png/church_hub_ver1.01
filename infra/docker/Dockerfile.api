@@ -6,7 +6,6 @@ FROM base AS deps
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY apps/api/package.json ./apps/api/
 COPY packages/shared-types/package.json ./packages/shared-types/
-# shared-types needs typescript (devDep) to compile before the API build
 RUN pnpm install --frozen-lockfile --filter @church-hub/api... --filter @church-hub/shared-types
 
 FROM base AS builder
@@ -17,15 +16,16 @@ COPY . .
 RUN pnpm --filter @church-hub/shared-types build
 RUN pnpm --filter @church-hub/api exec prisma generate
 RUN pnpm --filter @church-hub/api build
-# Portable prod bundle (includes @nestjs/* and workspace shared-types)
-RUN pnpm --filter @church-hub/api deploy --prod /prod/api \
-  && cp -r /app/apps/api/prisma /prod/api/prisma \
-  && cd /prod/api && /app/node_modules/.bin/prisma generate
 
+# Run from monorepo layout so pnpm symlinks + Prisma enums resolve (deploy bundle was missing enums)
 FROM node:20-alpine AS runner
-WORKDIR /app
+WORKDIR /app/apps/api
 ENV NODE_ENV=production
-COPY --from=builder /prod/api/ ./
+COPY --from=builder /app/node_modules /app/node_modules
+COPY --from=builder /app/packages/shared-types /app/packages/shared-types
+COPY --from=builder /app/apps/api/dist ./dist
+COPY --from=builder /app/apps/api/package.json ./package.json
 COPY --from=builder /app/apps/api/prisma ./prisma
+COPY --from=builder /app/apps/api/node_modules ./node_modules
 EXPOSE 4000
 CMD ["node", "dist/src/main.js"]
