@@ -9,7 +9,8 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { DevotionalReminderChannel, DevotionalReminderFrequency } from '@prisma/client';
+import type { DevotionalReminderChannel, DevotionalReminderFrequency } from '@prisma/client';
+import { DEVOTIONAL_REMINDER_CHANNEL, DEVOTIONAL_REMINDER_FREQUENCY } from './prisma-enum-values';
 
 export class CreateActionPointDto {
   @IsString()
@@ -45,12 +46,12 @@ export class CreateActionPointDto {
   remindersEnabled?: boolean;
 
   @IsOptional()
-  @IsEnum(DevotionalReminderFrequency)
+  @IsEnum(DEVOTIONAL_REMINDER_FREQUENCY)
   reminderFrequency?: DevotionalReminderFrequency;
 
   @IsOptional()
   @IsArray()
-  @IsEnum(DevotionalReminderChannel, { each: true })
+  @IsEnum(DEVOTIONAL_REMINDER_CHANNEL, { each: true })
   reminderChannels?: DevotionalReminderChannel[];
 
   @IsOptional()
@@ -89,12 +90,12 @@ export class UpdateActionPointDto {
   remindersEnabled?: boolean;
 
   @IsOptional()
-  @IsEnum(DevotionalReminderFrequency)
+  @IsEnum(DEVOTIONAL_REMINDER_FREQUENCY)
   reminderFrequency?: DevotionalReminderFrequency;
 
   @IsOptional()
   @IsArray()
-  @IsEnum(DevotionalReminderChannel, { each: true })
+  @IsEnum(DEVOTIONAL_REMINDER_CHANNEL, { each: true })
   reminderChannels?: DevotionalReminderChannel[];
 
   @IsOptional()

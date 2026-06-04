@@ -9,8 +9,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import type { DevotionalAudience } from '@prisma/client';
-
-const DEVOTIONAL_AUDIENCE_VALUES = ['ALL', 'YOUTH', 'ADULT', 'FAMILY', 'LEADERS'] as const;
+import { DEVOTIONAL_AUDIENCE } from './prisma-enum-values';
 
 export class DevotionalPlanDayInputDto {
   @IsOptional()
@@ -58,7 +57,7 @@ export class CreateDevotionalPlanDto {
   endDate?: string;
 
   @IsOptional()
-  @IsEnum(DEVOTIONAL_AUDIENCE_VALUES)
+  @IsEnum(DEVOTIONAL_AUDIENCE)
   audience?: DevotionalAudience;
 
   @IsOptional()

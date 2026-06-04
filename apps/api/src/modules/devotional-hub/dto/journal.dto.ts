@@ -9,7 +9,8 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { DevotionalJournalVisibility } from '@prisma/client';
+import type { DevotionalJournalVisibility } from '@prisma/client';
+import { DEVOTIONAL_JOURNAL_VISIBILITY } from './prisma-enum-values';
 
 class JournalAttachmentDto {
   @IsUrl()
@@ -44,7 +45,7 @@ export class CreateJournalDto {
   title?: string;
 
   @IsOptional()
-  @IsEnum(DevotionalJournalVisibility)
+  @IsEnum(DEVOTIONAL_JOURNAL_VISIBILITY)
   visibility?: DevotionalJournalVisibility;
 
   @IsOptional()

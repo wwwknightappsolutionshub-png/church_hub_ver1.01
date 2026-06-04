@@ -8,7 +8,8 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { DevotionalGroupVisibility } from '@prisma/client';
+import type { DevotionalGroupVisibility } from '@prisma/client';
+import { DEVOTIONAL_GROUP_VISIBILITY } from './prisma-enum-values';
 
 export class CreateDevotionalGroupDto {
   @IsString()
@@ -24,7 +25,7 @@ export class CreateDevotionalGroupDto {
   profileImageUrl?: string;
 
   @IsOptional()
-  @IsEnum(DevotionalGroupVisibility)
+  @IsEnum(DEVOTIONAL_GROUP_VISIBILITY)
   visibility?: DevotionalGroupVisibility;
 
   @IsOptional()
@@ -47,7 +48,7 @@ export class UpdateDevotionalGroupDto {
   profileImageUrl?: string;
 
   @IsOptional()
-  @IsEnum(DevotionalGroupVisibility)
+  @IsEnum(DEVOTIONAL_GROUP_VISIBILITY)
   visibility?: DevotionalGroupVisibility;
 
   @IsOptional()

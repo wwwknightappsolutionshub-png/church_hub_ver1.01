@@ -10,13 +10,11 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import {
-  DevotionalReminderChannel,
-  DevotionalReminderFrequency,
-} from '@prisma/client';
+import type { DevotionalReminderChannel, DevotionalReminderFrequency } from '@prisma/client';
+import { DEVOTIONAL_REMINDER_CHANNEL, DEVOTIONAL_REMINDER_FREQUENCY } from './prisma-enum-values';
 
 export class ReminderChannelSettingDto {
-  @IsEnum(DevotionalReminderChannel)
+  @IsEnum(DEVOTIONAL_REMINDER_CHANNEL)
   channel!: DevotionalReminderChannel;
 
   @IsOptional()
@@ -56,7 +54,7 @@ export class UpsertReminderPreferencesDto {
 
 export class UpsertPlanRemindersDto {
   @IsOptional()
-  @IsEnum(DevotionalReminderFrequency)
+  @IsEnum(DEVOTIONAL_REMINDER_FREQUENCY)
   frequency?: DevotionalReminderFrequency;
 
   @IsOptional()

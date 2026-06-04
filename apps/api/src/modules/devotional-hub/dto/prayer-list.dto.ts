@@ -8,7 +8,8 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { DevotionalPrayerListScope } from '@prisma/client';
+import type { DevotionalPrayerListScope } from '@prisma/client';
+import { DEVOTIONAL_PRAYER_LIST_SCOPE } from './prisma-enum-values';
 
 export class PrayerListItemDto {
   @IsString()
@@ -26,7 +27,7 @@ export class CreatePrayerListDto {
   title!: string;
 
   @IsOptional()
-  @IsEnum(DevotionalPrayerListScope)
+  @IsEnum(DEVOTIONAL_PRAYER_LIST_SCOPE)
   scope?: DevotionalPrayerListScope;
 
   @IsOptional()

@@ -1,5 +1,7 @@
 import { IsDateString, IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
-import { SermonNoteSourceType } from '@prisma/client';
+import type { SermonNoteSourceType } from '@prisma/client';
+
+const SERMON_NOTE_SOURCE_TYPE = ['AUDIO', 'TEXT', 'PDF'] as const;
 
 export class CreateSermonNoteDto {
   @IsString()
@@ -7,7 +9,7 @@ export class CreateSermonNoteDto {
   @MaxLength(200)
   title!: string;
 
-  @IsEnum(SermonNoteSourceType)
+  @IsEnum(SERMON_NOTE_SOURCE_TYPE)
   sourceType!: SermonNoteSourceType;
 
   @IsOptional()

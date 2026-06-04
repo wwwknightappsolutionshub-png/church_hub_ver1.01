@@ -9,7 +9,8 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { DevotionalMeetupRecurrence } from '@prisma/client';
+import type { DevotionalMeetupRecurrence } from '@prisma/client';
+import { DEVOTIONAL_MEETUP_RECURRENCE } from './prisma-enum-values';
 
 export class CreateMeetupDto {
   @IsString()
@@ -43,7 +44,7 @@ export class CreateMeetupDto {
   locationType?: 'PHYSICAL' | 'ONLINE' | 'HYBRID';
 
   @IsOptional()
-  @IsEnum(DevotionalMeetupRecurrence)
+  @IsEnum(DEVOTIONAL_MEETUP_RECURRENCE)
   recurrence?: DevotionalMeetupRecurrence;
 
   @IsOptional()
@@ -87,7 +88,7 @@ export class UpdateMeetupDto {
   locationType?: 'PHYSICAL' | 'ONLINE' | 'HYBRID';
 
   @IsOptional()
-  @IsEnum(DevotionalMeetupRecurrence)
+  @IsEnum(DEVOTIONAL_MEETUP_RECURRENCE)
   recurrence?: DevotionalMeetupRecurrence;
 }
 

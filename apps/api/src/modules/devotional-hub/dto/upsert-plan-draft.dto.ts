@@ -11,11 +11,16 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import {
+import type {
   DevotionalAudience,
   DevotionalPlanSourceType,
   DevotionalPlanTone,
 } from '@prisma/client';
+import {
+  DEVOTIONAL_AUDIENCE,
+  DEVOTIONAL_PLAN_SOURCE_TYPE,
+  DEVOTIONAL_PLAN_TONE,
+} from './prisma-enum-values';
 import { DevotionalPlanDayInputDto } from './create-plan.dto';
 
 export class UpsertDevotionalPlanDraftDto {
@@ -36,7 +41,7 @@ export class UpsertDevotionalPlanDraftDto {
   startDate?: string;
 
   @IsOptional()
-  @IsEnum(DevotionalPlanSourceType)
+  @IsEnum(DEVOTIONAL_PLAN_SOURCE_TYPE)
   sourceType?: DevotionalPlanSourceType;
 
   @IsOptional()
@@ -56,11 +61,11 @@ export class UpsertDevotionalPlanDraftDto {
   customTopic?: string;
 
   @IsOptional()
-  @IsEnum(DevotionalPlanTone)
+  @IsEnum(DEVOTIONAL_PLAN_TONE)
   tone?: DevotionalPlanTone;
 
   @IsOptional()
-  @IsEnum(DevotionalAudience)
+  @IsEnum(DEVOTIONAL_AUDIENCE)
   audience?: DevotionalAudience;
 
   @IsOptional()

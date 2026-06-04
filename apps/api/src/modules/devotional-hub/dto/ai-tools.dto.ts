@@ -8,11 +8,12 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { DevotionalPlanSourceType, DevotionalPlanTone } from '@prisma/client';
+import type { DevotionalPlanSourceType, DevotionalPlanTone } from '@prisma/client';
+import { DEVOTIONAL_PLAN_SOURCE_TYPE, DEVOTIONAL_PLAN_TONE } from './prisma-enum-values';
 
 export class StudyOutlineAiDto {
   @IsOptional()
-  @IsEnum(DevotionalPlanSourceType)
+  @IsEnum(DEVOTIONAL_PLAN_SOURCE_TYPE)
   sourceType?: DevotionalPlanSourceType;
 
   @IsOptional()
@@ -32,7 +33,7 @@ export class StudyOutlineAiDto {
   customTopic?: string;
 
   @IsOptional()
-  @IsEnum(DevotionalPlanTone)
+  @IsEnum(DEVOTIONAL_PLAN_TONE)
   tone?: DevotionalPlanTone;
 
   @IsOptional()
