@@ -21,21 +21,17 @@ export function DashboardAuthGate({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 p-8 text-center">
         <p className="text-lg font-medium">Sign in to load live data</p>
         <p className="max-w-md text-sm text-muted-foreground">
-          {authHint ??
-            'Start the API with `pnpm --filter @church-hub/api dev`, then sign in or use demo auto-login.'}
+          {authHint ?? 'Sign in to access your church workspace.'}
         </p>
         <div className="flex flex-wrap items-center justify-center gap-2">
           <Button type="button" variant="outline" onClick={() => retry()}>
             <RefreshCw className="mr-2 h-4 w-4" />
-            Retry demo login
+            Retry
           </Button>
           <Button asChild>
             <Link href="/login">Sign in</Link>
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Demo: admin@demo.church / ChurchHub123! · API: {process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}
-        </p>
       </div>
     );
   }
