@@ -19,6 +19,8 @@ RUN pnpm --filter @church-hub/api build
 
 # Run from monorepo layout so pnpm symlinks + Prisma enums resolve (deploy bundle was missing enums)
 FROM node:20-alpine AS runner
+# Prisma query engine needs OpenSSL on Alpine (libssl.so.1.1)
+RUN apk add --no-cache libc6-compat openssl openssl1.1-compat
 WORKDIR /app/apps/api
 ENV NODE_ENV=production
 COPY --from=builder /app/node_modules /app/node_modules
