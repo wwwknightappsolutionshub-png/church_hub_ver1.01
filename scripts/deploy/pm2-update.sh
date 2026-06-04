@@ -3,8 +3,9 @@
 #
 # Usage:
 #   cd /www/wwwroot/church-hub.wazconnect.com
-#   chmod +x scripts/deploy/pm2-update.sh
 #   ./scripts/deploy/pm2-update.sh
+#   # If "Permission denied": bash scripts/deploy/pm2-update.sh
+#   # (git tracks +x on scripts/deploy/*.sh — pull preserves execute bit)
 #
 # Env:
 #   CHURCHHUB_ROOT, GIT_BRANCH, SKIP_GIT=1, FORCE_GIT_RESET=1
