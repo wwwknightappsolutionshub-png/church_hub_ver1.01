@@ -17,7 +17,7 @@ import {
 } from '@/components/church-landing/ChurchLandingBrandingPanel';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { isChurchLeadershipRole } from '@/lib/session-role';
-import { churchPublicPreviewPath } from '@/lib/church-slug';
+import { churchPublicPath, churchPublicPreviewPath } from '@/lib/church-slug';
 import type {
   ChurchLandingAdminDto,
   ChurchLandingContent,
@@ -207,7 +207,14 @@ export default function ChurchLandingAdminPage() {
       actions={
         <>
           <Button variant="secondary" size="sm" asChild>
-            <Link href={churchPublicPath(previewSlug)} target="_blank">
+            <Link
+              href={
+                previewVersion != null
+                  ? churchPublicPreviewPath(previewSlug, previewVersion)
+                  : churchPublicPath(previewSlug)
+              }
+              target="_blank"
+            >
               <ExternalLink className="mr-2 h-4 w-4" />
               Preview
             </Link>
