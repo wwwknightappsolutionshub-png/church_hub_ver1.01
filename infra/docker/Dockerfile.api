@@ -18,7 +18,9 @@ RUN pnpm --filter @church-hub/shared-types build
 RUN pnpm --filter @church-hub/api exec prisma generate
 RUN pnpm --filter @church-hub/api build
 # Portable prod bundle (includes @nestjs/* and workspace shared-types)
-RUN pnpm --filter @church-hub/api deploy --prod /prod/api
+RUN pnpm --filter @church-hub/api deploy --prod /prod/api \
+  && cp -r /app/apps/api/prisma /prod/api/prisma \
+  && cd /prod/api && /app/node_modules/.bin/prisma generate
 
 FROM node:20-alpine AS runner
 WORKDIR /app

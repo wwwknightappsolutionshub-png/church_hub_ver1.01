@@ -26,7 +26,7 @@ services:
       S3_SECRET_KEY: churchhub-secret
       S3_REGION: us-east-1
       S3_PUBLIC_URL: http://minio:9000/churchhub-uploads
-    ports: !reset
+    ports:
       - "127.0.0.1:4000:4000"
     volumes:
       - ./uploads-data:/app/uploads
@@ -39,7 +39,7 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
         NEXT_PUBLIC_DEMO_MODE: ${NEXT_PUBLIC_DEMO_MODE:-false}
-    ports: !reset
+    ports:
       # Use 3003 when 3001/3002 are used by other apps on the host
       - "127.0.0.1:3003:3000"
 
