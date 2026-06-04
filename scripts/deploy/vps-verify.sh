@@ -26,21 +26,20 @@ fi
 
 LOGIN_CHUNK="$(echo "$HTML" | sed -n 's/.*\(app\/login\/page-[a-f0-9]*\.js\).*/\1/p' | head -1)"
 if [[ -n "$LOGIN_CHUNK" ]]; then
-  CHUNK_BODY=$(curl -sf "$PUBLIC_BASE/_next/static/chunks/$LOGIN_CHUNK" | head -c 50000 || true)
+  CHUNK_URL="$PUBLIC_BASE/_next/static/chunks/$LOGIN_CHUNK"
+  CODE=$(curl -s -o /dev/null -w "%{http_code}" "$CHUNK_URL" || true)
+  echo "Login chunk /_next/static/chunks/$LOGIN_CHUNK -> ${CODE:-000}"
+  LOCAL_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$LOCAL_WEB/_next/static/chunks/$LOGIN_CHUNK" || true)
+  echo "Local login chunk -> ${LOCAL_CODE:-000}"
+  if [[ "$CODE" != "200" ]]; then
+    echo "FAIL: public login JS chunk not served — check Nginx location ^~ /_next/ and run pm2-update.sh" >&2
+    exit 1
+  fi
+  CHUNK_BODY=$(curl -sf "$CHUNK_URL" | head -c 50000 || true)
   if echo "$CHUNK_BODY" | grep -qiE 'Magic login|admin@demo\.church|FALLBACK_TEST'; then
-    echo "WARN: login JS chunk still contains Magic login — redeploy web + hard-refresh browsers"
+    echo "WARN: login JS chunk still contains Magic login — hard-refresh browser / unregister service worker"
   else
     echo "OK: login JS chunk has no Magic login UI"
-  fi
-fi
-
-CHUNK="$(echo "$HTML" | sed -n 's/.*\(app\/login\/page-[a-f0-9]*\.js\).*/\1/p' | head -1)"
-if [[ -n "$CHUNK" ]]; then
-  CODE=$(curl -sf -o /dev/null -w "%{http_code}" "$PUBLIC_BASE/_next/static/chunks/$CHUNK" || echo "000")
-  echo "Login chunk /_next/static/chunks/$CHUNK -> $CODE"
-  if [[ "$CODE" != "200" ]]; then
-    echo "FAIL: login JS chunk missing — rebuild web and fix Nginx /_next/ proxy"
-    exit 1
   fi
 fi
 

@@ -76,6 +76,12 @@ fi
 mkdir -p "$STANDALONE/apps/web/.next"
 rsync -a "$WEB/.next/static/" "$STANDALONE/apps/web/.next/static/"
 rsync -a "$WEB/public/" "$STANDALONE/apps/web/public/"
+LOGIN_CHUNK_FILE=$(find "$STANDALONE/apps/web/.next/static/chunks/app/login" -name 'page-*.js' 2>/dev/null | head -1 || true)
+if [[ -z "$LOGIN_CHUNK_FILE" ]]; then
+  echo "WARN: login page chunk missing under standalone .next/static — web UI may break" >&2
+else
+  echo "Login chunk present: $(basename "$LOGIN_CHUNK_FILE")"
+fi
 echo "Standalone web bundle ready"
 
 echo "==> Migrations"

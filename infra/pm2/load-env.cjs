@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 /** Minimal .env parser for ecosystem.config.cjs (no dotenv dependency). */
 function loadEnvFile(envPath) {
@@ -23,10 +24,19 @@ function loadEnvFile(envPath) {
   return out;
 }
 
+function resolveGitSha(root) {
+  try {
+    return execSync('git rev-parse --short HEAD', { cwd: root, encoding: 'utf8' }).trim();
+  } catch {
+    return '';
+  }
+}
+
 function loadChurchHubEnv(root) {
   const file = path.join(root, '.env');
   const fileEnv = loadEnvFile(file);
   const pick = (key, fallback) => process.env[key] || fileEnv[key] || fallback;
+  const gitSha = resolveGitSha(root) || pick('GIT_COMMIT', '') || pick('BUILD_SHA', '');
   return {
     NODE_ENV: pick('NODE_ENV', 'production'),
     DATABASE_URL: pick('DATABASE_URL', ''),
@@ -34,6 +44,8 @@ function loadChurchHubEnv(root) {
     API_PORT: pick('API_PORT', '4000'),
     NEXT_PUBLIC_API_URL: pick('NEXT_PUBLIC_API_URL', ''),
     NEXT_PUBLIC_APP_URL: pick('NEXT_PUBLIC_APP_URL', ''),
+    GIT_COMMIT: gitSha,
+    BUILD_SHA: gitSha,
   };
 }
 
