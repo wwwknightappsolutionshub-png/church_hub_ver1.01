@@ -108,7 +108,8 @@ echo "==> Verify (wait for PM2 processes to listen)"
 wait_http() {
   local url="$1" label="$2" i code
   for i in $(seq 1 15); do
-    code=$(curl -s -o /dev/null -w "%{http_code}" "$url" 2>/dev/null || echo "000")
+    code=$(curl -s -o /dev/null -w "%{http_code}" "$url" 2>/dev/null)
+    code=${code:-000}
     if [[ "$code" != "000" && "$code" != "" ]]; then
       echo "$label -> $code"
       return 0
