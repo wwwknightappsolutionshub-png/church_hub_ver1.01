@@ -1,12 +1,13 @@
 import { notFound } from 'next/navigation';
 import { ChurchLandingView } from '@/components/church-landing/ChurchLandingView';
+import { getServerApiBaseUrl } from '@/lib/server-api-url';
 import type { PublicChurchLandingDto } from '@church-hub/shared-types';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 async function fetchLanding(slug: string): Promise<PublicChurchLandingDto | null> {
   try {
-    const res = await fetch(`${API_URL}/api/v1/churches/${encodeURIComponent(slug)}/landing`, {
+    const res = await fetch(
+      `${getServerApiBaseUrl()}/api/v1/churches/${encodeURIComponent(slug)}/landing`,
+      {
       cache: 'no-store',
     });
     if (!res.ok) return null;

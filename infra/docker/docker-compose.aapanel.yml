@@ -41,6 +41,8 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
         NEXT_PUBLIC_DEMO_MODE: ${NEXT_PUBLIC_DEMO_MODE:-false}
+    environment:
+      SERVER_API_URL: ${SERVER_API_URL:-http://api:4000}
     ports:
       # Use 3003 when 3001/3002 are used by other apps on the host
       - "127.0.0.1:3003:3000"

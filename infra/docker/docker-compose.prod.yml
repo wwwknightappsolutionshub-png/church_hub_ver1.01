@@ -37,5 +37,7 @@ services:
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+      # SSR fetches from the web container (e.g. /c/{slug} public pages)
+      SERVER_API_URL: ${SERVER_API_URL:-http://api:4000}
     depends_on:
       - api
