@@ -6,11 +6,13 @@ FROM base AS deps
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY apps/api/package.json ./apps/api/
 COPY packages/shared-types/package.json ./packages/shared-types/
-RUN pnpm install --frozen-lockfile --filter @church-hub/api...
+# shared-types needs typescript (devDep) to compile before the API build
+RUN pnpm install --frozen-lockfile --filter @church-hub/api... --filter @church-hub/shared-types
 
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=deps /app/packages/shared-types/node_modules ./packages/shared-types/node_modules
 COPY . .
 RUN pnpm --filter @church-hub/shared-types build
 RUN pnpm --filter @church-hub/api exec prisma generate
