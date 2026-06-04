@@ -57,5 +57,6 @@ infra/terraform/.terraform/
 # Docker
 *.pid
 
-# Uploads (local dev)
-uploads/
+# Uploaded files on disk (not the Nest uploads module under src/modules/uploads)
+/uploads/
+uploads-data/
