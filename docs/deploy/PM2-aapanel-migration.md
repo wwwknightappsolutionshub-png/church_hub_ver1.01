@@ -132,6 +132,15 @@ git pull
 
 Faster than Docker: no image rebuild; only `pnpm build` + `pm2 reload`.
 
+### Stale login page / demo accounts still visible
+
+If `bash scripts/deploy/vps-verify.sh` warns that **public** login HTML references an old `page-*.js` chunk but **PM2** serves a newer one, aaPanel/Nginx is caching HTML. In the site config, ensure:
+
+- `location ^~ /_next/` → proxy to `127.0.0.1:3003` (static JS)
+- `location /` → proxy to `127.0.0.1:3003` with `Cache-Control: no-store` on HTML (see `infra/nginx/church-hub.wazconnect.com.conf.example`)
+
+Then reload Nginx and hard-refresh the browser (or unregister the service worker).
+
 ---
 
 ## Nginx (aaPanel)

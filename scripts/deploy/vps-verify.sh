@@ -17,30 +17,44 @@ curl -sf -o /dev/null -w "GET /images/auth-side-visual.svg -> %{http_code}\n" \
   "$PUBLIC_BASE/images/auth-side-visual.svg"
 curl -sf -o /dev/null -w "GET /c/demo-church -> %{http_code}\n" "$PUBLIC_BASE/c/demo-church"
 
-HTML="$(curl -sf "$PUBLIC_BASE/login" | head -c 12000)"
-if echo "$HTML" | grep -qiE 'Magic login|admin@demo\.church|ChurchHub123'; then
-  echo "WARN: login HTML still shows demo/test credentials (stale web build or browser cache)"
-else
-  echo "OK: no demo credentials in login HTML shell"
-fi
+HTML_PUBLIC="$(curl -sf "$PUBLIC_BASE/login" | head -c 20000)"
+HTML_LOCAL="$(curl -sf "$LOCAL_WEB/login" | head -c 20000)"
 
-LOGIN_CHUNK="$(echo "$HTML" | sed -n 's/.*\(app\/login\/page-[a-f0-9]*\.js\).*/\1/p' | head -1)"
-if [[ -n "$LOGIN_CHUNK" ]]; then
-  CHUNK_URL="$PUBLIC_BASE/_next/static/chunks/$LOGIN_CHUNK"
-  CODE=$(curl -s -o /dev/null -w "%{http_code}" "$CHUNK_URL" || true)
-  echo "Login chunk /_next/static/chunks/$LOGIN_CHUNK -> ${CODE:-000}"
-  LOCAL_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$LOCAL_WEB/_next/static/chunks/$LOGIN_CHUNK" || true)
-  echo "Local login chunk -> ${LOCAL_CODE:-000}"
-  if [[ "$CODE" != "200" ]]; then
-    echo "FAIL: public login JS chunk not served — check Nginx location ^~ /_next/ and run pm2-update.sh" >&2
+if echo "$HTML_PUBLIC" | grep -qiE 'Magic login|admin@demo\.church|ChurchHub123'; then
+  echo "WARN: public login HTML mentions demo credentials (stale proxy cache or old build)"
+fi
+if echo "$HTML_LOCAL" | grep -qiE 'Magic login|admin@demo\.church|ChurchHub123'; then
+  echo "WARN: local login HTML mentions demo credentials"
+fi
+echo "OK: checked public + local login HTML shells"
+
+CHUNK_PUBLIC="$(echo "$HTML_PUBLIC" | sed -n 's/.*\(app\/login\/page-[a-f0-9]*\.js\).*/\1/p' | head -1)"
+CHUNK_LOCAL="$(echo "$HTML_LOCAL" | sed -n 's/.*\(app\/login\/page-[a-f0-9]*\.js\).*/\1/p' | head -1)"
+
+if [[ -n "$CHUNK_LOCAL" ]]; then
+  echo "Login chunk (PM2): $CHUNK_LOCAL"
+  LOCAL_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$LOCAL_WEB/_next/static/chunks/$CHUNK_LOCAL" || true)
+  echo "  local static -> ${LOCAL_CODE:-000}"
+  if [[ "$LOCAL_CODE" != "200" ]]; then
+    echo "FAIL: PM2 is not serving the current login JS — run ./scripts/deploy/pm2-update.sh" >&2
     exit 1
   fi
-  CHUNK_BODY=$(curl -sf "$CHUNK_URL" | head -c 50000 || true)
+  CHUNK_BODY=$(curl -sf "$LOCAL_WEB/_next/static/chunks/$CHUNK_LOCAL" | head -c 50000 || true)
   if echo "$CHUNK_BODY" | grep -qiE 'Magic login|admin@demo\.church|FALLBACK_TEST'; then
-    echo "WARN: login JS chunk still contains Magic login — hard-refresh browser / unregister service worker"
+    echo "WARN: login JS still contains Magic login — rebuild web"
   else
-    echo "OK: login JS chunk has no Magic login UI"
+    echo "OK: current login JS has no Magic login UI"
   fi
+fi
+
+if [[ -n "$CHUNK_PUBLIC" && "$CHUNK_PUBLIC" != "$CHUNK_LOCAL" ]]; then
+  echo "WARN: public login HTML references stale chunk $CHUNK_PUBLIC (live: $CHUNK_LOCAL)"
+  echo "      Purge Nginx/proxy cache for /login or ensure location / has Cache-Control: no-store"
+  PUB_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$PUBLIC_BASE/_next/static/chunks/$CHUNK_PUBLIC" || true)
+  echo "      stale public chunk -> ${PUB_CODE:-000}"
+elif [[ -n "$CHUNK_PUBLIC" ]]; then
+  PUB_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$PUBLIC_BASE/_next/static/chunks/$CHUNK_PUBLIC" || true)
+  echo "Login chunk (public): $CHUNK_PUBLIC -> ${PUB_CODE:-000}"
 fi
 
 echo ""
