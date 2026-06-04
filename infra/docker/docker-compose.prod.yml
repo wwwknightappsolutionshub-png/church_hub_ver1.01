@@ -13,6 +13,8 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgresql://churchhub:churchhub@postgres:5432/churchhub?schema=public
       REDIS_URL: redis://redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
       REDIS_ENABLED: 'true'
       API_PORT: '4000'
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
