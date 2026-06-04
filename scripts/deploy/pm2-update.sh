@@ -11,6 +11,9 @@
 
 set -euo pipefail
 
+# Non-interactive Corepack / pnpm on VPS
+export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+
 ROOT="${CHURCHHUB_ROOT:-$(pwd)}"
 cd "$ROOT"
 GIT_BRANCH="${GIT_BRANCH:-master}"
@@ -48,6 +51,9 @@ export REDIS_PORT="${REDIS_PORT:-6379}"
 export API_PORT="${API_PORT:-4000}"
 
 echo "==> Deploy commit $GIT_COMMIT (PM2)"
+echo "==> Enable pnpm via corepack"
+corepack enable 2>/dev/null || true
+corepack prepare pnpm@9.14.2 --activate 2>/dev/null || true
 echo "==> pnpm install"
 pnpm install --frozen-lockfile
 
