@@ -98,9 +98,32 @@ fi
 
 pm2 save
 
-echo "==> Verify"
+echo "==> Verify (wait for PM2 processes to listen)"
+wait_http() {
+  local url="$1" label="$2" i code
+  for i in $(seq 1 15); do
+    code=$(curl -s -o /dev/null -w "%{http_code}" "$url" 2>/dev/null || echo "000")
+    if [[ "$code" != "000" && "$code" != "" ]]; then
+      echo "$label -> $code"
+      return 0
+    fi
+    sleep 2
+  done
+  echo "$label -> failed (no response after 30s)" >&2
+  return 1
+}
+
+set +e
 curl -sf "http://127.0.0.1:${API_PORT}/api/v1/health" && echo ""
-curl -sf -o /dev/null -w "web /login -> %{http_code}\n" "http://127.0.0.1:3003/login"
-curl -sf -o /dev/null -w "auth image -> %{http_code}\n" "http://127.0.0.1:3003/images/auth-side-visual.svg"
+API_OK=$?
+wait_http "http://127.0.0.1:3003/login" "web /login"
+WEB_OK=$?
+wait_http "http://127.0.0.1:3003/images/auth-side-visual.svg" "auth image"
+set -e
+
+if [[ "$WEB_OK" -ne 0 ]]; then
+  echo "WARN: web check failed — recent logs:" >&2
+  pm2 logs church-hub-web --lines 25 --nostream 2>/dev/null || true
+fi
 
 echo "Deployed $GIT_COMMIT under PM2. Nginx: / -> 3003, /api/ -> ${API_PORT}"
