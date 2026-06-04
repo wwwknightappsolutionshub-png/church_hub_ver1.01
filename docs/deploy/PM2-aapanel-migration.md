@@ -31,9 +31,20 @@ chmod +x scripts/deploy/pm2-migrate-db-from-docker.sh
 Create DB on **host** Postgres (adjust user/password):
 
 ```bash
+# aaPanel: often /www/server/pgsql/bin/psql -U postgres ...
 sudo -u postgres psql -c "CREATE USER churchhub WITH PASSWORD 'YOUR_STRONG_PASSWORD';"
 sudo -u postgres psql -c "CREATE DATABASE churchhub OWNER churchhub;"
-sudo -u postgres psql -d churchhub -f /tmp/churchhub-docker-XXXXXXXX.sql
+# Import as churchhub so Prisma can write _prisma_migrations (not as postgres superuser)
+sudo -u postgres psql -d churchhub -c "GRANT ALL ON SCHEMA public TO churchhub;"
+psql -U churchhub -d churchhub -f /tmp/churchhub-docker-XXXXXXXX.sql
+```
+
+If you already imported as `postgres` and `prisma migrate deploy` fails with **permission denied for table _prisma_migrations**:
+
+```bash
+chmod +x scripts/deploy/pm2-fix-db-permissions.sh
+./scripts/deploy/pm2-fix-db-permissions.sh
+cd apps/api && npx prisma migrate deploy
 ```
 
 ---
