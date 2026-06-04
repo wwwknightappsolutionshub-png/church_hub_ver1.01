@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
-import { loginWithDemoCredentials, hasAuthToken } from '@/lib/auth-login';
+import { hasAuthToken } from '@/lib/auth-login';
+import { loginWithDemoCredentials } from '@/lib/auth-login-demo';
 import { api, clearAuthTokens } from '@/lib/api';
 
 export { hasAuthToken } from '@/lib/auth-login';

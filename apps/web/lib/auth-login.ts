@@ -2,9 +2,6 @@ import axios from 'axios';
 import { api, setAuthTokens } from '@/lib/api';
 import { applyAuthSessionFromApi } from '@/lib/apply-auth-session';
 
-export const DEMO_EMAIL = 'admin@demo.church';
-export const DEMO_PASSWORD = 'ChurchHub123!';
-
 export function hasAuthToken(): boolean {
   if (typeof window === 'undefined') return false;
   return !!localStorage.getItem('accessToken');
@@ -50,8 +47,4 @@ export async function loginWithCredentials(
     }
     return { ok: false, message: 'Sign in failed. Please try again.' };
   }
-}
-
-export async function loginWithDemoCredentials(): Promise<LoginResult> {
-  return loginWithCredentials(DEMO_EMAIL, DEMO_PASSWORD);
 }

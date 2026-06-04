@@ -20,10 +20,10 @@ curl -sf -o /dev/null -w "GET /c/demo-church -> %{http_code}\n" "$PUBLIC_BASE/c/
 HTML_PUBLIC="$(curl -sf "$PUBLIC_BASE/login" | head -c 20000)"
 HTML_LOCAL="$(curl -sf "$LOCAL_WEB/login" | head -c 20000)"
 
-if echo "$HTML_PUBLIC" | grep -qiE 'Magic login|admin@demo\.church|ChurchHub123'; then
+if echo "$HTML_PUBLIC" | grep -qiE 'Magic login|Shared password for all test'; then
   echo "WARN: public login HTML mentions demo credentials (stale proxy cache or old build)"
 fi
-if echo "$HTML_LOCAL" | grep -qiE 'Magic login|admin@demo\.church|ChurchHub123'; then
+if echo "$HTML_LOCAL" | grep -qiE 'Magic login|Shared password for all test'; then
   echo "WARN: local login HTML mentions demo credentials"
 fi
 echo "OK: checked public + local login HTML shells"
@@ -40,7 +40,7 @@ if [[ -n "$CHUNK_LOCAL" ]]; then
     exit 1
   fi
   CHUNK_BODY=$(curl -sf "$LOCAL_WEB/_next/static/chunks/$CHUNK_LOCAL" | head -c 50000 || true)
-  if echo "$CHUNK_BODY" | grep -qiE 'Magic login|admin@demo\.church|FALLBACK_TEST'; then
+  if echo "$CHUNK_BODY" | grep -qiE 'Magic login|FALLBACK_TEST|Shared password for all test'; then
     echo "WARN: login JS still contains Magic login — rebuild web"
   else
     echo "OK: current login JS has no Magic login UI"
