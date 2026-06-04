@@ -24,6 +24,35 @@
         add_header Cache-Control "public, max-age=31536000, immutable";
     }
 
+    # Auth pages — never cache HTML (stale chunk hashes break login after deploy)
+    location = /login {
+        proxy_pass http://127.0.0.1:3003;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache off;
+        proxy_no_cache 1;
+        proxy_cache_bypass 1;
+        add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+        add_header Pragma "no-cache" always;
+    }
+
+    location = /register {
+        proxy_pass http://127.0.0.1:3003;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache off;
+        proxy_no_cache 1;
+        proxy_cache_bypass 1;
+        add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+        add_header Pragma "no-cache" always;
+    }
+
     # API (NestJS) — must come before or as a separate prefix from /
     location ^~ /api/ {
         proxy_pass http://127.0.0.1:4000/api/;
@@ -44,6 +73,7 @@
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache off;
         proxy_cache_bypass 1;
         proxy_no_cache 1;
         add_header Cache-Control "no-store, no-cache, must-revalidate" always;
