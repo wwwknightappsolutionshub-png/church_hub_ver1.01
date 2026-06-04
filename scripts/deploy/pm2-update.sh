@@ -34,15 +34,14 @@ if [[ "${SKIP_GIT:-0}" != "1" ]]; then
   fi
 fi
 
-export GIT_COMMIT
-GIT_COMMIT="$(git rev-parse --short HEAD)"
-export BUILD_SHA="$GIT_COMMIT"
-
-# Load .env for build-time NEXT_PUBLIC_* and runtime API/DB
+# Load .env (secrets, URLs). Empty GIT_COMMIT/BUILD_SHA in .env must not win over git.
 set -a
 # shellcheck disable=SC1091
 source .env
 set +a
+
+export GIT_COMMIT="$(git rev-parse --short HEAD)"
+export BUILD_SHA="$GIT_COMMIT"
 
 # PM2: API on localhost; SSR must not use Docker hostname "api"
 export SERVER_API_URL="${SERVER_API_URL:-http://127.0.0.1:4000}"
@@ -54,7 +53,10 @@ echo "==> Deploy commit $GIT_COMMIT (PM2)"
 echo "==> Enable pnpm via corepack"
 corepack enable 2>/dev/null || true
 corepack prepare pnpm@9.14.2 --activate 2>/dev/null || true
-echo "==> pnpm install"
+
+# .env sets NODE_ENV=production — devDependencies (typescript, nest CLI) are required to build
+echo "==> pnpm install (including devDependencies for build)"
+export NODE_ENV=development
 pnpm install --frozen-lockfile
 
 echo "==> Build shared-types + API"
@@ -73,8 +75,9 @@ npx prisma migrate deploy
 cd "$ROOT"
 
 export CHURCHHUB_ROOT="$ROOT"
+export NODE_ENV=production
 
-# PM2 child processes inherit exported vars from .env (set -a above)
+# PM2 child processes inherit exported vars from .env
 if pm2 describe church-hub-api >/dev/null 2>&1; then
   echo "==> PM2 reload"
   pm2 reload "$ROOT/infra/pm2/ecosystem.config.cjs" --update-env
