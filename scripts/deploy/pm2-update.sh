@@ -54,12 +54,12 @@ echo "==> Enable pnpm via corepack"
 corepack enable 2>/dev/null || true
 corepack prepare pnpm@9.14.2 --activate 2>/dev/null || true
 
-# .env sets NODE_ENV=production — devDependencies (typescript, nest CLI) are required to build
-echo "==> pnpm install (including devDependencies for build)"
-export NODE_ENV=development
-pnpm install --frozen-lockfile
+# Install all deps (incl. typescript) without forcing NODE_ENV=development — that breaks `next build`
+echo "==> pnpm install"
+pnpm install --frozen-lockfile --prod=false
 
-echo "==> Build shared-types + API"
+echo "==> Build shared-types + API (production)"
+export NODE_ENV=production
 pnpm --filter @church-hub/shared-types build
 pnpm --filter @church-hub/api exec prisma generate
 pnpm --filter @church-hub/api build
@@ -83,7 +83,6 @@ npx prisma migrate deploy
 cd "$ROOT"
 
 export CHURCHHUB_ROOT="$ROOT"
-export NODE_ENV=production
 
 # PM2 child processes inherit exported vars from .env
 if pm2 describe church-hub-api >/dev/null 2>&1; then
