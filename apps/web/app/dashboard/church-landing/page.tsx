@@ -17,7 +17,7 @@ import {
 } from '@/components/church-landing/ChurchLandingBrandingPanel';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { isChurchLeadershipRole } from '@/lib/session-role';
-import { churchPublicPath } from '@/lib/church-slug';
+import { churchPublicPreviewPath } from '@/lib/church-slug';
 import type {
   ChurchLandingAdminDto,
   ChurchLandingContent,
@@ -82,6 +82,7 @@ export default function ChurchLandingAdminPage() {
   const [draft, setDraft] = useState<ChurchLandingContent | null>(null);
   const [branding, setBranding] = useState<ChurchLandingBrandingState | null>(null);
   const [publishNotice, setPublishNotice] = useState<string | null>(null);
+  const [previewVersion, setPreviewVersion] = useState<number | undefined>(undefined);
 
   const { data, isLoading } = useQuery({
     queryKey: ['church-landing-admin'],
@@ -137,6 +138,7 @@ export default function ChurchLandingAdminPage() {
         ? `Landing page saved and published. Public site: ${siteUrl}`
         : 'Landing page saved.';
       setPublishNotice(message);
+      setPreviewVersion(Date.now());
       toast.success('Landing page saved and published', {
         description: 'An in-app notification was sent to church administrators.',
         duration: 8000,

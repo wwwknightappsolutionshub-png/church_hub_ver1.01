@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Header, Param, Patch, Post } from '@nestjs/common';
 import { PublicMembershipRegisterDto } from './dto/public-membership-register.dto';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { ChurchesService } from './churches.service';
@@ -82,6 +82,7 @@ export class ChurchesController {
 
   @Public()
   @Get(':slug/landing')
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate')
   @ApiOperation({ summary: 'Public church landing page' })
   getPublicLanding(@Param('slug') slug: string) {
     return this.landingPageService.getPublicBySlug(slug);

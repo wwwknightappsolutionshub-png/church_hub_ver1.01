@@ -3,13 +3,19 @@ import { ChurchLandingView } from '@/components/church-landing/ChurchLandingView
 import { getServerApiBaseUrl } from '@/lib/server-api-url';
 import type { PublicChurchLandingDto } from '@church-hub/shared-types';
 
+/** Always read latest landing JSON from the API (no static/ISR cache). */
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 async function fetchLanding(slug: string): Promise<PublicChurchLandingDto | null> {
   try {
     const res = await fetch(
       `${getServerApiBaseUrl()}/api/v1/churches/${encodeURIComponent(slug)}/landing`,
       {
-      cache: 'no-store',
-    });
+        cache: 'no-store',
+        next: { revalidate: 0 },
+      },
+    );
     if (!res.ok) return null;
     return res.json();
   } catch {

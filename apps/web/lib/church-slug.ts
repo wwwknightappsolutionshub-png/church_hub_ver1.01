@@ -4,6 +4,12 @@ export function churchPublicPath(slug: string): string {
   return `/c/${encodeURIComponent(slug)}`;
 }
 
+/** Optional cache-bust query after CMS saves (forces fresh HTML even with an old service worker). */
+export function churchPublicPreviewPath(slug: string, version?: number): string {
+  const base = churchPublicPath(slug);
+  return version != null ? `${base}?v=${version}` : base;
+}
+
 export function getLastChurchSlug(): string | null {
   if (typeof window === 'undefined') return null;
   const slug = localStorage.getItem(STORAGE_KEY);

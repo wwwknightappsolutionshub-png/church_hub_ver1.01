@@ -1,6 +1,6 @@
 /* Church Hub PWA — Phase 11 hardened offline shell */
-const STATIC_CACHE = 'church-hub-static-v2';
-const RUNTIME_CACHE = 'church-hub-runtime-v2';
+const STATIC_CACHE = 'church-hub-static-v3';
+const RUNTIME_CACHE = 'church-hub-runtime-v3';
 const PRECACHE_URLS = [
   '/',
   '/offline',
@@ -37,6 +37,11 @@ function isNavigation(request) {
   return request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html');
 }
 
+/** Church public landing is CMS-driven — never cache HTML (avoids stale marketing content). */
+function isLiveCmsPage(url) {
+  return url.pathname.startsWith('/c/');
+}
+
 async function networkFirstNavigation(request) {
   try {
     const response = await fetch(request);
@@ -70,6 +75,10 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   if (isNavigation(event.request)) {
+    if (isLiveCmsPage(url)) {
+      event.respondWith(fetch(event.request));
+      return;
+    }
     event.respondWith(networkFirstNavigation(event.request));
     return;
   }
