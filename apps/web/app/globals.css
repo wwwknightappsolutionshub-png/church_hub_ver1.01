@@ -406,6 +406,20 @@
   }
 }
 
+@keyframes auth-side-glow {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.auth-side-glow {
+  animation: auth-side-glow 6s ease-in-out infinite;
+}
+
 @keyframes app-splash-pulse {
   0%,
   100% {

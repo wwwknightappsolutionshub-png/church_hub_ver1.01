@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import { CheckCircle2 } from 'lucide-react';
 import { BrandMark } from '@/components/brand/BrandMark';
 import { cn } from '@/lib/utils';
@@ -46,23 +45,19 @@ export function AuthSideVisual({ variant, className }: AuthSideVisualProps) {
   return (
     <aside
       className={cn(
-        'relative hidden min-h-[280px] w-full overflow-hidden lg:flex lg:w-1/2 lg:min-h-[100dvh]',
+        'auth-side-visual relative hidden min-h-[280px] w-full overflow-hidden md:flex md:w-2/5 lg:w-1/2 lg:min-h-[100dvh]',
         className,
       )}
       aria-label="Church Hub platform highlights"
     >
-      <Image
-        src="/images/auth-side-visual.svg"
-        alt=""
+      <div
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/images/auth-side-visual.svg')" }}
         aria-hidden
-        fill
-        priority
-        className="object-cover object-center"
-        sizes="50vw"
       />
       <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-900/75 to-slate-900/40" />
       <div
-        className="absolute inset-0 opacity-40"
+        className="auth-side-glow absolute inset-0 opacity-40"
         style={{
           backgroundImage:
             'radial-gradient(ellipse at 30% 20%, hsl(43 74% 55% / 0.2), transparent 55%)',
@@ -70,15 +65,17 @@ export function AuthSideVisual({ variant, className }: AuthSideVisualProps) {
         aria-hidden
       />
 
-      <div className="relative flex h-full min-h-[100dvh] flex-col justify-between p-10 xl:p-12">
+      <div className="relative flex h-full min-h-[280px] flex-col justify-between p-8 lg:min-h-[100dvh] lg:p-10 xl:p-12">
         <BrandMark variant="light" showTagline />
 
         <div>
-          <h2 className="font-heading text-3xl font-bold leading-tight text-white xl:text-4xl">
+          <h2 className="font-heading text-2xl font-bold leading-tight text-white lg:text-3xl xl:text-4xl">
             {title}
           </h2>
-          <p className="mt-4 max-w-md text-base leading-relaxed text-slate-300">{description}</p>
-          <ul className="mt-8 space-y-3">
+          <p className="mt-4 max-w-md text-sm leading-relaxed text-slate-300 lg:text-base">
+            {description}
+          </p>
+          <ul className="mt-6 space-y-3 lg:mt-8">
             {features.map((f) => (
               <li key={f} className="flex items-start gap-2.5 text-sm text-slate-200">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(43,74%,58%)]" />

@@ -42,11 +42,7 @@ export function useModuleAccess() {
     isLoading,
     canAccessFollowUp: data?.canAccessFollowUp ?? false,
     canAccessServiceUnitHub: data?.canAccessServiceUnitHub ?? false,
-    canAccessDepartmentTools:
-      data?.canAccessDepartmentTools ??
-      data?.isChurchStaff ??
-      data?.canManageMembers ??
-      false,
+    canAccessDepartmentTools: data?.canAccessDepartmentTools ?? false,
     canAccessMyProfile: data?.canAccessMyProfile ?? false,
     memberStatus: data?.member?.status ?? null,
     memberRoles: data?.memberRoles ?? data?.member?.roles ?? [],

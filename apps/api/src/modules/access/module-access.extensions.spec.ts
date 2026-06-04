@@ -45,8 +45,30 @@ describe('ModuleAccessService extensions', () => {
       ...staffCtx,
       userRoles: [],
       memberRoles: ['ADMIN' as const],
-      unitAdminUnitIds: [],
+      unitLeaderUnitIds: [],
     };
     expect(service.canAccessDepartmentTools(memberAdmin)).toBe(true);
+  });
+
+  it('allows department tools for unit leaders who are not church staff', () => {
+    const leader = {
+      ...staffCtx,
+      userRoles: ['MEMBER'],
+      memberRoles: [] as const,
+      unitLeaderUnitIds: ['unit-choir'],
+      unitAdminUnitIds: [],
+    };
+    expect(service.canAccessDepartmentTools(leader)).toBe(true);
+  });
+
+  it('denies department tools for regular members', () => {
+    const member = {
+      ...staffCtx,
+      userRoles: ['MEMBER'],
+      memberRoles: [] as const,
+      unitLeaderUnitIds: [],
+      unitAdminUnitIds: [],
+    };
+    expect(service.canAccessDepartmentTools(member)).toBe(false);
   });
 });

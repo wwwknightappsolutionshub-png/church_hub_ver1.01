@@ -44,6 +44,8 @@ export interface DashboardNavItem {
   requiresPastor?: boolean;
   /** Church ADMIN user role only */
   requiresChurchAdmin?: boolean;
+  /** Church admin, pastor, or department unit leader/admin */
+  requiresDepartmentTools?: boolean;
 }
 
 /** Open to all signed-in church users */
@@ -156,7 +158,12 @@ export const STAFF_COMMUNITY_NAV: DashboardNavItem[] = [
   { href: '/dashboard/testimony-hub', label: 'Testimony Hub', icon: Star },
   { href: '/dashboard/devotional-hub', label: 'Devotional Hub', icon: BookOpen },
   { href: '/dashboard/service-units', label: 'Service Unit Hub', icon: Layers },
-  { href: '/dashboard/departments', label: 'Departments', icon: Layers },
+  {
+    href: '/dashboard/departments',
+    label: 'Departments',
+    icon: Layers,
+    requiresDepartmentTools: true,
+  },
   { href: '/dashboard/outreach', label: 'Outreach Hub', icon: Megaphone },
   { href: '/dashboard/follow-up', label: 'Follow Up', icon: HeartHandshake },
   { href: '/dashboard/business', label: 'Kingdom Konnect', icon: Briefcase },
@@ -177,6 +184,7 @@ export function filterStaffNav(
     isChurchLeadership: boolean;
     isPastor: boolean;
     isChurchAdmin: boolean;
+    canAccessDepartmentTools?: boolean;
   },
   enabledModules?: ChurchTenantModulesMap,
 ) {
@@ -185,6 +193,7 @@ export function filterStaffNav(
     if (item.requiresPastor && !opts.isPastor) return false;
     if (item.requiresChurchLeadership && !opts.isChurchLeadership) return false;
     if (item.requiresStaffManage && !opts.canManageStaff) return false;
+    if (item.requiresDepartmentTools && !opts.canAccessDepartmentTools) return false;
     return true;
   });
   if (!enabledModules) return roleFiltered;
@@ -218,6 +227,8 @@ export function filterMemberNav(items: DashboardNavItem[], access: ModuleGateAcc
         return access.canAccessSermonNote ?? false;
       case 'ministryCells':
         return access.canAccessMinistryCells ?? false;
+      case 'departmentTools':
+        return access.canAccessDepartmentTools;
       default:
         return true;
     }

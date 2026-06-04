@@ -139,10 +139,18 @@ function DesktopSidebar({ onNavigate }: { onNavigate?: () => void }) {
           isChurchLeadership,
           isPastor,
           isChurchAdmin,
+          canAccessDepartmentTools,
         },
         enabledModules,
       ),
-    [canManageStaff, isChurchLeadership, isPastor, isChurchAdmin, enabledModules],
+    [
+      canManageStaff,
+      isChurchLeadership,
+      isPastor,
+      isChurchAdmin,
+      canAccessDepartmentTools,
+      enabledModules,
+    ],
   );
   const homeHref = isPlatformAdmin
     ? '/dashboard/platform'
@@ -291,10 +299,18 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           isChurchLeadership,
           isPastor,
           isChurchAdmin,
+          canAccessDepartmentTools,
         },
         enabledModules,
       ),
-    [canManageStaff, isChurchLeadership, isPastor, isChurchAdmin, enabledModules],
+    [
+      canManageStaff,
+      isChurchLeadership,
+      isPastor,
+      isChurchAdmin,
+      canAccessDepartmentTools,
+      enabledModules,
+    ],
   );
 
   const displayName = userDisplayName(user, member);

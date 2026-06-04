@@ -86,11 +86,11 @@ export class ModuleAccessService {
     );
   }
 
-  /** Church admin (user or member role), pastor, or unit admin on any department. */
+  /** Church admin, pastor, or department unit leader/admin. */
   canAccessDepartmentTools(ctx: UserMemberContext): boolean {
     if (this.isChurchStaff(ctx)) return true;
     if (ctx.memberRoles.includes('ADMIN')) return true;
-    return ctx.unitAdminUnitIds.length > 0;
+    return ctx.unitLeaderUnitIds.length > 0;
   }
 
   canAccessServiceUnitHub(ctx: UserMemberContext): boolean {

@@ -51,7 +51,7 @@ export function gateRequirementHint(
     case 'serviceUnitHub':
       return `Available when you are New Member, Active Member, or Discipled—or already assigned to a service unit. Your status: ${status}.`;
     case 'departmentTools':
-      return 'Available to church admin, pastor, or department unit admin only.';
+      return 'Available to church admin, pastor, or department unit leader only.';
     case 'profile':
       return `Available when your membership is beyond Visitor (New Member, Active Member, or Discipled). Your status: ${status}. Roles: ${roles}.`;
     case 'sermonNote':

@@ -39,8 +39,11 @@ export class AuthController {
 
   @Public()
   @Get('test-accounts')
-  @ApiOperation({ summary: 'List magic-login test accounts (demo only)' })
+  @ApiOperation({ summary: 'List magic-login test accounts (development only)' })
   testAccounts() {
+    if (process.env.NODE_ENV === 'production') {
+      return { password: '', accounts: [] };
+    }
     return {
       password: TEST_PASSWORD,
       accounts: TEST_ACCOUNTS,
