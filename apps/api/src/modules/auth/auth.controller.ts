@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  NotFoundException,
   Patch,
   Post,
   UploadedFile,
@@ -41,8 +42,8 @@ export class AuthController {
   @Get('test-accounts')
   @ApiOperation({ summary: 'List magic-login test accounts (development only)' })
   testAccounts() {
-    if (process.env.NODE_ENV === 'production') {
-      return { password: '', accounts: [] };
+    if (process.env.NODE_ENV === 'production' || process.env.DISABLE_TEST_ACCOUNTS === 'true') {
+      throw new NotFoundException();
     }
     return {
       password: TEST_PASSWORD,

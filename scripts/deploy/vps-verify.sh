@@ -18,10 +18,10 @@ curl -sf -o /dev/null -w "GET /images/auth-side-visual.svg -> %{http_code}\n" \
 curl -sf -o /dev/null -w "GET /c/demo-church -> %{http_code}\n" "$PUBLIC_BASE/c/demo-church"
 
 HTML="$(curl -sf "$PUBLIC_BASE/login" | head -c 12000)"
-if echo "$HTML" | grep -qi 'Magic login'; then
-  echo "WARN: HTML still mentions Magic login (stale web build or browser cache)"
+if echo "$HTML" | grep -qiE 'Magic login|admin@demo\.church|ChurchHub123'; then
+  echo "WARN: login HTML still shows demo/test credentials (stale web build or browser cache)"
 else
-  echo "OK: no Magic login in login HTML shell"
+  echo "OK: no demo credentials in login HTML shell"
 fi
 
 CHUNK="$(echo "$HTML" | sed -n 's/.*\(app\/login\/page-[a-f0-9]*\.js\).*/\1/p' | head -1)"

@@ -79,7 +79,9 @@ echo "Standalone web bundle ready"
 
 echo "==> Migrations"
 cd apps/api
-npx prisma migrate deploy
+if ! npx prisma migrate deploy; then
+  echo "WARN: prisma migrate deploy failed — PM2 will still reload (fix DB permissions if needed)." >&2
+fi
 cd "$ROOT"
 
 export CHURCHHUB_ROOT="$ROOT"
