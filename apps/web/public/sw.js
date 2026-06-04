@@ -1,6 +1,6 @@
 /* Church Hub PWA — Phase 11 hardened offline shell */
-const STATIC_CACHE = 'church-hub-static-v3';
-const RUNTIME_CACHE = 'church-hub-runtime-v3';
+const STATIC_CACHE = 'church-hub-static-v4';
+const RUNTIME_CACHE = 'church-hub-runtime-v4';
 const PRECACHE_URLS = [
   '/',
   '/offline',
@@ -37,9 +37,13 @@ function isNavigation(request) {
   return request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html');
 }
 
-/** Church public landing is CMS-driven — never cache HTML (avoids stale marketing content). */
-function isLiveCmsPage(url) {
-  return url.pathname.startsWith('/c/');
+/** Auth + CMS pages must always hit the network (no stale login/demo UI). */
+function isNeverCacheNavigation(url) {
+  return (
+    url.pathname === '/login' ||
+    url.pathname === '/register' ||
+    url.pathname.startsWith('/c/')
+  );
 }
 
 async function networkFirstNavigation(request) {
@@ -57,16 +61,18 @@ async function networkFirstNavigation(request) {
   }
 }
 
-async function staleWhileRevalidate(request) {
-  const cache = await caches.open(RUNTIME_CACHE);
-  const cached = await caches.match(request);
-  const fetchPromise = fetch(request)
-    .then((response) => {
-      if (response.ok) cache.put(request, response.clone());
-      return response;
-    })
-    .catch(() => cached);
-  return cached || fetchPromise;
+/** Network-first for JS/CSS — avoids serving old login bundles from cache. */
+async function networkFirstAsset(request) {
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      const cache = await caches.open(RUNTIME_CACHE);
+      cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    return caches.match(request);
+  }
 }
 
 self.addEventListener('fetch', (event) => {
@@ -75,7 +81,7 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   if (isNavigation(event.request)) {
-    if (isLiveCmsPage(url)) {
+    if (isNeverCacheNavigation(url)) {
       event.respondWith(fetch(event.request));
       return;
     }
@@ -88,7 +94,7 @@ self.addEventListener('fetch', (event) => {
     url.pathname.startsWith('/icons/') ||
     url.pathname === '/manifest.json'
   ) {
-    event.respondWith(staleWhileRevalidate(event.request));
+    event.respondWith(networkFirstAsset(event.request));
     return;
   }
 

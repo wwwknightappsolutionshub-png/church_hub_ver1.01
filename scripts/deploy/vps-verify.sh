@@ -24,6 +24,16 @@ else
   echo "OK: no demo credentials in login HTML shell"
 fi
 
+LOGIN_CHUNK="$(echo "$HTML" | sed -n 's/.*\(app\/login\/page-[a-f0-9]*\.js\).*/\1/p' | head -1)"
+if [[ -n "$LOGIN_CHUNK" ]]; then
+  CHUNK_BODY=$(curl -sf "$PUBLIC_BASE/_next/static/chunks/$LOGIN_CHUNK" | head -c 50000 || true)
+  if echo "$CHUNK_BODY" | grep -qiE 'Magic login|admin@demo\.church|FALLBACK_TEST'; then
+    echo "WARN: login JS chunk still contains Magic login — redeploy web + hard-refresh browsers"
+  else
+    echo "OK: login JS chunk has no Magic login UI"
+  fi
+fi
+
 CHUNK="$(echo "$HTML" | sed -n 's/.*\(app\/login\/page-[a-f0-9]*\.js\).*/\1/p' | head -1)"
 if [[ -n "$CHUNK" ]]; then
   CODE=$(curl -sf -o /dev/null -w "%{http_code}" "$PUBLIC_BASE/_next/static/chunks/$CHUNK" || echo "000")
