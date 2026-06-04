@@ -1,8 +1,14 @@
 {
-  "extends": "./tsconfig.json",
   "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2022",
     "outDir": "./dist/prisma",
-    "rootDir": "./prisma"
+    "rootDir": "./prisma",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "downlevelIteration": true
   },
   "include": ["prisma/seed.ts", "prisma/service-unit-catalog.ts"]
 }
