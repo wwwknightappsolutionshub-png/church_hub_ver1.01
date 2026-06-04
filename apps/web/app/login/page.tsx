@@ -1,10 +1,10 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { churchPublicPath } from '@/lib/church-slug';
 import { applyAuthSessionFromMe } from '@/lib/apply-auth-session';
@@ -17,14 +17,30 @@ import { AuthSideVisual } from '@/components/auth/AuthSideVisual';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-function LoginPageContent() {
+function useLoginSearchParams() {
+  const [params, setParams] = useState({
+    church: null as string | null,
+    justRegistered: false,
+    portalCreated: false,
+    email: null as string | null,
+  });
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    setParams({
+      church: sp.get('church'),
+      justRegistered: sp.get('registered') === '1',
+      portalCreated: sp.get('portal') === '1',
+      email: sp.get('email'),
+    });
+  }, []);
+  return params;
+}
+
+export default function LoginPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const searchParams = useSearchParams();
-  const churchFromUrl = searchParams.get('church');
-  const justRegistered = searchParams.get('registered') === '1';
-  const portalCreated = searchParams.get('portal') === '1';
-  const emailFromRegistration = searchParams.get('email');
+  const { church: churchFromUrl, justRegistered, portalCreated, email: emailFromRegistration } =
+    useLoginSearchParams();
   const [loading, setLoading] = useState(false);
   const [apiOnline, setApiOnline] = useState<boolean | null>(null);
   const { register, handleSubmit, setValue } = useForm<{ email: string; password: string }>({
@@ -169,23 +185,5 @@ function LoginPageContent() {
 
       <AuthSideVisual variant="login" />
     </div>
-  );
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-[100dvh] flex-col lg:flex-row">
-          <AuthMobileBrand />
-          <div className="flex flex-1 items-center justify-center p-6">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-label="Loading" />
-          </div>
-          <AuthSideVisual variant="login" />
-        </div>
-      }
-    >
-      <LoginPageContent />
-    </Suspense>
   );
 }

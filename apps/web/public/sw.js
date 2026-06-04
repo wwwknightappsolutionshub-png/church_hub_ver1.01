@@ -1,6 +1,6 @@
 /* Church Hub PWA — Phase 11 hardened offline shell */
-const STATIC_CACHE = 'church-hub-static-v4';
-const RUNTIME_CACHE = 'church-hub-runtime-v4';
+const STATIC_CACHE = 'church-hub-static-v5';
+const RUNTIME_CACHE = 'church-hub-runtime-v5';
 const PRECACHE_URLS = [
   '/',
   '/offline',
@@ -61,7 +61,7 @@ async function networkFirstNavigation(request) {
   }
 }
 
-/** Network-first for JS/CSS — avoids serving old login bundles from cache. */
+/** Network-first for JS/CSS — never return undefined (breaks React hydration). */
 async function networkFirstAsset(request) {
   try {
     const response = await fetch(request);
@@ -71,7 +71,9 @@ async function networkFirstAsset(request) {
     }
     return response;
   } catch {
-    return caches.match(request);
+    const cached = await caches.match(request);
+    if (cached) return cached;
+    return fetch(request);
   }
 }
 
@@ -99,8 +101,9 @@ self.addEventListener('fetch', (event) => {
   }
 
   event.respondWith(
-    fetch(event.request)
-      .then((response) => response)
-      .catch(() => caches.match(event.request)),
+    fetch(event.request).catch(async () => {
+      const cached = await caches.match(event.request);
+      return cached ?? fetch(event.request);
+    }),
   );
 });
