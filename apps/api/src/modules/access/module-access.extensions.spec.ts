@@ -1,4 +1,6 @@
+import type { MemberRoleType } from '@prisma/client';
 import { ModuleAccessService } from './module-access.service';
+import type { UserMemberContext } from './module-access.service';
 
 describe('ModuleAccessService extensions', () => {
   const prisma = {
@@ -7,11 +9,11 @@ describe('ModuleAccessService extensions', () => {
   };
   const service = new ModuleAccessService(prisma as never);
 
-  const staffCtx = {
+  const staffCtx: UserMemberContext = {
     userId: 'u1',
     churchId: 'c1',
     memberId: 'm1',
-    memberStatus: 'ACTIVE_MEMBER' as const,
+    memberStatus: 'ACTIVE_MEMBER',
     userRoles: ['PASTOR'],
     memberRoles: [],
     unitMembershipIds: [],
@@ -34,7 +36,7 @@ describe('ModuleAccessService extensions', () => {
     const youth = {
       ...staffCtx,
       userRoles: [],
-      memberRoles: ['YOUTH' as const],
+      memberRoles: ['YOUTH'] as MemberRoleType[],
     };
     expect(service.canAccessYouth(youth)).toBe(true);
   });
@@ -44,17 +46,17 @@ describe('ModuleAccessService extensions', () => {
     const memberAdmin = {
       ...staffCtx,
       userRoles: [],
-      memberRoles: ['ADMIN' as const],
+      memberRoles: ['ADMIN'] as MemberRoleType[],
       unitLeaderUnitIds: [],
     };
     expect(service.canAccessDepartmentTools(memberAdmin)).toBe(true);
   });
 
   it('allows department tools for unit leaders who are not church staff', () => {
-    const leader = {
+    const leader: UserMemberContext = {
       ...staffCtx,
       userRoles: ['MEMBER'],
-      memberRoles: [] as const,
+      memberRoles: [],
       unitLeaderUnitIds: ['unit-choir'],
       unitAdminUnitIds: [],
     };
@@ -62,10 +64,10 @@ describe('ModuleAccessService extensions', () => {
   });
 
   it('denies department tools for regular members', () => {
-    const member = {
+    const member: UserMemberContext = {
       ...staffCtx,
       userRoles: ['MEMBER'],
-      memberRoles: [] as const,
+      memberRoles: [],
       unitLeaderUnitIds: [],
       unitAdminUnitIds: [],
     };
