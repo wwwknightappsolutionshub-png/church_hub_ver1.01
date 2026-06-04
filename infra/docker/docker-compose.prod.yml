@@ -4,7 +4,7 @@
 services:
   api:
     build:
-      context: ../..
+      context: .
       dockerfile: infra/docker/Dockerfile.api
     image: churchhub-api:prod
     restart: unless-stopped
@@ -28,7 +28,7 @@ services:
 
   web:
     build:
-      context: ../..
+      context: .
       dockerfile: infra/docker/Dockerfile.web
     image: churchhub-web:prod
     restart: unless-stopped
