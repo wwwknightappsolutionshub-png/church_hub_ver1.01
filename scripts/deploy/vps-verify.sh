@@ -36,7 +36,7 @@ if [[ -n "$CHUNK_LOCAL" ]]; then
   LOCAL_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$LOCAL_WEB/_next/static/chunks/$CHUNK_LOCAL" || true)
   echo "  local static -> ${LOCAL_CODE:-000}"
   if [[ "$LOCAL_CODE" != "200" ]]; then
-    echo "FAIL: PM2 is not serving the current login JS — run ./scripts/deploy/pm2-update.sh" >&2
+    echo "FAIL: PM2 is not serving the current login JS — run ./scripts/deploy/vps-update.sh" >&2
     exit 1
   fi
   CHUNK_BODY=$(curl -sf "$LOCAL_WEB/_next/static/chunks/$CHUNK_LOCAL" | head -c 50000 || true)
@@ -58,7 +58,7 @@ elif [[ -n "$CHUNK_PUBLIC" ]]; then
 fi
 
 echo ""
-echo "==> Local containers"
+echo "==> Local PM2"
 curl -sf "$LOCAL_API/api/v1/health" && echo ""
 curl -sf -o /dev/null -w "local web /login -> %{http_code}\n" "$LOCAL_WEB/login"
 curl -sf -o /dev/null -w "local auth image -> %{http_code}\n" "$LOCAL_WEB/images/auth-side-visual.svg"

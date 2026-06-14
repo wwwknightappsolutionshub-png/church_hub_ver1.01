@@ -33,15 +33,16 @@ pnpm --filter @church-hub/api build
 pnpm --filter @church-hub/web build
 ```
 
-### Docker
+### VPS (PM2)
+
+Use the main deploy script — see [../deploy/AAPANEL-church-hub.wazconnect.com.md](../deploy/AAPANEL-church-hub.wazconnect.com.md):
 
 ```bash
-docker compose -f docker-compose.yml -f infra/docker/docker-compose.prod.yml up -d
-docker build -f infra/docker/Dockerfile.api -t churchhub-api .
-docker build -f infra/docker/Dockerfile.web -t churchhub-web .
+cd /www/wwwroot/church-hub.wazconnect.com
+./scripts/deploy/vps-update.sh
 ```
 
-Web image requires `output: 'standalone'` in `apps/web/next.config.js` (Phase 12).
+Web build requires `output: 'standalone'` in `apps/web/next.config.js` (Phase 12).
 
 ### Kubernetes
 

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Patch aaPanel Nginx so /login and /register HTML are never cached.
-# PM2 proxy rules live in extension/church-hub.wazconnect.com/churchhub-docker.conf (not the main vhost).
+# PM2 proxy rules may live in the main vhost or an extension include.
 set -euo pipefail
 
 CONF="${NGINX_CONF:-}"
 if [[ -z "$CONF" ]]; then
   for candidate in \
-    /www/server/panel/vhost/nginx/extension/church-hub.wazconnect.com/churchhub-docker.conf \
+    /www/server/panel/vhost/nginx/extension/church-hub.wazconnect.com/church-hub.conf \
     /www/server/panel/vhost/nginx/church-hub.wazconnect.com.conf \
     /etc/nginx/sites-enabled/church-hub.wazconnect.com \
     /etc/nginx/conf.d/church-hub.wazconnect.com.conf; do
@@ -18,7 +18,7 @@ if [[ -z "$CONF" ]]; then
 fi
 
 if [[ -z "$CONF" || ! -f "$CONF" ]]; then
-  echo "ERROR: Nginx config not found. Set NGINX_CONF=/path/to/churchhub-docker.conf" >&2
+  echo "ERROR: Nginx config not found. Set NGINX_CONF=/path/to/church-hub.conf" >&2
   exit 1
 fi
 

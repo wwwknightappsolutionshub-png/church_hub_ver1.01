@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fix host Postgres permissions after importing a Docker dump as superuser.
+# Fix host Postgres permissions after importing a database dump as superuser.
 # Run once on the VPS, then: cd apps/api && npx prisma migrate deploy
 set -euo pipefail
 

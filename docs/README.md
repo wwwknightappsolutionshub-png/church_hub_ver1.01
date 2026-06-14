@@ -10,7 +10,7 @@ ChurchApp/
 │   └── mobile/    Expo React Native (outreach + driver)
 ├── packages/
 │   └── shared-types/   Zod schemas shared across apps
-└── infra/         Docker, Kubernetes, Terraform, CI/CD
+└── infra/         PM2, Nginx, Kubernetes (optional), CI/CD
 ```
 
 ## Modules
@@ -26,12 +26,13 @@ ChurchApp/
 | Communications | `/communications` | Announcements, sermons, notifications |
 | Admin | `/admin` | Analytics dashboard |
 
-## Quick Start
+## Quick Start (local dev)
 
 ### Prerequisites
 - Node.js 20+
 - pnpm 9+
-- Docker Desktop
+- PostgreSQL (local install or remote)
+- Redis (optional — memory fallback when disabled)
 
 ### Setup
 
@@ -39,24 +40,22 @@ ChurchApp/
 cd ChurchApp
 cp .env.example .env
 
-# Start infrastructure
-docker compose up -d
-
-# Install & migrate
 pnpm install
 pnpm db:generate
 pnpm db:migrate
 pnpm --filter @church-hub/api prisma:seed
 
-# Run all apps
 pnpm dev
 ```
+
+### Production (aaPanel VPS)
+
+See [deploy/AAPANEL-church-hub.wazconnect.com.md](./deploy/AAPANEL-church-hub.wazconnect.com.md) — PM2 + host Postgres/Redis.
 
 ### URLs
 - Web: http://localhost:3001
 - API: http://localhost:4000
 - Swagger: http://localhost:4000/api/docs
-- MinIO Console: http://localhost:9001
 
 ### Demo credentials
 - Email: `admin@demo.church`

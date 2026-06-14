@@ -1,5 +1,5 @@
 /**
- * Base URL for server-side fetches (SSR / RSC). Prefer SERVER_API_URL in Docker
+ * Base URL for server-side fetches (SSR / RSC). Prefer SERVER_API_URL in production
  * (e.g. http://api:4000) so the web container can reach the API without relying
  * on NEXT_PUBLIC_* baked at build time.
  */

@@ -20,7 +20,7 @@ Production-ready church community management platform.
 | API | NestJS, Prisma, PostgreSQL, Redis, BullMQ |
 | Web | Next.js 14, Tailwind CSS, shadcn/ui, PWA |
 | Mobile | Expo React Native |
-| Infra | Docker, Kubernetes, Terraform, GitHub Actions |
+| Infra | PM2, aaPanel Nginx, PostgreSQL, Redis, GitHub Actions |
 
 ## Getting Started
 
@@ -29,8 +29,7 @@ Production-ready church community management platform.
 cd ChurchApp
 cp .env.example .env
 
-# Start Postgres, Redis, MinIO
-docker compose up -d
+# Prerequisites: PostgreSQL (and optional Redis) running locally
 
 # Install dependencies
 pnpm install
@@ -43,6 +42,8 @@ pnpm --filter @church-hub/api prisma:seed
 # Development (API + Web)
 pnpm dev
 ```
+
+**Production (VPS):** see [docs/deploy/AAPANEL-church-hub.wazconnect.com.md](docs/deploy/AAPANEL-church-hub.wazconnect.com.md)
 
 | Service | URL |
 |---------|-----|
@@ -69,9 +70,9 @@ apps/
 packages/
   shared-types/   Shared Zod schemas
 infra/
-  docker/         Dockerfiles
-  kubernetes/     K8s manifests
-  terraform/      AWS provisioning
+  pm2/            PM2 ecosystem config
+  nginx/          aaPanel Nginx examples
+  kubernetes/     K8s manifests (optional)
 docs/             Architecture & module docs
 postman/          API collection
 ```

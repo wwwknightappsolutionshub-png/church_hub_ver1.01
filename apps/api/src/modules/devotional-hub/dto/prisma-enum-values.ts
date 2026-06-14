@@ -1,4 +1,4 @@
-/** String literals for class-validator @IsEnum — avoids undefined Prisma enums in Docker prod bundles. */
+/** String literals for class-validator @IsEnum — avoids undefined Prisma enums in production bundles. */
 export const DEVOTIONAL_AUDIENCE = ['ALL', 'YOUTH', 'ADULT', 'FAMILY', 'LEADERS'] as const;
 export const DEVOTIONAL_PLAN_SOURCE_TYPE = [
   'TOPICAL_BOOK',
