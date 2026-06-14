@@ -571,4 +571,75 @@ export class ServiceUnitsDepartmentService {
     }
     return { notified };
   }
+
+  private assertUsheringUnit(departmentCode: DepartmentCode | null) {
+    if (departmentCode !== 'USHERING') {
+      throw new BadRequestException('Weekly headcounts are only for the Ushering service unit');
+    }
+  }
+
+  async listUsheringHeadcounts(churchId: string, serviceUnitId: string, weeks = 8) {
+    const unit = await this.requireUnit(churchId, serviceUnitId);
+    this.assertUsheringUnit(unit.departmentCode);
+    const since = weekStartUtc(new Date());
+    since.setUTCDate(since.getUTCDate() - weeks * 7);
+    return this.prisma.usheringWeeklyHeadcount.findMany({
+      where: { churchId, serviceUnitId, weekStart: { gte: since } },
+      orderBy: { weekStart: 'desc' },
+    });
+  }
+
+  async upsertUsheringHeadcount(
+    userId: string,
+    churchId: string,
+    serviceUnitId: string,
+    body: {
+      weekStart?: string;
+      male?: number;
+      female?: number;
+      babies?: number;
+      children?: number;
+      totalAttendees?: number;
+    },
+  ) {
+    const unit = await this.requireUnit(churchId, serviceUnitId);
+    this.assertUsheringUnit(unit.departmentCode);
+    await this.assertManage(userId, churchId, serviceUnitId);
+
+    const weekStart = body.weekStart
+      ? weekStartUtc(new Date(body.weekStart))
+      : weekStartUtc(new Date());
+    const male = Math.max(0, Math.floor(body.male ?? 0));
+    const female = Math.max(0, Math.floor(body.female ?? 0));
+    const babies = Math.max(0, Math.floor(body.babies ?? 0));
+    const children = Math.max(0, Math.floor(body.children ?? 0));
+    const summed = male + female + babies + children;
+    const totalAttendees =
+      body.totalAttendees !== undefined
+        ? Math.max(0, Math.floor(body.totalAttendees))
+        : summed;
+
+    return this.prisma.usheringWeeklyHeadcount.upsert({
+      where: { serviceUnitId_weekStart: { serviceUnitId, weekStart } },
+      create: {
+        churchId,
+        serviceUnitId,
+        weekStart,
+        male,
+        female,
+        babies,
+        children,
+        totalAttendees,
+        recordedByUserId: userId,
+      },
+      update: {
+        male,
+        female,
+        babies,
+        children,
+        totalAttendees,
+        recordedByUserId: userId,
+      },
+    });
+  }
 }

@@ -14,6 +14,7 @@ import { KonnectJobsPanel } from '@/components/business/KonnectJobsPanel';
 import { KonnectEventsPanel } from '@/components/business/KonnectEventsPanel';
 import { KonnectMentorshipPanel } from '@/components/business/KonnectMentorshipPanel';
 import { IdeaHub } from '@/components/business/IdeaHub';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import {
   EnterpriseContent,
   EnterpriseHero,
@@ -56,7 +57,7 @@ export default function BusinessPage() {
     <EnterpriseShell>
       <EnterpriseHero
         title="Kingdom Konnect"
-        description="Governed member business network—verified listings, marketplace, executive opportunities, events, and mentorship under church oversight."
+        description={MODULE_DESCRIPTIONS.business}
         badge={
           <Badge className="gap-1 border-slate-600 bg-slate-800 text-slate-100">
             <Briefcase className="h-3 w-3" />

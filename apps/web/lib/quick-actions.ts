@@ -7,7 +7,7 @@ export interface QuickActionItem {
 }
 
 export const DASHBOARD_QUICK_ACTIONS: QuickActionItem[] = [
-  { label: 'Add Member', href: '/dashboard/membership?add=1', icon: Users },
+  { label: 'Add Member', href: '/dashboard/membership/members?add=1', icon: Users },
   { label: 'Capture Outreach', href: '/dashboard/outreach', icon: Megaphone },
   { label: 'Follow-Up Queue', href: '/dashboard/follow-up', icon: HeartHandshake },
   { label: 'Service Units', href: '/dashboard/service-units', icon: Layers },

@@ -3,6 +3,8 @@ import { MembershipAutomationController } from './membership-automation.controll
 import { MembershipAutomationService } from './membership-automation.service';
 import { MembershipAutomationScheduler } from './membership-automation.scheduler';
 import { AutomationSyncService } from './automation-sync.service';
+import { AutomationEmailTemplatesController } from './automation-email-templates.controller';
+import { AutomationEmailTemplatesService } from './automation-email-templates.service';
 import { CommunicationsModule } from '../communications/communications.module';
 import { FollowUpModule } from '../follow-up/follow-up.module';
 import { MembershipModule } from '../membership/membership.module';
@@ -17,12 +19,13 @@ import { ServiceUnitsModule } from '../service-units/service-units.module';
     OutreachModule,
     ServiceUnitsModule,
   ],
-  controllers: [MembershipAutomationController],
+  controllers: [MembershipAutomationController, AutomationEmailTemplatesController],
   providers: [
     MembershipAutomationService,
     MembershipAutomationScheduler,
     AutomationSyncService,
+    AutomationEmailTemplatesService,
   ],
-  exports: [MembershipAutomationService, AutomationSyncService],
+  exports: [MembershipAutomationService, AutomationSyncService, AutomationEmailTemplatesService],
 })
 export class AutomationModule {}

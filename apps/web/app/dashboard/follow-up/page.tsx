@@ -26,6 +26,7 @@ import { FollowUpMembersPanel } from '@/components/follow-up/FollowUpMembersPane
 import { FollowUpAutomationPanel } from '@/components/follow-up/FollowUpAutomationPanel';
 import { useMembershipAccess } from '@/lib/hooks/use-membership-access';
 import { ModuleGate } from '@/components/app/ModuleGate';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import {
   EnterpriseContent,
   EnterpriseHero,
@@ -181,7 +182,7 @@ function FollowUpPageContent() {
       <EnterpriseHero
         eyebrow="Discipleship"
         title="Follow-Up"
-        description="End-to-end discipleship pipeline from outreach capture through cell placement, with governed lead creation and team notifications."
+        description={MODULE_DESCRIPTIONS.followUp}
         actions={
           <>
             <Button size="sm" onClick={() => setShowNew(true)}>

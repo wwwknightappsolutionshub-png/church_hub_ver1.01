@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
 import { SermonPlayer } from '@/components/sermons/SermonPlayer';
 import { SermonPlayerProvider } from '@/components/sermons/SermonPlayerContext';
@@ -28,7 +29,7 @@ export default function SpirifySermonsPage() {
   return (
     <DashboardModuleShell
       title="Spirify"
-      description="Enterprise sermon library—stream messages, series, and archives with governed church media access."
+      description={MODULE_DESCRIPTIONS.communicationsSermons}
       actions={
         <Button variant="outline" size="sm" asChild>
           <Link href={fromMemberNav ? '/dashboard/lounge' : '/dashboard/communications'}>

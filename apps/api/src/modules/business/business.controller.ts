@@ -108,8 +108,15 @@ export class BusinessController {
   }
 
   @Get('jobs')
-  listJobs(@ChurchId() churchId: string) {
-    return this.businessService.listJobs(churchId);
+  listJobs(
+    @ChurchId() churchId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.businessService.listJobs(churchId, {
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
   }
 
   @Post('jobs')

@@ -7,6 +7,7 @@ import {
   Bell,
   CalendarClock,
   Loader2,
+  Mail,
   RefreshCw,
   Sparkles,
   Stethoscope,
@@ -16,6 +17,7 @@ import {
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
+import { AutomationEmailTemplatesPanel } from '@/components/automation/AutomationEmailTemplatesPanel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -167,6 +169,7 @@ export function MembershipAutomationHub() {
 
   const s = displayStatus.settings;
   const axiosErr = (error ?? null) as AxiosError | null;
+  const [section, setSection] = useState<'workflows' | 'templates'>('workflows');
 
   if (isLoading && !status) {
     return (
@@ -181,6 +184,48 @@ export function MembershipAutomationHub() {
 
   return (
     <div className="space-y-6">
+      <div
+        className="flex flex-wrap gap-2 rounded-xl border border-slate-200/80 bg-slate-50 p-1 dark:border-slate-800 dark:bg-slate-900/50"
+        role="tablist"
+        aria-label="Automation sections"
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={section === 'workflows'}
+          className={cn(
+            'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition',
+            section === 'workflows'
+              ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-white'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+          onClick={() => setSection('workflows')}
+        >
+          <Zap className="h-4 w-4" />
+          Workflows
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={section === 'templates'}
+          className={cn(
+            'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition',
+            section === 'templates'
+              ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-white'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+          onClick={() => setSection('templates')}
+          data-testid="automation-email-templates-tab"
+        >
+          <Mail className="h-4 w-4" />
+          Email templates
+        </button>
+      </div>
+
+      {section === 'templates' ? <AutomationEmailTemplatesPanel /> : null}
+
+      {section === 'workflows' ? (
+        <>
       {isError && (
         <Card className="border-amber-500/40 bg-amber-500/5">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4 text-sm">
@@ -355,6 +400,8 @@ export function MembershipAutomationHub() {
           )}
         </CardContent>
       </Card>
+        </>
+      ) : null}
     </div>
   );
 }

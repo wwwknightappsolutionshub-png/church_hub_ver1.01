@@ -1,5 +1,6 @@
 'use client';
 
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { HubBoard } from '@/components/hubs/HubBoard';
 
 export default function PrayerHubPage() {
@@ -8,7 +9,7 @@ export default function PrayerHubPage() {
       type="prayer"
       hubPath="prayer-hub"
       title="Prayer Hub"
-      description="Governed prayer wall—browse congregation requests, record intercession, and share encouragement within church policy."
+      description={MODULE_DESCRIPTIONS.prayerHub}
     />
   );
 }

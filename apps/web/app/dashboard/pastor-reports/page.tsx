@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { ReportsInboxPanel } from '@/components/reports/ReportsInboxPanel';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { isPastorRole } from '@/lib/session-role';
@@ -34,7 +35,7 @@ export default function PastorReportsPage() {
       replyFormId="pastor-reply-form"
       eyebrow="Pastoral leadership"
       title="Pastor reports inbox"
-      description="Triage department and weekly reports, pastoral alerts, and messages routed to pastoral leadership—with governed replies."
+      description={MODULE_DESCRIPTIONS.pastorReports}
       defaultReplySubject="Re: Department report"
     />
   );

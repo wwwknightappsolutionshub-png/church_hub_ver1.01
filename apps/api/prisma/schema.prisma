@@ -95,6 +95,12 @@ model Church {
   loungePresence     LoungePresence[]
   churchServices           ChurchService[]
   membershipClassDefinitions MembershipClassDefinition[]
+  congregantClassifications  CongregantClassification[]
+  familyRoleDefinitions      FamilyRoleDefinition[]
+  memberCustomFieldDefinitions MemberCustomFieldDefinition[]
+  familyCustomFieldDefinitions FamilyCustomFieldDefinition[]
+  memberPropertyDefinitions  MemberPropertyDefinition[]
+  familyPropertyDefinitions  FamilyPropertyDefinition[]
   memberActivityLogs       MemberActivityLog[]
   classEnrollments         ClassEnrollment[]
   attendanceRecords        AttendanceRecord[]
@@ -104,6 +110,7 @@ model Church {
   communicationQueueItems  CommunicationQueueItem[]
   conversations            Conversation[]
   serviceUnitWeeklyReports ServiceUnitWeeklyReport[]
+  usheringWeeklyHeadcounts UsheringWeeklyHeadcount[]
   automationSettings       ChurchAutomationSettings?
   automationRunLogs        AutomationRunLog[]
   deptSchedules            DeptSchedule[]
@@ -117,6 +124,8 @@ model Church {
   deptChildrenDutyRosters   DeptChildrenDutyRoster[]
   deptChildrenCurriculum    DeptChildrenCurriculum[]
   deptChildrenClassReports  DeptChildrenClassReport[]
+  deptChildrenClassEnrollments DeptChildrenClassEnrollment[]
+  deptChildrenClassDefinitions DeptChildrenClassDefinition[]
   deptChildCheckIns        DeptChildCheckIn[]
   deptPrayerItems          DeptPrayerItem[]
   deptPrayerAssignments    DeptPrayerAssignment[]
@@ -138,6 +147,9 @@ model Church {
   deptFollowUpLogs         DeptFollowUpLog[]
   deptUnitFeedbacks        DeptUnitFeedback[]
   membershipImportJobs     MembershipImportJob[]
+  celebrationEmailTemplates CelebrationEmailTemplate[]
+  churchCalendarEvents      ChurchCalendarEvent[]
+  automationEmailTemplates  AutomationEmailTemplate[]
   wisdom365Subscriptions   Wisdom365Subscription[]
   wisdom365ChurchAvailability Wisdom365ChurchAvailability?
   platformMarketingDrips PlatformMarketingDrip[]
@@ -362,6 +374,7 @@ model User {
   cellMessagesSent          CellMessage[]      @relation("CellMessageFrom")
   cellMessagesReceived      CellMessage[]      @relation("CellMessageTo")
   cellPrayersCreated        CellPrayerRequest[] @relation("CellPrayerCreator")
+  createdCalendarEvents   ChurchCalendarEvent[] @relation("CalendarEventCreator")
 
   @@unique([churchId, email])
   @@map("users")
@@ -432,17 +445,219 @@ enum MemberRoleType {
   PASTOR
 }
 
+enum MemberGender {
+  UNKNOWN
+  MALE
+  FEMALE
+}
+
+enum MembershipCustomFieldType {
+  TEXT
+  NUMBER
+  DATE
+  BOOLEAN
+  PHONE
+  LINK
+}
+
+/// Congregant classification taxonomy (CRM: person classifications)
+model CongregantClassification {
+  id         String   @id @default(uuid())
+  churchId   String
+  code       String
+  name       String
+  sortOrder  Int      @default(0)
+  isInactive Boolean  @default(false)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  church  Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  members Member[]
+
+  @@unique([churchId, code])
+  @@index([churchId, isActive, sortOrder])
+  @@map("congregant_classifications")
+}
+
+/// Household role within a family (CRM: family roles)
+model FamilyRoleDefinition {
+  id        String   @id @default(uuid())
+  churchId  String
+  code      String
+  name      String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  church  Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  members Member[]
+
+  @@unique([churchId, code])
+  @@index([churchId, isActive, sortOrder])
+  @@map("family_role_definitions")
+}
+
+model MemberCustomFieldDefinition {
+  id        String                    @id @default(uuid())
+  churchId  String
+  fieldKey  String
+  label     String
+  fieldType MembershipCustomFieldType @default(TEXT)
+  sortOrder Int                       @default(0)
+  isRequired Boolean                  @default(false)
+  isActive  Boolean                   @default(true)
+  options   Json                      @default("[]")
+  createdAt DateTime                  @default(now())
+  updatedAt DateTime                  @updatedAt
+
+  church Church                  @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  values MemberCustomFieldValue[]
+
+  @@unique([churchId, fieldKey])
+  @@index([churchId, isActive, sortOrder])
+  @@map("member_custom_field_definitions")
+}
+
+model MemberCustomFieldValue {
+  id           String   @id @default(uuid())
+  memberId     String
+  definitionId String
+  valueText    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  member     Member                      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  definition MemberCustomFieldDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, definitionId])
+  @@map("member_custom_field_values")
+}
+
+model FamilyCustomFieldDefinition {
+  id        String                    @id @default(uuid())
+  churchId  String
+  fieldKey  String
+  label     String
+  fieldType MembershipCustomFieldType @default(TEXT)
+  sortOrder Int                       @default(0)
+  isRequired Boolean                  @default(false)
+  isActive  Boolean                   @default(true)
+  options   Json                      @default("[]")
+  createdAt DateTime                  @default(now())
+  updatedAt DateTime                  @updatedAt
+
+  church Church                  @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  values FamilyCustomFieldValue[]
+
+  @@unique([churchId, fieldKey])
+  @@index([churchId, isActive, sortOrder])
+  @@map("family_custom_field_definitions")
+}
+
+model FamilyCustomFieldValue {
+  id           String   @id @default(uuid())
+  familyId     String
+  definitionId String
+  valueText    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  family     Family                      @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  definition FamilyCustomFieldDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, definitionId])
+  @@map("family_custom_field_values")
+}
+
+model MemberPropertyDefinition {
+  id          String   @id @default(uuid())
+  churchId    String
+  name        String
+  description String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  church      Church                     @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  assignments MemberPropertyAssignment[]
+
+  @@unique([churchId, name])
+  @@index([churchId, isActive, sortOrder])
+  @@map("member_property_definitions")
+}
+
+model MemberPropertyAssignment {
+  id           String   @id @default(uuid())
+  memberId     String
+  definitionId String
+  createdAt    DateTime @default(now())
+
+  member     Member                   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  definition MemberPropertyDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, definitionId])
+  @@map("member_property_assignments")
+}
+
+model FamilyPropertyDefinition {
+  id          String   @id @default(uuid())
+  churchId    String
+  name        String
+  description String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  church      Church                     @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  assignments FamilyPropertyAssignment[]
+
+  @@unique([churchId, name])
+  @@index([churchId, isActive, sortOrder])
+  @@map("family_property_definitions")
+}
+
+model FamilyPropertyAssignment {
+  id           String   @id @default(uuid())
+  familyId     String
+  definitionId String
+  createdAt    DateTime @default(now())
+
+  family     Family                   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  definition FamilyPropertyDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, definitionId])
+  @@map("family_property_assignments")
+}
+
 model Family {
   id           String   @id @default(uuid())
   churchId     String
   name         String
   headMemberId String?
+  address      String?
+  address2     String?
+  city         String?
+  state        String?
+  zip          String?
+  country      String?
+  homePhone    String?
+  email        String?
+  homeCell     String?
+  specialOccasion     String?
+  specialOccasionDate DateTime?
+  isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  church            Church             @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  church            Church                     @relation(fields: [churchId], references: [id], onDelete: Cascade)
   members           Member[]
   attendanceRecords AttendanceRecord[]
+  customFieldValues FamilyCustomFieldValue[]
+  propertyAssignments FamilyPropertyAssignment[]
 
   @@map("families")
 }
@@ -511,25 +726,126 @@ model MembershipImportJobRow {
   @@map("membership_import_job_rows")
 }
 
+enum CelebrationEmailTemplateKind {
+  BIRTHDAY
+  ANNIVERSARY
+}
+
+model CelebrationEmailTemplate {
+  id        String                       @id @default(uuid())
+  churchId  String
+  kind      CelebrationEmailTemplateKind
+  subject   String
+  bodyHtml  String
+  isActive  Boolean                      @default(true)
+  autoSend  Boolean                      @default(true)
+  createdAt DateTime                     @default(now())
+  updatedAt DateTime                     @updatedAt
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@unique([churchId, kind])
+  @@map("celebration_email_templates")
+}
+
+enum ChurchCalendarEventKind {
+  EVENT
+  BIRTHDAY
+  ANNIVERSARY
+}
+
+model ChurchCalendarEvent {
+  id              String                  @id @default(uuid())
+  churchId        String
+  title           String
+  description     String?
+  startsAt        DateTime
+  endsAt          DateTime?
+  allDay          Boolean                 @default(false)
+  kind            ChurchCalendarEventKind @default(EVENT)
+  isPinned        Boolean                 @default(false)
+  highlightColor  String?
+  createdByUserId String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  church    Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  createdBy User?  @relation("CalendarEventCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([churchId, startsAt])
+  @@map("church_calendar_events")
+}
+
+enum AutomationEmailTemplateCode {
+  STAFF_WELCOME
+  ABSENTEE_FOLLOWUP
+  NEW_MEMBER_WELCOME
+  WEEKLY_DIGEST
+  EVENT_REMINDER
+  CUSTOM
+}
+
+model AutomationEmailTemplate {
+  id        String                      @id @default(uuid())
+  churchId  String
+  code      AutomationEmailTemplateCode
+  name      String
+  subject   String
+  bodyHtml  String
+  isActive  Boolean                     @default(true)
+  isSystem  Boolean                     @default(false)
+  sortOrder Int                         @default(0)
+  createdAt DateTime                    @default(now())
+  updatedAt DateTime                    @updatedAt
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@unique([churchId, code])
+  @@index([churchId, sortOrder])
+  @@map("automation_email_templates")
+}
+
 model Member {
   id                String         @id @default(uuid())
   churchId          String
   userId            String?        @unique
   familyId          String?
+  classificationId  String?
+  familyRoleId      String?
   firstName         String
   lastName          String
+  title             String?
+  middleName        String?
+  suffix            String?
   nickname          String?
+  gender            MemberGender   @default(UNKNOWN)
   email             String?
+  workEmail         String?
   phone             String?
+  homePhone         String?
+  workPhone         String?
+  cellPhone         String?
   dateOfBirth       DateTime?
+  hideAge           Boolean        @default(false)
+  membershipDate    DateTime?
+  friendDate        DateTime?
   status            MemberStatus   @default(VISITOR)
   roles             MemberRoleType[]
   ministryInterests String[]
   address           String?
+  address2          String?
   city              String?
+  state             String?
+  zip               String?
+  country           String?
   avatarUrl         String?
+  facebook          String?
+  twitter           String?
+  linkedIn          String?
   onboardingStep    Int            @default(0)
   notes             String?
+  specialOccasion      String?
+  specialOccasionDate  DateTime?
   bornAgain              Boolean?
   baptizedInHolySpirit Boolean?
   createdAt         DateTime       @default(now())
@@ -538,6 +854,10 @@ model Member {
   church            Church              @relation(fields: [churchId], references: [id], onDelete: Cascade)
   user              User?               @relation(fields: [userId], references: [id])
   family            Family?             @relation(fields: [familyId], references: [id])
+  classification    CongregantClassification? @relation(fields: [classificationId], references: [id], onDelete: SetNull)
+  familyRole        FamilyRoleDefinition?     @relation(fields: [familyRoleId], references: [id], onDelete: SetNull)
+  customFieldValues MemberCustomFieldValue[]
+  propertyAssignments MemberPropertyAssignment[]
   followUps         FollowUp[]
   pastoralNotes     PastoralNote[]
   youthMemberships  YouthGroupMember[]
@@ -635,6 +955,7 @@ model Member {
   deptChildrenDutyAssisting      DeptChildrenDutyRoster[]    @relation("DeptChildrenAssistant")
   deptChildrenCurriculumAuthored DeptChildrenCurriculum[]    @relation("DeptChildrenCurriculumAuthor")
   deptChildrenReportsAuthored    DeptChildrenClassReport[]   @relation("DeptChildrenReportTeacher")
+  deptChildrenClassEnrollments   DeptChildrenClassEnrollment[] @relation("DeptChildrenEnrolledChild")
   deptCheckInsAsChild            DeptChildCheckIn[]   @relation("DeptCheckInChild")
   deptCheckInsAsGuardian         DeptChildCheckIn[]   @relation("DeptCheckInGuardian")
   deptPrayerAssignments          DeptPrayerItem[]     @relation("DeptPrayerAssignee")
@@ -1710,6 +2031,7 @@ model ServiceUnit {
   attendanceRecords AttendanceRecord[]
   communicationQueueItems CommunicationQueueItem[]
   weeklyReports ServiceUnitWeeklyReport[]
+  usheringHeadcounts  UsheringWeeklyHeadcount[]
   deptSchedules       DeptSchedule[]
   deptAssignments     DeptAssignment[]
   deptModuleReports   DeptModuleReport[]
@@ -1721,6 +2043,8 @@ model ServiceUnit {
   deptChildrenDutyRosters DeptChildrenDutyRoster[]
   deptChildrenCurriculum  DeptChildrenCurriculum[]
   deptChildrenClassReports DeptChildrenClassReport[]
+  deptChildrenClassEnrollments DeptChildrenClassEnrollment[]
+  deptChildrenClassDefinitions DeptChildrenClassDefinition[]
   deptChildCheckIns   DeptChildCheckIn[]
   deptPrayerItems     DeptPrayerItem[]
   deptPrayerAssignments DeptPrayerAssignment[]
@@ -1763,6 +2087,29 @@ model ServiceUnitWeeklyReport {
   @@unique([serviceUnitId, weekStart])
   @@index([churchId, weekStart])
   @@map("service_unit_weekly_reports")
+}
+
+/// Ushering service unit — weekly sanctuary headcounts (Male / Female / Babies / Children / Total)
+model UsheringWeeklyHeadcount {
+  id               String   @id @default(uuid())
+  churchId         String
+  serviceUnitId    String
+  weekStart        DateTime
+  male             Int      @default(0)
+  female           Int      @default(0)
+  babies           Int      @default(0)
+  children         Int      @default(0)
+  totalAttendees   Int      @default(0)
+  recordedByUserId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceUnitId, weekStart])
+  @@index([churchId, weekStart])
+  @@map("ushering_weekly_headcounts")
 }
 
 model ServiceUnitMember {
@@ -2231,15 +2578,31 @@ model DeptChildCheckIn {
   @@map("dept_child_check_ins")
 }
 
-enum ChildrenClassGroup {
-  AGES_3_5
-  AGES_6_9
-  AGES_10_12
-}
-
 enum ChildrenCurriculumSource {
   OFFICIAL_WEEKLY
   CUSTOM_UPLOAD
+}
+
+model DeptChildrenClassDefinition {
+  id            String   @id @default(uuid())
+  churchId      String
+  serviceUnitId String
+  code          String
+  name          String
+  minAge        Int?
+  maxAge        Int?
+  sortOrder     Int      @default(0)
+  isActive      Boolean  @default(true)
+  isSystem      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceUnitId, code])
+  @@index([serviceUnitId, isActive, sortOrder])
+  @@map("dept_children_class_definitions")
 }
 
 model DeptChildrenDutyRoster {
@@ -2247,7 +2610,7 @@ model DeptChildrenDutyRoster {
   churchId          String
   serviceUnitId     String
   weekStart         DateTime
-  classGroup        ChildrenClassGroup
+  classGroup        String
   teacherMemberId   String
   assistantMemberId String?
   notes             String?
@@ -2274,7 +2637,7 @@ model DeptChildrenCurriculum {
   fileUrl          String?
   body             String?
   source           ChildrenCurriculumSource @default(CUSTOM_UPLOAD)
-  targetClassGroup ChildrenClassGroup?
+  targetClassGroup String?
   simplifiedLesson String?
   authorId         String?
   createdAt        DateTime                 @default(now())
@@ -2294,7 +2657,7 @@ model DeptChildrenClassReport {
   id                   String             @id @default(uuid())
   churchId             String
   serviceUnitId        String
-  classGroup           ChildrenClassGroup
+  classGroup           String
   serviceDate          DateTime
   teacherMemberId      String
   curriculumId         String?
@@ -2312,6 +2675,24 @@ model DeptChildrenClassReport {
 
   @@index([serviceUnitId, serviceDate])
   @@map("dept_children_class_reports")
+}
+
+model DeptChildrenClassEnrollment {
+  id            String             @id @default(uuid())
+  churchId      String
+  serviceUnitId String
+  childMemberId String
+  classGroup    String
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  child       Member      @relation("DeptChildrenEnrolledChild", fields: [childMemberId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceUnitId, childMemberId])
+  @@index([churchId, classGroup])
+  @@map("dept_children_class_enrollments")
 }
 
 model DeptPrayerItem {
@@ -3321,6 +3702,8 @@ enum CommunicationQueueKind {
   PASTORAL_ALERT
   AUTOMATION_RECOMMENDATION
   DIRECT_ALERT
+  BIRTHDAY_GREETING
+  ANNIVERSARY_GREETING
 }
 
 enum AutomationWorkflowKind {

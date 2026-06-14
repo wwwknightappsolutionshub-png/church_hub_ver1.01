@@ -7,13 +7,16 @@ import {
   Patch,
   Post,
   Query,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { ChatChannelType } from '@prisma/client';
+import type { CelebrationTemplateKind } from './celebration-email-templates.service';
 import { CommunicationsService } from './communications.service';
 import { CommunicationsQueueService } from './communications-queue.service';
 import { CommunicationsConversationsService } from './communications-conversations.service';
 import { CommunicationsAutomationService } from './communications-automation.service';
+import { CelebrationEmailTemplatesService } from './celebration-email-templates.service';
 import { ChurchId, CurrentUser, AuthUser } from '../auth/current-user.decorator';
 import { Roles, ModuleGate } from '../auth/decorators';
 import { ModuleAccessService } from '../access/module-access.service';
@@ -44,6 +47,7 @@ export class CommunicationsController {
     private readonly queueService: CommunicationsQueueService,
     private readonly conversationsService: CommunicationsConversationsService,
     private readonly automationService: CommunicationsAutomationService,
+    private readonly celebrationTemplates: CelebrationEmailTemplatesService,
     private readonly moduleAccess: ModuleAccessService,
   ) {}
 
@@ -430,5 +434,35 @@ export class CommunicationsController {
   @Roles(...COMM_MANAGERS)
   runServiceReminders(@ChurchId() churchId: string) {
     return this.automationService.runServiceReminders(churchId);
+  }
+
+  @Post('automation/celebration-emails')
+  @Roles(...COMM_MANAGERS)
+  @ApiOperation({ summary: 'Run birthday & anniversary auto-emails for today' })
+  runCelebrationEmails(@ChurchId() churchId: string) {
+    return this.automationService.runCelebrationEmails(churchId);
+  }
+
+  @Get('celebration-templates')
+  @Roles(...COMM_MANAGERS)
+  @ApiOperation({ summary: 'Birthday and anniversary email templates' })
+  listCelebrationTemplates(@ChurchId() churchId: string) {
+    return this.celebrationTemplates.list(churchId);
+  }
+
+  @Patch('celebration-templates/:kind')
+  @Roles(...COMM_MANAGERS)
+  @ApiOperation({ summary: 'Update celebration email template (WYSIWYG HTML)' })
+  updateCelebrationTemplate(
+    @ChurchId() churchId: string,
+    @Param('kind') kind: string,
+    @Body()
+    body: { subject?: string; bodyHtml?: string; isActive?: boolean; autoSend?: boolean },
+  ) {
+    const parsed = kind.toUpperCase() as CelebrationTemplateKind;
+    if (!['BIRTHDAY', 'ANNIVERSARY'].includes(parsed)) {
+      throw new BadRequestException('Invalid template kind');
+    }
+    return this.celebrationTemplates.update(churchId, parsed, body);
   }
 }

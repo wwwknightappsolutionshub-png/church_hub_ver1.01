@@ -7,12 +7,12 @@ import { PastoralCareService } from '../pastoral-care/pastoral-care.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { resolveDeptModuleCode } from '../../../prisma/dept-module-catalog';
 import {
-  CHILDREN_CLASS_GROUPS,
   type ChildrenClassGroup,
   isoWeekKey,
   parseWeekStartInput,
   simplifyLessonForChildren,
 } from './children.constants';
+import { ChildrenClassDefinitionsService } from './children-class-definitions.service';
 
 const memberSelect = {
   id: true,
@@ -33,21 +33,17 @@ export class ChildrenDepartmentService {
     private readonly commQueue: CommunicationsQueueService,
     private readonly pastoral: PastoralCareService,
     private readonly uploads: UploadsService,
+    private readonly classDefinitions: ChildrenClassDefinitionsService,
   ) {}
 
-  getCatalog() {
-    return { classGroups: CHILDREN_CLASS_GROUPS };
+  async getCatalog(userId: string, churchId: string, serviceUnitId: string) {
+    await this.requireChildrenUnit(userId, churchId, serviceUnitId);
+    const classGroups = await this.classDefinitions.listActive(churchId, serviceUnitId);
+    return { classGroups };
   }
 
   private async requireChildrenUnit(userId: string, churchId: string, serviceUnitId: string) {
-    const { ctx, unit } = await this.access.requireView(userId, churchId, serviceUnitId);
-    const code = resolveDeptModuleCode(unit.departmentCode, unit.name);
-    if (code !== 'CHILDREN') {
-      throw new BadRequestException(
-        "Children's ministry tools are only available for the Children's Church Teachers department",
-      );
-    }
-    return { ctx, unit };
+    return this.access.requireChildrenMinistryLeadership(userId, churchId, serviceUnitId);
   }
 
   private parseWeekStart(weekStart?: string): Date {
@@ -76,6 +72,7 @@ export class ChildrenDepartmentService {
   ) {
     await this.requireChildrenUnit(userId, churchId, serviceUnitId);
     const ws = this.parseWeekStart(weekStart);
+    const classGroups = await this.classDefinitions.listActive(churchId, serviceUnitId);
     const rows = await this.prisma.deptChildrenDutyRoster.findMany({
       where: { churchId, serviceUnitId, weekStart: ws },
       include: {
@@ -87,12 +84,12 @@ export class ChildrenDepartmentService {
     return {
       weekStart: ws.toISOString(),
       weekKey: isoWeekKey(ws),
-      classGroups: CHILDREN_CLASS_GROUPS,
+      classGroups,
       assignments: rows,
-      distribution: CHILDREN_CLASS_GROUPS.map((g) => ({
-        classGroup: g.value,
-        label: g.label,
-        assigned: rows.some((r: { classGroup: string }) => r.classGroup === g.value),
+      distribution: classGroups.map((g) => ({
+        classGroup: g.code,
+        label: g.name,
+        assigned: rows.some((r: { classGroup: string }) => r.classGroup === g.code),
       })),
     };
   }
@@ -103,7 +100,7 @@ export class ChildrenDepartmentService {
     serviceUnitId: string,
     body: {
       weekStart?: string;
-      classGroup: ChildrenClassGroup;
+      classGroup: string;
       teacherMemberId: string;
       assistantMemberId?: string | null;
       notes?: string;
@@ -111,6 +108,7 @@ export class ChildrenDepartmentService {
   ) {
     await this.access.requireParticipate(userId, churchId, serviceUnitId);
     await this.requireChildrenUnit(userId, churchId, serviceUnitId);
+    await this.classDefinitions.assertActiveClassCode(churchId, serviceUnitId, body.classGroup);
     const ws = this.parseWeekStart(body.weekStart);
 
     for (const id of [body.teacherMemberId, body.assistantMemberId].filter(Boolean) as string[]) {
@@ -200,7 +198,8 @@ export class ChildrenDepartmentService {
         userId: string | null;
       }>;
       const groupLabel =
-        CHILDREN_CLASS_GROUPS.find((g) => g.value === row.classGroup)?.label ?? row.classGroup;
+        (await this.classDefinitions.resolveLabel(churchId, serviceUnitId, row.classGroup)) ??
+        row.classGroup;
       const msg = [
         `Children's ministry teaching duty — week of ${weekLabel}`,
         `Class: ${groupLabel}`,
@@ -280,13 +279,16 @@ export class ChildrenDepartmentService {
       fileUrl?: string;
       body?: string;
       source?: 'OFFICIAL_WEEKLY' | 'CUSTOM_UPLOAD';
-      targetClassGroup?: ChildrenClassGroup;
+      targetClassGroup?: string;
       authorMemberId?: string;
     },
   ) {
     const { ctx } = await this.access.requireParticipate(userId, churchId, serviceUnitId);
     await this.requireChildrenUnit(userId, churchId, serviceUnitId);
     if (!body.title?.trim()) throw new BadRequestException('Title is required');
+    if (body.targetClassGroup) {
+      await this.classDefinitions.assertActiveClassCode(churchId, serviceUnitId, body.targetClassGroup);
+    }
 
     const authorId = body.authorMemberId ?? ctx.memberId ?? null;
 
@@ -315,7 +317,7 @@ export class ChildrenDepartmentService {
     churchId: string,
     serviceUnitId: string,
     file: Express.Multer.File,
-    meta?: { title?: string; weekStart?: string; targetClassGroup?: ChildrenClassGroup },
+    meta?: { title?: string; weekStart?: string; targetClassGroup?: string },
   ) {
     const { ctx } = await this.access.requireParticipate(userId, churchId, serviceUnitId);
     await this.requireChildrenUnit(userId, churchId, serviceUnitId);
@@ -335,7 +337,7 @@ export class ChildrenDepartmentService {
     churchId: string,
     serviceUnitId: string,
     curriculumId: string,
-    body: { classGroup: ChildrenClassGroup },
+    body: { classGroup: string },
   ) {
     await this.access.requireParticipate(userId, churchId, serviceUnitId);
     await this.requireChildrenUnit(userId, churchId, serviceUnitId);
@@ -345,6 +347,7 @@ export class ChildrenDepartmentService {
     if (!item) throw new NotFoundException('Curriculum item not found');
     const sourceText = item.body?.trim() || item.title;
     if (!sourceText) throw new BadRequestException('Add lesson text or title before simplifying');
+    await this.classDefinitions.assertActiveClassCode(churchId, serviceUnitId, body.classGroup);
 
     const simplified = simplifyLessonForChildren(sourceText, body.classGroup);
     return this.prisma.deptChildrenCurriculum.update({
@@ -383,7 +386,7 @@ export class ChildrenDepartmentService {
     churchId: string,
     serviceUnitId: string,
     body: {
-      classGroup: ChildrenClassGroup;
+      classGroup: string;
       serviceDate?: string;
       teacherMemberId: string;
       curriculumId?: string;
@@ -397,6 +400,7 @@ export class ChildrenDepartmentService {
     await this.access.requireParticipate(userId, churchId, serviceUnitId);
     await this.requireChildrenUnit(userId, churchId, serviceUnitId);
     if (!body.lessonTaught?.trim()) throw new BadRequestException('Lesson taught is required');
+    await this.classDefinitions.assertActiveClassCode(churchId, serviceUnitId, body.classGroup);
 
     const teacher = await this.prisma.member.findFirst({
       where: { id: body.teacherMemberId, churchId },
@@ -454,7 +458,8 @@ export class ChildrenDepartmentService {
     pastoralSummary?: string,
   ) {
     const groupLabel =
-      CHILDREN_CLASS_GROUPS.find((g) => g.value === report.classGroup)?.label ?? report.classGroup;
+      (await this.classDefinitions.resolveLabel(churchId, serviceUnitId, report.classGroup)) ??
+      report.classGroup;
     const summary = [
       pastoralSummary,
       `Class: ${groupLabel}`,

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Shield } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
 import { DashboardPageSkeleton } from '@/components/dashboard/DashboardPageSkeleton';
 import { Badge } from '@/components/ui/badge';
@@ -45,7 +46,7 @@ export default function AdminCommandCenterPage() {
     <DashboardModuleShell
       eyebrow="Administration"
       title="Admin Command Center"
-      description="Centralized command surface for membership, outreach, communications, and workflow automation."
+      description={MODULE_DESCRIPTIONS.admin}
       badge={
         <Badge variant="outline" className="gap-1 border-slate-500 text-slate-200">
           <Shield className="h-3 w-3" />

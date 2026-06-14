@@ -10,18 +10,28 @@ import {
   Query,
   UploadedFile,
   UseInterceptors,
+  Res,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
+import type { MembershipImportColumnMapping, MembershipImportOptions } from '@church-hub/shared-types';
 import { ChurchId, CurrentUser, AuthUser } from '../auth/current-user.decorator';
 import { ModuleGate } from '../auth/decorators';
 import { DepartmentModulesService } from './department-modules.service';
 import { ChildrenDepartmentService } from './children-department.service';
+import { ChildrenMinistryService } from './children-ministry.service';
 import {
+  AssignChildrenClassDto,
+  AddChildrenTeacherDto,
   ChildrenSendRemindersDto,
+  ChildrenSundayReportDto,
   CreateChildrenClassReportDto,
+  CreateChildrenClassDefinitionDto,
   CreateChildrenCurriculumDto,
+  RegisterChildWizardDto,
+  UpdateChildrenClassDefinitionDto,
   SimplifyChildrenCurriculumDto,
   UploadChildrenCurriculumMetaDto,
   UpsertChildrenRosterDto,
@@ -64,6 +74,7 @@ export class DepartmentModulesController {
     private readonly dept: DepartmentModulesService,
     private readonly medical: MedicalDepartmentService,
     private readonly children: ChildrenDepartmentService,
+    private readonly childrenMinistry: ChildrenMinistryService,
     private readonly choir: ChoirDepartmentService,
     private readonly prayer: PrayerDepartmentService,
   ) {}
@@ -280,8 +291,48 @@ export class DepartmentModulesController {
   }
 
   @Get('children/catalog')
-  childrenCatalog() {
-    return this.children.getCatalog();
+  childrenCatalog(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('unitId') unitId: string,
+  ) {
+    return this.children.getCatalog(user.userId, churchId, unitId);
+  }
+
+  @Get('children/classes')
+  @ApiOperation({ summary: 'List Children\'s Church age/class groups for this unit' })
+  listChildrenClasses(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('unitId') unitId: string,
+    @Query('includeInactive') includeInactive?: string,
+  ) {
+    return this.childrenMinistry.listClassDefinitions(user.userId, churchId, unitId, {
+      includeInactive: includeInactive === 'true',
+    });
+  }
+
+  @Post('children/classes')
+  @ApiOperation({ summary: 'Create a Children\'s Church class (church admin / children admin)' })
+  createChildrenClass(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('unitId') unitId: string,
+    @Body() body: CreateChildrenClassDefinitionDto,
+  ) {
+    return this.childrenMinistry.createClassDefinition(user.userId, churchId, unitId, body);
+  }
+
+  @Patch('children/classes/:classId')
+  @ApiOperation({ summary: 'Update a Children\'s Church class' })
+  updateChildrenClass(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('unitId') unitId: string,
+    @Param('classId') classId: string,
+    @Body() body: UpdateChildrenClassDefinitionDto,
+  ) {
+    return this.childrenMinistry.updateClassDefinition(user.userId, churchId, unitId, classId, body);
   }
 
   @Get('children/roster')
@@ -400,6 +451,322 @@ export class DepartmentModulesController {
     @Body() body: CreateChildrenClassReportDto,
   ) {
     return this.children.createClassReport(user.userId, churchId, unitId, body);
+  }
+
+  @Get('children/access')
+  @ApiOperation({ summary: 'Children\'s Church leadership access flags' })
+  childrenMinistryAccess(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('unitId') unitId: string,
+  ) {
+    return this.childrenMinistry.getAccess(user.userId, churchId, unitId);
+  }
+
+  @Get('children/children')
+  @ApiOperation({ summary: 'Paginated Children\'s Church roster' })
+  listChildrenMinistryChildren(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('unitId') unitId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.childrenMinistry.listChildren(user.userId, churchId, unitId, {
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      search,
+    });
+  }
+
+  @Get('children/children/:childId')
+  @ApiOperation({ summary: 'Child detail with parent connection tree' })
+  getChildrenMinistryChild(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('unitId') unitId: string,
+    @Param('childId') childId: string,
+  ) {
+    return this.childrenMinistry.getChildDetail(user.userId, churchId, unitId, childId);
+  }
+
+  @Get('children/parents')
+  @ApiOperation({ summary: 'Parents linked to Children\'s Church children' })
+  listChildrenMinistryParents(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('unitId') unitId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.childrenMinistry.listParents(user.userId, churchId, unitId, {
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+
+  @Get('children/teachers')
+  @ApiOperation({ summary: 'Teachers and Children Church admins' })
+  listChildrenMinistryTeachers(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('unitId') unitId: string,
+  ) {
+    return this.childrenMinistry.listTeachers(user.userId, churchId, unitId);
+  }
+
+  @Post('children/teachers')
+  @ApiOperation({ summary: 'Add teacher to Children\'s Church team (unit + ministry tag)' })
+  addChildrenMinistryTeacher(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('unitId') unitId: string,
+    @Body() body: AddChildrenTeacherDto,
+  ) {
+    return this.childrenMinistry.addTeacher(user.userId, churchId, unitId, body);
+  }
+
+  @Get('children/birthdays')
+  @ApiOperation({ summary: 'Upcoming children\'s birthdays' })
+  listChildrenMinistryBirthdays(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('unitId') unitId: string,
+    @Query('days') days?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.childrenMinistry.listBirthdays(user.userId, churchId, unitId, {
+      days: days ? Number(days) : undefined,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+
+  @Patch('children/enrollments/:childId')
+  @ApiOperation({ summary: 'Assign child to a class group' })
+  assignChildrenClass(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('unitId') unitId: string,
+    @Param('childId') childId: string,
+    @Body() body: AssignChildrenClassDto,
+  ) {
+    return this.childrenMinistry.assignClass(
+      user.userId,
+      churchId,
+      unitId,
+      childId,
+      body.classGroup,
+    );
+  }
+
+  @Get('children/registration/catalog')
+  @ApiOperation({ summary: 'Family form catalog and household list for child registration' })
+  childrenRegistrationCatalog(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('unitId') unitId: string,
+  ) {
+    return this.childrenMinistry.getRegistrationCatalog(user.userId, churchId, unitId);
+  }
+
+  @Get('children/registration/families')
+  @ApiOperation({ summary: 'Search families by surname for child registration' })
+  searchChildrenRegistrationFamilies(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('unitId') unitId: string,
+    @Query('search') search?: string,
+  ) {
+    return this.childrenMinistry.searchRegistrationFamilies(
+      user.userId,
+      churchId,
+      unitId,
+      search,
+    );
+  }
+
+  @Get('children/registration/guardians')
+  @ApiOperation({ summary: 'Search members to link as parents/guardians' })
+  searchChildrenRegistrationGuardians(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('unitId') unitId: string,
+    @Query('search') search?: string,
+  ) {
+    return this.childrenMinistry.searchRegistrationGuardians(
+      user.userId,
+      churchId,
+      unitId,
+      search,
+    );
+  }
+
+  @Post('children/registration/submit')
+  @ApiOperation({ summary: 'Register a child via the 3-step wizard (personal, family tree, preview)' })
+  submitChildrenRegistrationWizard(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('unitId') unitId: string,
+    @Body() body: RegisterChildWizardDto,
+  ) {
+    return this.childrenMinistry.registerChildWizard(user.userId, churchId, unitId, body);
+  }
+
+  @Post('children/registration/families')
+  @ApiOperation({ summary: 'Create household via family form (Children\'s Church teachers/admins)' })
+  createChildrenRegistrationFamily(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('unitId') unitId: string,
+    @Body()
+    body: {
+      name: string;
+      headMemberId?: string;
+      address?: string;
+      address2?: string;
+      city?: string;
+      state?: string;
+      zip?: string;
+      country?: string;
+      homePhone?: string;
+      email?: string;
+      homeCell?: string;
+      specialOccasion?: string;
+      specialOccasionDate?: string;
+      customFields?: Record<string, string | boolean | null>;
+      propertyIds?: string[];
+    },
+  ) {
+    return this.childrenMinistry.createFamilyForRegistration(
+      user.userId,
+      churchId,
+      unitId,
+      body,
+    );
+  }
+
+  @Post('children/registration/members')
+  @ApiOperation({ summary: 'Register a child member tagged for Children\'s Church' })
+  registerChildrenMember(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('unitId') unitId: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.childrenMinistry.registerChildMember(user.userId, churchId, unitId, body);
+  }
+
+  @Get('children/registration/import/template.csv')
+  @ApiOperation({ summary: 'Download CSV template for bulk child registration' })
+  childrenImportTemplate(@Res() res: Response) {
+    const csv = this.childrenMinistry.getChildrenImportTemplateCsv();
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="churchhub-children-import-template.csv"',
+    );
+    res.send(csv);
+  }
+
+  @Post('children/registration/import/upload')
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload CSV for bulk child registration' })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
+  )
+  uploadChildrenImport(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('unitId') unitId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.childrenMinistry.uploadChildrenImport(user.userId, churchId, unitId, file);
+  }
+
+  @Post('children/registration/import/preview')
+  @ApiOperation({ summary: 'Preview bulk child import mapping' })
+  previewChildrenImport(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('unitId') unitId: string,
+    @Body()
+    body: {
+      jobId: string;
+      columnMapping: MembershipImportColumnMapping;
+      options?: MembershipImportOptions;
+    },
+  ) {
+    return this.childrenMinistry.previewChildrenImport(
+      user.userId,
+      churchId,
+      unitId,
+      body.jobId,
+      body.columnMapping,
+      body.options,
+    );
+  }
+
+  @Post('children/registration/import/commit')
+  @ApiOperation({ summary: 'Commit bulk child import and tag for Children\'s Church' })
+  commitChildrenImport(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('unitId') unitId: string,
+    @Body() body: { jobId: string },
+  ) {
+    return this.childrenMinistry.commitChildrenImport(
+      churchId,
+      unitId,
+      body.jobId,
+      user.userId,
+    );
+  }
+
+  @Get('children/registration/import/jobs/:jobId')
+  @ApiOperation({ summary: 'Get bulk child import job status' })
+  getChildrenImportJob(
+    @ChurchId() churchId: string,
+    @Param('jobId') jobId: string,
+  ) {
+    return this.childrenMinistry.getChildrenImportJob(churchId, jobId);
+  }
+
+  @Get('children/check-in-board')
+  @ApiOperation({ summary: 'Pickup tracking board for today\'s session' })
+  childrenCheckInBoard(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('unitId') unitId: string,
+    @Query('serviceDate') serviceDate?: string,
+  ) {
+    return this.childrenMinistry.getCheckInBoard(user.userId, churchId, unitId, serviceDate);
+  }
+
+  @Post('children/sunday-report')
+  @ApiOperation({ summary: 'Send Sunday head-count report to church admin and pastor (email + in-app)' })
+  sendChildrenSundayReport(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('unitId') unitId: string,
+    @Body() body: ChildrenSundayReportDto,
+  ) {
+    return this.childrenMinistry.sendSundayReport(user.userId, churchId, unitId, body);
+  }
+
+  @Post('children/birthdays/run')
+  @ApiOperation({ summary: 'Queue parent birthday emails for children with birthdays today' })
+  runChildrenBirthdayEmails(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('unitId') unitId: string,
+  ) {
+    return this.childrenMinistry.runBirthdayParentEmailsManual(user.userId, churchId, unitId);
   }
 
   @Get('choir/catalog')

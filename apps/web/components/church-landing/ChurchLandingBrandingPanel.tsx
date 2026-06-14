@@ -47,13 +47,13 @@ export function ChurchLandingBrandingPanel({
   };
 
   return (
-    <section className="rounded-xl border border-border bg-card p-6">
-      <h2 className="font-semibold">Public URL & logo</h2>
-      <p className="mt-1 text-sm text-muted-foreground">
+    <section className="rounded-xl border border-border bg-card p-4" data-testid="church-landing-branding">
+      <h2 className="text-sm font-semibold">Public URL & logo</h2>
+      <p className="mt-1 text-xs text-muted-foreground">
         Set the domain visitors use to find your church site and the logo shown in the header.
       </p>
 
-      <div className="mt-6 grid gap-6 sm:grid-cols-2">
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <div className="space-y-3">
           <Label htmlFor="landing-public-domain" className="flex items-center gap-2">
             <Globe className="h-4 w-4 text-muted-foreground" />

@@ -30,6 +30,7 @@
     "date-fns": "^3.6.0",
     "framer-motion": "^11.3.19",
     "idb": "^8.0.0",
+    "leaflet": "^1.9.4",
     "lucide-react": "^0.411.0",
     "next": "14.2.5",
     "next-themes": "^0.3.0",
@@ -45,6 +46,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.45.0",
+    "@types/leaflet": "^1.9.21",
     "@types/node": "^20.14.10",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",

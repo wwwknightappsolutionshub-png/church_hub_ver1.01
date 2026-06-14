@@ -1,6 +1,7 @@
 export * from './enums';
 export * from './membership';
 export * from './membership-import';
+export * from './membership-registry';
 export * from './membership-config';
 export * from './membership-phase3';
 export * from './membership-analytics';
@@ -23,4 +24,5 @@ export * from './landing-page.images';
 export * from './landing-membership-form';
 export * from './tenant-modules';
 export * from './department-modules';
+export * from './children-ministry';
 export * from './wisdom365';

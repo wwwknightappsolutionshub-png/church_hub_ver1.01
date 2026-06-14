@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { ReportsInboxPanel } from '@/components/reports/ReportsInboxPanel';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { isChurchAdminRole } from '@/lib/session-role';
@@ -34,7 +35,7 @@ export default function AdminReportsPage() {
       replyFormId="admin-reply-form"
       eyebrow="Administration"
       title="Admin reports center"
-      description="Centralized capture of department reports, automation queue, notifications, and all in-app messages—respond to members, leaders, and pastors."
+      description={MODULE_DESCRIPTIONS.adminReports}
       defaultReplySubject="Re: Church communication"
     />
   );

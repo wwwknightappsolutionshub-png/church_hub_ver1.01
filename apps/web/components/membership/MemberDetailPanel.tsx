@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   ArrowRight,
@@ -71,6 +72,7 @@ export function MemberDetailPanel({
   onDeleted,
 }: MemberDetailPanelProps) {
   const queryClient = useQueryClient();
+  const [mounted, setMounted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
   const [detailTab, setDetailTab] = useState<'profile' | 'timeline'>('profile');
@@ -190,65 +192,95 @@ export function MemberDetailPanel({
   const progress = onboardingProgress(member.onboardingStep);
   const inOnboarding = member.onboardingStep > 0 && member.onboardingStep < 6;
 
-  return (
-    <div className="fixed inset-y-0 right-0 z-40 flex w-full max-w-md flex-col border-l border-border bg-card shadow-elevated">
-      <div className="flex items-center justify-between border-b border-border px-5 py-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <User className="h-5 w-5" />
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, []);
+
+  if (!mounted) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 p-0 sm:items-start sm:justify-center sm:px-4 sm:pb-8 sm:pt-10 md:pt-14"
+      role="dialog"
+      aria-modal
+      aria-labelledby="member-detail-title"
+      data-testid="member-detail-panel"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-background shadow-xl sm:max-h-[calc(100dvh-5rem)] sm:max-w-2xl sm:rounded-xl lg:max-w-3xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-4 sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <User className="h-6 w-6" />
+            </div>
+            <div className="min-w-0">
+              <p id="member-detail-title" className="truncate font-heading text-lg font-semibold">
+                {formatMemberName(member)}
+              </p>
+              <Badge variant={STATUS_VARIANT[member.status] ?? 'outline'} className="mt-1">
+                {STATUS_LABELS[member.status]}
+              </Badge>
+            </div>
           </div>
-          <div>
-            <p className="font-heading font-semibold">{formatMemberName(member)}</p>
-            <Badge variant={STATUS_VARIANT[member.status] ?? 'outline'}>
-              {STATUS_LABELS[member.status]}
-            </Badge>
-          </div>
-        </div>
-        <div className="flex gap-1">
-          {canManageMembers && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setEditing((v) => !v)}
-              title={editing ? 'Cancel edit' : 'Edit member'}
-            >
-              <Pencil className="h-5 w-5" />
+          <div className="flex shrink-0 gap-1">
+            {canManageMembers && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setEditing((v) => !v)}
+                title={editing ? 'Cancel edit' : 'Edit member'}
+              >
+                <Pencil className="h-5 w-5" />
+              </Button>
+            )}
+            <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+              <X className="h-5 w-5" />
             </Button>
-          )}
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-5 w-5" />
-          </Button>
+          </div>
         </div>
-      </div>
 
-      <div className="flex gap-1 border-b border-border px-5">
-        <button
-          type="button"
-          className={cn(
-            'border-b-2 px-3 py-2 text-sm font-medium transition',
-            detailTab === 'profile'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground',
-          )}
-          onClick={() => setDetailTab('profile')}
-        >
-          Profile
-        </button>
-        <button
-          type="button"
-          className={cn(
-            'border-b-2 px-3 py-2 text-sm font-medium transition',
-            detailTab === 'timeline'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground',
-          )}
-          onClick={() => setDetailTab('timeline')}
-        >
-          Service history
-        </button>
-      </div>
+        <div className="flex justify-center gap-1 border-b border-border px-4 sm:px-6">
+          <button
+            type="button"
+            className={cn(
+              'border-b-2 px-4 py-2.5 text-sm font-medium transition',
+              detailTab === 'profile'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground',
+            )}
+            onClick={() => setDetailTab('profile')}
+          >
+            Profile
+          </button>
+          <button
+            type="button"
+            className={cn(
+              'border-b-2 px-4 py-2.5 text-sm font-medium transition',
+              detailTab === 'timeline'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground',
+            )}
+            onClick={() => setDetailTab('timeline')}
+          >
+            Service history
+          </button>
+        </div>
 
-      <div className="flex-1 space-y-6 overflow-y-auto p-5">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+          <div className="mx-auto w-full max-w-xl space-y-6">
         {detailTab === 'timeline' && <MemberTimelinePanel memberId={member.id} />}
 
         {detailTab === 'profile' && (
@@ -555,7 +587,10 @@ export function MemberDetailPanel({
         )}
           </>
         )}
+          </div>
+        </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

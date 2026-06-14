@@ -2,6 +2,10 @@ import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { createDefaultChurchLanding, mergeTenantModulesIntoSettings } from '@church-hub/shared-types';
 import { SERVICE_UNIT_CATALOG } from './service-unit-catalog';
+import {
+  BRANDED_ANNIVERSARY_BODY,
+  BRANDED_BIRTHDAY_BODY,
+} from './celebration-email-seed-templates';
 
 const prisma = new PrismaClient();
 
@@ -160,16 +164,19 @@ async function main() {
     ministryInterests?: string[];
     onboardingStep?: number;
     familyKey?: string;
+    dateOfBirth?: Date;
+    specialOccasion?: string;
+    specialOccasionDate?: Date;
   };
 
   const membershipSeed: SeedMember[] = [
-    { firstName: 'Sarah', lastName: 'Johnson', email: 'sarah@demo.church', phone: '+44 7700 901001', status: 'ACTIVE_MEMBER', roles: ['ADULT', 'LEADER'], ministryInterests: ['Choir & Worship', 'Follow-up & Discipleship'], familyKey: 'johnson', onboardingStep: 6 },
-    { firstName: 'Michael', lastName: 'Chen', email: 'michael@demo.church', phone: '+44 7700 901002', status: 'DISCIPLED', roles: ['ADULT', 'EVANGELIST'], ministryInterests: ['Evangelism & Outreach', 'Follow-up & Discipleship'], familyKey: 'chen', onboardingStep: 6 },
-    { firstName: 'Grace', lastName: 'Williams', email: 'grace@demo.church', status: 'ACTIVE_MEMBER', roles: ['ADULT', 'DRIVER'], ministryInterests: ['Transportation', 'Hospitality'], familyKey: 'williams', onboardingStep: 6 },
-    { firstName: 'David', lastName: 'Okonkwo', email: 'david@demo.church', status: 'NEW_MEMBER', roles: ['ADULT'], ministryInterests: ['Ushering'], onboardingStep: 6 },
-    { firstName: 'Emma', lastName: 'Johnson', email: 'emma.j@demo.church', status: 'ACTIVE_MEMBER', roles: ['YOUTH'], ministryInterests: ["Teens' Church", 'Choir & Worship'], familyKey: 'johnson', onboardingStep: 6 },
-    { firstName: 'Noah', lastName: 'Johnson', status: 'NEW_MEMBER', roles: ['YOUTH'], ministryInterests: ["Teens' Church"], familyKey: 'johnson', onboardingStep: 4 },
-    { firstName: 'Lily', lastName: 'Chen', status: 'ACTIVE_MEMBER', roles: ['YOUTH'], ministryInterests: ["Children's Church"], familyKey: 'chen', onboardingStep: 6 },
+    { firstName: 'Sarah', lastName: 'Johnson', email: 'sarah@demo.church', phone: '+44 7700 901001', status: 'ACTIVE_MEMBER', roles: ['ADULT', 'LEADER'], ministryInterests: ['Choir & Worship', 'Follow-up & Discipleship'], familyKey: 'johnson', onboardingStep: 6, dateOfBirth: new Date('1985-06-20') },
+    { firstName: 'Michael', lastName: 'Chen', email: 'michael@demo.church', phone: '+44 7700 901002', status: 'DISCIPLED', roles: ['ADULT', 'EVANGELIST'], ministryInterests: ['Evangelism & Outreach', 'Follow-up & Discipleship'], familyKey: 'chen', onboardingStep: 6, specialOccasion: 'Wedding Anniversary', specialOccasionDate: new Date('2015-06-25') },
+    { firstName: 'Grace', lastName: 'Williams', email: 'grace@demo.church', status: 'ACTIVE_MEMBER', roles: ['ADULT', 'DRIVER'], ministryInterests: ['Transportation', 'Hospitality'], familyKey: 'williams', onboardingStep: 6, dateOfBirth: new Date('1988-06-12') },
+    { firstName: 'David', lastName: 'Okonkwo', email: 'david@demo.church', status: 'NEW_MEMBER', roles: ['ADULT'], ministryInterests: ['Ushering'], onboardingStep: 6, dateOfBirth: new Date('1990-07-01') },
+    { firstName: 'Emma', lastName: 'Johnson', email: 'emma.j@demo.church', status: 'ACTIVE_MEMBER', roles: ['YOUTH'], ministryInterests: ["Teens' Church", 'Choir & Worship'], familyKey: 'johnson', onboardingStep: 6, dateOfBirth: new Date('2010-06-15') },
+    { firstName: 'Noah', lastName: 'Johnson', status: 'NEW_MEMBER', roles: ['YOUTH'], ministryInterests: ["Children's Church"], familyKey: 'johnson', onboardingStep: 4, dateOfBirth: new Date('2019-07-22') },
+    { firstName: 'Lily', lastName: 'Chen', status: 'ACTIVE_MEMBER', roles: ['YOUTH'], ministryInterests: ["Children's Church"], familyKey: 'chen', onboardingStep: 6, dateOfBirth: new Date('2018-03-10') },
     { firstName: 'James', lastName: 'Adebayo', email: 'james.a@demo.church', status: 'VISITOR', roles: ['ADULT'], ministryInterests: [], onboardingStep: 2 },
     { firstName: 'Ruth', lastName: 'Mensah', email: 'ruth.m@demo.church', status: 'VISITOR', roles: ['ADULT'], ministryInterests: ['Prayer & Intercession'], onboardingStep: 1 },
     { firstName: 'Thomas', lastName: 'Williams', status: 'DISCIPLED', roles: ['ADULT', 'LEADER'], ministryInterests: ['Winning Foundation School', 'Follow-up & Discipleship'], familyKey: 'williams', onboardingStep: 6 },
@@ -214,6 +221,9 @@ async function main() {
       ministryInterests: m.ministryInterests ?? [],
       onboardingStep: m.onboardingStep ?? 0,
       familyId,
+      dateOfBirth: m.dateOfBirth,
+      specialOccasion: m.specialOccasion,
+      specialOccasionDate: m.specialOccasionDate,
       gamification: { create: {} },
     };
 
@@ -227,6 +237,9 @@ async function main() {
             onboardingStep: m.onboardingStep ?? existing.onboardingStep,
             familyId: familyId ?? existing.familyId,
             phone: m.phone,
+            dateOfBirth: m.dateOfBirth ?? existing.dateOfBirth,
+            specialOccasion: m.specialOccasion ?? existing.specialOccasion,
+            specialOccasionDate: m.specialOccasionDate ?? existing.specialOccasionDate,
           },
         })
       : await prisma.member.create({ data });
@@ -247,6 +260,54 @@ async function main() {
     where: { id: familyByKey.williams },
     data: { headMemberId: extraMembers.find((x) => x.firstName === 'Grace')?.id },
   });
+
+  await prisma.family.update({
+    where: { id: familyByKey.johnson },
+    data: {
+      address: '10 Downing Street',
+      city: 'London',
+      zip: 'SW1A 2AA',
+      country: 'United Kingdom',
+      specialOccasion: 'Wedding Anniversary',
+      specialOccasionDate: new Date('2010-06-18'),
+      email: 'johnson.family@demo.church',
+    },
+  });
+  await prisma.family.update({
+    where: { id: familyByKey.chen },
+    data: {
+      address: '1 Piccadilly Gardens',
+      city: 'Manchester',
+      zip: 'M1 1RG',
+      country: 'United Kingdom',
+      email: 'chen.family@demo.church',
+    },
+  });
+  await prisma.family.update({
+    where: { id: familyByKey.williams },
+    data: {
+      address: '1 Centenary Square',
+      city: 'Birmingham',
+      zip: 'B1 1BB',
+      country: 'United Kingdom',
+      specialOccasion: 'Wedding Anniversary',
+      specialOccasionDate: new Date('2005-07-05'),
+      email: 'williams.family@demo.church',
+    },
+  });
+
+  for (const kind of ['BIRTHDAY', 'ANNIVERSARY'] as const) {
+    const subject =
+      kind === 'BIRTHDAY'
+        ? 'Happy Birthday, {{firstName}}! — {{churchName}}'
+        : 'Celebrating {{occasionName}} with you — {{churchName}}';
+    const bodyHtml = kind === 'BIRTHDAY' ? BRANDED_BIRTHDAY_BODY : BRANDED_ANNIVERSARY_BODY;
+    await prisma.celebrationEmailTemplate.upsert({
+      where: { churchId_kind: { churchId: church.id, kind } },
+      update: { subject, bodyHtml, isActive: true, autoSend: true },
+      create: { churchId: church.id, kind, subject, bodyHtml, isActive: true, autoSend: true },
+    });
+  }
 
   const linkGuardian = async (parentEmail: string, childFirst: string, childLast: string) => {
     const parent = memberByEmail[parentEmail] ?? extraMembers.find((x) => x.email === parentEmail);
@@ -312,6 +373,7 @@ async function main() {
       'Harvesters Squad',
       'Prayer Squad',
       'Winning Foundation School',
+      "Children's Church Teachers",
     ]);
     if (!existingLeader) {
       await prisma.serviceUnitLeader.create({
@@ -372,6 +434,40 @@ async function main() {
         },
       });
     }
+  }
+
+  const childrenUnit = await prisma.serviceUnit.findFirst({
+    where: { churchId: church.id, name: "Children's Church Teachers" },
+  });
+  const lilyChild = extraMembers.find((x) => x.firstName === 'Lily' && x.lastName === 'Chen');
+  const noahChild = extraMembers.find((x) => x.firstName === 'Noah' && x.lastName === 'Johnson');
+  if (childrenUnit && lilyChild) {
+    await prisma.deptChildrenClassEnrollment.upsert({
+      where: {
+        serviceUnitId_childMemberId: { serviceUnitId: childrenUnit.id, childMemberId: lilyChild.id },
+      },
+      create: {
+        churchId: church.id,
+        serviceUnitId: childrenUnit.id,
+        childMemberId: lilyChild.id,
+        classGroup: 'AGES_6_9',
+      },
+      update: { classGroup: 'AGES_6_9' },
+    });
+  }
+  if (childrenUnit && noahChild) {
+    await prisma.deptChildrenClassEnrollment.upsert({
+      where: {
+        serviceUnitId_childMemberId: { serviceUnitId: childrenUnit.id, childMemberId: noahChild.id },
+      },
+      create: {
+        churchId: church.id,
+        serviceUnitId: childrenUnit.id,
+        childMemberId: noahChild.id,
+        classGroup: 'AGES_6_9',
+      },
+      update: { classGroup: 'AGES_6_9' },
+    });
   }
 
   const followUpSamples = [

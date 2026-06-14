@@ -35,7 +35,11 @@
         proxy_cache off;
         proxy_no_cache 1;
         proxy_cache_bypass 1;
-        add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+        proxy_ignore_headers Cache-Control Expires X-Accel-Expires;
+        proxy_hide_header Cache-Control;
+        proxy_hide_header Expires;
+        proxy_hide_header Surrogate-Control;
+        add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate" always;
         add_header Pragma "no-cache" always;
     }
 
@@ -49,7 +53,11 @@
         proxy_cache off;
         proxy_no_cache 1;
         proxy_cache_bypass 1;
-        add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+        proxy_ignore_headers Cache-Control Expires X-Accel-Expires;
+        proxy_hide_header Cache-Control;
+        proxy_hide_header Expires;
+        proxy_hide_header Surrogate-Control;
+        add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate" always;
         add_header Pragma "no-cache" always;
     }
 

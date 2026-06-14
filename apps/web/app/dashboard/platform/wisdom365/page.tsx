@@ -10,6 +10,7 @@ import { api } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-errors';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
 import { Wisdom365VariantEditor, type VariantRow } from '@/components/platform/wisdom365/Wisdom365VariantEditor';
 import { Wisdom365ContentManager } from '@/components/platform/wisdom365/Wisdom365ContentManager';
@@ -126,7 +127,7 @@ export default function PlatformWisdom365Page() {
   return (
     <DashboardModuleShell
       title="Wisdom365+ Management"
-      description="Variants, content repository, subscriptions, pricing, and church availability."
+      description={MODULE_DESCRIPTIONS.platformWisdom365}
       actions={
         <Button
           variant="outline"

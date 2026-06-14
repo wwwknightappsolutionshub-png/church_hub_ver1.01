@@ -262,7 +262,14 @@ export class BusinessService {
     return this.prisma.marketplaceItem.update({ where: { id }, data });
   }
 
-  async listJobs(churchId: string, activeOnly = true) {
+  async listJobs(
+    churchId: string,
+    opts?: { activeOnly?: boolean; page?: number; limit?: number },
+  ) {
+    const activeOnly = opts?.activeOnly ?? true;
+    const page = Math.max(1, opts?.page ?? 1);
+    const limit = Math.min(100, Math.max(1, opts?.limit ?? 20));
+
     const [jobs, community] = await Promise.all([
       this.prisma.jobPosting.findMany({
         where: { churchId, ...(activeOnly ? { isActive: true } : {}) },
@@ -275,10 +282,32 @@ export class BusinessService {
       }),
       this.communitySupport.listForKonnectJobBoard(churchId),
     ]);
-    return [
+
+    const merged = [
       ...jobs.map((job) => ({ ...job, source: 'posting' as const })),
       ...community,
-    ];
+    ].sort((a, b) => {
+      const aTime = new Date(
+        'createdAt' in a && a.createdAt ? a.createdAt : 0,
+      ).getTime();
+      const bTime = new Date(
+        'createdAt' in b && b.createdAt ? b.createdAt : 0,
+      ).getTime();
+      return bTime - aTime;
+    });
+
+    const total = merged.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const safePage = Math.min(page, totalPages);
+    const start = (safePage - 1) * limit;
+
+    return {
+      items: merged.slice(start, start + limit),
+      total,
+      page: safePage,
+      limit,
+      totalPages,
+    };
   }
 
   createJob(

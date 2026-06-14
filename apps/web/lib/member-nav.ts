@@ -83,7 +83,7 @@ export const STAFF_LEADERSHIP_NAV: DashboardNavItem[] = [
     icon: Shield,
     requiresChurchLeadership: true,
   },
-  { href: '/dashboard/membership', label: 'Membership', icon: Users },
+  { href: '/dashboard/membership', label: 'Congregants', icon: Users },
   {
     href: '/dashboard/analytics',
     label: 'Analytics',

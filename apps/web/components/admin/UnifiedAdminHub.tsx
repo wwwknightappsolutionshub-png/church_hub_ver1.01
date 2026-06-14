@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { normalizeDashboardMetrics } from '@/lib/dashboard-metrics';
+import { CelebrationColumnsPanel } from '@/components/membership/CelebrationColumnsPanel';
 import { Users, Megaphone, HeartHandshake, Bus } from 'lucide-react';
 
 export interface UnifiedAdminHubDto {
@@ -49,6 +50,8 @@ export function UnifiedAdminHub({ hub }: UnifiedAdminHubProps) {
         />
         <StatCard label="Active Rides" value={metrics.bus.activeRides} icon={Bus} />
       </div>
+
+      <CelebrationColumnsPanel compact />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>

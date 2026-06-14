@@ -9,6 +9,8 @@ import { MembershipClassesService } from './membership-classes.service';
 import { MembershipAttendanceService } from './membership-attendance.service';
 import { MembershipTimelineService } from './membership-timeline.service';
 import { MembershipAnalyticsService } from './membership-analytics.service';
+import { MembershipCelebrationsService } from './membership-celebrations.service';
+import { MembershipFamilyMapService } from './membership-family-map.service';
 import { AuthUser, ChurchId, CurrentUser } from '../auth/current-user.decorator';
 import { MemberAdmin, Roles } from '../auth/decorators';
 
@@ -24,6 +26,8 @@ export class MembershipController {
     private readonly membershipAttendance: MembershipAttendanceService,
     private readonly membershipTimeline: MembershipTimelineService,
     private readonly membershipAnalytics: MembershipAnalyticsService,
+    private readonly membershipCelebrations: MembershipCelebrationsService,
+    private readonly membershipFamilyMap: MembershipFamilyMapService,
   ) {}
 
   @Get('catalog')
@@ -44,7 +48,20 @@ export class MembershipController {
     @Query('status') status?: MemberStatus,
     @Query('search') search?: string,
     @Query('role') role?: MemberRoleType,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
+    if (page || limit) {
+      const pageNum = Math.max(1, parseInt(page ?? '1', 10) || 1);
+      const limitNum = Math.min(100, Math.max(1, parseInt(limit ?? '25', 10) || 25));
+      return this.membershipService.listMembersPaginated(churchId, {
+        status,
+        search,
+        role,
+        page: pageNum,
+        limit: limitNum,
+      });
+    }
     return this.membershipService.listMembers(churchId, { status, search, role });
   }
 
@@ -57,7 +74,12 @@ export class MembershipController {
   @Post('members')
   @MemberAdmin()
   createMember(@ChurchId() churchId: string, @Body() body: Record<string, unknown>) {
-    return this.membershipService.createMember(churchId, body as Parameters<MembershipService['createMember']>[1]);
+    return this.membershipService.createMember(
+      churchId,
+      { ...body, startOnboarding: body.startOnboarding ?? false } as Parameters<
+        MembershipService['createMember']
+      >[1],
+    );
   }
 
   @Patch('members/:id')
@@ -134,22 +156,45 @@ export class MembershipController {
   }
 
   @Get('families')
-  listFamilies(@ChurchId() churchId: string) {
-    return this.membershipService.listFamilies(churchId);
+  listFamilies(
+    @ChurchId() churchId: string,
+    @Query('search') search?: string,
+    @Query('serviceUnitId') serviceUnitId?: string,
+  ) {
+    return this.membershipService.listFamilies(churchId, { search, serviceUnitId });
   }
 
   @Post('families')
   @MemberAdmin()
   createFamily(
     @ChurchId() churchId: string,
-    @Body() body: { name: string; headMemberId?: string },
+    @Body()
+    body: {
+      name: string;
+      headMemberId?: string;
+      address?: string;
+      address2?: string;
+      city?: string;
+      state?: string;
+      zip?: string;
+      country?: string;
+      homePhone?: string;
+      email?: string;
+      homeCell?: string;
+      specialOccasion?: string;
+      specialOccasionDate?: string;
+      customFields?: Record<string, string | boolean | null>;
+      propertyIds?: string[];
+    },
     @CurrentUser() user: AuthUser,
   ) {
+    const { name, headMemberId, ...rest } = body;
     return this.membershipService.createFamily(
       churchId,
-      body.name,
-      body.headMemberId,
+      name,
+      headMemberId,
       user.userId,
+      rest,
     );
   }
 
@@ -213,9 +258,13 @@ export class MembershipController {
   updateFamily(
     @ChurchId() churchId: string,
     @Param('id') id: string,
-    @Body() body: { name?: string; headMemberId?: string | null },
+    @Body() body: Record<string, unknown>,
   ) {
-    return this.membershipService.updateFamily(churchId, id, body);
+    return this.membershipService.updateFamily(
+      churchId,
+      id,
+      body as Parameters<MembershipService['updateFamily']>[2],
+    );
   }
 
   @Get('members/:id/timeline')
@@ -429,6 +478,46 @@ export class MembershipController {
   @ApiOperation({ summary: 'Seed default services + class levels for this church' })
   seedConfigDefaults(@ChurchId() churchId: string) {
     return this.membershipConfig.seedChurchDefaults(churchId);
+  }
+
+  @Get('weekly-attendance-flow')
+  @Roles('ADMIN', 'PASTOR', 'LEADER')
+  @ApiOperation({ summary: 'Weekly sanctuary headcounts from Ushering service unit' })
+  getWeeklyAttendanceFlow(
+    @ChurchId() churchId: string,
+    @Query('weeks') weeks?: string,
+  ) {
+    const w = Math.min(12, Math.max(1, parseInt(weeks ?? '6', 10) || 6));
+    return this.membershipService.getUsheringWeeklyAttendanceFlow(churchId, w);
+  }
+
+  @Get('celebrations')
+  @Roles('ADMIN', 'PASTOR', 'LEADER')
+  @ApiOperation({ summary: 'Upcoming birthdays and special anniversaries' })
+  getCelebrations(
+    @ChurchId() churchId: string,
+    @Query('days') days?: string,
+    @Query('birthdaysPage') birthdaysPage?: string,
+    @Query('birthdaysLimit') birthdaysLimit?: string,
+    @Query('anniversariesPage') anniversariesPage?: string,
+    @Query('anniversariesLimit') anniversariesLimit?: string,
+  ) {
+    const windowDays = Math.min(90, Math.max(7, parseInt(days ?? '30', 10) || 30));
+    const parsePage = (v?: string) => Math.max(1, parseInt(v ?? '1', 10) || 1);
+    const parseLimit = (v?: string) => Math.min(50, Math.max(1, parseInt(v ?? '8', 10) || 8));
+    return this.membershipCelebrations.getCelebrations(churchId, windowDays, {
+      birthdaysPage: parsePage(birthdaysPage),
+      birthdaysLimit: parseLimit(birthdaysLimit),
+      anniversariesPage: parsePage(anniversariesPage),
+      anniversariesLimit: parseLimit(anniversariesLimit),
+    });
+  }
+
+  @Get('family-map')
+  @Roles('ADMIN', 'PASTOR', 'LEADER')
+  @ApiOperation({ summary: 'Geocoded family locations by post code for map display' })
+  getFamilyMap(@ChurchId() churchId: string) {
+    return this.membershipFamilyMap.getFamilyMapPins(churchId);
   }
 
   @Get('analytics')

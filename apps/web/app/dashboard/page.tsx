@@ -18,16 +18,17 @@ import {
   Bus,
   HeartHandshake,
   Megaphone,
-  Sparkles,
   Users,
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import { DEMO_ACTIVITY } from '@/lib/demo-data';
 import { normalizeDashboardMetrics, type DashboardMetrics } from '@/lib/dashboard-metrics';
 import { DASHBOARD_QUICK_ACTIONS } from '@/lib/quick-actions';
-import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
+import { DashboardAttendanceChart } from '@/components/dashboard/DashboardAttendanceChart';
+import { DashboardChurchCalendar } from '@/components/dashboard/DashboardChurchCalendar';
 import { QuickActionsList, QuickActionsMenu } from '@/components/dashboard/QuickActionsMenu';
 import { StatCard } from '@/components/dashboard/StatCard';
+import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -82,7 +83,7 @@ export default function DashboardPage() {
     <DashboardModuleShell
       eyebrow="Executive overview"
       title="Good morning, Pastor"
-      description="Operational snapshot of membership, outreach, communications, and automation across your organization."
+      description={MODULE_DESCRIPTIONS.dashboard}
       badge={isDemo ? <Badge variant="gold">Demo data</Badge> : undefined}
       actions={
         <QuickActionsMenu actions={DASHBOARD_QUICK_ACTIONS} scrollTargetId="quick-actions" />
@@ -131,18 +132,22 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card id="quick-actions">
-            <CardHeader>
+          <Card id="quick-actions" className="flex flex-col">
+            <CardHeader className="pb-3">
               <CardTitle className="text-base">Quick Actions</CardTitle>
               <CardDescription>Jump to common ministry tasks</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1">
               <QuickActionsList actions={DASHBOARD_QUICK_ACTIONS} />
             </CardContent>
           </Card>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <DashboardAttendanceChart />
+          </div>
+
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Members by Status</CardTitle>
@@ -171,32 +176,9 @@ export default function DashboardPage() {
               )}
             </CardContent>
           </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">Recent Activity</CardTitle>
-              <Sparkles className="h-4 w-4 text-gold" />
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-4">
-                {DEMO_ACTIVITY.map((item) => (
-                  <li key={item.id} className="flex gap-3">
-                    <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium leading-snug">{item.message}</p>
-                      <div className="mt-1 flex items-center gap-2">
-                        <Badge variant="outline" className="text-[10px]">
-                          {item.module}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">{item.time}</span>
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
         </div>
+
+        <DashboardChurchCalendar />
       </div>
     </DashboardModuleShell>
   );

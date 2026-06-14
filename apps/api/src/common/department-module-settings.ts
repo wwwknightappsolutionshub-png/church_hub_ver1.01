@@ -12,7 +12,7 @@ export type DepartmentModuleSettings = {
 export const DEFAULT_DEPARTMENT_TABS: Record<DepartmentModuleCode, string[]> = {
   MEDICAL: ['dashboard', 'attendance', 'schedules', 'assignments', 'reports', 'feedbacks', 'inventory', 'resources', 'messages', 'special'],
   MEDIA: ['dashboard', 'attendance', 'schedules', 'assignments', 'reports', 'feedbacks', 'inventory', 'resources', 'tasks', 'messages', 'special'],
-  CHILDREN: ['dashboard', 'children-roster', 'children-curriculum', 'children-reports', 'children-checkin', 'reports', 'feedbacks', 'resources', 'messages'],
+  CHILDREN: ['dashboard', 'children-list', 'children-parents', 'children-teachers', 'children-birthdays', 'children-roster', 'children-curriculum', 'children-reports', 'children-checkin', 'children-sunday-report', 'children-classes', 'reports', 'feedbacks', 'resources', 'messages'],
   CHOIR: ['dashboard', 'choir-roster', 'choir-library', 'choir-planning', 'choir-attendance', 'choir-talent', 'reports', 'feedbacks', 'resources', 'messages'],
   PRAYER: ['dashboard', 'prayer-assignments', 'prayer-schedule', 'prayer-intake', 'prayer-progress', 'prayer-scripture', 'reports', 'feedbacks', 'resources', 'messages'],
   USHERING: ['dashboard', 'attendance', 'schedules', 'assignments', 'reports', 'feedbacks', 'resources', 'messages'],

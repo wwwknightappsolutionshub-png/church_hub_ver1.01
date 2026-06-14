@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { UserAvatar } from '@/components/app/UserAvatar';
 import { ModuleGate } from '@/components/app/ModuleGate';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import {
   EnterpriseContent,
   EnterpriseHero,
@@ -193,7 +194,7 @@ function ProfilePageContent() {
       <EnterpriseHero
         eyebrow="Member profile"
         title={`${profile.firstName} ${profile.lastName}`}
-        description="Authoritative member record—service participation, business profile, community requests, and secure messaging."
+        description={MODULE_DESCRIPTIONS.profile}
         badge={
           <UserAvatar
             user={{

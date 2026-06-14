@@ -28,6 +28,7 @@ import { api } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-errors';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -108,7 +109,7 @@ const DEPT_MODULE_LABELS: Record<(typeof DEPT_MODULE_CODES)[number], string> = {
 const DEPT_TABS: Record<(typeof DEPT_MODULE_CODES)[number], string[]> = {
   MEDICAL: ['dashboard', 'attendance', 'schedules', 'assignments', 'reports', 'inventory', 'resources', 'messages', 'special'],
   MEDIA: ['dashboard', 'attendance', 'schedules', 'assignments', 'reports', 'inventory', 'resources', 'tasks', 'messages', 'special'],
-  CHILDREN: ['dashboard', 'children-roster', 'children-curriculum', 'children-reports', 'children-checkin', 'reports', 'resources', 'messages'],
+  CHILDREN: ['dashboard', 'children-list', 'children-parents', 'children-teachers', 'children-birthdays', 'children-roster', 'children-curriculum', 'children-reports', 'children-checkin', 'children-sunday-report', 'reports', 'resources', 'messages'],
   CHOIR: ['dashboard', 'choir-roster', 'choir-library', 'choir-planning', 'choir-attendance', 'choir-talent', 'reports', 'feedbacks', 'resources', 'messages'],
   PRAYER: ['dashboard', 'prayer-assignments', 'prayer-schedule', 'prayer-intake', 'prayer-progress', 'prayer-scripture', 'reports', 'resources', 'messages'],
   USHERING: ['dashboard', 'attendance', 'schedules', 'assignments', 'reports', 'resources', 'messages'],
@@ -329,7 +330,7 @@ export default function PlatformConsolePage() {
     <DashboardModuleShell
       eyebrow="Platform"
       title="SaaS owner console"
-      description="Multi-tenant administration—provision churches, govern module entitlements, and manage tenant lifecycle globally."
+      description={MODULE_DESCRIPTIONS.platform}
       badge={
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="gold" className="gap-1">

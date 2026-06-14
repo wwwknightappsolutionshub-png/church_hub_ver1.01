@@ -9,10 +9,13 @@ import { apiErrorMessage } from '@/lib/api-errors';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { JOB_TYPES } from '@/lib/konnect';
+import { ListPagination } from '@/components/ui/list-pagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+
+const JOBS_PAGE_SIZE = 20;
 
 interface JobPosting {
   id: string;
@@ -27,6 +30,14 @@ interface JobPosting {
   business?: { businessName: string; email?: string | null } | null;
 }
 
+interface PaginatedJobs {
+  items: JobPosting[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 interface BusinessProfile {
   id: string;
   businessName: string;
@@ -35,7 +46,11 @@ interface BusinessProfile {
 export function KonnectJobsPanel() {
   const queryClient = useQueryClient();
   const { isChurchStaff } = useModuleAccess();
-  const jobs = useApiQuery<JobPosting[]>(['konnect-jobs'], '/business/jobs');
+  const [page, setPage] = useState(1);
+  const jobs = useApiQuery<PaginatedJobs>(
+    ['konnect-jobs', String(page)],
+    `/business/jobs?page=${page}&limit=${JOBS_PAGE_SIZE}`,
+  );
   const profiles = useApiQuery<BusinessProfile[]>(['konnect-verified-biz'], '/business/profiles?verified=true');
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -57,6 +72,8 @@ export function KonnectJobsPanel() {
     contactEmail: '',
   });
 
+  const jobItems = jobs.data?.items ?? [];
+
   const createJob = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title.trim() || !form.description.trim()) return;
@@ -73,8 +90,10 @@ export function KonnectJobsPanel() {
       });
       toast.success('Job posted');
       setShowForm(false);
+      setPage(1);
       queryClient.invalidateQueries({ queryKey: ['konnect-jobs'] });
       queryClient.invalidateQueries({ queryKey: ['konnect-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['lounge-jobs'] });
     } catch (err) {
       toast.error(apiErrorMessage(err, 'Could not post job'));
     } finally {
@@ -98,8 +117,12 @@ export function KonnectJobsPanel() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-end">
+    <div className="space-y-6" data-testid="konnect-jobs-panel">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-muted-foreground">
+          {jobs.data?.total ?? 0} opening{(jobs.data?.total ?? 0) === 1 ? '' : 's'} · church postings and
+          approved community requests
+        </p>
         <Button size="sm" onClick={() => setShowForm((v) => !v)}>
           <Plus className="mr-1.5 h-4 w-4" />
           Post job
@@ -154,9 +177,11 @@ export function KonnectJobsPanel() {
 
       {jobs.isLoading ? (
         <Loader2 className="mx-auto h-8 w-8 animate-spin" />
+      ) : jobItems.length === 0 ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">No job openings on this page.</p>
       ) : (
         <div className="space-y-4">
-          {(jobs.data ?? []).map((j) => (
+          {jobItems.map((j) => (
             <Card key={j.id}>
               <CardHeader className="pb-2">
                 <div className="flex flex-wrap items-start justify-between gap-2">
@@ -173,16 +198,17 @@ export function KonnectJobsPanel() {
                 </div>
                 {j.business && <p className="text-xs text-muted-foreground">{j.business.businessName}</p>}
                 {j.source === 'community' && (
-                  <p className="text-xs text-muted-foreground">Anonymous community support listing</p>
+                  <p className="text-xs text-muted-foreground">Approved community support listing</p>
                 )}
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
-                <p className="text-muted-foreground line-clamp-3">{j.description}</p>
+                <p className="whitespace-pre-wrap leading-relaxed text-muted-foreground">{j.description}</p>
                 <p className="text-xs">
                   {[j.location, j.salaryRange, j.contactEmail ?? j.business?.email].filter(Boolean).join(' · ')}
                 </p>
                 {j.source !== 'community' && j.isActive && (
                   <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => closeJob(j.id)}>
+                    <Trash2 className="mr-1 h-3 w-3" />
                     Mark filled / close
                   </Button>
                 )}
@@ -191,6 +217,14 @@ export function KonnectJobsPanel() {
           ))}
         </div>
       )}
+
+      <ListPagination
+        page={jobs.data?.page ?? page}
+        totalPages={jobs.data?.totalPages ?? 1}
+        total={jobs.data?.total}
+        pageSize={jobs.data?.limit ?? JOBS_PAGE_SIZE}
+        onPage={setPage}
+      />
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { api } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-errors';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
 import { HtmlRichEditor } from '@/components/ui/HtmlRichEditor';
 import { Badge } from '@/components/ui/badge';
@@ -128,7 +129,7 @@ export default function PlatformMarketingPage() {
   return (
     <DashboardModuleShell
       title="Marketing"
-      description="Church_Hub branded email templates for tenant onboarding and campaigns. Customize with the WYSIWYG editor."
+      description={MODULE_DESCRIPTIONS.platformMarketing}
     >
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Badge variant="outline" className="font-normal">

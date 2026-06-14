@@ -11,10 +11,15 @@ import { MembershipClassesService } from './membership-classes.service';
 import { MembershipAttendanceService } from './membership-attendance.service';
 import { MembershipTimelineService } from './membership-timeline.service';
 import { MembershipAnalyticsService } from './membership-analytics.service';
+import { MembershipRegistryService } from './membership-registry.service';
+import { MembershipRegistryController } from './membership-registry.controller';
+import { MembershipCelebrationsService } from './membership-celebrations.service';
+import { MembershipFamilyMapService } from './membership-family-map.service';
+import { EmailAdapter } from '../notifications/adapters/email.adapter';
 
 @Module({
   imports: [FollowUpModule],
-  controllers: [MembershipController, MembershipImportController],
+  controllers: [MembershipController, MembershipImportController, MembershipRegistryController],
   providers: [
     MembershipImportService,
     MembershipService,
@@ -25,8 +30,13 @@ import { MembershipAnalyticsService } from './membership-analytics.service';
     MembershipAttendanceService,
     MembershipTimelineService,
     MembershipAnalyticsService,
+    MembershipRegistryService,
+    MembershipCelebrationsService,
+    MembershipFamilyMapService,
+    EmailAdapter,
   ],
   exports: [
+    MembershipImportService,
     MembershipService,
     MembershipAccessService,
     MembershipConfigService,
@@ -35,6 +45,9 @@ import { MembershipAnalyticsService } from './membership-analytics.service';
     MembershipAttendanceService,
     MembershipTimelineService,
     MembershipAnalyticsService,
+    MembershipRegistryService,
+    MembershipCelebrationsService,
+    MembershipFamilyMapService,
   ],
 })
 export class MembershipModule {}

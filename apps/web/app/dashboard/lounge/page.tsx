@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { useLoungePresence } from '@/lib/hooks/use-lounge-presence';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
 import { LoungeCanvas, type LoungeMember } from '@/components/lounge/LoungeCanvas';
 import { LoungeAnnouncementsPanel } from '@/components/lounge/LoungeAnnouncementsPanel';
@@ -52,8 +53,8 @@ export default function LoungePage() {
   );
 
   const loungeDescription = churchName
-    ? `${churchName} member lounge—see who is present, request connections, and review church announcements and opportunities.`
-    : 'Member lounge—presence, governed connections, announcements, and community opportunities.';
+    ? `${churchName} member lounge — see who is online, send connection requests, and browse announcements and jobs.`
+    : MODULE_DESCRIPTIONS.lounge;
 
   if (accessLoading || isPlatformAdmin) {
     return (

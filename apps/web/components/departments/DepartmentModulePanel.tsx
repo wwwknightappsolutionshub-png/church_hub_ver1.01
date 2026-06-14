@@ -8,6 +8,7 @@ import {
   BookOpen,
   Calendar,
   CheckCircle2,
+  Cake,
   ClipboardList,
   Clock,
   Heart,
@@ -19,6 +20,7 @@ import {
   Music,
   Package,
   Plus,
+  Send,
   Stethoscope,
   Users,
 } from 'lucide-react';
@@ -32,10 +34,20 @@ import { formatMemberName } from '@/lib/service-unit-utils';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import type { ServiceUnitAccessFlags } from '@/components/departments/DepartmentToolsRouter';
 import { DepartmentDashboardPanel } from '@/components/service-units/DepartmentDashboardPanel';
+import { UsheringWeeklyHeadcountForm } from '@/components/departments/UsheringWeeklyHeadcountForm';
 import { ChildrenTeachersPanel, type ChildrenSection } from '@/components/departments/ChildrenTeachersPanel';
+import { ChildrenMinistryPanel,
+  type ChildrenMinistrySection,
+} from '@/components/departments/ChildrenMinistryPanel';
+import { ChildrenAddChildSection } from '@/components/departments/ChildrenAddChildSection';
+import { ChildrenClassesSettingsPanel } from '@/components/departments/ChildrenClassesSettingsPanel';
 import { ChoirTeamPanel, type ChoirSection } from '@/components/departments/ChoirTeamPanel';
 import { PrayerSquadPanel, type PrayerSection } from '@/components/departments/PrayerSquadPanel';
-import { DepartmentLayout, type DepartmentTabItem } from '@/components/departments/DepartmentLayout';
+import { DepartmentLayout } from '@/components/departments/DepartmentLayout';
+import {
+  buildDepartmentNavGroups,
+  flattenDepartmentNavGroups,
+} from '@/components/departments/department-nav';
 import { MedicalIncidentPanel } from '@/components/departments/MedicalIncidentPanel';
 import { DepartmentFeedbacksSection } from '@/components/departments/DepartmentFeedbacksSection';
 import { DepartmentReportsSection } from '@/components/departments/DepartmentReportsSection';
@@ -70,7 +82,13 @@ type DeptTab =
   | 'children-roster'
   | 'children-curriculum'
   | 'children-reports'
-  | 'children-checkin';
+  | 'children-checkin'
+  | 'children-list'
+  | 'children-parents'
+  | 'children-teachers'
+  | 'children-birthdays'
+  | 'children-sunday-report'
+  | 'children-classes';
 
 interface MemberRef {
   id: string;
@@ -96,6 +114,10 @@ interface DeptContext {
     canDelete: boolean;
     canViewFeedbacks?: boolean;
     canReplyFeedback?: boolean;
+    canAccessChildrenMinistry?: boolean;
+    canRegisterChildren?: boolean;
+    canManageChildrenClasses?: boolean;
+    isChildrenChurchAdmin?: boolean;
   };
   ui?: {
     enabledTabs?: string[];
@@ -120,82 +142,6 @@ function canViewLeadershipHub(
       unitAdminUnitIds.includes(unitId) ||
       unitLeaderUnitIds.includes(unitId),
   );
-}
-
-function buildDepartmentTabs(departmentCode: string): DepartmentTabItem[] {
-  if (departmentCode === 'PRAYER') {
-    return [
-      { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
-      { id: 'prayer-assignments', label: 'Assignment board', icon: ClipboardList },
-      { id: 'prayer-schedule', label: 'Prayer schedule', icon: Calendar },
-      { id: 'prayer-intake', label: 'Request intake', icon: Heart },
-      { id: 'prayer-progress', label: 'Progress', icon: CheckCircle2 },
-      { id: 'prayer-scripture', label: 'Scripture guide', icon: BookOpen },
-      { id: 'reports', label: 'Reports', icon: ClipboardList },
-      { id: 'feedbacks', label: 'Feedbacks', icon: Inbox },
-      { id: 'resources', label: 'Library', icon: BookOpen },
-      { id: 'messages', label: 'Forum', icon: MessageSquare },
-    ];
-  }
-
-  if (departmentCode === 'CHILDREN') {
-    return [
-      { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
-      { id: 'children-roster', label: 'Duty roster', icon: Users },
-      { id: 'children-curriculum', label: 'Curriculum', icon: BookOpen },
-      { id: 'children-reports', label: 'Class reporting', icon: ClipboardList },
-      { id: 'children-checkin', label: 'Check-in', icon: CheckCircle2 },
-      { id: 'reports', label: 'Reports', icon: ClipboardList },
-      { id: 'feedbacks', label: 'Feedbacks', icon: Inbox },
-      { id: 'resources', label: 'Library', icon: BookOpen },
-      { id: 'messages', label: 'Forum', icon: MessageSquare },
-    ];
-  }
-
-  if (departmentCode === 'CHOIR') {
-    return [
-      { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
-      { id: 'choir-roster', label: 'Roster', icon: Calendar },
-      { id: 'choir-library', label: 'Song library', icon: Music },
-      { id: 'choir-planning', label: 'Planning', icon: ClipboardList },
-      { id: 'choir-attendance', label: 'Attendance', icon: Clock },
-      { id: 'choir-talent', label: 'Talent', icon: Mic2 },
-      { id: 'reports', label: 'Reports', icon: ClipboardList },
-      { id: 'feedbacks', label: 'Feedbacks', icon: Inbox },
-      { id: 'resources', label: 'Library', icon: BookOpen },
-      { id: 'messages', label: 'Forum', icon: MessageSquare },
-    ];
-  }
-
-  const hideDeptTabs = departmentCode === 'CHILDREN' || departmentCode === 'PRAYER';
-  const items: DepartmentTabItem[] = [
-    { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
-    { id: 'attendance', label: 'Attendance', icon: Users },
-  ];
-  if (!hideDeptTabs) {
-    items.push(
-      { id: 'schedules', label: 'Schedule', icon: Calendar },
-      { id: 'assignments', label: 'Assignments', icon: ClipboardList },
-      { id: 'reports', label: 'Reports', icon: ClipboardList },
-      { id: 'feedbacks', label: 'Feedbacks', icon: Inbox },
-    );
-  }
-  if (departmentCode === 'MEDICAL' || departmentCode === 'MEDIA') {
-    items.push({ id: 'inventory', label: 'Inventory', icon: Package });
-  }
-  items.push({ id: 'resources', label: 'Library', icon: BookOpen });
-  if (departmentCode === 'MEDIA') {
-    items.push({ id: 'tasks', label: 'Projects', icon: ClipboardList });
-  }
-  items.push({ id: 'messages', label: 'Forum', icon: MessageSquare });
-  if (departmentCode === 'MEDICAL' || departmentCode === 'MEDIA') {
-    items.push({
-      id: 'special',
-      label: departmentCode === 'MEDIA' ? 'Skills' : specialTabLabel(departmentCode),
-      icon: departmentCode === 'MEDICAL' ? Stethoscope : Heart,
-    });
-  }
-  return items;
 }
 
 function choirSectionFromTab(tab: DeptTab): ChoirSection | null {
@@ -247,6 +193,23 @@ function childrenSectionFromTab(tab: DeptTab): ChildrenSection | null {
   }
 }
 
+function childrenMinistrySectionFromTab(tab: DeptTab): ChildrenMinistrySection | null {
+  switch (tab) {
+    case 'children-list':
+      return 'children';
+    case 'children-parents':
+      return 'parents';
+    case 'children-teachers':
+      return 'teachers';
+    case 'children-birthdays':
+      return 'birthdays';
+    case 'children-sunday-report':
+      return 'sunday-report';
+    default:
+      return null;
+  }
+}
+
 export function DepartmentModulePanel({
   unitId,
   departmentCode,
@@ -255,7 +218,13 @@ export function DepartmentModulePanel({
   unitAccess,
 }: DepartmentModulePanelProps) {
   const queryClient = useQueryClient();
-  const { memberId, unitAdminUnitIds, unitLeaderUnitIds } = useModuleAccess();
+  const {
+    memberId,
+    unitAdminUnitIds,
+    unitLeaderUnitIds,
+    unitMembershipIds,
+    isChurchStaff,
+  } = useModuleAccess();
   const label = DEPT_MODULE_LABELS[departmentCode] ?? 'Department';
   const [tab, setTab] = useState<DeptTab>('dashboard');
   const [busy, setBusy] = useState(false);
@@ -307,19 +276,48 @@ export function DepartmentModulePanel({
     unitLeaderUnitIds,
   );
   const canReplyFeedback = ctx?.access?.canReplyFeedback ?? canViewFeedbacks;
+  const canAccessChildrenMinistry =
+    departmentCode !== 'CHILDREN' || (ctx?.access?.canAccessChildrenMinistry ?? false);
+  const canRegisterChildren =
+    departmentCode === 'CHILDREN' &&
+    (ctx?.access?.canRegisterChildren ??
+      ctx?.access?.canAccessChildrenMinistry ??
+      ctx?.access?.canParticipate ??
+      unitMembershipIds.includes(unitId) ??
+      isChurchStaff);
+  const canManageChildrenClasses =
+    departmentCode === 'CHILDREN' &&
+    ((ctx?.access?.canManageChildrenClasses ??
+      ctx?.access?.canAccessChildrenMinistry ??
+      isChurchStaff) ||
+      canManage);
 
-  const tabs = useMemo(() => {
-    const baseTabs = buildDepartmentTabs(departmentCode);
-    const enabled = new Set(ctx?.ui?.enabledTabs ?? baseTabs.map((t) => t.id));
+  const navGroups = useMemo(() => {
+    const baseGroups = buildDepartmentNavGroups(departmentCode);
+    const enabled = new Set(
+      ctx?.ui?.enabledTabs ?? flattenDepartmentNavGroups(baseGroups).map((t) => t.id),
+    );
     if (canViewFeedbacks) {
       enabled.add('reports');
       enabled.add('feedbacks');
     }
-    return baseTabs.filter((t) => {
-      if ((t.id === 'feedbacks' || t.id === 'reports') && !canViewFeedbacks) return false;
-      return enabled.has(t.id);
-    });
-  }, [departmentCode, ctx?.ui?.enabledTabs, canViewFeedbacks]);
+    if (canManageChildrenClasses) {
+      enabled.add('children-classes');
+    }
+
+    return baseGroups
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((t) => {
+          if ((t.id === 'feedbacks' || t.id === 'reports') && !canViewFeedbacks) return false;
+          if (t.id === 'children-classes' && !canManageChildrenClasses) return false;
+          return enabled.has(t.id);
+        }),
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [departmentCode, ctx?.ui?.enabledTabs, canViewFeedbacks, canManageChildrenClasses]);
+
+  const tabs = useMemo(() => flattenDepartmentNavGroups(navGroups), [navGroups]);
 
   useEffect(() => {
     if (!tabs.length) return;
@@ -339,10 +337,12 @@ export function DepartmentModulePanel({
   const choirSection = choirSectionFromTab(tab);
   const prayerSection = prayerSectionFromTab(tab);
   const childrenSection = childrenSectionFromTab(tab);
+  const childrenMinistrySection = childrenMinistrySectionFromTab(tab);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['dept-dashboard', unitId] });
     queryClient.invalidateQueries({ queryKey: ['dept-context', unitId] });
+    queryClient.invalidateQueries({ queryKey: ['children-ministry-children', unitId] });
   };
 
   const toolsError =
@@ -371,30 +371,50 @@ export function DepartmentModulePanel({
         </Card>
       )}
 
+      {departmentCode === 'CHILDREN' && ctx && !canAccessChildrenMinistry && (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardContent className="py-4 text-sm">
+            Children&apos;s Church leadership tools are limited to Church Admin, Pastor, and
+            Children Church Admin roles.
+          </CardContent>
+        </Card>
+      )}
+
       <DepartmentLayout
         title={ctx?.unit?.name ?? label}
         subtitle={ctx?.unit?.departmentLabel ?? `${label} workspace`}
         departmentCode={departmentCode}
         accessLabel={accessLabel}
-        tabs={tabs}
+        navGroups={navGroups}
         activeTab={tab}
         onTabChange={(id) => setTab(id as DeptTab)}
       >
       {tab === 'dashboard' && (
-        <div className="space-y-4">
+        <div className="space-y-6">
+          <div>
+            <h3 className="font-display text-lg font-semibold">Department overview</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Key metrics and upcoming activity for {ctx?.unit?.departmentLabel ?? label}.
+            </p>
+          </div>
+          {canRegisterChildren ? (
+            <ChildrenAddChildSection unitId={unitId} onRegistered={invalidate} />
+          ) : null}
           <DeptStatCards dash={displayDash} isLoading={isLoading} label={label} />
           {displayDash?.upcoming?.length ? (
-            <Card>
+            <Card className="border-border/60">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Upcoming</CardTitle>
+                <CardTitle className="text-base">Upcoming</CardTitle>
+                <CardDescription>Schedules and events on the horizon</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-2 text-sm">
+              <CardContent className="divide-y divide-border/60">
                 {displayDash.upcoming.map((s) => (
-                  <div key={s.id} className="flex justify-between gap-2">
-                    <span>{s.title}</span>
-                    <span className="text-muted-foreground">
-                      {new Date(s.startsAt).toLocaleDateString()}
-                    </span>
+                  <div key={s.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                    <div>
+                      <p className="text-sm font-medium">{s.title}</p>
+                      <p className="text-xs text-muted-foreground">{s.type.replace(/_/g, ' ')}</p>
+                    </div>
+                    <Badge variant="outline">{new Date(s.startsAt).toLocaleDateString()}</Badge>
                   </div>
                 ))}
               </CardContent>
@@ -405,6 +425,9 @@ export function DepartmentModulePanel({
 
       {tab === 'attendance' && (
         <div className="space-y-4">
+          {departmentCode === 'USHERING' ? (
+            <UsheringWeeklyHeadcountForm unitId={unitId} canManage={canEdit} onSaved={invalidate} />
+          ) : null}
           <DeptStatCards dash={displayDash} isLoading={isLoading} label={label} />
           <DepartmentDashboardPanel
             unitId={unitId}
@@ -513,15 +536,30 @@ export function DepartmentModulePanel({
         />
       )}
 
-      {childrenSection && (
+      {childrenMinistrySection &&
+        (canAccessChildrenMinistry ||
+          (canRegisterChildren && childrenMinistrySection === 'sunday-report')) && (
+        <ChildrenMinistryPanel
+          unitId={unitId}
+          section={childrenMinistrySection}
+          canManage={canAccessChildrenMinistry}
+          members={members}
+        />
+      )}
+
+      {childrenSection && canAccessChildrenMinistry && (
         <ChildrenTeachersPanel
           unitId={unitId}
           section={childrenSection}
-          canEdit={canSubmit}
+          canEdit={canEdit || canLead}
           canManage={canEdit}
           members={members}
         />
       )}
+
+      {tab === 'children-classes' && canManageChildrenClasses ? (
+        <ChildrenClassesSettingsPanel unitId={unitId} />
+      ) : null}
       </DepartmentLayout>
     </div>
   );
@@ -550,12 +588,12 @@ function DeptStatCards({
 }) {
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {[0, 1, 2, 3, 4, 5].map((i) => (
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => (
           <Card key={i} className="border-border/60">
-            <CardContent className="p-3">
-              <div className="h-3 w-16 animate-pulse rounded bg-muted" />
-              <div className="mt-2 h-7 w-10 animate-pulse rounded bg-muted" />
+            <CardContent className="p-4">
+              <div className="h-3 w-20 animate-pulse rounded bg-muted" />
+              <div className="mt-3 h-8 w-12 animate-pulse rounded bg-muted" />
             </CardContent>
           </Card>
         ))}
@@ -566,27 +604,23 @@ function DeptStatCards({
   const entries = Object.entries(dash?.stats ?? {});
   if (entries.length === 0) {
     return (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <Card className="border-border/60">
-          <CardContent className="p-3">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
-            <p className="font-display text-xl font-semibold">—</p>
-            <p className="mt-1 text-xs text-muted-foreground">Stats appear as you add schedules and rolls.</p>
-          </CardContent>
-        </Card>
-      </div>
+      <Card className="border-dashed border-border/70 bg-muted/10">
+        <CardContent className="p-6 text-sm text-muted-foreground">
+          Stats for {label} will appear here as you record attendance, schedules, and reports.
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
       {entries.map(([key, val]) => (
-        <Card key={key} className="border-border/60">
-          <CardContent className="p-3">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+        <Card key={key} className="border-border/60 bg-gradient-to-br from-background to-muted/20">
+          <CardContent className="p-4">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               {STAT_LABELS[key] ?? key.replace(/([A-Z])/g, ' $1').trim()}
             </p>
-            <p className="font-display text-xl font-semibold">{val}</p>
+            <p className="mt-2 font-display text-2xl font-semibold tabular-nums">{val}</p>
           </CardContent>
         </Card>
       ))}

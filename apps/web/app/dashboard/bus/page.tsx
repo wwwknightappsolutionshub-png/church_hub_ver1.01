@@ -3,6 +3,7 @@
 import { Loader2, AlertTriangle, Bus, Navigation } from 'lucide-react';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useBusRealtime } from '@/lib/hooks/use-bus-realtime';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
 import { BusMap } from '@/components/dashboard/BusMap';
 import { Badge } from '@/components/ui/badge';
@@ -38,7 +39,7 @@ export default function BusPage() {
   return (
     <DashboardModuleShell
       title="Bus Ministry"
-      description="Fleet operations—ride scheduling, route coordination, live driver tracking, and emergency dispatch."
+      description={MODULE_DESCRIPTIONS.bus}
       badge={
         <div className="flex gap-2">
           <Badge variant="gold">{active.length} active rides</Badge>

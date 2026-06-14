@@ -6,6 +6,7 @@ import { Megaphone, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useOfflineSync } from '@/lib/hooks/use-offline-sync';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
 import { OutreachCaptureForm } from '@/components/outreach/OutreachCaptureForm';
 import { EvangelistQrPanel } from '@/components/outreach/EvangelistQrPanel';
@@ -64,7 +65,7 @@ export default function OutreachPage() {
     <DashboardModuleShell
       eyebrow="Evangelism"
       title="Outreach"
-      description="Field capture, convert pipeline, follow-up linkage, transportation coordination, and governed offline synchronization."
+      description={MODULE_DESCRIPTIONS.outreach}
       badge={<Badge variant="success">Offline-ready</Badge>}
       actions={
         <Button variant="outline" size="sm" asChild>

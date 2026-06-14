@@ -30,7 +30,15 @@ const ACTION_VARIANT: Record<string, 'default' | 'secondary' | 'outline' | 'succ
   ERROR: 'outline',
 };
 
-export function MembershipImportWizard({ onComplete }: { onComplete?: () => void }) {
+export function MembershipImportWizard({
+  onComplete,
+  apiBase = '/membership/import',
+  templateFilename = 'churchhub-member-import-template.csv',
+}: {
+  onComplete?: () => void;
+  apiBase?: string;
+  templateFilename?: string;
+}) {
   const [step, setStep] = useState<Step>('upload');
   const [busy, setBusy] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -48,7 +56,7 @@ export function MembershipImportWizard({ onComplete }: { onComplete?: () => void
 
   const downloadTemplate = () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    const url = `${API_URL}/api/v1/membership/import/template.csv`;
+    const url = `${API_URL}/api/v1${apiBase}/template.csv`;
     const a = document.createElement('a');
     a.href = token ? `${url}?_=${Date.now()}` : url;
     if (token) {
@@ -57,13 +65,13 @@ export function MembershipImportWizard({ onComplete }: { onComplete?: () => void
         .then((blob) => {
           const obj = URL.createObjectURL(blob);
           a.href = obj;
-          a.download = 'churchhub-member-import-template.csv';
+          a.download = templateFilename;
           a.click();
           URL.revokeObjectURL(obj);
         })
         .catch(() => toast.error('Could not download template'));
     } else {
-      a.download = 'churchhub-member-import-template.csv';
+      a.download = templateFilename;
       a.click();
     }
   };
@@ -77,7 +85,7 @@ export function MembershipImportWizard({ onComplete }: { onComplete?: () => void
         jobId: string;
         headers: string[];
         suggestedMapping: Partial<MembershipImportColumnMapping>;
-      }>('/membership/import/upload', fd);
+      }>(`${apiBase}/upload`, fd);
       setJobId(data.jobId);
       setHeaders(data.headers);
       setMapping({ ...suggestColumnMapping(data.headers), ...data.suggestedMapping });
@@ -97,7 +105,7 @@ export function MembershipImportWizard({ onComplete }: { onComplete?: () => void
     }
     setBusy(true);
     try {
-      const { data } = await api.post<MembershipImportPreviewResponse>('/membership/import/preview', {
+      const { data } = await api.post<MembershipImportPreviewResponse>(`${apiBase}/preview`, {
         jobId,
         columnMapping: mapping,
         options,
@@ -115,7 +123,7 @@ export function MembershipImportWizard({ onComplete }: { onComplete?: () => void
     if (!jobId) return;
     setBusy(true);
     try {
-      const { data } = await api.post<{ summary: Record<string, number> }>('/membership/import/commit', {
+      const { data } = await api.post<{ summary: Record<string, number> }>(`${apiBase}/commit`, {
         jobId,
       });
       setCommitSummary(data.summary);

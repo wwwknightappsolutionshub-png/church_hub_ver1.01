@@ -11,7 +11,12 @@ interface StatusPipelineProps {
 
 export function StatusPipeline({ counts, activeFilter, onFilter }: StatusPipelineProps) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/50" data-testid="status-pipeline">
+      <div className="mb-3">
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-50">Lifecycle pipeline</h2>
+        <p className="text-xs text-muted-foreground">Member status distribution — click a stage to filter the member list.</p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {MEMBER_STATUSES.map((status, i) => {
         const active = activeFilter === status;
         const count = counts[status] ?? 0;
@@ -38,6 +43,7 @@ export function StatusPipeline({ counts, activeFilter, onFilter }: StatusPipelin
           </button>
         );
       })}
+      </div>
     </div>
   );
 }

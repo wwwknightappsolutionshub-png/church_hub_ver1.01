@@ -70,6 +70,17 @@ export function LegacyDepartmentWorkspace({
     }
   }, [tabs, tab]);
 
+  const navGroups = useMemo(
+    () => [
+      {
+        id: 'workspace',
+        label: 'Workspace',
+        items: tabs,
+      },
+    ],
+    [tabs],
+  );
+
   return (
     <DepartmentLayout
       title={unitName}
@@ -82,7 +93,7 @@ export function LegacyDepartmentWorkspace({
             ? 'Unit leader'
             : 'Member'
       }
-      tabs={tabs}
+      navGroups={navGroups}
       activeTab={tab}
       onTabChange={(id) => setTab(id as LegacyTab)}
     >

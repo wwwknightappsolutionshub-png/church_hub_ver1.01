@@ -131,10 +131,12 @@ export class CommunicationsQueueService {
 
     if (channels.includes('EMAIL')) {
       for (const email of recipients.emails) {
+        const isHtml = /<[a-z][\s\S]*>/i.test(item.body);
         await this.email.send({
           to: email,
           subject: item.title,
-          body: item.body,
+          body: isHtml ? item.body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : item.body,
+          html: isHtml ? item.body : undefined,
           churchId: item.churchId,
         });
       }

@@ -9,6 +9,7 @@ import { api } from '@/lib/api';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { isPastorRole } from '@/lib/session-role';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -188,7 +189,7 @@ export default function PastoralCarePage() {
   return (
     <DashboardModuleShell
       title="Pastoral Care"
-      description="Secure pastoral case management—counseling intake, prayer escalations, and confidential leadership notes."
+      description={MODULE_DESCRIPTIONS.pastoralCare}
       badge={
         stats ? (
           <Badge variant="outline" className="border-slate-500 text-slate-200">

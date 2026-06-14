@@ -23,4 +23,11 @@ export class AdminController {
   getUnifiedHub(@ChurchId() churchId: string) {
     return this.adminService.getUnifiedHub(churchId);
   }
+
+  @Get('attendance-performance')
+  @Roles('ADMIN', 'PASTOR', 'LEADER')
+  @ApiOperation({ summary: 'Sanctuary attendance from ushering weekly headcounts' })
+  getAttendancePerformance(@ChurchId() churchId: string) {
+    return this.adminService.getAttendancePerformance(churchId);
+  }
 }

@@ -3,10 +3,13 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.module';
+import { AutomationEmailTemplatesService } from '../automation/automation-email-templates.service';
+import { EmailAdapter } from '../notifications/adapters/email.adapter';
 import {
   CHURCH_ASSIGNABLE_ROLES,
   CreateChurchStaffDto,
@@ -15,7 +18,13 @@ import {
 
 @Injectable()
 export class ChurchStaffService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(ChurchStaffService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailTemplates: AutomationEmailTemplatesService,
+    private readonly email: EmailAdapter,
+  ) {}
 
   private async roleIds(names: string[]) {
     const roles = await this.prisma.role.findMany({
@@ -100,7 +109,55 @@ export class ChurchStaffService {
 
     await this.ensureMemberProfile(churchId, user.id, user.email, user.firstName, user.lastName);
 
+    await this.sendStaffWelcomeEmail(churchId, {
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      temporaryPassword: dto.password,
+      roles: dto.roles,
+    });
+
     return this.findOne(churchId, user.id);
+  }
+
+  private async sendStaffWelcomeEmail(
+    churchId: string,
+    data: {
+      email: string;
+      firstName: string;
+      lastName: string;
+      temporaryPassword: string;
+      roles: string[];
+    },
+  ) {
+    try {
+      const church = await this.prisma.church.findUnique({
+        where: { id: churchId },
+        select: { name: true },
+      });
+      const roleLabel = data.roles.join(', ');
+      const rendered = await this.emailTemplates.render(churchId, 'STAFF_WELCOME', {
+        churchName: church?.name ?? 'Your church',
+        firstName: data.firstName,
+        lastName: data.lastName,
+        fullName: `${data.firstName} ${data.lastName}`.trim(),
+        email: data.email,
+        temporaryPassword: data.temporaryPassword,
+        roleLabel,
+      });
+      const plain = rendered.bodyHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      await this.email.send({
+        to: data.email,
+        subject: rendered.subject,
+        body: plain,
+        html: rendered.bodyHtml,
+        churchId,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Staff welcome email failed for ${data.email}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   async findOne(churchId: string, id: string) {

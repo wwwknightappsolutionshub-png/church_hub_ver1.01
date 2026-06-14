@@ -1,8 +1,10 @@
 import {
+  parseServiceDateInput,
   simplifyLessonForChildren,
   weekStartUtc,
   isoWeekKey,
   parseWeekStartInput,
+  serviceDateIso,
 } from './children.constants';
 
 describe('children.constants', () => {
@@ -14,6 +16,12 @@ describe('children.constants', () => {
 
   it('parses date input as stable week start', () => {
     expect(isoWeekKey(parseWeekStartInput('2026-05-27'))).toBe('2026-05-25');
+  });
+
+  it('parses service date as exact UTC calendar day', () => {
+    const day = parseServiceDateInput('2026-06-09');
+    expect(serviceDateIso(day)).toBe('2026-06-09');
+    expect(isoWeekKey(day)).toBe('2026-06-09');
   });
 
   it('simplifies lesson text with age prefix', () => {

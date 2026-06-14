@@ -18,12 +18,15 @@ import {
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { isChurchLeadershipRole } from '@/lib/session-role';
 import { churchPublicPath, churchPublicPreviewPath } from '@/lib/church-slug';
+import { ChurchLandingLivePreview } from '@/components/church-landing/ChurchLandingLivePreview';
 import type {
   ChurchLandingAdminDto,
   ChurchLandingContent,
   LandingTemplateId,
+  PublicChurchLandingDto,
 } from '@church-hub/shared-types';
 import { LANDING_TEMPLATE_IDS, normalizeChurchLanding } from '@church-hub/shared-types';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,9 +52,9 @@ function ListEditor<T extends { id?: string; title: string }>({
   createItem: () => T;
 }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {items.map((item, index) => (
-        <div key={item.id ?? index} className="rounded-lg border border-border p-4">
+        <div key={item.id ?? index} className="rounded-lg border border-border p-3">
           {renderItem(item, index, (patch) => {
             const next = [...items];
             next[index] = { ...item, ...patch };
@@ -198,12 +201,26 @@ export default function ChurchLandingAdminPage() {
   const previewSlug = churchSlug ?? data.slug;
   const previewDomain = branding.publicDomain.trim() || data.defaultPublicDomain;
 
+  const previewData: PublicChurchLandingDto = {
+    churchName: churchName ?? data.churchName,
+    slug: previewSlug,
+    logoUrl: branding.logoUrl,
+    publicDomain: previewDomain,
+    defaultPublicDomain: data.defaultPublicDomain,
+    publicSiteUrl: `https://${previewDomain}`,
+    publicPath: `/c/${previewSlug}`,
+    city: data.city,
+    country: data.country,
+    landing: draft,
+    communitySupportItems: data.communitySupportItems,
+  };
+
   return (
     <DashboardModuleShell
       eyebrow="Public presence"
       title="Church landing page"
-      description="Public-facing church presence—template selection, content governance, and pre-authentication visitor experience."
-      contentClassName="mx-auto max-w-4xl space-y-8 pb-16 pt-6 md:pt-8"
+      description={MODULE_DESCRIPTIONS.churchLanding}
+      contentClassName="mx-auto max-w-[1600px] space-y-4 pb-8 pt-4 md:pt-5"
       actions={
         <>
           <Button variant="secondary" size="sm" asChild>
@@ -258,7 +275,15 @@ export default function ChurchLandingAdminPage() {
         disabled={saveMutation.isPending}
       />
 
-      <section className="rounded-xl border border-border bg-card p-6">
+      <div
+        className="grid gap-4 xl:grid-cols-2 xl:items-stretch"
+        data-testid="church-landing-editor-grid"
+      >
+        <div
+          className="flex min-h-0 flex-col space-y-4"
+          data-testid="church-landing-editor-column"
+        >
+      <section className="rounded-xl border border-border bg-card p-4">
         <h2 className="font-semibold">Default template</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Pick the layout members and visitors see at{' '}
@@ -266,7 +291,7 @@ export default function ChurchLandingAdminPage() {
           {' · '}
           <code className="text-xs">/c/{previewSlug}</code>
         </p>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
           {LANDING_TEMPLATE_IDS.map((id) => {
             const meta = data.templates[id];
             const selected = draft.templateId === id;
@@ -307,7 +332,7 @@ export default function ChurchLandingAdminPage() {
         </Button>
       </section>
 
-      <label className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
+      <label className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2">
         <input
           type="checkbox"
           checked={draft.published}
@@ -331,7 +356,7 @@ export default function ChurchLandingAdminPage() {
           <TabsTrigger value="membership-form">Membership form</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="hero" className="mt-4 space-y-4 rounded-xl border border-border p-4">
+        <TabsContent value="hero" className="mt-3 space-y-3 rounded-xl border border-border p-3">
           <div className="rounded-lg border border-dashed border-border bg-muted/30 p-4">
             <h3 className="font-semibold">Hero carousel</h3>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -495,7 +520,7 @@ export default function ChurchLandingAdminPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="about" className="mt-4 space-y-4 rounded-xl border border-border p-4">
+        <TabsContent value="about" className="mt-3 space-y-3 rounded-xl border border-border p-3">
           <div>
             <Label>Pastor photo URL</Label>
             <Input
@@ -557,7 +582,7 @@ export default function ChurchLandingAdminPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="services" className="mt-4 rounded-xl border border-border p-4">
+        <TabsContent value="services" className="mt-3 rounded-xl border border-border p-3">
           <ListEditor
             items={draft.serviceTimes}
             onChange={(serviceTimes) => setDraft({ ...draft, serviceTimes })}
@@ -588,7 +613,7 @@ export default function ChurchLandingAdminPage() {
           />
         </TabsContent>
 
-        <TabsContent value="links" className="mt-4 rounded-xl border border-border p-4">
+        <TabsContent value="links" className="mt-3 rounded-xl border border-border p-3">
           <ListEditor
             items={draft.quickLinks}
             onChange={(quickLinks) => setDraft({ ...draft, quickLinks })}
@@ -619,7 +644,7 @@ export default function ChurchLandingAdminPage() {
           />
         </TabsContent>
 
-        <TabsContent value="reviews-youtube" className="mt-4 rounded-xl border border-border p-4">
+        <TabsContent value="reviews-youtube" className="mt-3 rounded-xl border border-border p-3">
           <ChurchLandingSocialFeedTab
             draft={draft}
             churchName={churchName ?? data.churchName}
@@ -627,11 +652,11 @@ export default function ChurchLandingAdminPage() {
           />
         </TabsContent>
 
-        <TabsContent value="community-support" className="mt-4 rounded-xl border border-border p-4">
+        <TabsContent value="community-support" className="mt-3 rounded-xl border border-border p-3">
           <ChurchLandingCommunitySupportTab draft={draft} onChange={setDraft} />
         </TabsContent>
 
-        <TabsContent value="announcements" className="mt-4 rounded-xl border border-border p-4">
+        <TabsContent value="announcements" className="mt-3 rounded-xl border border-border p-3">
           <ListEditor
             items={draft.announcements}
             onChange={(announcements) => setDraft({ ...draft, announcements })}
@@ -672,7 +697,7 @@ export default function ChurchLandingAdminPage() {
           />
         </TabsContent>
 
-        <TabsContent value="stats" className="mt-4 rounded-xl border border-border p-4">
+        <TabsContent value="stats" className="mt-3 rounded-xl border border-border p-3">
           <p className="mb-4 text-sm text-muted-foreground">Shown on the Classic template.</p>
           <div className="space-y-4">
             {draft.stats.map((item, index) => (
@@ -736,7 +761,7 @@ export default function ChurchLandingAdminPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="contact" className="mt-4 space-y-4 rounded-xl border border-border p-4">
+        <TabsContent value="contact" className="mt-3 space-y-3 rounded-xl border border-border p-3">
           <div>
             <Label>Address</Label>
             <Textarea
@@ -773,10 +798,19 @@ export default function ChurchLandingAdminPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="membership-form" className="mt-4">
+        <TabsContent value="membership-form" className="mt-3">
           <ChurchLandingMembershipFormTab />
         </TabsContent>
       </Tabs>
+        </div>
+
+        <aside
+          className="flex min-h-0 min-w-0 flex-col"
+          data-testid="church-landing-preview-column"
+        >
+          <ChurchLandingLivePreview data={previewData} className="h-full" />
+        </aside>
+      </div>
     </DashboardModuleShell>
   );
 }

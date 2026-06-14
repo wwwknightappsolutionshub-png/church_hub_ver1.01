@@ -9,6 +9,7 @@ import { api } from '@/lib/api';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { ServiceUnitJoinSheet } from '@/components/service-units/ServiceUnitJoinSheet';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import {
   EnterpriseContent,
   EnterpriseHero,
@@ -88,7 +89,7 @@ export default function ServiceUnitsPage() {
       <EnterpriseHero
         eyebrow="Ministries"
         title="Service Unit Hub"
-        description="Operational control for ministry teams—rosters, meetings, moderated boards, and membership requests."
+        description={MODULE_DESCRIPTIONS.serviceUnits}
         badge={
           <Badge className="border-slate-600 bg-slate-800 text-slate-100">
             {(units.data ?? []).length} units

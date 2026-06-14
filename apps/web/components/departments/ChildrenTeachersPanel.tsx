@@ -6,19 +6,18 @@ import type { AxiosError } from 'axios';
 import {
   Bell,
   BookOpen,
-  CheckCircle2,
   ClipboardList,
   Download,
   Loader2,
   Sparkles,
   Upload,
-  Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-errors';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { deptToolsApiBase } from '@/lib/dept-module-catalog';
+import { useChildrenClassGroups } from '@/lib/children-classes';
 import { formatMemberName } from '@/lib/service-unit-utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,6 +25,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { ChildrenCheckInBoard } from '@/components/departments/ChildrenCheckInBoard';
 
 type MemberRef = {
   id: string;
@@ -35,13 +35,7 @@ type MemberRef = {
   phone?: string | null;
 };
 
-const CLASS_GROUPS = [
-  { value: 'AGES_3_5', label: 'Ages 3–5' },
-  { value: 'AGES_6_9', label: 'Ages 6–9' },
-  { value: 'AGES_10_12', label: 'Ages 10–12' },
-] as const;
-
-type ClassGroup = (typeof CLASS_GROUPS)[number]['value'];
+type ClassGroup = string;
 
 function currentWeekStartIso() {
   const d = new Date();
@@ -67,6 +61,7 @@ export function ChildrenTeachersPanel({
   members: Array<{ memberId: string; member: MemberRef }>;
 }) {
   const base = deptToolsApiBase(unitId);
+  const { classOptions } = useChildrenClassGroups(unitId);
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [weekStart, setWeekStart] = useState(currentWeekStartIso());
@@ -113,10 +108,6 @@ export function ChildrenTeachersPanel({
     }>
   >(['children-reports', unitId], `${base}/children/reports`);
 
-  const { data: checkIns = [] } = useApiQuery<
-    Array<{ id: string; child: MemberRef; checkedOutAt?: string | null }>
-  >(['dept-checkins', unitId], `${base}/check-ins`);
-
   const [rosterForm, setRosterForm] = useState({
     classGroup: 'AGES_3_5' as ClassGroup,
     teacherMemberId: members[0]?.memberId ?? '',
@@ -143,7 +134,6 @@ export function ChildrenTeachersPanel({
     pastoralSummary: '',
   });
 
-  const [childId, setChildId] = useState(members[0]?.memberId ?? '');
   const [simplifyGroup, setSimplifyGroup] = useState<ClassGroup>('AGES_6_9');
   const [simplifyId, setSimplifyId] = useState('');
 
@@ -152,8 +142,16 @@ export function ChildrenTeachersPanel({
     if (!first) return;
     setRosterForm((f) => (f.teacherMemberId ? f : { ...f, teacherMemberId: first }));
     setReportForm((f) => (f.teacherMemberId ? f : { ...f, teacherMemberId: first }));
-    setChildId((id) => id || first);
   }, [members]);
+
+  useEffect(() => {
+    const firstCode = classOptions[0]?.value;
+    if (!firstCode) return;
+    setRosterForm((f) => ({ ...f, classGroup: f.classGroup || firstCode }));
+    setCurriculumForm((f) => ({ ...f, targetClassGroup: f.targetClassGroup || firstCode }));
+    setReportForm((f) => ({ ...f, classGroup: f.classGroup || firstCode }));
+    setSimplifyGroup((g) => g || firstCode);
+  }, [classOptions]);
 
   const refresh = async () => {
     await Promise.all([
@@ -304,28 +302,7 @@ export function ChildrenTeachersPanel({
     }
   };
 
-  const checkIn = async () => {
-    if (!childId) return;
-    try {
-      await api.post(`${base}/check-ins`, { childMemberId: childId });
-      toast.success('Checked in');
-      await refresh();
-    } catch (err) {
-      showError(err, 'Check-in failed');
-    }
-  };
-
-  const checkOut = async (id: string) => {
-    try {
-      await api.patch(`${base}/check-ins/${id}/checkout`);
-      toast.success('Checked out');
-      await refresh();
-    } catch (err) {
-      showError(err, 'Check-out failed');
-    }
-  };
-
-  if (members.length === 0) {
+  if (members.length === 0 && section !== 'checkin') {
     return (
       <p className="text-sm text-muted-foreground">
         Add members to this service unit before assigning teachers or recording check-ins.
@@ -375,7 +352,7 @@ export function ChildrenTeachersPanel({
               <li key={a.id} className="rounded-lg border px-3 py-2 text-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-medium">
-                    {CLASS_GROUPS.find((g) => g.value === a.classGroup)?.label}
+                    {classOptions.find((g) => g.value === a.classGroup)?.label}
                   </span>
                   {a.reminderSentAt && (
                     <Badge variant="outline" className="text-xs">
@@ -403,7 +380,7 @@ export function ChildrenTeachersPanel({
                 value={rosterForm.classGroup}
                 onChange={(e) => setRosterForm({ ...rosterForm, classGroup: e.target.value as ClassGroup })}
               >
-                {CLASS_GROUPS.map((g) => (
+                {classOptions.map((g) => (
                   <option key={g.value} value={g.value}>
                     {g.label}
                   </option>
@@ -459,7 +436,7 @@ export function ChildrenTeachersPanel({
                 <p className="text-xs text-muted-foreground">
                   {c.source === 'OFFICIAL_WEEKLY' ? 'Official weekly' : 'Custom upload'}
                   {c.targetClassGroup
-                    ? ` · ${CLASS_GROUPS.find((g) => g.value === c.targetClassGroup)?.label}`
+                    ? ` · ${classOptions.find((g) => g.value === c.targetClassGroup)?.label}`
                     : ''}
                 </p>
                 {c.simplifiedLesson && (
@@ -573,7 +550,7 @@ export function ChildrenTeachersPanel({
                   value={simplifyGroup}
                   onChange={(e) => setSimplifyGroup(e.target.value as ClassGroup)}
                 >
-                  {CLASS_GROUPS.map((g) => (
+                  {classOptions.map((g) => (
                     <option key={g.value} value={g.value}>
                       {g.label}
                     </option>
@@ -598,7 +575,7 @@ export function ChildrenTeachersPanel({
             <li key={r.id} className="rounded-lg border px-3 py-2 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-medium">
-                  {CLASS_GROUPS.find((g) => g.value === r.classGroup)?.label} ·{' '}
+                  {classOptions.find((g) => g.value === r.classGroup)?.label} ·{' '}
                   {new Date(r.serviceDate).toLocaleDateString()}
                 </span>
                 {r.escalatePastoralCare && (
@@ -632,7 +609,7 @@ export function ChildrenTeachersPanel({
                     setReportForm({ ...reportForm, classGroup: e.target.value as ClassGroup })
                   }
                 >
-                  {CLASS_GROUPS.map((g) => (
+                  {classOptions.map((g) => (
                     <option key={g.value} value={g.value}>
                       {g.label}
                     </option>
@@ -708,44 +685,9 @@ export function ChildrenTeachersPanel({
     );
   }
 
-  return (
-    <div className="space-y-3">
-        {canEdit && (
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <select
-              className="h-10 flex-1 rounded-md border bg-background px-3 text-sm"
-              value={childId}
-              onChange={(e) => setChildId(e.target.value)}
-            >
-              {members.map((m) => (
-                <option key={m.memberId} value={m.memberId}>
-                  {formatMemberName(m.member)}
-                </option>
-              ))}
-            </select>
-            <Button type="button" onClick={checkIn} className="gap-1">
-              <Users className="h-4 w-4" />
-              Check in
-            </Button>
-          </div>
-        )}
-        <ul className="space-y-2">
-          {checkIns.map((c) => (
-            <li
-              key={c.id}
-              className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
-            >
-              <span>{formatMemberName(c.child)}</span>
-              {!c.checkedOutAt && canEdit ? (
-                <Button type="button" size="sm" variant="outline" onClick={() => checkOut(c.id)}>
-                  Check out
-                </Button>
-              ) : (
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-              )}
-            </li>
-          ))}
-        </ul>
-    </div>
-  );
+  if (section === 'checkin') {
+    return <ChildrenCheckInBoard unitId={unitId} canEdit={canEdit} />;
+  }
+
+  return null;
 }

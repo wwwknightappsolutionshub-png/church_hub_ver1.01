@@ -2,6 +2,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Bell,
   BookOpen,
+  Cake,
   Inbox,
   LayoutDashboard,
   ListOrdered,
@@ -57,6 +58,13 @@ export const COMM_TAB_GROUPS: CommTabGroup[] = [
         shortLabel: 'Push',
         description: 'Alerts and automations',
         icon: Radio,
+      },
+      {
+        id: 'celebrations',
+        label: 'Celebration Emails',
+        shortLabel: 'Celebrations',
+        description: 'Birthday & anniversary templates',
+        icon: Cake,
       },
       {
         id: 'inbox',

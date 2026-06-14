@@ -6,6 +6,7 @@ import { ModuleGate } from '@/components/app/ModuleGate';
 import { AxiosError } from 'axios';
 import { DashboardPageSkeleton } from '@/components/dashboard/DashboardPageSkeleton';
 import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -78,7 +79,7 @@ export default function DepartmentsPage() {
         <DashboardModuleShell
           eyebrow="Ministries"
           title="Department tools"
-          description="Specialized operations for choir, media, children, prayer squad, medical, and related ministry units."
+          description={MODULE_DESCRIPTIONS.departments}
         >
           <Card className="border-amber-500/40 bg-amber-500/5">
             <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4 text-sm">
@@ -101,7 +102,7 @@ export default function DepartmentsPage() {
       <DashboardModuleShell
         eyebrow="Ministries"
         title="Department tools"
-        description="Specialized operations for choir, media, children, prayer squad, medical, and related ministry units—with attendance and reporting."
+        description={MODULE_DESCRIPTIONS.departments}
       >
         {list.length === 0 ? (
           <Card>

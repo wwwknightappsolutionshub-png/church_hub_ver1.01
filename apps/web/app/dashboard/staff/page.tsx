@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -145,7 +146,7 @@ export default function ChurchStaffPage() {
     <DashboardModuleShell
       eyebrow="Administration"
       title="Church staff"
-      description="Identity and access management for leadership roles, module entitlements, and church-scoped accounts."
+      description={MODULE_DESCRIPTIONS.staff}
       actions={
         <Button onClick={() => { resetForm(); setShowForm(true); }}>
           <Plus className="mr-2 h-4 w-4" />

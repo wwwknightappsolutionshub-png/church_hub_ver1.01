@@ -24,6 +24,10 @@ test.describe('Membership API smoke', () => {
       '/membership/stats',
       '/membership/members',
       '/membership/families',
+      '/membership/registry/catalog',
+      '/membership/registry/admin-catalog',
+      '/membership/registry/congregant-analytics',
+      '/membership/registry/email-links',
     ]) {
       const res = await request.get(`${API_URL}${path}`, { headers });
       expect(res.ok(), `${path} → ${res.status()}`).toBeTruthy();

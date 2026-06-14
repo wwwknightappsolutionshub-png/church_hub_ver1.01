@@ -17,6 +17,7 @@ import { api } from '@/lib/api';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useMediaQuery } from '@/lib/hooks/use-media-query';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import {
   EnterpriseContent,
   EnterpriseHero,
@@ -497,7 +498,7 @@ export function MinistryCellsPageShell() {
       <EnterpriseHero
         eyebrow="Ministry"
         title="Ministry/Cells"
-        description="Enterprise cell branch management — weekly reporting, attendance, leader messaging, and pastoral oversight."
+        description={MODULE_DESCRIPTIONS.ministryCells}
       />
       <EnterpriseContent className="px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:px-6">
         <MinistryCellsApp />

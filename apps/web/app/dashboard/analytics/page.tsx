@@ -5,6 +5,7 @@ import { BarChart3, TrendingUp, Users } from 'lucide-react';
 import type { MembershipAnalyticsDashboardDto } from '@church-hub/shared-types';
 import { useMembershipAnalytics } from '@/lib/hooks/use-membership-analytics';
 import { LazyAnalyticsCharts } from '@/lib/membership-lazy';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
 import { DashboardPageSkeleton } from '@/components/dashboard/DashboardPageSkeleton';
 import { StatCard } from '@/components/dashboard/StatCard';
@@ -24,7 +25,7 @@ export default function MembershipAnalyticsPage() {
   return (
     <DashboardModuleShell
       title="Membership Analytics"
-      description="Executive analytics on attendance, retention, outreach velocity, and follow-up—ministry metrics without financial disclosure."
+      description={MODULE_DESCRIPTIONS.analytics}
       badge={<Badge variant="outline" className="border-slate-500 text-slate-200">Analytics</Badge>}
       actions={
         <div className="flex gap-2" role="group" aria-label="Select period">

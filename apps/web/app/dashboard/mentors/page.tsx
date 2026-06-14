@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
 import { MentorsManagePanel } from '@/components/business/MentorsManagePanel';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
@@ -28,7 +29,7 @@ export default function MentorsManagePage() {
   return (
     <DashboardModuleShell
       title="Mentors"
-      description="Volunteer mentor pipeline—application review, approval workflow, and mentee assignment tracking."
+      description={MODULE_DESCRIPTIONS.mentors}
     >
       <MentorsManagePanel />
     </DashboardModuleShell>

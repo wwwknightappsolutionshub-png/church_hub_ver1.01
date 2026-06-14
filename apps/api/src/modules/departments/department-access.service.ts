@@ -107,6 +107,49 @@ export class DepartmentAccessService {
     return { ctx, unit };
   }
 
+  /** Church Admin, Pastor, or Children Church Admin (unit admin on CHILDREN unit). */
+  canAccessChildrenMinistryLeadership(ctx: UserMemberContext, serviceUnitId: string): boolean {
+    if (this.moduleAccess.isChurchStaff(ctx)) return true;
+    return ctx.unitAdminUnitIds.includes(serviceUnitId);
+  }
+
+  async requireChildrenMinistryLeadership(userId: string, churchId: string, serviceUnitId: string) {
+    const { ctx, unit } = await this.requireView(userId, churchId, serviceUnitId);
+    const code = resolveDeptModuleCode(unit.departmentCode, unit.name);
+    if (code !== 'CHILDREN') {
+      throw new BadRequestException(
+        "Children's ministry leadership tools are only available for the Children's Church department",
+      );
+    }
+    if (!this.canAccessChildrenMinistryLeadership(ctx, serviceUnitId)) {
+      throw new ForbiddenException(
+        "Children's Church access requires Church Admin, Pastor, or Children Church Admin",
+      );
+    }
+    return { ctx, unit };
+  }
+
+  /** Teachers (unit members), unit leaders, or children's ministry leadership may register children. */
+  canRegisterChildren(ctx: UserMemberContext, serviceUnitId: string): boolean {
+    if (this.canAccessChildrenMinistryLeadership(ctx, serviceUnitId)) return true;
+    if (this.canLead(ctx, serviceUnitId)) return true;
+    return ctx.unitMembershipIds.includes(serviceUnitId);
+  }
+
+  async requireChildrenRegistration(userId: string, churchId: string, serviceUnitId: string) {
+    const { ctx, unit } = await this.requireView(userId, churchId, serviceUnitId);
+    const code = resolveDeptModuleCode(unit.departmentCode, unit.name);
+    if (code !== 'CHILDREN') {
+      throw new BadRequestException(
+        "Child registration is only available for the Children's Church department",
+      );
+    }
+    if (!this.canRegisterChildren(ctx, serviceUnitId)) {
+      throw new ForbiddenException('Department membership required to register children');
+    }
+    return { ctx, unit };
+  }
+
   canLead(ctx: UserMemberContext, serviceUnitId: string): boolean {
     if (this.moduleAccess.canManageServiceUnit(ctx, serviceUnitId)) return true;
     return ctx.unitLeaderUnitIds.includes(serviceUnitId);

@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-errors';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -213,7 +214,7 @@ export function SermonNotesPanel() {
   return (
     <DashboardModuleShell
       title="Sermon Note"
-      description="Summarize Sunday teaching and publish a 7-day devotional with daily scripture and full message descriptions."
+      description={MODULE_DESCRIPTIONS.sermonNotes}
     >
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <Card>

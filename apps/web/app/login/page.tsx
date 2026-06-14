@@ -14,6 +14,8 @@ import { api } from '@/lib/api';
 import { checkApiReachable } from '@/lib/api-health';
 import { AuthMobileBrand } from '@/components/auth/AuthMobileBrand';
 import { AuthSideVisual } from '@/components/auth/AuthSideVisual';
+import { LoginTestAccountsPanel } from '@/components/auth/LoginTestAccountsPanel';
+import { showLoginTestAccounts } from '@/lib/auth-test-logins';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -86,6 +88,8 @@ export default function LoginPage() {
       router.push('/dashboard');
     }
   };
+
+  const showTestLogins = showLoginTestAccounts();
 
   const onSubmit = async (data: { email: string; password: string }) => {
     setLoading(true);
@@ -173,6 +177,15 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
+
+          {showTestLogins ? (
+            <LoginTestAccountsPanel
+              onUseAccount={(email, password) => {
+                setValue('email', email);
+                setValue('password', password);
+              }}
+            />
+          ) : null}
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
             No account?{' '}

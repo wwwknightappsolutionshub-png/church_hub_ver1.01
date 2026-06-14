@@ -49,15 +49,70 @@ export type DevotionalHubTabId =
 
 export const DEVOTIONAL_QUERY_KEYS_REMINDERS = () => ['devotional-reminder-sync'] as string[];
 
-export const DEVOTIONAL_HUB_TABS: Array<{ id: DevotionalHubTabId; label: string }> = [
-  { id: 'today', label: 'Today' },
-  { id: 'plans', label: 'Plans' },
-  { id: 'study', label: 'Study & AI' },
-  { id: 'actions', label: 'Action points' },
-  { id: 'review', label: 'Weekly review' },
-  { id: 'challenges', label: 'Challenges' },
-  { id: 'reminders', label: 'Reminders' },
-  { id: 'groups', label: 'Groups' },
-  { id: 'journal', label: 'Journal' },
-  { id: 'prayer', label: 'Prayer list' },
+export const DEVOTIONAL_HUB_TABS: Array<{
+  id: DevotionalHubTabId;
+  label: string;
+  description: string;
+  shortLabel?: string;
+}> = [
+  {
+    id: 'today',
+    label: 'Today',
+    shortLabel: 'Today',
+    description: 'Today’s scripture reading, reflection, and mark-complete for your active plan.',
+  },
+  {
+    id: 'plans',
+    label: 'Plans',
+    shortLabel: 'Plans',
+    description: 'Browse reading plans; church leaders can create and publish new plans.',
+  },
+  {
+    id: 'study',
+    label: 'Study & AI',
+    shortLabel: 'Study',
+    description: 'Generate study notes and AI artifacts linked to your current reading plan.',
+  },
+  {
+    id: 'actions',
+    label: 'Action points',
+    shortLabel: 'Actions',
+    description: 'Capture daily action steps and reminders from your devotional reading.',
+  },
+  {
+    id: 'review',
+    label: 'Weekly review',
+    shortLabel: 'Review',
+    description: 'Summarize your week — reading progress, prayer, and journal highlights.',
+  },
+  {
+    id: 'challenges',
+    label: 'Challenges',
+    shortLabel: 'Challenge',
+    description: 'Join streak challenges, earn badges, and track weekly devotional goals.',
+  },
+  {
+    id: 'reminders',
+    label: 'Reminders',
+    shortLabel: 'Remind',
+    description: 'Set push and email reminders for your preferred devotional times.',
+  },
+  {
+    id: 'groups',
+    label: 'Groups',
+    shortLabel: 'Groups',
+    description: 'Create or join small groups reading the same plan together.',
+  },
+  {
+    id: 'journal',
+    label: 'Journal',
+    shortLabel: 'Journal',
+    description: 'Private or team journal entries with rich text and optional sharing.',
+  },
+  {
+    id: 'prayer',
+    label: 'Prayer list',
+    shortLabel: 'Prayer',
+    description: 'Personal prayer lists with answered markers and streak tracking.',
+  },
 ];

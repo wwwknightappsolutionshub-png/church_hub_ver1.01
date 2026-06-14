@@ -564,7 +564,7 @@
 @layer utilities {
   .devotional-tab-panel,
   .membership-hub-section {
-    will-change: opacity, transform;
+    will-change: opacity;
   }
 
   .membership-hub-root {
@@ -574,11 +574,9 @@
   @keyframes hub-page-enter {
     from {
       opacity: 0;
-      transform: translateY(6px);
     }
     to {
       opacity: 1;
-      transform: translateY(0);
     }
   }
 

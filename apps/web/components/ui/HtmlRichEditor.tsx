@@ -11,6 +11,7 @@ interface HtmlRichEditorProps {
   placeholder?: string;
   className?: string;
   minHeight?: string;
+  testId?: string;
 }
 
 export function HtmlRichEditor({
@@ -19,6 +20,7 @@ export function HtmlRichEditor({
   placeholder = 'Edit content…',
   className,
   minHeight = 'min-h-[280px]',
+  testId = 'html-rich-editor',
 }: HtmlRichEditorProps) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -44,7 +46,7 @@ export function HtmlRichEditor({
   };
 
   return (
-    <div className={cn('rounded-md border border-input', className)}>
+    <div className={cn('rounded-md border border-input', className)} data-testid={testId}>
       <div className="flex flex-wrap gap-0.5 border-b bg-muted/30 p-1">
         <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => exec('bold')}>
           <Bold className="h-3.5 w-3.5" />

@@ -126,6 +126,7 @@ export default function ServiceUnitDetailPage() {
     user,
     member,
     unitAdminUnitIds,
+    unitMembershipIds,
     isChurchStaff,
   } = useModuleAccess();
   const [accessDenied, setAccessDenied] = useState(false);
@@ -166,6 +167,8 @@ export default function ServiceUnitDetailPage() {
 
   const canViewDepartmentTab =
     isChurchStaff ||
+    unitMembershipIds.includes(id) ||
+    (unit.data?.access?.canView ?? false) ||
     (unit.data?.access?.canLead ?? false) ||
     (unit.data?.access?.canManage ?? false);
 
@@ -391,37 +394,61 @@ export default function ServiceUnitDetailPage() {
 
   const data = unit.data;
   const moderatorIds = new Set(data.leaders.filter((l) => l.isModerator).map((l) => l.member.id));
+  const isDepartmentFocus = tab === 'department';
 
   return (
-    <div className="space-y-6 p-6 md:p-8">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
+    <div className={cn('space-y-6', isDepartmentFocus ? 'p-4 md:p-6' : 'p-6 md:p-8')}>
+      <div
+        className={cn(
+          'flex flex-col gap-4',
+          !isDepartmentFocus && 'md:flex-row md:items-start md:justify-between',
+        )}
+      >
+        <div className="min-w-0">
           <Button asChild variant="ghost" size="sm" className="mb-2 -ml-2">
             <Link href="/dashboard/service-units">
               <ArrowLeft className="mr-1 h-4 w-4" />
               Service Unit Hub
             </Link>
           </Button>
-          <h1 className="font-heading text-2xl font-bold md:text-3xl">{data.name}</h1>
-          <p className="font-sans mt-1 max-w-2xl text-sm text-muted-foreground">{data.description}</p>
+          {!isDepartmentFocus ? (
+            <>
+              <h1 className="font-heading text-2xl font-bold md:text-3xl">{data.name}</h1>
+              <p className="font-sans mt-1 max-w-2xl text-sm text-muted-foreground">{data.description}</p>
+            </>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="font-heading text-xl font-semibold md:text-2xl">{data.name}</h1>
+              <Badge variant="secondary">Department workspace</Badge>
+            </div>
+          )}
         </div>
-        <Badge variant="outline" className="w-fit gap-2">
-          <OnlineIndicator online={!!currentMemberId && isOnline(currentMemberId)} />
-          {data.members.filter((m) => isOnline(m.memberId)).length} members online
-        </Badge>
+        {!isDepartmentFocus ? (
+          <Badge variant="outline" className="w-fit gap-2">
+            <OnlineIndicator online={!!currentMemberId && isOnline(currentMemberId)} />
+            {data.members.filter((m) => isOnline(m.memberId)).length} members online
+          </Badge>
+        ) : null}
       </div>
 
-      <div className="flex flex-wrap gap-2 border-b border-border pb-1">
+      <div
+        className={cn(
+          'flex gap-2 overflow-x-auto pb-1 scrollbar-thin',
+          isDepartmentFocus ? 'rounded-xl border border-border/60 bg-muted/20 p-1.5' : 'border-b border-border',
+        )}
+      >
         {visibleTabs.map(({ id: tabId, label, icon: Icon }) => (
           <button
             key={tabId}
             type="button"
             onClick={() => setTab(tabId)}
             className={cn(
-              'flex items-center gap-2 rounded-t-lg px-4 py-2 text-sm font-medium transition-colors',
+              'flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors md:px-4',
               tab === tabId
-                ? 'border-b-2 border-primary text-primary'
-                : 'text-muted-foreground hover:text-foreground',
+                ? isDepartmentFocus
+                  ? 'bg-background text-primary shadow-sm ring-1 ring-border/60'
+                  : 'border-b-2 border-primary text-primary'
+                : 'text-muted-foreground hover:bg-background/60 hover:text-foreground',
             )}
           >
             <Icon className="h-4 w-4" />

@@ -15,6 +15,7 @@ import { ProfilePhotoUpload } from '@/components/settings/ProfilePhotoUpload';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { EnterpriseContent, EnterpriseHero, EnterpriseShell } from '@/components/layout/EnterpriseModuleShell';
 
 interface AccountForm {
@@ -225,7 +226,7 @@ export default function SettingsPage() {
     <EnterpriseShell>
       <EnterpriseHero
         title="Settings"
-        description="Account preferences and profile presentation synchronized across church modules and your membership record."
+        description={MODULE_DESCRIPTIONS.settings}
       />
       <EnterpriseContent className="space-y-6 pb-24 md:pb-8">
       <Card>

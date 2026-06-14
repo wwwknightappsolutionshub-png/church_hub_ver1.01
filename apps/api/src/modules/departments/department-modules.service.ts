@@ -22,6 +22,7 @@ import {
   parseDepartmentModuleSettings,
 } from '../../common/department-module-settings';
 import { DepartmentAccessService } from './department-access.service';
+import { checkedInAtForServiceDay, parseServiceDateInput } from './children.constants';
 import { CommunicationsQueueService } from '../communications/communications-queue.service';
 import { MedicalDepartmentService } from './medical-department.service';
 
@@ -70,6 +71,15 @@ export class DepartmentModulesService {
       enabledTabs = enabledTabs.filter((t) => t !== 'feedbacks' && t !== 'reports');
     }
 
+    const canAccessChildrenMinistry =
+      code === 'CHILDREN' && this.access.canAccessChildrenMinistryLeadership(ctx, serviceUnitId);
+    const canRegisterChildren =
+      code === 'CHILDREN' && this.access.canRegisterChildren(ctx, serviceUnitId);
+    if (code === 'CHILDREN' && !canAccessChildrenMinistry) {
+      const teacherTabs = ['dashboard', 'children-sunday-report'];
+      enabledTabs = enabledTabs.filter((t) => teacherTabs.includes(t));
+    }
+
     return {
       unit: {
         id: unit.id,
@@ -77,7 +87,13 @@ export class DepartmentModulesService {
         departmentCode: code,
         departmentLabel: DEPT_MODULE_LABEL[code] ?? unit.name,
       },
-      access: flags,
+      access: {
+        ...flags,
+        canAccessChildrenMinistry,
+        canRegisterChildren,
+        canManageChildrenClasses: canAccessChildrenMinistry,
+        isChildrenChurchAdmin: ctx.unitAdminUnitIds.includes(serviceUnitId),
+      },
       ui: { enabledTabs },
     };
   }
@@ -519,8 +535,23 @@ export class DepartmentModulesService {
 
   // ─── Child check-in ──────────────────────────────────────────
 
+  private async requireChildrenCheckInAccess(
+    userId: string,
+    churchId: string,
+    serviceUnitId: string,
+  ) {
+    const { ctx, unit } = await this.access.requireView(userId, churchId, serviceUnitId);
+    const code = resolveDeptModuleCode(unit.departmentCode, unit.name);
+    if (code === 'CHILDREN') {
+      await this.access.requireChildrenMinistryLeadership(userId, churchId, serviceUnitId);
+      return { ctx, unit };
+    }
+    await this.access.requireParticipate(userId, churchId, serviceUnitId);
+    return { ctx, unit };
+  }
+
   listCheckIns(userId: string, churchId: string, serviceUnitId: string) {
-    return this.access.requireView(userId, churchId, serviceUnitId).then(() =>
+    return this.requireChildrenCheckInAccess(userId, churchId, serviceUnitId).then(() =>
       this.prisma.deptChildCheckIn.findMany({
         where: { serviceUnitId },
         orderBy: { checkedInAt: 'desc' },
@@ -542,9 +573,34 @@ export class DepartmentModulesService {
       guardianMemberId?: string;
       classGroup?: string;
       notes?: string;
+      serviceDate?: string;
     },
   ) {
-    await this.access.requireParticipate(userId, churchId, serviceUnitId);
+    const { unit } = await this.requireChildrenCheckInAccess(userId, churchId, serviceUnitId);
+    const code = resolveDeptModuleCode(unit.departmentCode, unit.name);
+
+    const sessionStart = parseServiceDateInput(body.serviceDate);
+    const sessionEnd = new Date(sessionStart);
+    sessionEnd.setUTCDate(sessionEnd.getUTCDate() + 1);
+
+    if (code === 'CHILDREN') {
+      const existing = await this.prisma.deptChildCheckIn.findFirst({
+        where: {
+          serviceUnitId,
+          childMemberId: body.childMemberId,
+          checkedInAt: { gte: sessionStart, lt: sessionEnd },
+        },
+        orderBy: { checkedInAt: 'desc' },
+      });
+
+      if (existing && !existing.checkedOutAt) {
+        throw new ForbiddenException('Child is already checked in for this session');
+      }
+      if (existing?.checkedOutAt) {
+        throw new ForbiddenException('Child has already been checked out for this session');
+      }
+    }
+
     return this.prisma.deptChildCheckIn.create({
       data: {
         churchId,
@@ -553,6 +609,7 @@ export class DepartmentModulesService {
         guardianMemberId: body.guardianMemberId,
         classGroup: body.classGroup,
         notes: body.notes,
+        checkedInAt: checkedInAtForServiceDay(sessionStart),
       },
       include: {
         child: { select: memberSelect },
@@ -562,7 +619,7 @@ export class DepartmentModulesService {
   }
 
   async checkOutChild(userId: string, churchId: string, serviceUnitId: string, id: string) {
-    await this.access.requireParticipate(userId, churchId, serviceUnitId);
+    await this.requireChildrenCheckInAccess(userId, churchId, serviceUnitId);
     return this.prisma.deptChildCheckIn.update({
       where: { id },
       data: { checkedOutAt: new Date() },

@@ -24,6 +24,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
+interface PaginatedJobs {
+  items: JobPosting[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 interface JobPosting {
   id: string;
   title: string;
@@ -41,7 +49,10 @@ const LOUNGE_JOB_LIMIT = 5;
 
 export function LoungeJobsPanel({ canManage }: LoungeJobsPanelProps) {
   const queryClient = useQueryClient();
-  const { data, isLoading } = useApiQuery<JobPosting[]>(['lounge-jobs'], '/business/jobs');
+  const { data, isLoading } = useApiQuery<PaginatedJobs>(
+    ['lounge-jobs'],
+    '/business/jobs?page=1&limit=100',
+  );
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -57,7 +68,7 @@ export function LoungeJobsPanel({ canManage }: LoungeJobsPanelProps) {
     jobType: JOB_TYPES[0],
   });
 
-  const activeJobs = useMemo(() => (data ?? []).filter((j) => j.isActive), [data]);
+  const activeJobs = useMemo(() => (data?.items ?? []).filter((j) => j.isActive), [data?.items]);
   const previewJobs = activeJobs.slice(0, LOUNGE_JOB_LIMIT);
   const hasMoreJobs = activeJobs.length > LOUNGE_JOB_LIMIT;
 

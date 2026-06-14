@@ -12,6 +12,7 @@
   },
   "include": [
     "prisma/seed.ts",
+    "prisma/celebration-email-seed-templates.ts",
     "prisma/service-unit-catalog.ts",
     "prisma/seed-test-users.ts",
     "prisma/seed-platform-admin.ts",

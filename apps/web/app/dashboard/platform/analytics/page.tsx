@@ -16,6 +16,7 @@ import { useEffect } from 'react';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { apiErrorMessage } from '@/lib/api-errors';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -123,7 +124,7 @@ export default function PlatformAnalyticsPage() {
   return (
     <DashboardModuleShell
       title="Business analytics"
-      description="SaaS performance — tenants, premium add-on revenue, Spirify adoption, and marketing drips."
+      description={MODULE_DESCRIPTIONS.platformAnalytics}
       actions={
         <Button
           variant="outline"

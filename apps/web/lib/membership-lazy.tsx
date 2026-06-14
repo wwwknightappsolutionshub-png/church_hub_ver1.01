@@ -39,6 +39,24 @@ export const LazyMemberOnboardingWizard = dynamic(
   { loading: panelFallback },
 );
 
+export const LazyCongregantEditorForm = dynamic(
+  () => import('@/components/membership/CongregantEditorForm').then((m) => m.CongregantEditorForm),
+  { loading: panelFallback },
+);
+
+export const LazyFamilyEditorDialog = dynamic(
+  () => import('@/components/membership/FamilyEditorDialog').then((m) => m.FamilyEditorDialog),
+  { loading: panelFallback },
+);
+
+export const LazyMembershipRegistrySettingsPanel = dynamic(
+  () =>
+    import('@/components/membership/MembershipRegistrySettingsPanel').then(
+      (m) => m.MembershipRegistrySettingsPanel,
+    ),
+  { loading: panelFallback },
+);
+
 const AnalyticsCharts = dynamic(
   () => import('@/components/membership/AnalyticsChartsSection').then((m) => m.AnalyticsChartsSection),
   { loading: () => <DashboardPageSkeleton cards={4} />, ssr: false },

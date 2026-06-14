@@ -1,8 +1,11 @@
 'use client';
 
+import Link from 'next/link';
+import { Cake } from 'lucide-react';
 import { Bell, BookOpen, Megaphone, MessageSquare, Mic, Radio } from 'lucide-react';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 interface CommStats {
   announcements: number;
@@ -32,25 +35,46 @@ export function CommOverviewPanel() {
   ];
 
   return (
-    <div className="space-y-6">
-      <p className="text-sm text-muted-foreground">
-        Central hub for church-wide communication — push alerts, private messages, announcements, media, devotionals, and moderated group chats.
-      </p>
+    <div className="space-y-6" data-testid="comm-overview-corporate">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map((c) => (
-          <Card key={c.label} className="shadow-sm">
+          <Card
+            key={c.label}
+            className="border-slate-200/80 shadow-sm transition hover:border-primary/30 hover:shadow-md"
+          >
             <CardHeader className="flex flex-row items-center gap-3 pb-2">
-              <div className={`rounded-lg bg-muted p-2 ${c.color ?? 'text-primary'}`}>
+              <div className={`rounded-lg bg-slate-900/5 p-2.5 dark:bg-white/5 ${c.color ?? 'text-primary'}`}>
                 <c.icon className="h-5 w-5" />
               </div>
-              <CardTitle className="text-xs font-medium text-muted-foreground">{c.label}</CardTitle>
+              <CardTitle className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {c.label}
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">{c.value}</p>
+              <p className="text-3xl font-bold tabular-nums tracking-tight">{c.value}</p>
             </CardContent>
           </Card>
         ))}
       </div>
+
+      <Card className="border-primary/20 bg-gradient-to-br from-slate-900 to-slate-800 text-white shadow-lg">
+        <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base text-white">
+              <Cake className="h-4 w-4 text-amber-300" />
+              Celebration email templates
+            </CardTitle>
+            <CardDescription className="text-slate-300">
+              Customize birthday and anniversary WYSIWYG emails — auto-sent on occasion dates.
+            </CardDescription>
+          </div>
+          <Button size="sm" variant="secondary" className="shrink-0" asChild>
+            <Link href="/dashboard/communications?tab=celebrations" data-testid="comm-celebration-templates-link">
+              Manage templates
+            </Link>
+          </Button>
+        </CardHeader>
+      </Card>
     </div>
   );
 }

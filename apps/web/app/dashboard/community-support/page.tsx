@@ -1,6 +1,7 @@
 'use client';
 
 import { CommunitySupportManagePanel } from '@/components/community-support/CommunitySupportManagePanel';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { isChurchLeadershipRole } from '@/lib/session-role';
@@ -29,7 +30,7 @@ export default function CommunitySupportManagePage() {
     <DashboardModuleShell
       eyebrow="Community Support"
       title="Job & business requests"
-      description="Govern listing lifecycle for member-submitted employment and business inquiries on public channels."
+      description={MODULE_DESCRIPTIONS.communitySupport}
     >
       <CommunitySupportManagePanel />
     </DashboardModuleShell>

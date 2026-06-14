@@ -69,4 +69,37 @@ export class ServiceUnitsDepartmentController {
   ) {
     return this.departments.generateWeeklyReport(churchId, id, body?.weekStart, user.userId);
   }
+
+  @Get(':id/ushering-headcounts')
+  @ApiOperation({ summary: 'List weekly sanctuary headcounts (Ushering unit)' })
+  listUsheringHeadcounts(
+    @ChurchId() churchId: string,
+    @Param('id') id: string,
+    @Query('weeks') weeks?: string,
+  ) {
+    return this.departments.listUsheringHeadcounts(
+      churchId,
+      id,
+      weeks ? Number(weeks) : 8,
+    );
+  }
+
+  @Post(':id/ushering-headcounts')
+  @ApiOperation({ summary: 'Record weekly sanctuary headcount (Ushering unit admin)' })
+  upsertUsheringHeadcount(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body()
+    body: {
+      weekStart?: string;
+      male?: number;
+      female?: number;
+      babies?: number;
+      children?: number;
+      totalAttendees?: number;
+    },
+  ) {
+    return this.departments.upsertUsheringHeadcount(user.userId, churchId, id, body);
+  }
 }

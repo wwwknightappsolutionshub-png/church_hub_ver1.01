@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.module';
+import { MembershipService } from '../membership/membership.service';
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly membership: MembershipService,
+  ) {}
 
   async getDashboardMetrics(churchId: string) {
     const [
@@ -101,6 +105,33 @@ export class AdminService {
         { key: 'communications', label: 'Communications', path: '/dashboard/communications', status: pendingNotifications > 0 ? 'attention' : 'ok' },
         { key: 'staff', label: 'Church Staff', path: '/dashboard/staff', status: 'ok' },
       ],
+    };
+  }
+
+  async getAttendancePerformance(churchId: string, weeks = 8) {
+    const flow = await this.membership.getUsheringWeeklyAttendanceFlow(churchId, weeks);
+    const chart = flow.weeks.map((w) => ({
+      period: w.period,
+      label: new Date(w.period).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+      total: w.totalAttendees,
+      male: w.male,
+      female: w.female,
+      babies: w.babies,
+      children: w.children,
+    }));
+    const totals = chart.map((c) => c.total).filter((n) => n > 0);
+    const avg =
+      totals.length > 0 ? Math.round(totals.reduce((a, b) => a + b, 0) / totals.length) : 0;
+    const latest = chart.length ? chart[chart.length - 1].total : 0;
+    const previous = chart.length > 1 ? chart[chart.length - 2].total : 0;
+    const changePct =
+      previous > 0 ? Math.round(((latest - previous) / previous) * 100) : latest > 0 ? 100 : 0;
+    return {
+      source: flow.source,
+      serviceUnitId: flow.serviceUnitId,
+      serviceUnitName: flow.serviceUnitName,
+      weeks: chart,
+      summary: { average: avg, latest, changePct },
     };
   }
 }

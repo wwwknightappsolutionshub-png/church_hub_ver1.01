@@ -36,7 +36,7 @@ export function EnterpriseHero({
     eyebrow.trim().toLowerCase() !== title.trim().toLowerCase();
 
   return (
-    <header className="relative overflow-hidden border-b border-slate-200/80 bg-slate-900 text-white dark:border-slate-800">
+    <header className="relative overflow-visible border-b border-slate-200/80 bg-slate-900 text-white dark:border-slate-800">
       <div
         className="pointer-events-none absolute inset-0 opacity-40"
         style={{

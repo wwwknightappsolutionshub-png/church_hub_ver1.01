@@ -51,6 +51,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { cn } from '@/lib/utils';
 
 interface PaginatedPlans {
@@ -189,7 +190,7 @@ export function DevotionalHubPanel() {
     <>
       <DevotionalHubHero
         title="Devotional Hub"
-        description="Enterprise-grade daily scripture, study plans, prayer, journals, and groups — optimized for mobile and offline use."
+        description={MODULE_DESCRIPTIONS.devotionalHub}
         badge={
           <Badge className="gap-1 border-emerald-700/50 bg-emerald-900/40 text-emerald-100">
             <BookOpen className="h-3 w-3" aria-hidden />
