@@ -6,6 +6,7 @@ import { Toaster } from 'sonner';
 import { useEffect, useState } from 'react';
 import { AppErrorBoundary } from '@/components/app/AppErrorBoundary';
 import { ChurchPwaRegister } from '@/components/church-landing/ChurchPwaRegister';
+import { PwaInstallGate } from '@/components/pwa/PwaInstallGate';
 import { attachAuthRefreshInterceptor } from '@/lib/auth-refresh';
 
 let refreshAttached = false;
@@ -37,6 +38,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
         <AppErrorBoundary>
           <ChurchPwaRegister />
+          <PwaInstallGate />
           {children}
         </AppErrorBoundary>
         <Toaster

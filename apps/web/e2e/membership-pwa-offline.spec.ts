@@ -13,7 +13,7 @@ test.describe('PWA & offline shell (Phase 10)', () => {
     expect(manifest.name).toBeTruthy();
     expect(manifest.start_url).toBeTruthy();
     expect(manifest.display).toBe('standalone');
-    expect(Array.isArray(manifest.icons)).toBe(true);
+    expect(manifest.icons.some((i: { src: string }) => i.src.includes('icon-512.png'))).toBe(true);
   });
 
   test('service worker registers on dashboard', async ({ page, request }) => {

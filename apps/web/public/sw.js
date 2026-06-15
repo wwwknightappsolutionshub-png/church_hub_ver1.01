@@ -1,12 +1,14 @@
 /* Church Hub PWA — Phase 11 hardened offline shell */
-const STATIC_CACHE = 'church-hub-static-v5';
-const RUNTIME_CACHE = 'church-hub-runtime-v5';
+const STATIC_CACHE = 'church-hub-static-v6';
+const RUNTIME_CACHE = 'church-hub-runtime-v6';
 const PRECACHE_URLS = [
   '/',
   '/offline',
   '/manifest.json',
+  '/icons/icon.svg',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
+  '/icons/apple-touch-icon.png',
 ];
 
 self.addEventListener('install', (event) => {

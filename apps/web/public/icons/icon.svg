@@ -1,4 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Church Hub">
-  <rect width="512" height="512" rx="96" fill="#3d4fbf"/>
-  <path fill="#ffffff" d="M256 88c-44 0-80 32-80 72v24h-48v64h48v200h160V248h48v-64h-48v-24c0-40-36-72-80-72zm0 48c22 0 40 14 40 32v24H216v-24c0-18 18-32 40-32z"/>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#312e81"/>
+      <stop offset="45%" stop-color="#4338ca"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect width="512" height="256" rx="112" fill="url(#shine)"/>
+  <circle cx="256" cy="188" r="72" fill="none" stroke="#ffffff" stroke-width="16" opacity="0.95"/>
+  <path fill="#ffffff" d="M256 128v120M196 188h120" stroke="#ffffff" stroke-width="16" stroke-linecap="round"/>
+  <path fill="#ffffff" d="M176 292c0-44 36-80 80-80s80 36 80 80v88H176V292z" opacity="0.95"/>
+  <path fill="#c7d2fe" d="M128 380c48-36 96-54 128-54s80 18 128 54v24H128v-24z" opacity="0.85"/>
 </svg>
