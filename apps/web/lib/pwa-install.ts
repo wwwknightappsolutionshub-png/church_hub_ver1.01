@@ -1,12 +1,14 @@
 /** Mobile PWA install gate — detect device, standalone mode, and gate completion. */
 
-export const PWA_GATE_STORAGE_KEY = 'church-hub-pwa-gate-v1';
+export const PWA_GATE_STORAGE_KEY = 'church-hub-pwa-gate-v2';
 
 export type PwaGateStep = 'install' | 'notifications' | 'done';
 
 export interface PwaGateState {
   step: PwaGateStep;
   notificationsAddressed: boolean;
+  /** Android install prompt accepted while still in browser tab */
+  installAccepted?: boolean;
 }
 
 const DEFAULT_GATE: PwaGateState = { step: 'install', notificationsAddressed: false };
@@ -24,10 +26,16 @@ export function isMobilePhoneViewport(): boolean {
   return coarse && touch;
 }
 
-export function isIosSafari(): boolean {
+export function isIos(): boolean {
   if (typeof navigator === 'undefined') return false;
   const ua = navigator.userAgent;
   return /iPad|iPhone|iPod/.test(ua) || (ua.includes('Mac') && 'ontouchend' in document);
+}
+
+export function isIosSafari(): boolean {
+  if (!isIos()) return false;
+  const ua = navigator.userAgent;
+  return /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua);
 }
 
 export function isAndroid(): boolean {
@@ -44,10 +52,20 @@ export function isStandalonePwa(): boolean {
   return modes.some((mode) => window.matchMedia(`(display-mode: ${mode})`).matches);
 }
 
-/** User confirmed install or we detected standalone — advance to notification step. */
-export function completeInstallStep(): boolean {
-  markInstallCompleteAdvanceToNotifications();
-  return isStandalonePwa();
+/** Install step complete — standalone launch or Android prompt accepted. */
+export function completeInstallStep(opts?: { installAccepted?: boolean }): boolean {
+  const standalone = isStandalonePwa();
+  writePwaGateState({
+    step: 'notifications',
+    notificationsAddressed: false,
+    installAccepted: standalone || Boolean(opts?.installAccepted),
+  });
+  return standalone;
+}
+
+export function canShowNotificationsStep(): boolean {
+  const state = readPwaGateState();
+  return isStandalonePwa() || Boolean(state.installAccepted);
 }
 
 export function readPwaGateState(): PwaGateState {
@@ -59,6 +77,7 @@ export function readPwaGateState(): PwaGateState {
     return {
       step: parsed.step === 'done' || parsed.step === 'notifications' ? parsed.step : 'install',
       notificationsAddressed: Boolean(parsed.notificationsAddressed),
+      installAccepted: Boolean(parsed.installAccepted),
     };
   } catch {
     return DEFAULT_GATE;
@@ -77,8 +96,10 @@ export function shouldShowPwaInstallGate(): boolean {
   const state = readPwaGateState();
   if (state.step === 'done' || state.notificationsAddressed) return false;
 
-  // Step 2 (notifications) — show even in mobile browser after user confirmed install
-  if (state.step === 'notifications') return true;
+  // Step 2 — only after install (standalone shell or Android prompt accepted)
+  if (state.step === 'notifications') {
+    return canShowNotificationsStep();
+  }
 
   // Step 1 — installed PWA shell skips straight to notifications
   if (isStandalonePwa()) return true;
@@ -89,7 +110,7 @@ export function shouldShowPwaInstallGate(): boolean {
 export function resolveInitialGateStep(): PwaGateStep {
   const state = readPwaGateState();
   if (state.notificationsAddressed || state.step === 'done') return 'done';
-  if (state.step === 'notifications') return 'notifications';
+  if (state.step === 'notifications' && canShowNotificationsStep()) return 'notifications';
   if (isStandalonePwa()) return 'notifications';
   return 'install';
 }
@@ -106,6 +127,10 @@ export function markNotificationsAddressed(): void {
   writePwaGateState({ step: 'done', notificationsAddressed: true });
 }
 
-export function markInstallCompleteAdvanceToNotifications(): void {
-  writePwaGateState({ step: 'notifications', notificationsAddressed: false });
+export function markInstallCompleteAdvanceToNotifications(installAccepted = false): void {
+  writePwaGateState({
+    step: 'notifications',
+    notificationsAddressed: false,
+    installAccepted: installAccepted || isStandalonePwa(),
+  });
 }

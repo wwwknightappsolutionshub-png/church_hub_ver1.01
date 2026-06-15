@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Bell,
   BellRing,
@@ -14,6 +14,7 @@ import {
 import {
   completeInstallStep,
   isAndroid,
+  isIos,
   isIosSafari,
   isStandalonePwa,
   markNotificationsAddressed,
@@ -37,7 +38,8 @@ export function PwaInstallGate() {
   const [notifStatus, setNotifStatus] = useState<'idle' | 'granted' | 'denied' | 'unsupported'>(
     'idle',
   );
-  const [installHint, setInstallHint] = useState<string | null>(null);
+  const [highlightInstallGuide, setHighlightInstallGuide] = useState(false);
+  const installGuideRef = useRef<HTMLDivElement>(null);
 
   const refreshVisibility = useCallback(() => {
     if (!shouldShowPwaInstallGate()) {
@@ -81,39 +83,26 @@ export function PwaInstallGate() {
     };
   }, [refreshVisibility]);
 
+  const goToNotificationsStep = useCallback((installAccepted = false) => {
+    completeInstallStep(installAccepted ? { installAccepted: true } : undefined);
+    setStep('notifications');
+  }, []);
+
   useEffect(() => {
     if (step !== 'install') return;
     if (!isStandalonePwa()) return;
-    completeInstallStep();
-    setInstallHint(null);
-    setStep('notifications');
-  }, [step]);
+    goToNotificationsStep();
+  }, [step, goToNotificationsStep]);
 
   useEffect(() => {
     if (step !== 'install' || !visible) return;
     const tick = () => {
       if (!isStandalonePwa()) return;
-      completeInstallStep();
-      setInstallHint(null);
-      setStep('notifications');
+      goToNotificationsStep();
     };
     const id = window.setInterval(tick, 1500);
     return () => window.clearInterval(id);
-  }, [step, visible]);
-
-  const advanceToNotifications = (fromManual = false) => {
-    const launchedStandalone = completeInstallStep();
-    if (!launchedStandalone && fromManual) {
-      setInstallHint(
-        isIosSafari()
-          ? 'Next time, open Church Hub from your home-screen icon for the full app experience. You can set up notifications now.'
-          : 'For the best experience, open Church Hub from your home screen or app drawer. You can set up notifications now.',
-      );
-    } else {
-      setInstallHint(null);
-    }
-    setStep('notifications');
-  };
+  }, [step, visible, goToNotificationsStep]);
 
   const runAndroidInstall = async () => {
     if (!deferredPrompt) return;
@@ -121,8 +110,17 @@ export function PwaInstallGate() {
     const choice = await deferredPrompt.userChoice;
     setDeferredPrompt(null);
     if (choice.outcome === 'accepted') {
-      advanceToNotifications();
+      goToNotificationsStep(true);
     }
+  };
+
+  const handleInstallApp = () => {
+    if (deferredPrompt && isAndroid()) {
+      void runAndroidInstall();
+      return;
+    }
+    setHighlightInstallGuide(true);
+    installGuideRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   };
 
   const enableNotifications = async () => {
@@ -141,6 +139,19 @@ export function PwaInstallGate() {
     markNotificationsAddressed();
     setVisible(false);
   };
+
+  const installFooterHint = (() => {
+    if (deferredPrompt && isAndroid()) {
+      return 'Tap Install app to add Church Hub to your phone, then open it from your home screen or app drawer.';
+    }
+    if (isIos()) {
+      return 'Tap Install app for steps, then use Share → Add to Home Screen. Open the new icon to reach step 2.';
+    }
+    if (isAndroid()) {
+      return 'Tap Install app for steps, or use Chrome menu (⋮) → Install app. Open from your home screen to continue.';
+    }
+    return 'Install Church Hub to your home screen, then open it from the new icon to continue.';
+  })();
 
   if (!visible) return null;
 
@@ -172,7 +183,7 @@ export function PwaInstallGate() {
           </h2>
           <p className="mt-2 text-center text-sm leading-relaxed text-slate-300">
             {step === 'install'
-              ? 'A quick install gives you an app-like experience — faster access than the browser, and the same alternative path as our native mobile app.'
+              ? 'Install the app for a native-like experience — faster access than the browser, with the same path as our mobile app.'
               : 'Turn on notifications so you never miss announcements, events, prayer updates, and reminders from your church.'}
           </p>
         </div>
@@ -197,17 +208,25 @@ export function PwaInstallGate() {
                 </li>
               </ul>
 
-              <div className="rounded-xl border border-indigo-400/30 bg-indigo-500/10 p-4">
+              <div
+                ref={installGuideRef}
+                className={cn(
+                  'rounded-xl border bg-indigo-500/10 p-4 transition-all duration-300',
+                  highlightInstallGuide
+                    ? 'border-indigo-300 ring-2 ring-indigo-400/60'
+                    : 'border-indigo-400/30',
+                )}
+              >
                 <p className="text-xs font-semibold uppercase tracking-wide text-indigo-200">
                   How to install
                 </p>
-                {isIosSafari() ? (
+                {isIos() ? (
                   <ol className="mt-3 space-y-2 text-sm text-slate-100">
                     <li className="flex gap-2">
                       <span className="font-bold text-indigo-300">1.</span>
                       <span>
                         Tap the <Share className="inline h-4 w-4 align-text-bottom" /> Share button
-                        in Safari (bottom bar on iPhone).
+                        {isIosSafari() ? ' in Safari (bottom bar on iPhone)' : ' in your browser'}.
                       </span>
                     </li>
                     <li className="flex gap-2">
@@ -219,8 +238,7 @@ export function PwaInstallGate() {
                     <li className="flex gap-2">
                       <span className="font-bold text-indigo-300">3.</span>
                       <span>
-                        Open Church Hub from your new home-screen icon — we&apos;ll continue to step
-                        2 automatically.
+                        Open Church Hub from your new home-screen icon — step 2 starts automatically.
                       </span>
                     </li>
                   </ol>
@@ -229,8 +247,7 @@ export function PwaInstallGate() {
                     <li className="flex gap-2">
                       <span className="font-bold text-indigo-300">1.</span>
                       <span>
-                        Tap <strong>Install app</strong> below, or use browser menu →{' '}
-                        <strong>Install app</strong> / <strong>Add to Home screen</strong>.
+                        Tap <strong>Install app</strong> below{deferredPrompt ? '' : ', or Chrome menu (⋮) → Install app'}.
                       </span>
                     </li>
                     <li className="flex gap-2">
@@ -242,35 +259,21 @@ export function PwaInstallGate() {
                   <ol className="mt-3 space-y-2 text-sm text-slate-100">
                     <li className="flex gap-2">
                       <span className="font-bold text-indigo-300">1.</span>
-                      <span>Use your browser menu to <strong>Install</strong> or </span>
-                      <strong>Add to Home screen</strong>.
+                      <span>
+                        Tap <strong>Install app</strong> below or use your browser menu →{' '}
+                        <strong>Add to Home screen</strong>.
+                      </span>
                     </li>
                     <li className="flex gap-2">
                       <span className="font-bold text-indigo-300">2.</span>
-                      <span>Launch from the new icon to unlock the full experience.</span>
+                      <span>Launch from the new icon to unlock step 2.</span>
                     </li>
                   </ol>
                 )}
               </div>
-
-              {deferredPrompt && isAndroid() ? (
-                <Button
-                  type="button"
-                  className="h-12 w-full gap-2 bg-indigo-500 text-base font-semibold text-white hover:bg-indigo-400"
-                  onClick={() => void runAndroidInstall()}
-                >
-                  <Download className="h-5 w-5" />
-                  Install Church Hub app
-                </Button>
-              ) : null}
             </div>
           ) : (
             <div className="space-y-4">
-              {installHint ? (
-                <p className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
-                  {installHint}
-                </p>
-              ) : null}
               <ul className="space-y-3 text-sm text-slate-200">
                 <li className="flex gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
                   <Bell className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" aria-hidden />
@@ -333,17 +336,13 @@ export function PwaInstallGate() {
             <Button
               type="button"
               className="h-12 w-full gap-2 bg-indigo-500 text-base font-semibold text-white hover:bg-indigo-400"
-              onClick={() => advanceToNotifications(true)}
-              data-testid="pwa-gate-continue-install"
+              onClick={handleInstallApp}
+              data-testid="pwa-gate-install-app"
             >
-              I&apos;ve added it — continue to step 2
-              <ChevronRight className="h-5 w-5" />
+              <Download className="h-5 w-5" />
+              Install app
             </Button>
-            <p className="text-center text-[11px] leading-relaxed text-slate-400">
-              {isIosSafari()
-                ? 'After Add to Home Screen, you can continue here — or close Safari and open the new Church Hub icon for the full app.'
-                : 'Tap continue after installing, or open Church Hub from your home screen — we detect that automatically.'}
-            </p>
+            <p className="text-center text-[11px] leading-relaxed text-slate-400">{installFooterHint}</p>
           </div>
         ) : (
           <div className="border-t border-white/10 px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
