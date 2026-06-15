@@ -12,10 +12,10 @@ import {
   Sparkles,
 } from 'lucide-react';
 import {
+  completeInstallStep,
   isAndroid,
   isIosSafari,
   isStandalonePwa,
-  markInstallCompleteAdvanceToNotifications,
   markNotificationsAddressed,
   requestWebPushPermission,
   resolveInitialGateStep,
@@ -37,6 +37,7 @@ export function PwaInstallGate() {
   const [notifStatus, setNotifStatus] = useState<'idle' | 'granted' | 'denied' | 'unsupported'>(
     'idle',
   );
+  const [installHint, setInstallHint] = useState<string | null>(null);
 
   const refreshVisibility = useCallback(() => {
     if (!shouldShowPwaInstallGate()) {
@@ -83,9 +84,36 @@ export function PwaInstallGate() {
   useEffect(() => {
     if (step !== 'install') return;
     if (!isStandalonePwa()) return;
-    markInstallCompleteAdvanceToNotifications();
+    completeInstallStep();
+    setInstallHint(null);
     setStep('notifications');
   }, [step]);
+
+  useEffect(() => {
+    if (step !== 'install' || !visible) return;
+    const tick = () => {
+      if (!isStandalonePwa()) return;
+      completeInstallStep();
+      setInstallHint(null);
+      setStep('notifications');
+    };
+    const id = window.setInterval(tick, 1500);
+    return () => window.clearInterval(id);
+  }, [step, visible]);
+
+  const advanceToNotifications = (fromManual = false) => {
+    const launchedStandalone = completeInstallStep();
+    if (!launchedStandalone && fromManual) {
+      setInstallHint(
+        isIosSafari()
+          ? 'Next time, open Church Hub from your home-screen icon for the full app experience. You can set up notifications now.'
+          : 'For the best experience, open Church Hub from your home screen or app drawer. You can set up notifications now.',
+      );
+    } else {
+      setInstallHint(null);
+    }
+    setStep('notifications');
+  };
 
   const runAndroidInstall = async () => {
     if (!deferredPrompt) return;
@@ -93,8 +121,7 @@ export function PwaInstallGate() {
     const choice = await deferredPrompt.userChoice;
     setDeferredPrompt(null);
     if (choice.outcome === 'accepted') {
-      markInstallCompleteAdvanceToNotifications();
-      setStep('notifications');
+      advanceToNotifications();
     }
   };
 
@@ -236,13 +263,14 @@ export function PwaInstallGate() {
                   Install Church Hub app
                 </Button>
               ) : null}
-
-              <p className="text-center text-xs text-slate-400">
-                After installing, open from your home screen to continue to notifications setup.
-              </p>
             </div>
           ) : (
             <div className="space-y-4">
+              {installHint ? (
+                <p className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                  {installHint}
+                </p>
+              ) : null}
               <ul className="space-y-3 text-sm text-slate-200">
                 <li className="flex gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
                   <Bell className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" aria-hidden />
@@ -301,11 +329,21 @@ export function PwaInstallGate() {
         </div>
 
         {step === 'install' ? (
-          <div className="border-t border-white/10 px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-            <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
-              <span className="inline-flex h-2 w-2 rounded-full bg-indigo-400" />
-              <span>Waiting for home-screen launch…</span>
-            </div>
+          <div className="space-y-2 border-t border-white/10 px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <Button
+              type="button"
+              className="h-12 w-full gap-2 bg-indigo-500 text-base font-semibold text-white hover:bg-indigo-400"
+              onClick={() => advanceToNotifications(true)}
+              data-testid="pwa-gate-continue-install"
+            >
+              I&apos;ve added it — continue to step 2
+              <ChevronRight className="h-5 w-5" />
+            </Button>
+            <p className="text-center text-[11px] leading-relaxed text-slate-400">
+              {isIosSafari()
+                ? 'After Add to Home Screen, you can continue here — or close Safari and open the new Church Hub icon for the full app.'
+                : 'Tap continue after installing, or open Church Hub from your home screen — we detect that automatically.'}
+            </p>
           </div>
         ) : (
           <div className="border-t border-white/10 px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">

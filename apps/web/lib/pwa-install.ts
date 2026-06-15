@@ -38,9 +38,16 @@ export function isAndroid(): boolean {
 /** True when opened from home-screen / installed PWA shell. */
 export function isStandalonePwa(): boolean {
   if (typeof window === 'undefined') return false;
-  const standaloneMq = window.matchMedia('(display-mode: standalone)').matches;
   const iosStandalone = (navigator as Navigator & { standalone?: boolean }).standalone === true;
-  return standaloneMq || iosStandalone;
+  if (iosStandalone) return true;
+  const modes = ['standalone', 'fullscreen', 'minimal-ui'] as const;
+  return modes.some((mode) => window.matchMedia(`(display-mode: ${mode})`).matches);
+}
+
+/** User confirmed install or we detected standalone — advance to notification step. */
+export function completeInstallStep(): boolean {
+  markInstallCompleteAdvanceToNotifications();
+  return isStandalonePwa();
 }
 
 export function readPwaGateState(): PwaGateState {
@@ -68,20 +75,22 @@ export function shouldShowPwaInstallGate(): boolean {
   if (!isMobilePhoneViewport()) return false;
 
   const state = readPwaGateState();
-  if (state.step === 'done') return false;
+  if (state.step === 'done' || state.notificationsAddressed) return false;
 
-  if (isStandalonePwa()) {
-    return !state.notificationsAddressed;
-  }
+  // Step 2 (notifications) — show even in mobile browser after user confirmed install
+  if (state.step === 'notifications') return true;
+
+  // Step 1 — installed PWA shell skips straight to notifications
+  if (isStandalonePwa()) return true;
 
   return true;
 }
 
 export function resolveInitialGateStep(): PwaGateStep {
-  if (isStandalonePwa()) {
-    const state = readPwaGateState();
-    return state.notificationsAddressed ? 'done' : 'notifications';
-  }
+  const state = readPwaGateState();
+  if (state.notificationsAddressed || state.step === 'done') return 'done';
+  if (state.step === 'notifications') return 'notifications';
+  if (isStandalonePwa()) return 'notifications';
   return 'install';
 }
 
