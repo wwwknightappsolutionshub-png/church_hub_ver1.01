@@ -52,6 +52,8 @@ export const MODULE_DESCRIPTIONS = {
     'Today’s reading, study plans, prayer lists, journals, small groups, challenges, reminders, and weekly review.',
   wisdom365:
     'Subscribe to premium daily devotional tracks with scripture, reflection prompts, and reading progress.',
+  youth:
+    'Youth groups, events, social feed, moderated chat, prayer wall, Q&A, gamification, and parent visibility tools.',
   sermonNotes:
     'Publish sermon summaries and a linked seven-day devotional plan for the congregation.',
   ministryCells:

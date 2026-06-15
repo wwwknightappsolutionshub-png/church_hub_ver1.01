@@ -46,11 +46,32 @@ export class Wisdom365Controller {
       orderBy: { sortOrder: 'asc' },
     });
     const me = await this.subscriptions.getMe(user);
-    const config = await this.prisma.wisdom365ProductConfig.findUnique({
+    let config = await this.prisma.wisdom365ProductConfig.findUnique({
       where: { id: 'default' },
     });
+    if (!config) {
+      config = await this.prisma.wisdom365ProductConfig.create({
+        data: {
+          id: 'default',
+          licensePricePence: 1000,
+          multiLicenseDiscountPercent: 20,
+          multiLicenseMinCount: 2,
+          currency: 'GBP',
+          subscriptionDurationDays: 365,
+          isActive: true,
+        },
+      });
+    }
     const quoteSample = await this.stripe.calculateTotal(2);
-    return { variants, me, product: config, sampleQuote: quoteSample };
+    const checkoutAvailable =
+      (config?.isActive ?? true) || !this.stripe.isConfigured();
+    return {
+      variants,
+      me,
+      product: config,
+      sampleQuote: quoteSample,
+      checkoutAvailable,
+    };
   }
 
   @Get('me')

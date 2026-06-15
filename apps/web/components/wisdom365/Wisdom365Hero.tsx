@@ -38,6 +38,9 @@ export function Wisdom365Hero({
     );
   }
 
+  const subtitle =
+    description ?? 'Daily biblical wisdom with practical life application for every season.';
+
   return (
     <header className="relative overflow-hidden border-b border-amber-900/30 bg-slate-950 text-white">
       <div
@@ -52,24 +55,19 @@ export function Wisdom365Hero({
         className="pointer-events-none absolute -right-20 top-0 h-64 w-64 rounded-full bg-amber-400/10 blur-3xl"
         aria-hidden
       />
-      <div className="relative mx-auto max-w-lg px-4 py-6 sm:px-6 sm:py-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-300/90">
-          Daily wisdom · Life application
-        </p>
-        <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="min-w-0 flex-1">
+      <div className="relative mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1 space-y-2">
             <h1 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl">
               Wisdom<span className="text-amber-400">365+</span>
             </h1>
-            <p className="mt-1.5 text-sm text-slate-300">
-              {description ?? 'Daily biblical wisdom. Practical life application.'}
-            </p>
+            <p className="max-w-xl text-sm leading-relaxed text-slate-300">{subtitle}</p>
             {streakLabel ? (
-              <p className="mt-2 text-xs font-medium text-amber-200/80">{streakLabel}</p>
+              <p className="text-xs font-medium text-amber-200/80">{streakLabel}</p>
             ) : null}
-            {actions ? <div className="mt-3 flex flex-wrap gap-2">{actions}</div> : null}
+            {actions ? <div className="flex flex-wrap gap-2 pt-1">{actions}</div> : null}
           </div>
-          {badge}
+          {badge ? <div className="shrink-0 lg:pt-1">{badge}</div> : null}
         </div>
       </div>
     </header>

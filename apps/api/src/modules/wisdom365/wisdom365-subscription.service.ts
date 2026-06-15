@@ -122,7 +122,7 @@ export class Wisdom365SubscriptionService {
     const config = await this.prisma.wisdom365ProductConfig.findUnique({
       where: { id: 'default' },
     });
-    if (!config?.isActive) {
+    if (!config?.isActive && this.stripe.isConfigured()) {
       throw new BadRequestException('Wisdom365+ subscriptions are temporarily unavailable');
     }
 

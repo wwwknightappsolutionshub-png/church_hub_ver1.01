@@ -252,6 +252,14 @@ export function ChoirTeamPanel({
     attended: true,
   });
 
+  const attendedMemberLabels = attForm.memberIds
+    .map((id) => {
+      const member = members.find((m) => m.memberId === id)?.member;
+      return member ? formatMemberName(member) : null;
+    })
+    .filter(Boolean)
+    .join(', ');
+
   const [auditionForm, setAuditionForm] = useState({
     id: '' as string | undefined,
     memberId: members[0]?.memberId ?? '',
@@ -927,15 +935,35 @@ export function ChoirTeamPanel({
                 </select>
                 <Input type="date" value={attForm.eventDate} onChange={(e) => setAttForm({ ...attForm, eventDate: e.target.value })} />
                 {!attForm.id && (
-                  <MemberMultiSelect members={members} selected={attForm.memberIds} onChange={(ids) => setAttForm({ ...attForm, memberIds: ids })} />
+                  <>
+                    <MemberMultiSelect
+                      members={members}
+                      selected={attForm.memberIds}
+                      onChange={(ids) => setAttForm({ ...attForm, memberIds: ids, attended: true })}
+                    />
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="choir-attended-members" className="text-xs">
+                        Attended
+                      </Label>
+                      <Input
+                        id="choir-attended-members"
+                        readOnly
+                        value={attendedMemberLabels || 'Select members above to mark as attended'}
+                        className="bg-muted/40 text-sm"
+                        data-testid="choir-attendance-attended-summary"
+                      />
+                    </div>
+                  </>
                 )}
-                <div className="flex flex-wrap items-center gap-3">
-                  <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={attForm.attended} onChange={(e) => setAttForm({ ...attForm, attended: e.target.checked })} />
-                    Attended
-                  </label>
-                  <Input type="number" className="w-32" placeholder="Minutes late" value={attForm.minutesLate} onChange={(e) => setAttForm({ ...attForm, minutesLate: e.target.value })} />
-                </div>
+                {attForm.id && (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={attForm.attended} onChange={(e) => setAttForm({ ...attForm, attended: e.target.checked })} />
+                      Attended
+                    </label>
+                    <Input type="number" className="w-32" placeholder="Minutes late" value={attForm.minutesLate} onChange={(e) => setAttForm({ ...attForm, minutesLate: e.target.value })} />
+                  </div>
+                )}
                 <Button
                   type="button"
                   disabled={busy}
@@ -960,7 +988,7 @@ export function ChoirTeamPanel({
                           eventType: attForm.eventType,
                           eventDate: new Date(attForm.eventDate).toISOString(),
                           memberIds: attForm.memberIds,
-                          attended: attForm.attended,
+                          attended: true,
                           minutesLate: Number(attForm.minutesLate) || 0,
                         });
                         toast.success(`Saved for ${attForm.memberIds.length} member(s)`);
@@ -969,7 +997,7 @@ export function ChoirTeamPanel({
                         id: undefined,
                         eventType: 'REHEARSAL',
                         eventDate: new Date().toISOString().slice(0, 10),
-                        memberIds: members.map((m) => m.memberId),
+                        memberIds: [],
                         minutesLate: '0',
                         attended: true,
                       });

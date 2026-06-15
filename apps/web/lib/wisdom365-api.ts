@@ -21,6 +21,8 @@ export interface Wisdom365CatalogResponse {
     isActive: boolean;
   } | null;
   sampleQuote: Wisdom365CheckoutQuote;
+  /** False when product is paused and Stripe checkout is required. */
+  checkoutAvailable?: boolean;
 }
 
 export interface Wisdom365CheckoutResponse {

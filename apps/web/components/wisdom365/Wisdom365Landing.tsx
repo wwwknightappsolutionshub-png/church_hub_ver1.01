@@ -162,9 +162,9 @@ export function Wisdom365Landing({
             </div>
 
             <Button
-              className="h-12 w-full gap-2 bg-amber-500 text-base font-semibold text-slate-950 hover:bg-amber-400"
+              className="h-12 w-full gap-2 bg-amber-500 text-base font-semibold text-slate-950 hover:bg-amber-400 disabled:opacity-60"
               onClick={handleCheckout}
-              disabled={busy || !catalog.product?.isActive}
+              disabled={busy || catalog.checkoutAvailable === false}
             >
               {busy ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
@@ -174,7 +174,9 @@ export function Wisdom365Landing({
               Buy {licenseCount} license{licenseCount > 1 ? 's' : ''} & continue
             </Button>
             <p className="text-center text-xs text-muted-foreground">
-              After payment you&apos;ll assign each license to a journey variant.
+              {catalog.checkoutAvailable === false
+                ? 'Subscriptions are paused by your platform operator. Contact support to enable checkout.'
+                : 'After payment you&apos;ll assign each license to a journey variant.'}
             </p>
           </CardContent>
         </Card>

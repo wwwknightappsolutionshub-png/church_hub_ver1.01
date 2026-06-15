@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Flame, Sparkles, Zap } from 'lucide-react';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
+import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { YOUTH_FEATURES } from '@/lib/youth/features';
 import { useYouthContext } from './YouthProvider';
 import { cn } from '@/lib/utils';
@@ -47,8 +48,7 @@ export function YouthHubHero() {
               Your space to grow, connect & shine ✨
             </h1>
             <p className="mt-3 text-sm text-white/90 sm:text-base">
-              Groups, events, feed, chat, prayer wall, Q&A, and points — built mobile-first for
-              your PWA.
+              {MODULE_DESCRIPTIONS.youth}
             </p>
             {ctx?.gamification && (
               <p className="mt-4 inline-flex items-center gap-2 rounded-xl bg-black/20 px-4 py-2 text-sm font-medium backdrop-blur">

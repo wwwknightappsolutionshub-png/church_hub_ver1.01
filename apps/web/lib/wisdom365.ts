@@ -1,4 +1,5 @@
-export const WISDOM365_TAGLINE = 'Daily biblical wisdom. Practical life application.';
+export const WISDOM365_TAGLINE =
+  'Daily biblical wisdom with practical life application for every season.';
 
 export const WISDOM365_ROUTES = {
   hub: '/dashboard/wisdom365',
