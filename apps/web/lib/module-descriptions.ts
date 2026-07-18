@@ -49,7 +49,7 @@ export const MODULE_DESCRIPTIONS = {
   testimonyHub:
     'Share praise reports and testimonies; browse, react, and comment to build up the congregation.',
   suggestions:
-    'Send comments on church service, evangelism, membership, or grievances — pastors and church admins are notified by email and in-app.',
+    'Share feedback on church service, evangelism, membership, grievances, or other church matters so leadership can review and follow up.',
   devotionalHub:
     'Today’s reading, study plans, prayer lists, journals, small groups, challenges, reminders, and weekly review.',
   wisdom365:

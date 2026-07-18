@@ -25,6 +25,7 @@ import { DepartmentsModule } from './modules/departments/departments.module';
 import { AutomationModule } from './modules/automation/automation.module';
 import { CommunityHubModule } from './modules/community-hub/community-hub.module';
 import { SuggestionsModule } from './modules/suggestions/suggestions.module';
+import { RtpModule } from './modules/rtp/rtp.module';
 import { DevotionalHubModule } from './modules/devotional-hub/devotional-hub.module';
 import { MemberProfileModule } from './modules/member-profile/member-profile.module';
 import { CommunitySupportModule } from './modules/community-support/community-support.module';
@@ -78,6 +79,7 @@ const redisEnabled = process.env.REDIS_ENABLED !== 'false';
     AutomationModule,
     CommunityHubModule,
     SuggestionsModule,
+    RtpModule,
     DevotionalHubModule,
     MemberProfileModule,
     CommunitySupportModule,

@@ -59,7 +59,9 @@ export default function SuggestionsPage() {
         subject: subject.trim() || undefined,
         body: body.trim(),
       });
-      toast.success('Suggestion sent to pastors and church admins');
+      toast.success(
+        "Thank you for your suggestion, this is well recieved and we'd work on the points raised",
+      );
       setSubject('');
       setBody('');
       setTopic('CHURCH_SERVICE');
@@ -86,8 +88,9 @@ export default function SuggestionsPage() {
               Share a suggestion
             </CardTitle>
             <CardDescription>
-              Send feedback on church service, evangelism, membership, or grievances. Pastors and
-              church admins receive it by email and in-app notification.
+              Use this module to share feedback on church service, evangelism, membership,
+              grievances, or other church matters. Leadership reviews submissions and follows up on
+              the points raised.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

@@ -313,6 +313,7 @@ export class CommunicationsService {
       cellAttendance,
       unitAttendance,
       meetingSummaries,
+      rtpRequests,
       queueItems,
       notifications,
       inApp,
@@ -338,6 +339,7 @@ export class CommunicationsService {
         this.listCellAttendanceReports(churchId),
         this.listServiceUnitAttendanceReports(churchId),
         this.listMeetingSummaries(churchId),
+        this.listRtpRequests(churchId),
         this.prisma.communicationQueueItem.findMany({
           where: {
             churchId,
@@ -373,6 +375,7 @@ export class CommunicationsService {
         cellAttendance,
         unitAttendance,
         meetingSummaries,
+        rtpRequests,
       },
       queue: queueItems,
       notifications,
@@ -389,6 +392,7 @@ export class CommunicationsService {
       cellAttendance,
       unitAttendance,
       meetingSummaries,
+      rtpRequests,
       queueItems,
       notifications,
       inApp,
@@ -414,6 +418,7 @@ export class CommunicationsService {
         this.listCellAttendanceReports(churchId),
         this.listServiceUnitAttendanceReports(churchId),
         this.listMeetingSummaries(churchId),
+        this.listRtpRequests(churchId),
         this.prisma.communicationQueueItem.findMany({
           where: { churchId },
           orderBy: { createdAt: 'desc' },
@@ -467,6 +472,7 @@ export class CommunicationsService {
         cellAttendance,
         unitAttendance,
         meetingSummaries,
+        rtpRequests,
       },
       queue: queueItems,
       notifications,
@@ -582,6 +588,39 @@ export class CommunicationsService {
         firstName: row.author.firstName,
         lastName: row.author.lastName,
       },
+    }));
+  }
+
+  private async listRtpRequests(churchId: string) {
+    const rows = await this.prisma.rtpRequest.findMany({
+      where: { churchId },
+      orderBy: { createdAt: 'desc' },
+      take: 120,
+      include: {
+        serviceUnit: { select: { id: true, name: true, departmentCode: true } },
+        submittedBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+        receivedBy: { select: { id: true, firstName: true, lastName: true } },
+        approvedBy: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      status: row.status,
+      fieldValues:
+        row.fieldValues && typeof row.fieldValues === 'object' && !Array.isArray(row.fieldValues)
+          ? (row.fieldValues as Record<string, unknown>)
+          : {},
+      createdAt: row.createdAt.toISOString(),
+      receivedAt: row.receivedAt?.toISOString() ?? null,
+      approvedAt: row.approvedAt?.toISOString() ?? null,
+      rejectedAt: row.rejectedAt?.toISOString() ?? null,
+      rejectionReason: row.rejectionReason,
+      serviceUnit: row.serviceUnit,
+      submittedBy: row.submittedBy,
+      receivedBy: row.receivedBy,
+      approvedBy: row.approvedBy,
     }));
   }
 

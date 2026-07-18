@@ -15,6 +15,7 @@ import {
   Shield,
   Trash2,
   Users,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { AxiosError } from 'axios';
@@ -34,6 +35,7 @@ import { ServiceUnitJoinSheet } from '@/components/service-units/ServiceUnitJoin
 import { ServiceUnitAdminPanel } from '@/components/service-units/ServiceUnitAdminPanel';
 import { ServiceUnitMembersPanel } from '@/components/service-units/ServiceUnitMembersPanel';
 import { ServiceUnitWeeklyAttendancePanel } from '@/components/service-units/ServiceUnitWeeklyAttendancePanel';
+import { ServiceUnitRtpPanel } from '@/components/service-units/ServiceUnitRtpPanel';
 import {
   DepartmentToolsRouter,
 } from '@/components/departments/DepartmentToolsRouter';
@@ -45,6 +47,7 @@ type Tab =
   | 'meetings'
   | 'leaders'
   | 'weekly'
+  | 'rtp'
   | 'forum'
   | 'admin'
   | 'department';
@@ -117,6 +120,7 @@ const baseTabs: { id: Tab; label: string; icon: typeof Users }[] = [
   { id: 'meetings', label: 'Meetings', icon: Calendar },
   { id: 'leaders', label: 'Members', icon: Users },
   { id: 'weekly', label: 'Attendance', icon: ClipboardList },
+  { id: 'rtp', label: 'RTP', icon: FileSpreadsheet },
   { id: 'forum', label: 'Forum', icon: MessageSquare },
   { id: 'admin', label: 'Unit admin', icon: Shield },
 ];
@@ -177,21 +181,21 @@ export default function ServiceUnitDetailPage() {
 
   const visibleTabs = useMemo(() => {
     const data = unit.data;
-    if (!data) return baseTabs.filter((t) => t.id !== 'department' && t.id !== 'admin');
+    if (!data) return baseTabs.filter((t) => t.id !== 'department' && t.id !== 'admin' && t.id !== 'rtp');
 
     const showDeptTab =
       showDepartmentToolsTab(data.departmentCode, data.name) && canViewDepartmentTab;
 
     return baseTabs.filter((t) => {
       if (t.id === 'department') return showDeptTab;
-      if (t.id === 'admin') return canManage;
+      if (t.id === 'admin' || t.id === 'rtp') return canManage;
       return true;
     });
   }, [unit.data, canViewDepartmentTab, canManage]);
 
   useEffect(() => {
     if (tab === 'department' && !canViewDepartmentTab) setTab('overview');
-    if (tab === 'admin' && !canManage) setTab('overview');
+    if ((tab === 'admin' || tab === 'rtp') && !canManage) setTab('overview');
   }, [tab, canViewDepartmentTab, canManage]);
 
   const [unitEditForm, setUnitEditForm] = useState({
@@ -820,6 +824,10 @@ export default function ServiceUnitDetailPage() {
           unitName={unit.data.name}
           canManage={canManage}
         />
+      )}
+
+      {tab === 'rtp' && canManage && unit.data && (
+        <ServiceUnitRtpPanel unitId={id} unitName={unit.data.name} />
       )}
 
       {tab === 'admin' && canManage && unit.data && (

@@ -35,6 +35,7 @@ type TriageKind =
   | 'cell'
   | 'unit'
   | 'meeting'
+  | 'rtp'
   | 'queue'
   | 'notification'
   | 'message';
@@ -110,6 +111,21 @@ export interface ReportsInboxData {
       serviceUnit: { id: string; name: string; departmentCode: string | null };
       author: { id: string; userId: string | null; firstName: string; lastName: string };
     }>;
+    rtpRequests?: Array<{
+      id: string;
+      title: string;
+      status: 'SUBMITTED' | 'PROCESSING' | 'APPROVED' | 'REJECTED';
+      fieldValues: Record<string, unknown>;
+      createdAt: string;
+      receivedAt: string | null;
+      approvedAt: string | null;
+      rejectedAt: string | null;
+      rejectionReason: string | null;
+      serviceUnit: { id: string; name: string; departmentCode: string | null };
+      submittedBy: { id: string; firstName: string; lastName: string; email: string | null };
+      receivedBy: { id: string; firstName: string; lastName: string } | null;
+      approvedBy: { id: string; firstName: string; lastName: string } | null;
+    }>;
   };
   queue: Array<{
     id: string;
@@ -160,6 +176,7 @@ const KIND_OPTIONS: Array<{ value: TriageKind; label: string }> = [
   { value: 'department', label: 'Department reports' },
   { value: 'weekly', label: 'Weekly reports' },
   { value: 'meeting', label: 'Meeting summaries' },
+  { value: 'rtp', label: 'RTP Requests' },
   { value: 'cell', label: 'Ministry / Cells' },
   { value: 'unit', label: 'Service units' },
   { value: 'queue', label: 'Queue alerts' },
@@ -851,6 +868,15 @@ export function ReportsInboxPanel({
     });
   }, [data, kindFilter, search]);
 
+  const rtpRequests = useMemo(() => {
+    if (kindFilter !== 'all' && kindFilter !== 'rtp') return [];
+    return (data?.reports.rtpRequests ?? []).filter((r) => {
+      const values = Object.values(r.fieldValues ?? {}).join(' ');
+      const blob = `${r.title} ${r.status} ${r.serviceUnit.name} ${r.submittedBy.firstName} ${r.submittedBy.lastName} ${values}`;
+      return matchesSearch(blob, search);
+    });
+  }, [data, kindFilter, search]);
+
   const queueItems = useMemo(() => {
     if (kindFilter !== 'all' && kindFilter !== 'queue') return [];
     return (data?.queue ?? []).filter((q) => {
@@ -880,6 +906,7 @@ export function ReportsInboxPanel({
     deptReports.length +
     weeklyReports.length +
     meetingSummaries.length +
+    rtpRequests.length +
     cellAttendanceReports.length +
     unitAttendanceReports.length +
     queueItems.length +
@@ -901,6 +928,10 @@ export function ReportsInboxPanel({
     if (deptReports.length) counts.medium += deptReports.length;
     if (weeklyReports.length) counts.info += weeklyReports.length;
     if (meetingSummaries.length) counts.medium += meetingSummaries.length;
+    if (rtpRequests.length) {
+      counts.high += rtpRequests.filter((r) => r.status === 'SUBMITTED').length;
+      counts.medium += rtpRequests.filter((r) => r.status === 'PROCESSING').length;
+    }
     if (cellAttendanceReports.length) counts.low += cellAttendanceReports.length;
     if (unitAttendanceReports.length) counts.low += unitAttendanceReports.length;
     return counts;
@@ -909,6 +940,7 @@ export function ReportsInboxPanel({
     deptReports.length,
     weeklyReports.length,
     meetingSummaries.length,
+    rtpRequests,
     cellAttendanceReports.length,
     unitAttendanceReports.length,
     statusFilter,
@@ -948,6 +980,7 @@ export function ReportsInboxPanel({
           {(data?.reports.department.length ?? 0) +
             (data?.reports.weekly.length ?? 0) +
             (data?.reports.meetingSummaries?.length ?? 0) +
+            (data?.reports.rtpRequests?.length ?? 0) +
             (data?.reports.cellAttendance?.length ?? 0) +
             (data?.reports.unitAttendance?.length ?? 0)}{' '}
           reports ·{' '}
@@ -1165,6 +1198,116 @@ export function ReportsInboxPanel({
                 </pre>
               </article>
             ))}
+          </InboxScrollCard>
+
+          <InboxScrollCard
+            title="RTP Requests"
+            description="Service unit Request to Purchase — mark Received to stop 15-minute reminders and notify the originator (Processing)."
+            count={rtpRequests.length}
+            emptyMessage="No RTP requests match your filters."
+            testId="reports-rtp-inbox"
+          >
+            {rtpRequests.map((r) => {
+              const urgency =
+                r.status === 'SUBMITTED' ? 'high' : r.status === 'PROCESSING' ? 'medium' : 'info';
+              const meta = URGENCY_META[urgency];
+              const entries = Object.entries(r.fieldValues ?? {});
+              return (
+                <article key={r.id} className={cn('rounded-lg border px-3 py-2.5 text-sm', meta.card)}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium">{r.title}</p>
+                    <Badge className={cn('text-[10px]', meta.badge)}>{r.status}</Badge>
+                    <Badge variant="secondary" className="text-[10px]">
+                      {r.serviceUnit.name}
+                    </Badge>
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {r.submittedBy.firstName} {r.submittedBy.lastName}
+                    {` · ${new Date(r.createdAt).toLocaleString()}`}
+                  </p>
+                  {entries.length > 0 && (
+                    <div className="mt-2 overflow-x-auto">
+                      <table className="w-full min-w-[280px] text-xs">
+                        <thead>
+                          <tr className="border-b border-border/60 text-left text-muted-foreground">
+                            <th className="py-1 pr-3 font-medium">Field</th>
+                            <th className="py-1 font-medium">Value</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {entries.map(([key, value]) => (
+                            <tr key={key} className="border-b border-border/40 last:border-0">
+                              <td className="py-1 pr-3 align-top font-medium">{key.replace(/_/g, ' ')}</td>
+                              <td className="py-1 align-top whitespace-pre-wrap">
+                                {value === null || value === undefined || value === ''
+                                  ? '—'
+                                  : String(value)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {r.status === 'SUBMITTED' && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            await api.post(`/rtp/requests/${r.id}/received`);
+                            toast.success('Marked Received — originator notified (Processing)');
+                            qc.invalidateQueries({ queryKey: [queryKey] });
+                          } catch (e) {
+                            toast.error(apiErrorMessage(e, 'Could not mark received'));
+                          }
+                        }}
+                      >
+                        Received
+                      </Button>
+                    )}
+                    {(r.status === 'SUBMITTED' || r.status === 'PROCESSING') && (
+                      <>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={async () => {
+                            try {
+                              await api.post(`/rtp/requests/${r.id}/approve`);
+                              toast.success('RTP approved');
+                              qc.invalidateQueries({ queryKey: [queryKey] });
+                            } catch (e) {
+                              toast.error(apiErrorMessage(e, 'Could not approve RTP'));
+                            }
+                          }}
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={async () => {
+                            const reason = window.prompt('Rejection reason (optional)') ?? undefined;
+                            try {
+                              await api.post(`/rtp/requests/${r.id}/reject`, { reason });
+                              toast.success('RTP rejected');
+                              qc.invalidateQueries({ queryKey: [queryKey] });
+                            } catch (e) {
+                              toast.error(apiErrorMessage(e, 'Could not reject RTP'));
+                            }
+                          }}
+                        >
+                          Reject
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
           </InboxScrollCard>
 
           <div className="grid gap-4 xl:grid-cols-2 xl:items-stretch">

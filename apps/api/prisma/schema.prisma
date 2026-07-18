@@ -166,6 +166,8 @@ model Church {
   cellPrayerRequests        CellPrayerRequest[]
   cellReminders             CellReminder[]
   memberSuggestions         MemberSuggestion[]
+  rtpFormFields             RtpFormFieldDefinition[]
+  rtpRequests               RtpRequest[]
 
   @@map("churches")
 }
@@ -379,6 +381,9 @@ model User {
   cellMessagesReceived      CellMessage[]      @relation("CellMessageTo")
   cellPrayersCreated        CellPrayerRequest[] @relation("CellPrayerCreator")
   memberSuggestionsAuthored MemberSuggestion[] @relation("MemberSuggestionAuthor")
+  rtpRequestsSubmitted      RtpRequest[] @relation("RtpRequestSubmitter")
+  rtpRequestsReceived       RtpRequest[] @relation("RtpRequestReceiver")
+  rtpRequestsApproved       RtpRequest[] @relation("RtpRequestApprover")
   createdCalendarEvents   ChurchCalendarEvent[] @relation("CalendarEventCreator")
 
   @@unique([churchId, email])
@@ -2104,6 +2109,7 @@ model ServiceUnit {
   deptPrayerChecklists DeptPrayerChecklist[]
   deptFollowUpLogs    DeptFollowUpLog[]
   deptUnitFeedbacks   DeptUnitFeedback[]
+  rtpRequests         RtpRequest[]
 
   @@index([churchId, isActive])
   @@index([churchId, departmentCode])
@@ -2260,6 +2266,78 @@ model ServiceUnitMeetingSummary {
 
   @@index([serviceUnitId, meetingDate])
   @@map("service_unit_meeting_summaries")
+}
+
+enum RtpRequestStatus {
+  SUBMITTED
+  PROCESSING
+  APPROVED
+  REJECTED
+}
+
+enum RtpFieldType {
+  TEXT
+  TEXTAREA
+  NUMBER
+  DATE
+  SELECT
+  CURRENCY
+}
+
+/// Church-configurable RTP (Request to Purchase) wizard fields.
+model RtpFormFieldDefinition {
+  id           String       @id @default(uuid())
+  churchId     String
+  fieldKey     String
+  label        String
+  fieldType    RtpFieldType @default(TEXT)
+  sectionKey   String
+  sectionLabel String
+  sortOrder    Int          @default(0)
+  isRequired   Boolean      @default(false)
+  isActive     Boolean      @default(true)
+  options      Json         @default("[]")
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@unique([churchId, fieldKey])
+  @@index([churchId, isActive, sortOrder])
+  @@map("rtp_form_field_definitions")
+}
+
+/// Service-unit Request to Purchase with SLA tracking.
+model RtpRequest {
+  id                 String           @id @default(uuid())
+  churchId           String
+  serviceUnitId      String
+  submittedByUserId  String
+  title              String
+  status             RtpRequestStatus @default(SUBMITTED)
+  fieldValues        Json             @default("{}")
+  receivedAt         DateTime?
+  receivedByUserId   String?
+  processingNotifiedAt DateTime?
+  approvedAt         DateTime?
+  approvedByUserId   String?
+  rejectedAt         DateTime?
+  rejectionReason    String?
+  lastReminderAt     DateTime?
+  nextReminderAt     DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  submittedBy User        @relation("RtpRequestSubmitter", fields: [submittedByUserId], references: [id], onDelete: Cascade)
+  receivedBy  User?       @relation("RtpRequestReceiver", fields: [receivedByUserId], references: [id], onDelete: SetNull)
+  approvedBy  User?       @relation("RtpRequestApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([churchId, status, createdAt])
+  @@index([serviceUnitId, createdAt])
+  @@index([status, nextReminderAt])
+  @@map("rtp_requests")
 }
 
 model ServiceUnitMeeting {
