@@ -4,6 +4,7 @@ import { ServiceUnitsDepartmentController } from './service-units-department.con
 import { ServiceUnitsService } from './service-units.service';
 import { ServiceUnitsDepartmentService } from './service-units-department.service';
 import { ServiceUnitsDepartmentScheduler } from './service-units-department.scheduler';
+import { ServiceUnitsAttendanceScheduler } from './service-units-attendance.scheduler';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
 import { MembershipModule } from '../membership/membership.module';
@@ -17,6 +18,7 @@ import { AccessModule } from '../access/access.module';
     ServiceUnitsService,
     ServiceUnitsDepartmentService,
     ServiceUnitsDepartmentScheduler,
+    ServiceUnitsAttendanceScheduler,
     EmailAdapter,
   ],
   exports: [ServiceUnitsService, ServiceUnitsDepartmentService],

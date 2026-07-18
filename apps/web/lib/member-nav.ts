@@ -25,6 +25,7 @@ import {
   UserCircle,
   UserCog,
   Users,
+  Lightbulb,
 } from 'lucide-react';
 import type { ChurchTenantModulesMap } from '@church-hub/shared-types';
 import type { ModuleGateAccess, ModuleGateType } from '@/lib/module-gates';
@@ -53,6 +54,7 @@ export const OPEN_MEMBER_NAV: DashboardNavItem[] = [
   { href: '/dashboard/lounge', label: 'Lounge', icon: Coffee, exact: false },
   { href: '/dashboard/prayer-hub', label: 'Prayer Hub', icon: Heart },
   { href: '/dashboard/testimony-hub', label: 'Testimony Hub', icon: Star },
+  { href: '/dashboard/suggestions', label: 'Suggestions', icon: Lightbulb },
   { href: '/dashboard/devotional-hub', label: 'Devotional Hub', icon: BookOpen },
   { href: '/dashboard/wisdom365', label: 'Wisdom365+', icon: Sunrise },
   { href: '/dashboard/outreach', label: 'Outreach', icon: Megaphone },
@@ -156,6 +158,7 @@ export const STAFF_COMMUNITY_NAV: DashboardNavItem[] = [
   { href: '/dashboard/lounge', label: 'Lounge', icon: Coffee },
   { href: '/dashboard/prayer-hub', label: 'Prayer Hub', icon: Heart },
   { href: '/dashboard/testimony-hub', label: 'Testimony Hub', icon: Star },
+  { href: '/dashboard/suggestions', label: 'Suggestions', icon: Lightbulb },
   { href: '/dashboard/devotional-hub', label: 'Devotional Hub', icon: BookOpen },
   { href: '/dashboard/service-units', label: 'Service Unit Hub', icon: Layers },
   // Departments remains functional via /dashboard/departments and Service Unit workspaces; not listed in nav.

@@ -165,6 +165,7 @@ model Church {
   cellMessages              CellMessage[]
   cellPrayerRequests        CellPrayerRequest[]
   cellReminders             CellReminder[]
+  memberSuggestions         MemberSuggestion[]
 
   @@map("churches")
 }
@@ -377,6 +378,7 @@ model User {
   cellMessagesSent          CellMessage[]      @relation("CellMessageFrom")
   cellMessagesReceived      CellMessage[]      @relation("CellMessageTo")
   cellPrayersCreated        CellPrayerRequest[] @relation("CellPrayerCreator")
+  memberSuggestionsAuthored MemberSuggestion[] @relation("MemberSuggestionAuthor")
   createdCalendarEvents   ChurchCalendarEvent[] @relation("CalendarEventCreator")
 
   @@unique([churchId, email])
@@ -4877,6 +4879,32 @@ model Notification {
   @@index([userId, readAt])
   @@index([churchId, sentAt])
   @@map("notifications")
+}
+
+enum SuggestionTopic {
+  CHURCH_SERVICE
+  EVANGELISM
+  MEMBERSHIP
+  GRIEVANCE
+  OTHER
+}
+
+/// Member-submitted suggestions / feedback for pastors and church admins.
+model MemberSuggestion {
+  id           String          @id @default(uuid())
+  churchId     String
+  authorUserId String
+  topic        SuggestionTopic
+  subject      String?
+  body         String
+  createdAt    DateTime        @default(now())
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  author User   @relation("MemberSuggestionAuthor", fields: [authorUserId], references: [id], onDelete: Cascade)
+
+  @@index([churchId, createdAt])
+  @@index([churchId, topic])
+  @@map("member_suggestions")
 }
 
 // ─── Service unit email templates ───────────────────────────

@@ -334,7 +334,7 @@ export class ServiceUnitsController {
       body: string;
       meetingDate?: string;
       meetingId?: string;
-      authorId: string;
+      authorId?: string;
     },
   ) {
     return this.serviceUnits.createMeetingSummary(user.userId, churchId, id, body);

@@ -486,25 +486,25 @@ export class ServiceUnitsService {
     const ctx = await this.requireUnitManager(userId, churchId, serviceUnitId);
     await this.getUnit(churchId, serviceUnitId);
 
-    let authorId = data.authorId?.trim() || ctx.memberId || undefined;
-    if (!authorId) {
-      const linked = await this.prisma.member.findFirst({
-        where: { churchId, userId },
-        select: { id: true },
-      });
-      authorId = linked?.id;
-    }
-    if (!authorId) {
-      throw new BadRequestException(
-        'Could not resolve author — link your user to a congregant record or join this unit first',
-      );
-    }
+    const authorId = await this.resolveSummaryAuthorId(
+      churchId,
+      userId,
+      data.authorId?.trim(),
+      ctx,
+    );
 
-    if (data.meetingId) {
+    const meetingId = data.meetingId?.trim() || null;
+    if (meetingId) {
       const meeting = await this.prisma.serviceUnitMeeting.findFirst({
-        where: { id: data.meetingId, churchId, serviceUnitId },
+        where: { id: meetingId, churchId, serviceUnitId },
       });
       if (!meeting) throw new NotFoundException('Linked meeting not found');
+    }
+
+    let meetingDate: Date | undefined;
+    if (data.meetingDate) {
+      const parsed = new Date(data.meetingDate);
+      if (!Number.isNaN(parsed.getTime())) meetingDate = parsed;
     }
 
     const row = await this.prisma.serviceUnitMeetingSummary.create({
@@ -513,8 +513,8 @@ export class ServiceUnitsService {
         serviceUnitId,
         title: data.title.trim(),
         body: data.body.trim(),
-        meetingDate: data.meetingDate ? new Date(data.meetingDate) : undefined,
-        meetingId: data.meetingId || null,
+        meetingDate,
+        meetingId,
         authorId,
       },
       include: {
@@ -523,8 +523,75 @@ export class ServiceUnitsService {
       },
     });
 
-    await this.notifyLeadershipOfMeetingSummary(churchId, serviceUnitId, row);
+    try {
+      await this.notifyLeadershipOfMeetingSummary(churchId, serviceUnitId, row);
+    } catch (err) {
+      // Summary is already saved — do not fail Publish if notify fails.
+      console.warn(
+        `Meeting summary notify failed for ${row.id}:`,
+        err instanceof Error ? err.message : err,
+      );
+    }
     return row;
+  }
+
+  /** Ensure Publish always has a valid Member author (staff without congregant get a stub). */
+  private async resolveSummaryAuthorId(
+    churchId: string,
+    userId: string,
+    preferredMemberId: string | undefined,
+    ctx: UserMemberContext,
+  ): Promise<string> {
+    if (preferredMemberId) {
+      const preferred = await this.prisma.member.findFirst({
+        where: { id: preferredMemberId, churchId },
+        select: { id: true },
+      });
+      if (preferred) return preferred.id;
+    }
+    if (ctx.memberId) return ctx.memberId;
+
+    const linked = await this.prisma.member.findFirst({
+      where: { churchId, userId },
+      select: { id: true },
+    });
+    if (linked) return linked.id;
+
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, churchId },
+      select: { id: true, email: true, firstName: true, lastName: true },
+    });
+    if (!user) {
+      throw new BadRequestException('User not found in this church');
+    }
+
+    if (user.email) {
+      const byEmail = await this.prisma.member.findFirst({
+        where: { churchId, email: { equals: user.email, mode: 'insensitive' } },
+        select: { id: true, userId: true },
+      });
+      if (byEmail) {
+        if (!byEmail.userId) {
+          await this.prisma.member.update({
+            where: { id: byEmail.id },
+            data: { userId: user.id },
+          });
+        }
+        return byEmail.id;
+      }
+    }
+
+    const created = await this.prisma.member.create({
+      data: {
+        churchId,
+        userId: user.id,
+        firstName: user.firstName?.trim() || 'Staff',
+        lastName: user.lastName?.trim() || 'User',
+        email: user.email,
+        status: 'ACTIVE_MEMBER',
+      },
+    });
+    return created.id;
   }
 
   private async notifyLeadershipOfMeetingSummary(
@@ -576,12 +643,11 @@ export class ServiceUnitsService {
 
     for (const staff of staffUsers) {
       await this.commQueue.enqueue(churchId, {
-        kind: 'DEPARTMENT_WEEKLY_REPORT',
+        kind: 'DIRECT_ALERT',
         title,
         body,
         channels: ['IN_APP', 'EMAIL'],
         targetUserId: staff.id,
-        serviceUnitId,
         metadata: {
           reportType: 'Meeting Summary',
           serviceUnitId,
@@ -992,6 +1058,155 @@ export class ServiceUnitsService {
           testifiersCount: row.testifiersCount,
         },
       });
+    }
+  }
+
+  /**
+   * After 3 PM church-local time every Sunday, remind unit admins whose units
+   * have not recorded attendance for that Sunday (email + in-app bell).
+   */
+  async runSundayAttendanceReminders(now = new Date()) {
+    const churches = await this.prisma.church.findMany({
+      where: { isActive: true },
+      select: { id: true, timezone: true, name: true },
+    });
+
+    let reminded = 0;
+    for (const church of churches) {
+      const timezone = church.timezone?.trim() || 'UTC';
+      const local = this.localClockParts(now, timezone);
+      if (local.weekday !== 0) continue; // Sunday
+      if (local.hour < 15) continue; // after 3 PM
+
+      const sundayYmd = local.ymd;
+      const dayStart = new Date(`${sundayYmd}T00:00:00.000Z`);
+      const dayEnd = new Date(`${sundayYmd}T23:59:59.999Z`);
+      const weekStart = this.startOfWeek(new Date(`${sundayYmd}T12:00:00`));
+
+      const units = await this.prisma.serviceUnit.findMany({
+        where: { churchId: church.id, isActive: true },
+        select: { id: true, name: true },
+      });
+
+      for (const unit of units) {
+        const recorded = await this.prisma.serviceUnitAttendance.findFirst({
+          where: {
+            churchId: church.id,
+            serviceUnitId: unit.id,
+            OR: [
+              { meetingDate: { gte: dayStart, lte: dayEnd } },
+              { weekStart },
+            ],
+          },
+          select: { id: true },
+        });
+        if (recorded) continue;
+
+        const admins = await this.prisma.serviceUnitLeader.findMany({
+          where: { serviceUnitId: unit.id, isUnitAdmin: true },
+          include: {
+            member: {
+              select: {
+                id: true,
+                userId: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        });
+        if (admins.length === 0) continue;
+
+        const title = `Reminder: update ${unit.name} attendance`;
+        const body = [
+          `Hello,`,
+          ``,
+          `Sunday attendance for "${unit.name}" has not been recorded yet.`,
+          `Please open the Attendance tab and submit today's demographic counts.`,
+          ``,
+          `Church: ${church.name}`,
+          `Date: ${sundayYmd}`,
+          `Deadline reminder: after 3:00 PM Sunday`,
+        ].join('\n');
+
+        for (const admin of admins) {
+          const reminderKey = `sunday-attendance:${unit.id}:${sundayYmd}:${admin.member.id}`;
+          const already = await this.prisma.communicationQueueItem.findFirst({
+            where: {
+              churchId: church.id,
+              kind: 'DIRECT_ALERT',
+              metadata: { path: ['reminderKey'], equals: reminderKey },
+            },
+            select: { id: true },
+          });
+          if (already) continue;
+
+          // Do not set serviceUnitId on the queue row — that fans out to every unit member.
+          await this.commQueue.enqueue(church.id, {
+            kind: 'DIRECT_ALERT',
+            title,
+            body,
+            channels: ['IN_APP', 'EMAIL'],
+            targetUserId: admin.member.userId ?? undefined,
+            targetMemberId: admin.member.id,
+            metadata: {
+              reminderKey,
+              reminderType: 'SUNDAY_ATTENDANCE',
+              serviceUnitId: unit.id,
+              serviceUnitName: unit.name,
+              sundayDate: sundayYmd,
+            },
+          });
+          reminded++;
+        }
+      }
+    }
+
+    return { churches: churches.length, reminded };
+  }
+
+  private localClockParts(
+    date: Date,
+    timezone: string,
+  ): { hour: number; weekday: number; ymd: string } {
+    try {
+      const fmt = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        hour: 'numeric',
+        hour12: false,
+        weekday: 'short',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+      const parts = fmt.formatToParts(date);
+      const hourRaw = parseInt(parts.find((p) => p.type === 'hour')?.value ?? '0', 10);
+      const hour = hourRaw === 24 ? 0 : hourRaw;
+      const weekdayLabel = parts.find((p) => p.type === 'weekday')?.value ?? 'Sun';
+      const map: Record<string, number> = {
+        Sun: 0,
+        Mon: 1,
+        Tue: 2,
+        Wed: 3,
+        Thu: 4,
+        Fri: 5,
+        Sat: 6,
+      };
+      const year = parts.find((p) => p.type === 'year')?.value ?? '';
+      const month = parts.find((p) => p.type === 'month')?.value ?? '';
+      const day = parts.find((p) => p.type === 'day')?.value ?? '';
+      return {
+        hour,
+        weekday: map[weekdayLabel] ?? date.getUTCDay(),
+        ymd: `${year}-${month}-${day}`,
+      };
+    } catch {
+      return {
+        hour: date.getUTCHours(),
+        weekday: date.getUTCDay(),
+        ymd: date.toISOString().slice(0, 10),
+      };
     }
   }
 

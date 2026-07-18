@@ -17,7 +17,9 @@ import {
   Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import type { AxiosError } from 'axios';
 import { api } from '@/lib/api';
+import { apiErrorMessage } from '@/lib/api-errors';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useServiceUnitPresence } from '@/lib/hooks/use-service-unit-presence';
 import { formatDateTime, formatMemberName, getEmailFromToken } from '@/lib/service-unit-utils';
@@ -312,7 +314,8 @@ export default function ServiceUnitDetailPage() {
         body: summaryForm.body.trim(),
         meetingDate: summaryForm.meetingDate || undefined,
         meetingId: summaryForm.meetingId || undefined,
-        ...(currentMemberId ? { authorId: currentMemberId } : {}),
+        // Prefer the signed-in congregant — never fall back to another unit member.
+        ...(member?.id ? { authorId: member.id } : {}),
       };
       if (editingSummaryId) {
         await api.patch(`/service-units/${id}/meeting-summaries/${editingSummaryId}`, {
@@ -328,8 +331,8 @@ export default function ServiceUnitDetailPage() {
       setSummaryForm({ title: '', body: '', meetingDate: '', meetingId: '' });
       setEditingSummaryId(null);
       refresh();
-    } catch {
-      toast.error('Could not save summary');
+    } catch (err) {
+      toast.error(apiErrorMessage(err as AxiosError, 'Could not save summary'));
     }
   };
 

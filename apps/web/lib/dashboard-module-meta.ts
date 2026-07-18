@@ -30,6 +30,7 @@ const MODULE_PAGE_CHROME_PREFIXES = [
   '/dashboard/platform',
   '/dashboard/prayer-hub',
   '/dashboard/testimony-hub',
+  '/dashboard/suggestions',
   '/dashboard/devotional-hub',
   '/dashboard/wisdom365',
   '/dashboard/spirify',
@@ -49,6 +50,7 @@ export function hasModulePageChrome(pathname: string): boolean {
 export const MOBILE_ROUTE_TITLES: Record<string, string> = {
   '/dashboard/lounge': 'Lounge',
   '/dashboard/prayer-hub': 'Prayer Hub',
+  '/dashboard/suggestions': 'Suggestions',
   '/dashboard/devotional-hub': 'Devotional Hub',
   '/dashboard/testimony-hub': 'Testimony Hub',
   '/dashboard/outreach/field': 'Field capture',
