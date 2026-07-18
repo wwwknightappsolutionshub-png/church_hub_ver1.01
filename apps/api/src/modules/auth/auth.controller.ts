@@ -12,10 +12,17 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { UpdateAccountDto } from './dto/update-account.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ProfileAvatarDataDto } from './dto/profile-avatar-data.dto';
+import {
+  ConsumeMagicLinkDto,
+  ForgotPasswordDto,
+  RequestMagicLinkDto,
+  ResetPasswordDto,
+} from './dto/auth-link.dto';
 import { Public } from './decorators';
 import { TEST_ACCOUNTS, TEST_PASSWORD } from './test-accounts';
 import { CurrentUser, AuthUser } from './current-user.decorator';
@@ -73,6 +80,38 @@ export class AuthController {
   @ApiOperation({ summary: 'Login with email and password' })
   login(@Body() body: { email: string; password: string }) {
     return this.authService.login(body.email, body.password);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('forgot-password')
+  @ApiOperation({ summary: 'Email a one-time password reset link' })
+  forgotPassword(@Body() body: ForgotPasswordDto) {
+    return this.authService.requestPasswordReset(body.email);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('reset-password')
+  @ApiOperation({ summary: 'Set a new password using a reset token from email' })
+  resetPassword(@Body() body: ResetPasswordDto) {
+    return this.authService.resetPasswordWithToken(body.token, body.newPassword);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('magic-link')
+  @ApiOperation({ summary: 'Email a one-time magic sign-in link' })
+  requestMagicLink(@Body() body: RequestMagicLinkDto) {
+    return this.authService.requestMagicLink(body.email);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Post('magic-link/consume')
+  @ApiOperation({ summary: 'Exchange a magic sign-in token for session tokens' })
+  consumeMagicLink(@Body() body: ConsumeMagicLinkDto) {
+    return this.authService.consumeMagicLink(body.token);
   }
 
   @Public()

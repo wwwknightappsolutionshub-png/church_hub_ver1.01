@@ -333,6 +333,7 @@ model User {
   member       Member?
   roles        UserRole[]
   refreshTokens RefreshToken[]
+  authLinkTokens AuthLinkToken[]
   assignedFollowUps FollowUp[] @relation("AssignedFollowUps")
   pastoralNotes PastoralNote[] @relation("PastoralNoteAuthor")
   counselingAssigned CounselingCase[] @relation("CounselingAssignee")
@@ -424,6 +425,27 @@ model RefreshToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("refresh_tokens")
+}
+
+enum AuthLinkPurpose {
+  PASSWORD_RESET
+  MAGIC_LOGIN
+}
+
+/// One-time email links for forgot-password and magic sign-in.
+model AuthLinkToken {
+  id         String          @id @default(uuid())
+  userId     String
+  purpose    AuthLinkPurpose
+  tokenHash  String          @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime        @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@map("auth_link_tokens")
 }
 
 // ─── Membership ──────────────────────────────────────────────

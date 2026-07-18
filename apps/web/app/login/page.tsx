@@ -160,7 +160,15 @@ export default function LoginPage() {
               <Input type="email" placeholder="you@yourchurch.org" {...register('email')} required />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium">Password</label>
+              <div className="mb-1.5 flex items-center justify-between gap-3">
+                <label className="block text-sm font-medium">Password</label>
+                <Link
+                  href="/forgot-password"
+                  className="text-sm font-medium text-primary hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
               <Input type="password" placeholder="••••••••" {...register('password')} required />
             </div>
             <Button type="submit" className="w-full shadow-brand" disabled={loading}>
@@ -177,6 +185,16 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
+
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            Prefer no password?{' '}
+            <Link
+              href="/forgot-password?mode=magic"
+              className="font-medium text-primary hover:underline"
+            >
+              Email me a sign-in link
+            </Link>
+          </p>
 
           {showTestLogins ? (
             <LoginTestAccountsPanel

@@ -11,5 +11,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/login', '/register', '/sw.js'],
+  matcher: ['/login', '/login/magic', '/register', '/forgot-password', '/reset-password', '/sw.js'],
 };

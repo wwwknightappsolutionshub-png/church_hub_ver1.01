@@ -1,11 +1,13 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   UnauthorizedException,
   ConflictException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { AuthLinkPurpose } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { randomBytes, createHash } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.module';
@@ -14,6 +16,8 @@ import {
   DEFAULT_LANDING_MEMBERSHIP_FORM,
 } from '@church-hub/shared-types';
 import { PlatformMarketingDripService } from '../platform/platform-marketing-drip.service';
+import { EmailAdapter } from '../notifications/adapters/email.adapter';
+import { buildAuthLinkEmail } from './auth-link-email';
 
 export interface JwtPayload {
   sub: string;
@@ -21,13 +25,20 @@ export interface JwtPayload {
   email: string;
 }
 
+const AUTH_LINK_TTL_MINUTES = 30;
+const GENERIC_LINK_SENT =
+  'If an account exists for that email, we sent a link. Check your inbox (and spam folder).';
+
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly drips: PlatformMarketingDripService,
+    private readonly email: EmailAdapter,
   ) {}
 
   async register(input: {
@@ -145,6 +156,143 @@ export class AuthService {
     });
 
     return { success: true, mustChangePassword: false };
+  }
+
+  /** Request a password-reset email. Always returns the same message (no email enumeration). */
+  async requestPasswordReset(email: string) {
+    await this.issueAuthLink(email.trim().toLowerCase(), AuthLinkPurpose.PASSWORD_RESET);
+    return { success: true, message: GENERIC_LINK_SENT };
+  }
+
+  /** Request a magic sign-in email. Always returns the same message (no email enumeration). */
+  async requestMagicLink(email: string) {
+    await this.issueAuthLink(email.trim().toLowerCase(), AuthLinkPurpose.MAGIC_LOGIN);
+    return { success: true, message: GENERIC_LINK_SENT };
+  }
+
+  async resetPasswordWithToken(token: string, newPassword: string) {
+    if (newPassword.length < 8) {
+      throw new BadRequestException('New password must be at least 8 characters');
+    }
+
+    const record = await this.consumeAuthLink(token, AuthLinkPurpose.PASSWORD_RESET);
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await this.prisma.user.update({
+      where: { id: record.userId },
+      data: { passwordHash, mustChangePassword: false },
+    });
+
+    await this.prisma.refreshToken.updateMany({
+      where: { userId: record.userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
+    return { success: true, message: 'Password updated. You can sign in with your new password.' };
+  }
+
+  async consumeMagicLink(token: string) {
+    const record = await this.consumeAuthLink(token, AuthLinkPurpose.MAGIC_LOGIN);
+    const user = await this.prisma.user.findFirst({
+      where: { id: record.userId, isActive: true },
+    });
+    if (!user) {
+      throw new UnauthorizedException('This sign-in link is no longer valid');
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    const tokenChurchId = await this.tokenChurchIdForUser(user.id, user.churchId);
+    const tokens = await this.issueTokens(user.id, tokenChurchId, user.email);
+    return { ...tokens, mustChangePassword: user.mustChangePassword };
+  }
+
+  private async issueAuthLink(email: string, purpose: AuthLinkPurpose) {
+    const user = await this.prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' }, isActive: true },
+    });
+    if (!user) return;
+
+    await this.prisma.authLinkToken.updateMany({
+      where: { userId: user.id, purpose, consumedAt: null },
+      data: { consumedAt: new Date() },
+    });
+
+    const rawToken = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + AUTH_LINK_TTL_MINUTES * 60 * 1000);
+    await this.prisma.authLinkToken.create({
+      data: {
+        userId: user.id,
+        purpose,
+        tokenHash: this.hashToken(rawToken),
+        expiresAt,
+      },
+    });
+
+    const appUrl =
+      this.config.get<string>('APP_URL') ??
+      this.config.get<string>('NEXT_PUBLIC_APP_URL') ??
+      process.env.WEB_APP_URL ??
+      'http://localhost:3001';
+    const actionUrl =
+      purpose === AuthLinkPurpose.PASSWORD_RESET
+        ? `${appUrl.replace(/\/$/, '')}/reset-password?token=${rawToken}`
+        : `${appUrl.replace(/\/$/, '')}/login/magic?token=${rawToken}`;
+
+    const rendered = buildAuthLinkEmail({
+      firstName: user.firstName || 'there',
+      purpose,
+      actionUrl,
+      expiresMinutes: AUTH_LINK_TTL_MINUTES,
+    });
+
+    try {
+      await this.email.send({
+        to: user.email,
+        subject: rendered.subject,
+        body: rendered.text,
+        html: rendered.html,
+        churchId: user.churchId,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Auth link email failed for ${user.email}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      // Still succeed to the client — do not leak delivery failures as "email not found".
+    }
+
+    if (process.env.NODE_ENV !== 'production' && !process.env.SMTP_HOST) {
+      this.logger.log(`[auth-link:${purpose}] ${user.email} → ${actionUrl}`);
+    }
+  }
+
+  private async consumeAuthLink(rawToken: string, purpose: AuthLinkPurpose) {
+    const tokenHash = this.hashToken(rawToken.trim());
+    const record = await this.prisma.authLinkToken.findUnique({
+      where: { tokenHash },
+    });
+
+    if (
+      !record ||
+      record.purpose !== purpose ||
+      record.consumedAt ||
+      record.expiresAt < new Date()
+    ) {
+      throw new BadRequestException(
+        purpose === AuthLinkPurpose.PASSWORD_RESET
+          ? 'This password reset link is invalid or has expired'
+          : 'This sign-in link is invalid or has expired',
+      );
+    }
+
+    await this.prisma.authLinkToken.update({
+      where: { id: record.id },
+      data: { consumedAt: new Date() },
+    });
+
+    return record;
   }
 
   async refresh(refreshToken: string) {
