@@ -41,8 +41,8 @@ export function MobileMoreMenu({
         onClick={onClose}
         aria-label="Close menu"
       />
-      <div className="app-more-sheet absolute inset-x-0 bottom-0 max-h-[min(78dvh,520px)] overflow-hidden rounded-t-3xl bg-card shadow-elevated">
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+      <div className="app-more-sheet absolute inset-x-0 bottom-0 flex max-h-[min(88dvh,720px)] flex-col overflow-hidden rounded-t-3xl bg-card shadow-elevated">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
           <p className="text-sm font-semibold">All modules</p>
           <button
             type="button"
@@ -53,7 +53,7 @@ export function MobileMoreMenu({
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="overflow-y-auto px-3 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 [-webkit-overflow-scrolling:touch] pb-[calc(1rem+env(safe-area-inset-bottom))]">
           {isChurchStaff && staffNav.length > 0 && (
             <>
               <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
