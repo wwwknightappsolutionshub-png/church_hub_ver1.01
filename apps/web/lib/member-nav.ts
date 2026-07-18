@@ -67,7 +67,7 @@ export const GATED_MEMBER_NAV: DashboardNavItem[] = [
   { href: '/dashboard/follow-up', label: 'Follow-Up', icon: HeartHandshake, gate: 'followUp' },
   { href: '/dashboard/ministry-cells', label: 'Ministry/Cells', icon: Network, gate: 'ministryCells' },
   { href: '/dashboard/service-units', label: 'Service Unit Hub', icon: Layers, gate: 'serviceUnitHub' },
-  { href: '/dashboard/departments', label: 'Departments', icon: Layers, gate: 'departmentTools' },
+  // Departments hub stays at /dashboard/departments (and via Service Unit tools) but is hidden from menus.
   { href: '/dashboard/profile', label: 'My Profile', icon: UserCircle, gate: 'profile' },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ];
@@ -158,12 +158,7 @@ export const STAFF_COMMUNITY_NAV: DashboardNavItem[] = [
   { href: '/dashboard/testimony-hub', label: 'Testimony Hub', icon: Star },
   { href: '/dashboard/devotional-hub', label: 'Devotional Hub', icon: BookOpen },
   { href: '/dashboard/service-units', label: 'Service Unit Hub', icon: Layers },
-  {
-    href: '/dashboard/departments',
-    label: 'Departments',
-    icon: Layers,
-    requiresDepartmentTools: true,
-  },
+  // Departments remains functional via /dashboard/departments and Service Unit workspaces; not listed in nav.
   { href: '/dashboard/outreach', label: 'Outreach Hub', icon: Megaphone },
   { href: '/dashboard/follow-up', label: 'Follow Up', icon: HeartHandshake },
   { href: '/dashboard/business', label: 'Kingdom Konnect', icon: Briefcase },

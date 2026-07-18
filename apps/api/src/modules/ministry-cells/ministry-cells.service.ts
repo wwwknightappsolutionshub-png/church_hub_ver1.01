@@ -14,6 +14,8 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import type { AuthUser } from '../auth/current-user.decorator';
 import { MembershipService } from '../membership/membership.service';
+import { MembershipRegistryService } from '../membership/membership-registry.service';
+import { CommunicationsQueueService } from '../communications/communications-queue.service';
 import {
   MinistryCellsAccessService,
   type MinistryCellsRole,
@@ -50,6 +52,8 @@ export class MinistryCellsService {
     private readonly prisma: PrismaService,
     private readonly access: MinistryCellsAccessService,
     private readonly membership: MembershipService,
+    private readonly registry: MembershipRegistryService,
+    private readonly commQueue: CommunicationsQueueService,
   ) {}
 
   async getContext(user: AuthUser, churchId: string) {
@@ -252,41 +256,41 @@ export class MinistryCellsService {
 
   /**
    * Create a new church member when search finds no match, then attach to this branch.
+   * Accepts the global congregant editor payload and writes to the membership database.
    */
   async createMemberAndAdd(
     user: AuthUser,
     churchId: string,
     branchId: string,
-    data: {
-      firstName: string;
-      lastName: string;
-      email?: string;
-      phone?: string;
-    },
+    data: Record<string, unknown>,
   ) {
     await this.access.assertBranchAccess(user, churchId, branchId);
     await this.getBranchOrThrow(churchId, branchId);
-    const firstName = data.firstName?.trim() ?? '';
-    const lastName = data.lastName?.trim() ?? '';
+    const firstName = String(data.firstName ?? '').trim();
+    const lastName = String(data.lastName ?? '').trim();
     if (!firstName || !lastName) {
       throw new BadRequestException('First name and last name are required');
     }
     const created = await this.membership.createMember(churchId, {
+      ...(data as Parameters<MembershipService['createMember']>[1]),
       firstName,
       lastName,
-      email: data.email?.trim() || undefined,
-      phone: data.phone?.trim() || undefined,
-      status: 'NEW_MEMBER',
       cellBranchId: branchId,
-      requireContactFields: false,
+      startOnboarding: data.startOnboarding === true,
+      requireContactFields: data.requireContactFields !== false,
     });
     const row = await this.prisma.cellBranchMember.findUnique({
       where: { churchId_memberId: { churchId, memberId: created.id } },
     });
     if (!row) {
-      return this.addMember(user, churchId, branchId, created.id);
+      await this.addMember(user, churchId, branchId, created.id);
     }
-    return { ...row, member: created };
+    return created;
+  }
+
+  async getRegistryCatalog(user: AuthUser, churchId: string) {
+    await this.access.assertCanAccess(user, churchId);
+    return this.registry.getRegistryCatalog(churchId);
   }
 
   async removeMember(
@@ -575,7 +579,174 @@ export class MinistryCellsService {
         notes: body.notes?.trim() || null,
         recordedByUserId: user.userId,
       },
+    }).then(async (row) => {
+      await this.notifyLeadershipOfAttendance(churchId, branchId, row, 'created');
+      return row;
     });
+  }
+
+  async updateAttendance(
+    user: AuthUser,
+    churchId: string,
+    branchId: string,
+    attendanceId: string,
+    body: {
+      weekStart?: string;
+      meetingDate?: string;
+      presentCount?: number;
+      absentCount?: number;
+      maleCount?: number;
+      femaleCount?: number;
+      boysCount?: number;
+      girlsCount?: number;
+      testifiersCount?: number;
+      firstTimersCount?: number;
+      notes?: string;
+    },
+  ) {
+    await this.access.assertBranchAccess(user, churchId, branchId);
+    const existing = await this.prisma.cellAttendance.findFirst({
+      where: { id: attendanceId, churchId, branchId },
+    });
+    if (!existing) throw new NotFoundException('Attendance record not found');
+
+    const maleCount =
+      body.maleCount != null ? this.nonNegInt(body.maleCount, 'maleCount') : existing.maleCount;
+    const femaleCount =
+      body.femaleCount != null
+        ? this.nonNegInt(body.femaleCount, 'femaleCount')
+        : existing.femaleCount;
+    const boysCount =
+      body.boysCount != null ? this.nonNegInt(body.boysCount, 'boysCount') : existing.boysCount;
+    const girlsCount =
+      body.girlsCount != null ? this.nonNegInt(body.girlsCount, 'girlsCount') : existing.girlsCount;
+    const testifiersCount =
+      body.testifiersCount != null
+        ? this.nonNegInt(body.testifiersCount, 'testifiersCount')
+        : existing.testifiersCount;
+    const firstTimersCount =
+      body.firstTimersCount != null
+        ? this.nonNegInt(body.firstTimersCount, 'firstTimersCount')
+        : existing.firstTimersCount;
+
+    const demographicTotal = maleCount + femaleCount + boysCount + girlsCount;
+    const presentCount =
+      body.presentCount != null
+        ? this.nonNegInt(body.presentCount, 'presentCount')
+        : demographicTotal > 0
+          ? demographicTotal
+          : existing.presentCount;
+
+    const meetingDate = body.meetingDate
+      ? new Date(body.meetingDate)
+      : existing.meetingDate ?? existing.weekStart;
+    if (Number.isNaN(meetingDate.getTime())) {
+      throw new BadRequestException('Invalid meeting date');
+    }
+    const weekStart = body.weekStart
+      ? new Date(body.weekStart)
+      : this.startOfWeek(meetingDate);
+
+    const row = await this.prisma.cellAttendance.update({
+      where: { id: attendanceId },
+      data: {
+        weekStart,
+        meetingDate,
+        presentCount,
+        absentCount:
+          body.absentCount != null && Number.isFinite(body.absentCount)
+            ? Math.floor(body.absentCount)
+            : existing.absentCount,
+        maleCount,
+        femaleCount,
+        boysCount,
+        girlsCount,
+        testifiersCount,
+        firstTimersCount,
+        notes: body.notes !== undefined ? body.notes?.trim() || null : existing.notes,
+      },
+    });
+
+    await this.notifyLeadershipOfAttendance(churchId, branchId, row, 'updated');
+    return row;
+  }
+
+  private async notifyLeadershipOfAttendance(
+    churchId: string,
+    branchId: string,
+    row: {
+      id: string;
+      weekStart: Date;
+      meetingDate: Date | null;
+      presentCount: number;
+      maleCount: number;
+      femaleCount: number;
+      boysCount: number;
+      girlsCount: number;
+      testifiersCount: number;
+      firstTimersCount: number;
+      createdAt: Date;
+    },
+    action: 'created' | 'updated',
+  ) {
+    const branch = await this.prisma.cellBranch.findFirst({
+      where: { id: branchId, churchId },
+      select: { name: true },
+    });
+    const branchName = branch?.name ?? 'Branch/Cell';
+    const meetingDate = row.meetingDate ?? row.weekStart;
+    const dateLabel = meetingDate.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+    const timestamp = new Date().toISOString();
+    const title = `[Attendance Report] ${branchName} — ${dateLabel}`;
+    const body = [
+      `Tags: Branch/Cell Name · Date · Attendance Report · Timestamp`,
+      ``,
+      `Branch/Cell Name: ${branchName}`,
+      `Date: ${dateLabel}`,
+      `Attendance Report: ${action === 'created' ? 'New' : 'Updated'} weekly attendance`,
+      `Timestamp: ${timestamp}`,
+      ``,
+      `Male: ${row.maleCount}`,
+      `Female: ${row.femaleCount}`,
+      `Boys: ${row.boysCount}`,
+      `Girls: ${row.girlsCount}`,
+      `Testifiers: ${row.testifiersCount}`,
+      `First Timers: ${row.firstTimersCount}`,
+      `Total present: ${row.presentCount}`,
+    ].join('\n');
+
+    const staffUsers = await this.prisma.user.findMany({
+      where: {
+        churchId,
+        isActive: true,
+        roles: { some: { role: { name: { in: ['ADMIN', 'PASTOR'] } } } },
+      },
+      select: { id: true },
+    });
+
+    for (const staff of staffUsers) {
+      await this.commQueue.enqueue(churchId, {
+        kind: 'DEPARTMENT_WEEKLY_REPORT',
+        title,
+        body,
+        channels: ['IN_APP', 'EMAIL'],
+        targetUserId: staff.id,
+        metadata: {
+          tags: ['Branch/Cell Name', 'Date', 'Attendance Report', 'Timestamp'],
+          branchId,
+          branchName,
+          date: dateLabel,
+          reportType: 'Attendance Report',
+          timestamp,
+          attendanceId: row.id,
+          action,
+        },
+      });
+    }
   }
 
   async listAttendance(user: AuthUser, churchId: string, branchId: string) {

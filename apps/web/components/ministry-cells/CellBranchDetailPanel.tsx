@@ -13,6 +13,7 @@ import {
 import { BranchAnalyticsPanel } from '@/components/ministry-cells/BranchAnalyticsPanel';
 import { BranchLeaderSelect } from '@/components/ministry-cells/BranchLeaderSelect';
 import { BranchMembersPanel } from '@/components/ministry-cells/BranchMembersPanel';
+import { BranchWeeklyAttendancePanel } from '@/components/ministry-cells/BranchWeeklyAttendancePanel';
 import { CellBranchMembersSheet } from '@/components/ministry-cells/CellBranchMembersSheet';
 import { CellPrayerPanel } from '@/components/ministry-cells/CellPrayerPanel';
 import type { BranchDetail, FormDef, MinistryCellsContext, TeachingResource } from '@/components/ministry-cells/types';
@@ -48,7 +49,6 @@ export function CellBranchDetailPanel({
   editLocation,
   editLeaderId,
   branchSaving,
-  weeklyForm,
   reportFormId,
   messageBody,
   onClose,
@@ -57,9 +57,7 @@ export function CellBranchDetailPanel({
   onEditLocation,
   onEditLeaderId,
   onSaveBranch,
-  onWeeklyFormChange,
   onReportFormId,
-  onRecordAttendance,
   onSubmitReport,
   onMessageBody,
   onSendMessage,
@@ -84,7 +82,6 @@ export function CellBranchDetailPanel({
   editLocation: string;
   editLeaderId: string;
   branchSaving: boolean;
-  weeklyForm: WeeklyAttendanceForm;
   reportFormId: string;
   messageBody: string;
   onClose?: () => void;
@@ -93,9 +90,7 @@ export function CellBranchDetailPanel({
   onEditLocation: (v: string) => void;
   onEditLeaderId: (v: string) => void;
   onSaveBranch: (e: React.FormEvent) => void;
-  onWeeklyFormChange: (patch: Partial<WeeklyAttendanceForm>) => void;
   onReportFormId: (v: string) => void;
-  onRecordAttendance: () => void;
   onSubmitReport: () => void;
   onMessageBody: (v: string) => void;
   onSendMessage: () => void;
@@ -121,21 +116,6 @@ export function CellBranchDetailPanel({
     { id: 'weekly', label: 'Weekly' },
     { id: 'connect', label: 'Connect' },
     { id: 'analytics', label: 'Analytics' },
-  ];
-
-  const demoTotal =
-    (Number(weeklyForm.maleCount) || 0) +
-    (Number(weeklyForm.femaleCount) || 0) +
-    (Number(weeklyForm.boysCount) || 0) +
-    (Number(weeklyForm.girlsCount) || 0);
-
-  const weeklyFields: { key: keyof WeeklyAttendanceForm; label: string }[] = [
-    { key: 'maleCount', label: 'Male' },
-    { key: 'femaleCount', label: 'Female' },
-    { key: 'boysCount', label: 'Boys' },
-    { key: 'girlsCount', label: 'Girls' },
-    { key: 'testifiersCount', label: 'Testifiers' },
-    { key: 'firstTimersCount', label: 'First Timers' },
   ];
 
   const stats = [
@@ -323,41 +303,11 @@ export function CellBranchDetailPanel({
             <CardTitle className="text-base">Weekly reporting</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="meeting-date">Date</Label>
-              <Input
-                id="meeting-date"
-                type="date"
-                className="mt-1 h-10 max-w-xs"
-                value={weeklyForm.meetingDate}
-                onChange={(e) => onWeeklyFormChange({ meetingDate: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-              {weeklyFields.map(({ key, label }) => (
-                <div key={key}>
-                  <Label htmlFor={`weekly-${key}`}>{label}</Label>
-                  <Input
-                    id={`weekly-${key}`}
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    className="mt-1 h-10"
-                    value={weeklyForm[key]}
-                    onChange={(e) => onWeeklyFormChange({ [key]: e.target.value })}
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <p className="text-sm text-muted-foreground">
-                Total present:{' '}
-                <span className="font-semibold text-foreground tabular-nums">{demoTotal}</span>
-              </p>
-              <Button type="button" variant="outline" className="h-10" onClick={onRecordAttendance}>
-                Record attendance
-              </Button>
-            </div>
+            <BranchWeeklyAttendancePanel
+              branchId={selectedBranchId}
+              canManage={ctx.canManage || ctx.role === 'cellLeader'}
+              onChanged={onChanged}
+            />
             {forms.length > 0 && (
               <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
                 <select

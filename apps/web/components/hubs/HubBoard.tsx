@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
+import { useModuleHeroStickyTitle } from '@/components/layout/useStickyModuleTitle';
 import type { HubCardItem, HubKind, HubListResponse } from './hub-types';
 import { HUB_THEMES } from './hub-themes';
 import { HubDetailModal } from './HubDetailModal';
@@ -32,6 +33,7 @@ interface HubBoardProps {
 
 export function HubBoard({ type, title, description, hubPath }: HubBoardProps) {
   const theme = HUB_THEMES[type];
+  const headerRef = useModuleHeroStickyTitle<HTMLDivElement>(title);
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const { isChurchStaff } = useModuleAccess();
@@ -172,6 +174,8 @@ export function HubBoard({ type, title, description, hubPath }: HubBoardProps) {
   return (
     <div className="min-h-0 pb-8">
       <div
+        ref={headerRef}
+        data-module-hero
         className={cn(
           'relative overflow-hidden border-b bg-gradient-to-br px-4 py-8 sm:px-6 md:px-8',
           theme.gradient,

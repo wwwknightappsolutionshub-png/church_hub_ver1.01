@@ -65,6 +65,9 @@ interface CongregantEditorFormProps {
   createMemberPath?: string;
   patchMemberPath?: string;
   defaultFamilyId?: string;
+  /** Pre-select and lock this cell branch on create. */
+  defaultCellBranchId?: string;
+  lockCellBranch?: boolean;
   dialogTitle?: string;
   submitLabel?: string;
   addAnotherLabel?: string;
@@ -141,6 +144,8 @@ export function CongregantEditorForm({
   createMemberPath = '/membership/members',
   patchMemberPath,
   defaultFamilyId,
+  defaultCellBranchId,
+  lockCellBranch = false,
   dialogTitle,
   submitLabel,
   addAnotherLabel = 'Save & Add Another',
@@ -162,6 +167,11 @@ export function CongregantEditorForm({
     if (!defaultFamilyId || memberId) return;
     setForm((prev) => ({ ...prev, familyChoice: defaultFamilyId }));
   }, [defaultFamilyId, memberId]);
+
+  useEffect(() => {
+    if (!defaultCellBranchId || memberId) return;
+    setForm((prev) => ({ ...prev, cellBranchId: defaultCellBranchId }));
+  }, [defaultCellBranchId, memberId]);
 
   useEffect(() => {
     if (!memberId) return;
@@ -353,7 +363,10 @@ export function CongregantEditorForm({
         toast.success('Congregant created');
         onSaved(res.data.id);
         if (addAnother) {
-          setForm(defaultFamilyId ? { ...emptyForm(), familyChoice: defaultFamilyId } : emptyForm());
+          setForm({
+            ...(defaultFamilyId ? { ...emptyForm(), familyChoice: defaultFamilyId } : emptyForm()),
+            ...(defaultCellBranchId ? { cellBranchId: defaultCellBranchId } : {}),
+          });
           setStep(0);
         } else {
           onClose();
@@ -690,7 +703,9 @@ export function CongregantEditorForm({
               <div>
                 <FieldLabel>Cell Membership</FieldLabel>
                 <p className="mb-2 text-xs text-slate-500">
-                  Assign this person to a home cell / ministry group (one per congregant).
+                  {lockCellBranch && defaultCellBranchId
+                    ? 'This congregant will be added to the current branch/cell.'
+                    : 'Assign this person to a home cell / ministry group (one per congregant).'}
                 </p>
                 {cellBranches.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-500">
@@ -698,11 +713,12 @@ export function CongregantEditorForm({
                   </p>
                 ) : (
                   <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-70"
                     value={form.cellBranchId}
                     onChange={(e) => setField('cellBranchId', e.target.value)}
+                    disabled={lockCellBranch}
                   >
-                    <option value="">No cell assignment</option>
+                    {!lockCellBranch ? <option value="">No cell assignment</option> : null}
                     {cellBranches.map((branch) => (
                       <option key={branch.id} value={branch.id}>
                         {branch.name}

@@ -31,6 +31,7 @@ import { SkipToMain } from '@/components/accessibility/SkipToMain';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { ModuleChromeProvider, useModuleChrome } from '@/components/layout/ModuleChromeContext';
 
 const platformNav: DashboardNavItem[] = [
   { href: '/dashboard/platform', label: 'Platform console', icon: Building2, exact: false },
@@ -227,8 +228,17 @@ function DesktopSidebar({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
+  return (
+    <ModuleChromeProvider>
+      <DashboardShellInner>{children}</DashboardShellInner>
+    </ModuleChromeProvider>
+  );
+}
+
+function DashboardShellInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
+  const { stickyModuleTitle } = useModuleChrome();
   const {
     canAccessFollowUp,
     canAccessServiceUnitHub,
@@ -351,9 +361,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 <>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      {churchName ?? 'Church Hub'}
+                      {stickyModuleTitle ?? churchName ?? 'Church Hub'}
                     </p>
-                    {showMobilePageTitle ? (
+                    {showMobilePageTitle && !stickyModuleTitle ? (
                       <h1 className="truncate font-heading text-lg font-bold leading-tight">{pageTitle}</h1>
                     ) : null}
                   </div>

@@ -91,15 +91,14 @@ export class MinistryCellsController {
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
-    @Body()
-    body: {
-      firstName: string;
-      lastName: string;
-      email?: string;
-      phone?: string;
-    },
+    @Body() body: Record<string, unknown>,
   ) {
     return this.service.createMemberAndAdd(user, churchId, id, body);
+  }
+
+  @Get('registry-catalog')
+  registryCatalog(@ChurchId() churchId: string, @CurrentUser() user: AuthUser) {
+    return this.service.getRegistryCatalog(user, churchId);
   }
 
   @Delete('branches/:branchId/members/:memberId')
@@ -224,6 +223,30 @@ export class MinistryCellsController {
     @Param('id') id: string,
   ) {
     return this.service.listAttendance(user, churchId, id);
+  }
+
+  @Patch('branches/:id/attendance/:attendanceId')
+  updateAttendance(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('attendanceId') attendanceId: string,
+    @Body()
+    body: {
+      weekStart?: string;
+      meetingDate?: string;
+      presentCount?: number;
+      absentCount?: number;
+      maleCount?: number;
+      femaleCount?: number;
+      boysCount?: number;
+      girlsCount?: number;
+      testifiersCount?: number;
+      firstTimersCount?: number;
+      notes?: string;
+    },
+  ) {
+    return this.service.updateAttendance(user, churchId, id, attendanceId, body);
   }
 
   @Get('branches/:id/analytics')

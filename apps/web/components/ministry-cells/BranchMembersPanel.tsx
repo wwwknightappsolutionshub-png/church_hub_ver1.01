@@ -1,10 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Loader2, Trash2, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
+import { LazyCongregantEditorForm } from '@/lib/membership-lazy';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,6 +24,11 @@ interface AvailableMember {
   lastName: string;
   email: string | null;
   status: string;
+}
+
+interface FamilyOption {
+  id: string;
+  name: string;
 }
 
 interface BranchMembersPanelProps {
@@ -44,11 +50,7 @@ export function BranchMembersPanel({
   const [selectedMemberId, setSelectedMemberId] = useState('');
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
-  const [createMode, setCreateMode] = useState(false);
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
+  const [showCongregantEditor, setShowCongregantEditor] = useState(false);
 
   const { data: available = [], isLoading } = useApiQuery<AvailableMember[]>(
     ['ministry-cells', 'available-members', branchId],
@@ -56,25 +58,26 @@ export function BranchMembersPanel({
     { enabled: canManage && pickerOpen },
   );
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return available;
-    return available.filter(
-      (m) =>
-        m.firstName.toLowerCase().includes(q) ||
-        m.lastName.toLowerCase().includes(q) ||
-        m.email?.toLowerCase().includes(q),
-    );
-  }, [available, search]);
+  const { data: families = [] } = useApiQuery<FamilyOption[]>(
+    ['membership-families'],
+    '/membership/families',
+    { enabled: canManage && showCongregantEditor },
+  );
+
+  const filtered = search.trim()
+    ? available.filter((m) => {
+        const q = search.trim().toLowerCase();
+        return (
+          m.firstName.toLowerCase().includes(q) ||
+          m.lastName.toLowerCase().includes(q) ||
+          m.email?.toLowerCase().includes(q)
+        );
+      })
+    : available;
 
   const resetPicker = () => {
     setSelectedMemberId('');
     setSearch('');
-    setCreateMode(false);
-    setFirstName('');
-    setLastName('');
-    setEmail('');
-    setPhone('');
   };
 
   const addMember = async () => {
@@ -93,30 +96,6 @@ export function BranchMembersPanel({
       onChanged();
     } catch {
       toast.error('Could not add member — they may already belong to another branch');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const createAndAdd = async () => {
-    if (!firstName.trim() || !lastName.trim()) {
-      toast.error('First and last name are required');
-      return;
-    }
-    setBusy(true);
-    try {
-      await api.post(`/ministry-cells/branches/${branchId}/members/create`, {
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        email: email.trim() || undefined,
-        phone: phone.trim() || undefined,
-      });
-      toast.success('Member created and added to branch');
-      resetPicker();
-      setPickerOpen(false);
-      onChanged();
-    } catch {
-      toast.error('Could not create member');
     } finally {
       setBusy(false);
     }
@@ -167,139 +146,75 @@ export function BranchMembersPanel({
 
       {pickerOpen && canManage && (
         <div className="space-y-3 rounded-md border border-border bg-muted/30 p-3">
-          {!createMode ? (
-            <>
-              <div>
-                <Label htmlFor="member-search">Search church members</Label>
-                <Input
-                  id="member-search"
-                  value={search}
-                  onChange={(e) => {
-                    setSearch(e.target.value);
-                    setSelectedMemberId('');
-                  }}
-                  placeholder="Name or email"
-                />
-              </div>
-              {isLoading ? (
-                <div className="flex justify-center py-4">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                </div>
-              ) : (
-                <select
-                  className="flex h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
-                  value={selectedMemberId}
-                  onChange={(e) => setSelectedMemberId(e.target.value)}
-                >
-                  <option value="">Select a member…</option>
-                  {filtered.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.firstName} {m.lastName}
-                      {m.email ? ` · ${m.email}` : ''} · {m.status.replace(/_/g, ' ')}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {noSearchMatch && (
-                <p className="text-xs text-muted-foreground">
-                  No match in the church membership database. You can create them manually.
-                </p>
-              )}
-              {!isLoading && filtered.length === 0 && !search.trim() && (
-                <p className="text-xs text-muted-foreground">
-                  No available members — all may already be assigned to a cell branch, or create a new
-                  member below.
-                </p>
-              )}
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" size="sm" onClick={addMember} disabled={busy || !selectedMemberId}>
-                  Add to branch
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => {
-                    setCreateMode(true);
-                    const parts = search.trim().split(/\s+/);
-                    if (parts[0]) setFirstName(parts[0]);
-                    if (parts.length > 1) setLastName(parts.slice(1).join(' '));
-                  }}
-                >
-                  Create new member
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setPickerOpen(false);
-                    resetPicker();
-                  }}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </>
+          <div>
+            <Label htmlFor="member-search">Search church members</Label>
+            <Input
+              id="member-search"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setSelectedMemberId('');
+              }}
+              placeholder="Name or email"
+            />
+          </div>
+          {isLoading ? (
+            <div className="flex justify-center py-4">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
           ) : (
-            <>
-              <p className="text-sm font-medium">Create member and add to this branch</p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <div>
-                  <Label htmlFor="new-first">First name</Label>
-                  <Input
-                    id="new-first"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    autoComplete="given-name"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="new-last">Last name</Label>
-                  <Input
-                    id="new-last"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    autoComplete="family-name"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="new-email">Email (optional)</Label>
-                  <Input
-                    id="new-email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    autoComplete="email"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="new-phone">Phone (optional)</Label>
-                  <Input
-                    id="new-phone"
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    autoComplete="tel"
-                  />
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={createAndAdd}
-                  disabled={busy || !firstName.trim() || !lastName.trim()}
-                >
-                  {busy ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
-                  Create &amp; add
-                </Button>
-                <Button type="button" size="sm" variant="ghost" onClick={() => setCreateMode(false)}>
-                  Back to search
-                </Button>
-              </div>
-            </>
+            <select
+              className="flex h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+              value={selectedMemberId}
+              onChange={(e) => setSelectedMemberId(e.target.value)}
+            >
+              <option value="">Select a member…</option>
+              {filtered.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.firstName} {m.lastName}
+                  {m.email ? ` · ${m.email}` : ''} · {m.status.replace(/_/g, ' ')}
+                </option>
+              ))}
+            </select>
           )}
+          {noSearchMatch && (
+            <p className="text-xs text-muted-foreground">
+              No match in the church membership database. Create them with the global congregant form.
+            </p>
+          )}
+          {!isLoading && filtered.length === 0 && !search.trim() && (
+            <p className="text-xs text-muted-foreground">
+              No available members to attach — create a new congregant instead.
+            </p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" onClick={addMember} disabled={busy || !selectedMemberId}>
+              Add to branch
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setShowCongregantEditor(true);
+                setPickerOpen(false);
+                resetPicker();
+              }}
+            >
+              Create new congregant
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setPickerOpen(false);
+                resetPicker();
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
         </div>
       )}
 
@@ -313,9 +228,7 @@ export function BranchMembersPanel({
               <span className="font-medium">
                 {m.firstName} {m.lastName}
               </span>
-              {m.email && (
-                <span className="ml-2 text-xs text-muted-foreground">{m.email}</span>
-              )}
+              {m.email && <span className="ml-2 text-xs text-muted-foreground">{m.email}</span>}
             </div>
             {canManage && (
               <Button
@@ -336,6 +249,24 @@ export function BranchMembersPanel({
           <li className="text-sm text-muted-foreground">No members on this branch yet.</li>
         )}
       </ul>
+
+      {showCongregantEditor && canManage && (
+        <LazyCongregantEditorForm
+          families={(families ?? []).map((f) => ({ id: f.id, name: f.name }))}
+          createMemberPath={`/ministry-cells/branches/${branchId}/members/create`}
+          catalogPath="/ministry-cells/registry-catalog"
+          defaultCellBranchId={branchId}
+          lockCellBranch
+          dialogTitle="Add congregant to this branch"
+          submitLabel="Create & add to branch"
+          onClose={() => setShowCongregantEditor(false)}
+          onSaved={() => {
+            setShowCongregantEditor(false);
+            toast.success('Congregant saved to membership and added to this branch');
+            onChanged();
+          }}
+        />
+      )}
     </div>
   );
 }

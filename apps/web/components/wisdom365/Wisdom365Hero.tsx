@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { Sparkles } from 'lucide-react';
+import { useModuleHeroStickyTitle } from '@/components/layout/useStickyModuleTitle';
 
 export function Wisdom365Hero({
   description,
@@ -16,6 +17,8 @@ export function Wisdom365Hero({
   streakLabel?: string;
   compact?: boolean;
 }) {
+  const headerRef = useModuleHeroStickyTitle('Wisdom365+', !compact);
+
   if (compact) {
     return (
       <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border/60 bg-background/90 px-4 py-3 backdrop-blur-md sm:px-6">
@@ -42,7 +45,11 @@ export function Wisdom365Hero({
     description ?? 'Daily biblical wisdom with practical life application for every season.';
 
   return (
-    <header className="relative overflow-hidden border-b border-amber-900/30 bg-slate-950 text-white">
+    <header
+      ref={headerRef}
+      className="relative overflow-hidden border-b border-amber-900/30 bg-slate-950 text-white"
+      data-module-hero
+    >
       <div
         className="pointer-events-none absolute inset-0"
         style={{

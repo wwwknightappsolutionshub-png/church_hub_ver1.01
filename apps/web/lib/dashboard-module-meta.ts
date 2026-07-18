@@ -1,7 +1,7 @@
 /**
- * Routes that previously had in-page EnterpriseHero / YouthHubHero banners.
- * Heroes are now hidden, but we still suppress a duplicate mobile app-bar title
- * (the top bar already shows the church name).
+ * Routes that render an in-page module hero (EnterpriseHero / YouthHubHero / etc.).
+ * Suppresses a duplicate mobile app-bar page title; the sticky bar shows the church
+ * name until the hero scrolls away, then the module title.
  */
 const MODULE_PAGE_CHROME_PREFIXES = [
   '/dashboard',

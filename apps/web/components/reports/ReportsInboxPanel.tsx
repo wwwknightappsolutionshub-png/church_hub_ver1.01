@@ -52,6 +52,13 @@ export interface ReportsInboxData {
     createdAt: string;
     targetUserId?: string | null;
     serviceUnit?: { id: string; name: string } | null;
+    metadata?: {
+      tags?: string[];
+      branchName?: string;
+      date?: string;
+      reportType?: string;
+      timestamp?: string;
+    } | null;
   }>;
   notifications: Array<{ id: string; title: string; body: string; type: string; sentAt: string }>;
   messages: Array<{
@@ -545,10 +552,16 @@ export function ReportsInboxPanel({
                       <Badge className={cn('text-[10px]', meta.badge)}>
                         {meta.label} · {q.status}
                       </Badge>
+                      {(q.metadata?.tags ?? []).map((tag) => (
+                        <Badge key={tag} variant="outline" className="text-[10px]">
+                          {tag}
+                        </Badge>
+                      ))}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {q.kind} · {new Date(q.createdAt).toLocaleString()}
                       {q.serviceUnit?.name ? ` · ${q.serviceUnit.name}` : ''}
+                      {q.metadata?.branchName ? ` · ${q.metadata.branchName}` : ''}
                     </p>
                     <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
                       {q.body}
