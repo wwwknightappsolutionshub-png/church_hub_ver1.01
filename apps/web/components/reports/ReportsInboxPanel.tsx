@@ -1211,7 +1211,17 @@ export function ReportsInboxPanel({
               const urgency =
                 r.status === 'SUBMITTED' ? 'high' : r.status === 'PROCESSING' ? 'medium' : 'info';
               const meta = URGENCY_META[urgency];
-              const entries = Object.entries(r.fieldValues ?? {});
+              const values = r.fieldValues ?? {};
+              const lineItems = Array.isArray(values.line_items)
+                ? (values.line_items as Array<Record<string, unknown>>)
+                : [];
+              const skipKeys = new Set([
+                'line_items',
+                'item_description',
+                'quantity',
+                'unit_cost',
+              ]);
+              const entries = Object.entries(values).filter(([key]) => !skipKeys.has(key));
               return (
                 <article key={r.id} className={cn('rounded-lg border px-3 py-2.5 text-sm', meta.card)}>
                   <div className="flex flex-wrap items-center gap-2">
@@ -1225,6 +1235,52 @@ export function ReportsInboxPanel({
                     {r.submittedBy.firstName} {r.submittedBy.lastName}
                     {` · ${new Date(r.createdAt).toLocaleString()}`}
                   </p>
+                  {lineItems.length > 0 && (
+                    <div className="mt-2 overflow-x-auto">
+                      <table className="w-full min-w-[480px] text-xs">
+                        <thead>
+                          <tr className="border-b border-border/60 text-left text-muted-foreground">
+                            <th className="py-1 pr-2 font-medium">Item</th>
+                            <th className="py-1 pr-2 font-medium">Qty</th>
+                            <th className="py-1 pr-2 font-medium">Unit</th>
+                            <th className="py-1 pr-2 font-medium">Total</th>
+                            <th className="py-1 font-medium">Link</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {lineItems.map((item, idx) => {
+                            const url = String(item.websiteUrl ?? item.website_url ?? '');
+                            return (
+                              <tr key={idx} className="border-b border-border/40 last:border-0">
+                                <td className="py-1 pr-2 align-top">
+                                  {String(item.description ?? '—')}
+                                </td>
+                                <td className="py-1 pr-2 align-top">{String(item.quantity ?? '—')}</td>
+                                <td className="py-1 pr-2 align-top">{String(item.unitCost ?? '—')}</td>
+                                <td className="py-1 pr-2 align-top">
+                                  {String(item.lineTotal ?? '—')}
+                                </td>
+                                <td className="py-1 align-top">
+                                  {url ? (
+                                    <a
+                                      href={url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="text-primary underline-offset-2 hover:underline"
+                                    >
+                                      Open
+                                    </a>
+                                  ) : (
+                                    '—'
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                   {entries.length > 0 && (
                     <div className="mt-2 overflow-x-auto">
                       <table className="w-full min-w-[280px] text-xs">
@@ -1237,7 +1293,9 @@ export function ReportsInboxPanel({
                         <tbody>
                           {entries.map(([key, value]) => (
                             <tr key={key} className="border-b border-border/40 last:border-0">
-                              <td className="py-1 pr-3 align-top font-medium">{key.replace(/_/g, ' ')}</td>
+                              <td className="py-1 pr-3 align-top font-medium">
+                                {key.replace(/_/g, ' ')}
+                              </td>
                               <td className="py-1 align-top whitespace-pre-wrap">
                                 {value === null || value === undefined || value === ''
                                   ? '—'

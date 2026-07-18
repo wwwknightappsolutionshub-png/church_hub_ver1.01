@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, RtpFieldType, RtpRequestStatus } from '@prisma/client';
+import { Prisma, RtpFieldType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.module';
 import { ModuleAccessService } from '../access/module-access.service';
 import { CommunicationsQueueService } from '../communications/communications-queue.service';
@@ -55,7 +55,7 @@ const DEFAULT_FIELDS: Array<{
     sectionKey: 'items',
     sectionLabel: '2. Items to purchase',
     sortOrder: 40,
-    isRequired: true,
+    isRequired: false,
   },
   {
     fieldKey: 'quantity',
@@ -64,7 +64,7 @@ const DEFAULT_FIELDS: Array<{
     sectionKey: 'items',
     sectionLabel: '2. Items to purchase',
     sortOrder: 50,
-    isRequired: true,
+    isRequired: false,
   },
   {
     fieldKey: 'unit_cost',
@@ -82,7 +82,7 @@ const DEFAULT_FIELDS: Array<{
     sectionKey: 'budget',
     sectionLabel: '3. Budget & supplier',
     sortOrder: 70,
-    isRequired: true,
+    isRequired: false,
   },
   {
     fieldKey: 'budget_line',
@@ -167,19 +167,30 @@ export class RtpService {
 
   async ensureDefaultFields(churchId: string) {
     const count = await this.prisma.rtpFormFieldDefinition.count({ where: { churchId } });
-    if (count > 0) return;
-    await this.prisma.rtpFormFieldDefinition.createMany({
-      data: DEFAULT_FIELDS.map((f) => ({
+    if (count === 0) {
+      await this.prisma.rtpFormFieldDefinition.createMany({
+        data: DEFAULT_FIELDS.map((f) => ({
+          churchId,
+          fieldKey: f.fieldKey,
+          label: f.label,
+          fieldType: f.fieldType,
+          sectionKey: f.sectionKey,
+          sectionLabel: f.sectionLabel,
+          sortOrder: f.sortOrder,
+          isRequired: f.isRequired,
+          options: (f.options ?? []) as Prisma.InputJsonValue,
+        })),
+      });
+      return;
+    }
+
+    // Existing churches: line items replace single-item required fields; total is computed.
+    await this.prisma.rtpFormFieldDefinition.updateMany({
+      where: {
         churchId,
-        fieldKey: f.fieldKey,
-        label: f.label,
-        fieldType: f.fieldType,
-        sectionKey: f.sectionKey,
-        sectionLabel: f.sectionLabel,
-        sortOrder: f.sortOrder,
-        isRequired: f.isRequired,
-        options: (f.options ?? []) as Prisma.InputJsonValue,
-      })),
+        fieldKey: { in: ['item_description', 'quantity', 'unit_cost', 'estimated_total'] },
+      },
+      data: { isRequired: false },
     });
   }
 
@@ -314,7 +325,10 @@ export class RtpService {
     userId: string,
     churchId: string,
     serviceUnitId: string,
-    data: { title?: string; fieldValues: Record<string, string | number | null> },
+    data: {
+      title?: string;
+      fieldValues: Record<string, unknown>;
+    },
   ) {
     await this.requireUnitManager(userId, churchId, serviceUnitId);
     const unit = await this.prisma.serviceUnit.findFirst({
@@ -324,9 +338,36 @@ export class RtpService {
     if (!unit) throw new NotFoundException('Service unit not found');
 
     const fields = await this.listFormFields(userId, churchId, true);
-    const values = data.fieldValues ?? {};
+    const values: Record<string, unknown> = { ...(data.fieldValues ?? {}) };
+    const lineItems = this.normalizeLineItems(values.line_items);
+    if (lineItems.length === 0) {
+      throw new BadRequestException('Add at least one item to purchase');
+    }
+    for (const [idx, item] of lineItems.entries()) {
+      if (!item.description.trim()) {
+        throw new BadRequestException(`Item ${idx + 1}: description is required`);
+      }
+      if (!(item.quantity > 0)) {
+        throw new BadRequestException(`Item ${idx + 1}: quantity must be greater than 0`);
+      }
+    }
+    const estimatedTotal = this.sumLineItems(lineItems);
+    values.line_items = lineItems;
+    values.estimated_total = estimatedTotal;
+    // Keep legacy single-item keys populated for older inboxes.
+    values.item_description = lineItems.map((i) => i.description).join('; ');
+    values.quantity = lineItems.reduce((sum, i) => sum + i.quantity, 0);
+    values.unit_cost = lineItems[0]?.unitCost ?? 0;
+
+    const skipKeys = new Set([
+      'item_description',
+      'quantity',
+      'unit_cost',
+      'estimated_total',
+      'line_items',
+    ]);
     for (const field of fields) {
-      if (!field.isRequired) continue;
+      if (!field.isRequired || skipKeys.has(field.fieldKey)) continue;
       const raw = values[field.fieldKey];
       if (raw === undefined || raw === null || String(raw).trim() === '') {
         throw new BadRequestException(`Missing required field: ${field.label}`);
@@ -366,6 +407,41 @@ export class RtpService {
     return row;
   }
 
+  private normalizeLineItems(raw: unknown): Array<{
+    description: string;
+    quantity: number;
+    unitCost: number;
+    websiteUrl: string;
+    lineTotal: number;
+  }> {
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .map((row) => {
+        const r = row && typeof row === 'object' ? (row as Record<string, unknown>) : {};
+        const quantity = Number(r.quantity ?? 0);
+        const unitCost = Number(r.unitCost ?? r.unit_cost ?? 0);
+        const qty = Number.isFinite(quantity) ? Math.max(0, quantity) : 0;
+        const cost = Number.isFinite(unitCost) ? Math.max(0, unitCost) : 0;
+        const description = String(r.description ?? r.item_description ?? '').trim();
+        const websiteUrl = String(r.websiteUrl ?? r.website_url ?? r.url ?? '').trim();
+        return {
+          description,
+          quantity: qty,
+          unitCost: cost,
+          websiteUrl,
+          lineTotal: Math.round(qty * cost * 100) / 100,
+        };
+      })
+      .filter((i) => i.description || i.quantity > 0 || i.unitCost > 0 || i.websiteUrl);
+  }
+
+  private sumLineItems(
+    items: Array<{ quantity: number; unitCost: number; lineTotal?: number }>,
+  ): number {
+    const total = items.reduce((sum, i) => sum + i.quantity * i.unitCost, 0);
+    return Math.round(total * 100) / 100;
+  }
+
   private buildTabularBody(
     fields: Array<{ fieldKey: string; label: string; sectionLabel: string }>,
     values: Record<string, unknown>,
@@ -380,7 +456,9 @@ export class RtpService {
       `Field | Value`,
       `---|---`,
     ];
+    const skipKeys = new Set(['item_description', 'quantity', 'unit_cost', 'line_items']);
     for (const field of fields) {
+      if (skipKeys.has(field.fieldKey)) continue;
       const raw = values[field.fieldKey];
       const display =
         raw === undefined || raw === null || String(raw).trim() === ''
@@ -388,7 +466,90 @@ export class RtpService {
           : String(raw).replace(/\n/g, ' ');
       lines.push(`${field.label} | ${display}`);
     }
+
+    const items = this.normalizeLineItems(values.line_items);
+    if (items.length > 0) {
+      lines.push(``);
+      lines.push(`Items to purchase`);
+      lines.push(`# | Description | Qty | Unit cost | Line total | Website`);
+      lines.push(`---|---|---|---|---|---`);
+      items.forEach((item, idx) => {
+        lines.push(
+          `${idx + 1} | ${item.description.replace(/\|/g, '/')} | ${item.quantity} | ${item.unitCost} | ${item.lineTotal} | ${item.websiteUrl || '—'}`,
+        );
+      });
+      lines.push(`Estimated total (from items) | ${this.sumLineItems(items)}`);
+    }
     return lines.join('\n');
+  }
+
+  async remindLeadership(userId: string, churchId: string, requestId: string) {
+    const row = await this.prisma.rtpRequest.findFirst({
+      where: { id: requestId, churchId },
+      include: {
+        serviceUnit: { select: { id: true, name: true } },
+        submittedBy: { select: { firstName: true, lastName: true } },
+      },
+    });
+    if (!row) throw new NotFoundException('RTP request not found');
+    await this.requireUnitManager(userId, churchId, row.serviceUnitId);
+
+    if (row.status === 'APPROVED' || row.status === 'REJECTED') {
+      throw new BadRequestException('Closed RTP requests cannot be reminded');
+    }
+
+    const staffUsers = await this.prisma.user.findMany({
+      where: {
+        churchId,
+        isActive: true,
+        roles: { some: { role: { name: { in: ['ADMIN', 'PASTOR'] } } } },
+      },
+      select: { id: true },
+    });
+    if (staffUsers.length === 0) {
+      throw new BadRequestException('No church admin or pastor available to remind');
+    }
+
+    const submitter = `${row.submittedBy.firstName} ${row.submittedBy.lastName}`.trim();
+    const title = `Manual reminder: RTP — ${row.title}`;
+    const body = [
+      `A service unit admin requested a reminder on this Request to Purchase.`,
+      ``,
+      `Service Unit: ${row.serviceUnit.name}`,
+      `Title: ${row.title}`,
+      `Status: ${row.status}`,
+      `Submitted by: ${submitter}`,
+      `Submitted at: ${row.createdAt.toISOString()}`,
+      ``,
+      `Open Admin/Pastor Reports → RTP Requests to review.`,
+    ].join('\n');
+
+    for (const staff of staffUsers) {
+      await this.commQueue.enqueue(churchId, {
+        kind: 'DIRECT_ALERT',
+        title,
+        body,
+        channels: ['IN_APP', 'EMAIL'],
+        targetUserId: staff.id,
+        metadata: {
+          reportType: 'RTP Reminder',
+          rtpRequestId: row.id,
+          reminderType: 'RTP_MANUAL',
+        },
+      });
+    }
+
+    const now = new Date();
+    await this.prisma.rtpRequest.update({
+      where: { id: row.id },
+      data: {
+        lastReminderAt: now,
+        nextReminderAt:
+          row.status === 'SUBMITTED' ? new Date(now.getTime() + 15 * 60 * 1000) : row.nextReminderAt,
+      },
+    });
+
+    return { ok: true, reminded: staffUsers.length };
   }
 
   private async notifyLeadershipOfSubmission(

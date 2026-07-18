@@ -108,9 +108,19 @@ export class RtpController {
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
     @Param('serviceUnitId') serviceUnitId: string,
-    @Body() body: { title?: string; fieldValues: Record<string, string | number | null> },
+    @Body() body: { title?: string; fieldValues: Record<string, unknown> },
   ) {
     return this.rtp.submitRequest(user.userId, churchId, serviceUnitId, body);
+  }
+
+  @Post('requests/:id/remind')
+  @ApiOperation({ summary: 'Unit admin manual reminder to pastor/church admin' })
+  remind(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.rtp.remindLeadership(user.userId, churchId, id);
   }
 
   @Post('requests/:id/received')
