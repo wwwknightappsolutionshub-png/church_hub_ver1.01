@@ -95,8 +95,25 @@ export default function LoginPage() {
     setLoading(true);
     const result = await loginWithCredentials(data.email, data.password);
     setLoading(false);
-    if (result.ok) completeLogin(result.mustChangePassword);
-    else toast.error(result.message);
+    if (result.ok) {
+      completeLogin(result.mustChangePassword);
+      return;
+    }
+
+    if (result.clearPassword) {
+      setValue('password', '');
+    }
+
+    if (result.resetLinkSent) {
+      toast.message('Check your registered email', {
+        description:
+          'We sent a password reset link after too many failed sign-in attempts. Open that email to set a new password.',
+        duration: 10_000,
+      });
+      return;
+    }
+
+    toast.error(result.message);
   };
 
   return (

@@ -28,6 +28,12 @@ export interface JwtPayload {
 const AUTH_LINK_TTL_MINUTES = 30;
 const GENERIC_LINK_SENT =
   'If an account exists for that email, we sent a link. Check your inbox (and spam folder).';
+/** Failed password attempts in this window before clearing the password field. */
+const LOGIN_CLEAR_PASSWORD_AT = 3;
+/** Failed attempt that triggers an automatic password-reset email. */
+const LOGIN_AUTO_RESET_AT = 4;
+/** Sliding window for counting failed logins (30 minutes). */
+const LOGIN_FAILURE_WINDOW_MS = 30 * 60 * 1000;
 
 @Injectable()
 export class AuthService {
@@ -131,26 +137,102 @@ export class AuthService {
   }
 
   async login(email: string, password: string) {
+    const emailKey = email.trim().toLowerCase();
     const user = await this.prisma.user.findFirst({
-      where: { email, isActive: true },
+      where: { email: { equals: emailKey, mode: 'insensitive' }, isActive: true },
     });
+
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      await this.rejectFailedLogin(emailKey);
     }
 
-    const valid = await bcrypt.compare(password, user.passwordHash);
+    const valid = await bcrypt.compare(password, user!.passwordHash);
     if (!valid) {
-      throw new UnauthorizedException('Invalid credentials');
+      await this.rejectFailedLogin(emailKey);
     }
+
+    await this.clearLoginFailures(emailKey);
 
     await this.prisma.user.update({
-      where: { id: user.id },
+      where: { id: user!.id },
       data: { lastLoginAt: new Date() },
     });
 
-    const tokenChurchId = await this.tokenChurchIdForUser(user.id, user.churchId);
-    const tokens = await this.issueTokens(user.id, tokenChurchId, user.email);
-    return { ...tokens, mustChangePassword: user.mustChangePassword };
+    const tokenChurchId = await this.tokenChurchIdForUser(user!.id, user!.churchId);
+    const tokens = await this.issueTokens(user!.id, tokenChurchId, user!.email);
+    return { ...tokens, mustChangePassword: user!.mustChangePassword };
+  }
+
+  /**
+   * Record a failed password attempt. Clears the password field after 3 failures;
+   * on the 4th, emails a reset link (if the account exists) and resets the counter.
+   */
+  private async rejectFailedLogin(emailKey: string): Promise<never> {
+    const failedAttempts = await this.recordLoginFailure(emailKey);
+    const clearPassword = failedAttempts >= LOGIN_CLEAR_PASSWORD_AT;
+    let resetLinkSent = false;
+
+    if (failedAttempts >= LOGIN_AUTO_RESET_AT) {
+      await this.requestPasswordReset(emailKey);
+      resetLinkSent = true;
+      await this.clearLoginFailures(emailKey);
+    }
+
+    throw new UnauthorizedException({
+      message: resetLinkSent
+        ? 'Too many failed attempts. Check your registered email for a password reset link.'
+        : 'Invalid credentials',
+      clearPassword,
+      resetLinkSent,
+      failedAttempts,
+    });
+  }
+
+  private async recordLoginFailure(emailKey: string): Promise<number> {
+    const now = new Date();
+    const existing = await this.prisma.loginFailureBucket.findUnique({
+      where: { emailKey },
+    });
+
+    if (!existing) {
+      await this.prisma.loginFailureBucket.create({
+        data: {
+          emailKey,
+          attemptCount: 1,
+          windowStartedAt: now,
+          lastAttemptAt: now,
+        },
+      });
+      return 1;
+    }
+
+    const windowExpired =
+      now.getTime() - existing.windowStartedAt.getTime() > LOGIN_FAILURE_WINDOW_MS;
+
+    if (windowExpired) {
+      await this.prisma.loginFailureBucket.update({
+        where: { emailKey },
+        data: {
+          attemptCount: 1,
+          windowStartedAt: now,
+          lastAttemptAt: now,
+        },
+      });
+      return 1;
+    }
+
+    const updated = await this.prisma.loginFailureBucket.update({
+      where: { emailKey },
+      data: {
+        attemptCount: { increment: 1 },
+        lastAttemptAt: now,
+      },
+    });
+    return updated.attemptCount;
+  }
+
+  private async clearLoginFailures(emailKey: string) {
+    await this.prisma.loginFailureBucket.deleteMany({ where: { emailKey } });
   }
 
   async changePassword(userId: string, currentPassword: string, newPassword: string) {

@@ -9,7 +9,42 @@ export function hasAuthToken(): boolean {
 
 export type LoginResult =
   | { ok: true; mustChangePassword?: boolean }
-  | { ok: false; message: string };
+  | {
+      ok: false;
+      message: string;
+      clearPassword?: boolean;
+      resetLinkSent?: boolean;
+      failedAttempts?: number;
+    };
+
+function parseLoginErrorBody(data: unknown): {
+  message: string;
+  clearPassword?: boolean;
+  resetLinkSent?: boolean;
+  failedAttempts?: number;
+} {
+  if (!data || typeof data !== 'object') {
+    return { message: 'Invalid email or password' };
+  }
+  const body = data as Record<string, unknown>;
+  const nested =
+    body.message && typeof body.message === 'object'
+      ? (body.message as Record<string, unknown>)
+      : null;
+
+  const messageRaw = nested?.message ?? body.message;
+  let message = 'Invalid email or password';
+  if (typeof messageRaw === 'string') message = messageRaw;
+  else if (Array.isArray(messageRaw)) message = messageRaw.join(', ');
+
+  const clearPassword = Boolean(nested?.clearPassword ?? body.clearPassword);
+  const resetLinkSent = Boolean(nested?.resetLinkSent ?? body.resetLinkSent);
+  const failedAttemptsRaw = nested?.failedAttempts ?? body.failedAttempts;
+  const failedAttempts =
+    typeof failedAttemptsRaw === 'number' ? failedAttemptsRaw : undefined;
+
+  return { message, clearPassword, resetLinkSent, failedAttempts };
+}
 
 export async function loginWithCredentials(
   email: string,
@@ -40,10 +75,8 @@ export async function loginWithCredentials(
             'Cannot reach the API on port 4000. Run: pnpm --filter @church-hub/api dev (or pnpm --filter @church-hub/api start after build)',
         };
       }
-      const msg = err.response.data?.message;
-      if (Array.isArray(msg)) return { ok: false, message: msg.join(', ') };
-      if (typeof msg === 'string') return { ok: false, message: msg };
-      return { ok: false, message: 'Invalid email or password' };
+      const parsed = parseLoginErrorBody(err.response.data);
+      return { ok: false, ...parsed };
     }
     return { ok: false, message: 'Sign in failed. Please try again.' };
   }

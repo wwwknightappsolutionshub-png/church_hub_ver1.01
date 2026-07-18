@@ -448,6 +448,18 @@ model AuthLinkToken {
   @@map("auth_link_tokens")
 }
 
+/// Tracks failed password attempts per email (login lockout / auto reset).
+model LoginFailureBucket {
+  id              String   @id @default(uuid())
+  emailKey        String   @unique
+  attemptCount    Int      @default(0)
+  windowStartedAt DateTime @default(now())
+  lastAttemptAt   DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("login_failure_buckets")
+}
+
 // ─── Membership ──────────────────────────────────────────────
 
 enum MemberStatus {
