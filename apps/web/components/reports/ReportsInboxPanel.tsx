@@ -1,11 +1,23 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, Loader2, Mail, MessageSquare, Search, Send } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import {
+  ChevronDown,
+  ChevronUp,
+  FileDown,
+  Loader2,
+  Mail,
+  MessageSquare,
+  Search,
+  Send,
+  X,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-errors';
+import { openAttendanceReportPdf } from '@/lib/attendance-report-pdf';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +34,7 @@ type TriageKind =
   | 'weekly'
   | 'cell'
   | 'unit'
+  | 'meeting'
   | 'queue'
   | 'notification'
   | 'message';
@@ -88,6 +101,15 @@ export interface ReportsInboxData {
     }>;
     cellAttendance?: CellAttendanceReportItem[];
     unitAttendance?: UnitAttendanceReportItem[];
+    meetingSummaries?: Array<{
+      id: string;
+      title: string;
+      body: string;
+      meetingDate: string | null;
+      createdAt: string;
+      serviceUnit: { id: string; name: string; departmentCode: string | null };
+      author: { id: string; userId: string | null; firstName: string; lastName: string };
+    }>;
   };
   queue: Array<{
     id: string;
@@ -137,6 +159,7 @@ const KIND_OPTIONS: Array<{ value: TriageKind; label: string }> = [
   { value: 'all', label: 'All types' },
   { value: 'department', label: 'Department reports' },
   { value: 'weekly', label: 'Weekly reports' },
+  { value: 'meeting', label: 'Meeting summaries' },
   { value: 'cell', label: 'Ministry / Cells' },
   { value: 'unit', label: 'Service units' },
   { value: 'queue', label: 'Queue alerts' },
@@ -263,68 +286,64 @@ function WeeklyReportItem({ report }: { report: ReportsInboxData['reports']['wee
   );
 }
 
-function CellAttendanceReportItemCard({ report }: { report: CellAttendanceReportItem }) {
-  const dateLabel = new Date(report.meetingDate).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-  const details = [
-    { label: 'Male', value: report.maleCount },
-    { label: 'Female', value: report.femaleCount },
-    { label: 'Boys', value: report.boysCount },
-    { label: 'Girls', value: report.girlsCount },
-    { label: 'First timers', value: report.firstTimersCount },
-  ];
+function threeMonthsAgo() {
+  const d = new Date();
+  d.setMonth(d.getMonth() - 3);
+  return d;
+}
 
-  return (
-    <article className={cn('rounded-lg border px-3 py-2.5 text-sm', URGENCY_META.low.card)}>
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="font-medium leading-snug">{report.branchName}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {report.location ? `${report.location} · ` : ''}
-            {dateLabel}
-            {report.recordedBy
-              ? ` · ${report.recordedBy.firstName} ${report.recordedBy.lastName}`
-              : ''}
-          </p>
-        </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <Badge variant="secondary" className="text-[10px]">
-            Ministry / Cells
-          </Badge>
-          <p className="text-lg font-bold tabular-nums leading-none">{report.presentCount}</p>
-          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Total attendance</p>
-        </div>
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
-        {details.map((d) => (
-          <div
-            key={d.label}
-            className="rounded-md border border-border/60 bg-background/70 px-2 py-1.5 text-center"
-          >
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{d.label}</p>
-            <p className="text-sm font-semibold tabular-nums">{d.value}</p>
-          </div>
-        ))}
-      </div>
-      {report.testifiersCount > 0 ? (
-        <p className="mt-2 text-xs text-muted-foreground">Testifiers: {report.testifiersCount}</p>
-      ) : null}
-      <p className="mt-2 text-[10px] text-muted-foreground">
-        Recorded {new Date(report.createdAt).toLocaleString()}
-      </p>
-    </article>
+function reportSortTime(iso: string) {
+  const t = new Date(iso).getTime();
+  return Number.isNaN(t) ? 0 : t;
+}
+
+function latestByKey<T>(
+  items: T[],
+  keyFn: (item: T) => string,
+  timeFn: (item: T) => string,
+): T[] {
+  const map = new Map<string, T>();
+  for (const item of items) {
+    const key = keyFn(item);
+    const prev = map.get(key);
+    if (!prev || reportSortTime(timeFn(item)) > reportSortTime(timeFn(prev))) {
+      map.set(key, item);
+    }
+  }
+  return Array.from(map.values()).sort(
+    (a, b) => reportSortTime(timeFn(b)) - reportSortTime(timeFn(a)),
   );
 }
 
-function UnitAttendanceReportItemCard({ report }: { report: UnitAttendanceReportItem }) {
-  const dateLabel = new Date(report.meetingDate).toLocaleDateString(undefined, {
+function historyInWindow<T>(
+  items: T[],
+  key: string,
+  keyFn: (item: T) => string,
+  timeFn: (item: T) => string,
+): T[] {
+  const cutoff = threeMonthsAgo().getTime();
+  return items
+    .filter((item) => keyFn(item) === key && reportSortTime(timeFn(item)) >= cutoff)
+    .sort((a, b) => reportSortTime(timeFn(b)) - reportSortTime(timeFn(a)));
+}
+
+function formatAttendanceDate(iso: string) {
+  return new Date(iso).toLocaleDateString(undefined, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
   });
+}
+
+function CellAttendanceReportItemCard({
+  report,
+  history,
+}: {
+  report: CellAttendanceReportItem;
+  history: CellAttendanceReportItem[];
+}) {
+  const [open, setOpen] = useState(false);
+  const dateLabel = formatAttendanceDate(report.meetingDate);
   const details = [
     { label: 'Male', value: report.maleCount },
     { label: 'Female', value: report.femaleCount },
@@ -333,45 +352,353 @@ function UnitAttendanceReportItemCard({ report }: { report: UnitAttendanceReport
     { label: 'First timers', value: report.firstTimersCount },
   ];
 
+  const exportPdf = (rows: CellAttendanceReportItem[]) => {
+    try {
+      openAttendanceReportPdf({
+        title: report.branchName,
+        subtitle: report.location ?? undefined,
+        kindLabel: 'Ministry / Cells attendance',
+        rows: rows.map((r) => ({
+          dateLabel: formatAttendanceDate(r.meetingDate),
+          presentCount: r.presentCount,
+          maleCount: r.maleCount,
+          femaleCount: r.femaleCount,
+          boysCount: r.boysCount,
+          girlsCount: r.girlsCount,
+          testifiersCount: r.testifiersCount,
+          firstTimersCount: r.firstTimersCount,
+          recordedAt: r.createdAt,
+          recordedBy: r.recordedBy
+            ? `${r.recordedBy.firstName} ${r.recordedBy.lastName}`
+            : undefined,
+        })),
+      });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not export PDF');
+    }
+  };
+
   return (
-    <article className={cn('rounded-lg border px-3 py-2.5 text-sm', URGENCY_META.low.card)}>
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="font-medium leading-snug">{report.serviceUnitName}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {report.departmentCode ? `${report.departmentCode} · ` : ''}
-            {dateLabel}
-            {report.recordedBy
-              ? ` · ${report.recordedBy.firstName} ${report.recordedBy.lastName}`
-              : ''}
-          </p>
-        </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <Badge variant="secondary" className="text-[10px]">
-            Service unit
-          </Badge>
-          <p className="text-lg font-bold tabular-nums leading-none">{report.presentCount}</p>
-          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Total attendance</p>
-        </div>
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
-        {details.map((d) => (
-          <div
-            key={d.label}
-            className="rounded-md border border-border/60 bg-background/70 px-2 py-1.5 text-center"
-          >
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{d.label}</p>
-            <p className="text-sm font-semibold tabular-nums">{d.value}</p>
+    <>
+      <article
+        role="button"
+        tabIndex={0}
+        onClick={() => setOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
+        className={cn(
+          'cursor-pointer rounded-lg border px-3 py-2.5 text-sm transition hover:border-primary/40',
+          URGENCY_META.low.card,
+        )}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-medium leading-snug">{report.branchName}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {report.location ? `${report.location} · ` : ''}
+              {dateLabel}
+              {report.recordedBy
+                ? ` · ${report.recordedBy.firstName} ${report.recordedBy.lastName}`
+                : ''}
+              {' · '}
+              <span className="text-primary">Latest · click for history</span>
+            </p>
           </div>
-        ))}
-      </div>
-      {report.testifiersCount > 0 ? (
-        <p className="mt-2 text-xs text-muted-foreground">Testifiers: {report.testifiersCount}</p>
-      ) : null}
-      <p className="mt-2 text-[10px] text-muted-foreground">
-        Recorded {new Date(report.createdAt).toLocaleString()}
-      </p>
-    </article>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <Badge variant="secondary" className="text-[10px]">
+              Ministry / Cells
+            </Badge>
+            <p className="text-lg font-bold tabular-nums leading-none">{report.presentCount}</p>
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              Total attendance
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+          {details.map((d) => (
+            <div
+              key={d.label}
+              className="rounded-md border border-border/60 bg-background/70 px-2 py-1.5 text-center"
+            >
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{d.label}</p>
+              <p className="text-sm font-semibold tabular-nums">{d.value}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[10px] text-muted-foreground">
+            Recorded {new Date(report.createdAt).toLocaleString()}
+            {report.testifiersCount > 0 ? ` · Testifiers: ${report.testifiersCount}` : ''}
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-7 gap-1 text-xs"
+            onClick={(e) => {
+              e.stopPropagation();
+              exportPdf([report]);
+            }}
+          >
+            <FileDown className="h-3.5 w-3.5" />
+            PDF
+          </Button>
+        </div>
+      </article>
+
+      {open
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[120] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4"
+              onClick={() => setOpen(false)}
+            >
+              <div
+                className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-t-2xl bg-background p-4 shadow-xl sm:rounded-2xl sm:p-6"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-semibold">{report.branchName}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Attendance history (last 3 months)
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="gap-1"
+                      onClick={() => exportPdf(history.length ? history : [report])}
+                    >
+                      <FileDown className="h-3.5 w-3.5" />
+                      Export PDF
+                    </Button>
+                    <Button type="button" size="icon" variant="ghost" onClick={() => setOpen(false)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[640px] text-left text-sm">
+                    <thead>
+                      <tr className="border-b text-muted-foreground">
+                        <th className="pb-2 font-medium">Date</th>
+                        <th className="pb-2 font-medium">Total</th>
+                        <th className="pb-2 font-medium">Male</th>
+                        <th className="pb-2 font-medium">Female</th>
+                        <th className="pb-2 font-medium">Boys</th>
+                        <th className="pb-2 font-medium">Girls</th>
+                        <th className="pb-2 font-medium">First timers</th>
+                        <th className="pb-2 font-medium">Testifiers</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(history.length ? history : [report]).map((row) => (
+                        <tr key={row.id} className="border-b border-border/60">
+                          <td className="py-2">{formatAttendanceDate(row.meetingDate)}</td>
+                          <td className="py-2 tabular-nums">{row.presentCount}</td>
+                          <td className="py-2 tabular-nums">{row.maleCount}</td>
+                          <td className="py-2 tabular-nums">{row.femaleCount}</td>
+                          <td className="py-2 tabular-nums">{row.boysCount}</td>
+                          <td className="py-2 tabular-nums">{row.girlsCount}</td>
+                          <td className="py-2 tabular-nums">{row.firstTimersCount}</td>
+                          <td className="py-2 tabular-nums">{row.testifiersCount}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
+  );
+}
+
+function UnitAttendanceReportItemCard({
+  report,
+  history,
+}: {
+  report: UnitAttendanceReportItem;
+  history: UnitAttendanceReportItem[];
+}) {
+  const [open, setOpen] = useState(false);
+  const dateLabel = formatAttendanceDate(report.meetingDate);
+  const details = [
+    { label: 'Male', value: report.maleCount },
+    { label: 'Female', value: report.femaleCount },
+    { label: 'First timers', value: report.firstTimersCount },
+    { label: 'Testifiers', value: report.testifiersCount },
+  ];
+
+  const exportPdf = (rows: UnitAttendanceReportItem[]) => {
+    try {
+      openAttendanceReportPdf({
+        title: report.serviceUnitName,
+        subtitle: report.departmentCode ?? undefined,
+        kindLabel: 'Service unit attendance',
+        omitChildrenCols: true,
+        rows: rows.map((r) => ({
+          dateLabel: formatAttendanceDate(r.meetingDate),
+          presentCount: r.presentCount,
+          maleCount: r.maleCount,
+          femaleCount: r.femaleCount,
+          testifiersCount: r.testifiersCount,
+          firstTimersCount: r.firstTimersCount,
+          recordedAt: r.createdAt,
+          recordedBy: r.recordedBy
+            ? `${r.recordedBy.firstName} ${r.recordedBy.lastName}`
+            : undefined,
+        })),
+      });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not export PDF');
+    }
+  };
+
+  return (
+    <>
+      <article
+        role="button"
+        tabIndex={0}
+        onClick={() => setOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
+        className={cn(
+          'cursor-pointer rounded-lg border px-3 py-2.5 text-sm transition hover:border-primary/40',
+          URGENCY_META.low.card,
+        )}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-medium leading-snug">{report.serviceUnitName}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {report.departmentCode ? `${report.departmentCode} · ` : ''}
+              {dateLabel}
+              {report.recordedBy
+                ? ` · ${report.recordedBy.firstName} ${report.recordedBy.lastName}`
+                : ''}
+              {' · '}
+              <span className="text-primary">Latest · click for history</span>
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <Badge variant="secondary" className="text-[10px]">
+              Service unit
+            </Badge>
+            <p className="text-lg font-bold tabular-nums leading-none">{report.presentCount}</p>
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              Total attendance
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {details.map((d) => (
+            <div
+              key={d.label}
+              className="rounded-md border border-border/60 bg-background/70 px-2 py-1.5 text-center"
+            >
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{d.label}</p>
+              <p className="text-sm font-semibold tabular-nums">{d.value}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[10px] text-muted-foreground">
+            Recorded {new Date(report.createdAt).toLocaleString()}
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-7 gap-1 text-xs"
+            onClick={(e) => {
+              e.stopPropagation();
+              exportPdf([report]);
+            }}
+          >
+            <FileDown className="h-3.5 w-3.5" />
+            PDF
+          </Button>
+        </div>
+      </article>
+
+      {open
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[120] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4"
+              onClick={() => setOpen(false)}
+            >
+              <div
+                className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-t-2xl bg-background p-4 shadow-xl sm:rounded-2xl sm:p-6"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-semibold">{report.serviceUnitName}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Attendance history (last 3 months)
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="gap-1"
+                      onClick={() => exportPdf(history.length ? history : [report])}
+                    >
+                      <FileDown className="h-3.5 w-3.5" />
+                      Export PDF
+                    </Button>
+                    <Button type="button" size="icon" variant="ghost" onClick={() => setOpen(false)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[560px] text-left text-sm">
+                    <thead>
+                      <tr className="border-b text-muted-foreground">
+                        <th className="pb-2 font-medium">Date</th>
+                        <th className="pb-2 font-medium">Total</th>
+                        <th className="pb-2 font-medium">Male</th>
+                        <th className="pb-2 font-medium">Female</th>
+                        <th className="pb-2 font-medium">First timers</th>
+                        <th className="pb-2 font-medium">Testifiers</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(history.length ? history : [report]).map((row) => (
+                        <tr key={row.id} className="border-b border-border/60">
+                          <td className="py-2">{formatAttendanceDate(row.meetingDate)}</td>
+                          <td className="py-2 tabular-nums">{row.presentCount}</td>
+                          <td className="py-2 tabular-nums">{row.maleCount}</td>
+                          <td className="py-2 tabular-nums">{row.femaleCount}</td>
+                          <td className="py-2 tabular-nums">{row.firstTimersCount}</td>
+                          <td className="py-2 tabular-nums">{row.testifiersCount}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
   );
 }
 
@@ -480,7 +807,7 @@ export function ReportsInboxPanel({
     });
   }, [data, kindFilter, search]);
 
-  const cellAttendanceReports = useMemo(() => {
+  const cellAttendanceAll = useMemo(() => {
     if (kindFilter !== 'all' && kindFilter !== 'cell') return [];
     return (data?.reports.cellAttendance ?? []).filter((r) => {
       const blob = `${r.branchName} ${r.location ?? ''} ${r.presentCount} ${r.maleCount} ${r.femaleCount} ${r.boysCount} ${r.girlsCount} ${r.firstTimersCount}`;
@@ -488,10 +815,38 @@ export function ReportsInboxPanel({
     });
   }, [data, kindFilter, search]);
 
-  const unitAttendanceReports = useMemo(() => {
+  const cellAttendanceReports = useMemo(
+    () =>
+      latestByKey(
+        cellAttendanceAll,
+        (r) => r.branchId,
+        (r) => r.meetingDate || r.createdAt,
+      ),
+    [cellAttendanceAll],
+  );
+
+  const unitAttendanceAll = useMemo(() => {
     if (kindFilter !== 'all' && kindFilter !== 'unit') return [];
     return (data?.reports.unitAttendance ?? []).filter((r) => {
-      const blob = `${r.serviceUnitName} ${r.departmentCode ?? ''} ${r.presentCount} ${r.maleCount} ${r.femaleCount} ${r.boysCount} ${r.girlsCount} ${r.firstTimersCount}`;
+      const blob = `${r.serviceUnitName} ${r.departmentCode ?? ''} ${r.presentCount} ${r.maleCount} ${r.femaleCount} ${r.firstTimersCount}`;
+      return matchesSearch(blob, search);
+    });
+  }, [data, kindFilter, search]);
+
+  const unitAttendanceReports = useMemo(
+    () =>
+      latestByKey(
+        unitAttendanceAll,
+        (r) => r.serviceUnitId,
+        (r) => r.meetingDate || r.createdAt,
+      ),
+    [unitAttendanceAll],
+  );
+
+  const meetingSummaries = useMemo(() => {
+    if (kindFilter !== 'all' && kindFilter !== 'meeting') return [];
+    return (data?.reports.meetingSummaries ?? []).filter((r) => {
+      const blob = `${r.title} ${r.body} ${r.serviceUnit.name} ${r.author.firstName} ${r.author.lastName}`;
       return matchesSearch(blob, search);
     });
   }, [data, kindFilter, search]);
@@ -524,6 +879,7 @@ export function ReportsInboxPanel({
   const triageCount =
     deptReports.length +
     weeklyReports.length +
+    meetingSummaries.length +
     cellAttendanceReports.length +
     unitAttendanceReports.length +
     queueItems.length +
@@ -544,6 +900,7 @@ export function ReportsInboxPanel({
     }
     if (deptReports.length) counts.medium += deptReports.length;
     if (weeklyReports.length) counts.info += weeklyReports.length;
+    if (meetingSummaries.length) counts.medium += meetingSummaries.length;
     if (cellAttendanceReports.length) counts.low += cellAttendanceReports.length;
     if (unitAttendanceReports.length) counts.low += unitAttendanceReports.length;
     return counts;
@@ -551,6 +908,7 @@ export function ReportsInboxPanel({
     data?.queue,
     deptReports.length,
     weeklyReports.length,
+    meetingSummaries.length,
     cellAttendanceReports.length,
     unitAttendanceReports.length,
     statusFilter,
@@ -589,6 +947,7 @@ export function ReportsInboxPanel({
           <Mail className="h-3 w-3" />
           {(data?.reports.department.length ?? 0) +
             (data?.reports.weekly.length ?? 0) +
+            (data?.reports.meetingSummaries?.length ?? 0) +
             (data?.reports.cellAttendance?.length ?? 0) +
             (data?.reports.unitAttendance?.length ?? 0)}{' '}
           reports ·{' '}
@@ -738,25 +1097,73 @@ export function ReportsInboxPanel({
 
           <InboxScrollCard
             title="Ministry / Cells attendance"
-            description="Branch and cell weekly attendance with demographic breakdown."
+            description="Latest report per branch/cell — click a card for 3-month history and PDF export."
             count={cellAttendanceReports.length}
             emptyMessage="No Ministry/Cells attendance reports yet. Record attendance from a branch Weekly tab."
             testId="reports-cell-attendance-inbox"
           >
             {cellAttendanceReports.map((r) => (
-              <CellAttendanceReportItemCard key={r.id} report={r} />
+              <CellAttendanceReportItemCard
+                key={r.branchId}
+                report={r}
+                history={historyInWindow(
+                  cellAttendanceAll,
+                  r.branchId,
+                  (x) => x.branchId,
+                  (x) => x.meetingDate || x.createdAt,
+                )}
+              />
             ))}
           </InboxScrollCard>
 
           <InboxScrollCard
             title="Service unit attendance"
-            description="Service unit weekly attendance with demographic breakdown."
+            description="Latest report per service unit — click a card for 3-month history and PDF export."
             count={unitAttendanceReports.length}
-            emptyMessage="No service unit attendance reports yet. Record attendance from a unit Weekly tab."
+            emptyMessage="No service unit attendance reports yet. Record attendance from a unit Attendance tab."
             testId="reports-unit-attendance-inbox"
           >
             {unitAttendanceReports.map((r) => (
-              <UnitAttendanceReportItemCard key={r.id} report={r} />
+              <UnitAttendanceReportItemCard
+                key={r.serviceUnitId}
+                report={r}
+                history={historyInWindow(
+                  unitAttendanceAll,
+                  r.serviceUnitId,
+                  (x) => x.serviceUnitId,
+                  (x) => x.meetingDate || x.createdAt,
+                )}
+              />
+            ))}
+          </InboxScrollCard>
+
+          <InboxScrollCard
+            title="Meeting summaries"
+            description="Published service unit meeting summaries."
+            count={meetingSummaries.length}
+            emptyMessage="No meeting summaries match your filters."
+            testId="reports-meeting-summaries-inbox"
+          >
+            {meetingSummaries.map((s) => (
+              <article
+                key={s.id}
+                className={cn('rounded-lg border px-3 py-2.5 text-sm', URGENCY_META.medium.card)}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-medium">{s.title}</p>
+                  <Badge variant="secondary" className="text-[10px]">
+                    {s.serviceUnit.name}
+                  </Badge>
+                </div>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {s.author.firstName} {s.author.lastName}
+                  {s.meetingDate ? ` · ${formatAttendanceDate(s.meetingDate)}` : ''}
+                  {` · ${new Date(s.createdAt).toLocaleString()}`}
+                </p>
+                <pre className="mt-2 whitespace-pre-wrap rounded-md bg-muted/45 p-2.5 font-sans text-xs leading-relaxed">
+                  {s.body}
+                </pre>
+              </article>
             ))}
           </InboxScrollCard>
 

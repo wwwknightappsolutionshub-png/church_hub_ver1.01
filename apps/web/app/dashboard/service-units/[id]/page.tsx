@@ -41,7 +41,6 @@ import { useSearchParams } from 'next/navigation';
 type Tab =
   | 'overview'
   | 'meetings'
-  | 'summaries'
   | 'leaders'
   | 'weekly'
   | 'forum'
@@ -114,9 +113,8 @@ const baseTabs: { id: Tab; label: string; icon: typeof Users }[] = [
   { id: 'overview', label: 'Overview', icon: Users },
   { id: 'department', label: 'Department', icon: BarChart3 },
   { id: 'meetings', label: 'Meetings', icon: Calendar },
-  { id: 'summaries', label: 'Meeting summary', icon: ClipboardList },
   { id: 'leaders', label: 'Members', icon: Users },
-  { id: 'weekly', label: 'Weekly', icon: ClipboardList },
+  { id: 'weekly', label: 'Attendance', icon: ClipboardList },
   { id: 'forum', label: 'Forum', icon: MessageSquare },
   { id: 'admin', label: 'Unit admin', icon: Shield },
 ];
@@ -204,7 +202,12 @@ export default function ServiceUnitDetailPage() {
   const [meetingForm, setMeetingForm] = useState({ title: '', startsAt: '', location: '' });
   const [postForm, setPostForm] = useState({ title: '', body: '' });
   const [replyForms, setReplyForms] = useState<Record<string, string>>({});
-  const [summaryForm, setSummaryForm] = useState({ title: '', body: '', meetingDate: '' });
+  const [summaryForm, setSummaryForm] = useState({
+    title: '',
+    body: '',
+    meetingDate: '',
+    meetingId: '',
+  });
   const [editingSummaryId, setEditingSummaryId] = useState<string | null>(null);
 
   const refresh = () => {
@@ -299,19 +302,30 @@ export default function ServiceUnitDetailPage() {
 
   const saveSummary = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentMemberId || !summaryForm.title.trim()) return;
+    if (!summaryForm.title.trim() || !summaryForm.body.trim()) {
+      toast.error('Title and summary body are required');
+      return;
+    }
     try {
+      const payload = {
+        title: summaryForm.title.trim(),
+        body: summaryForm.body.trim(),
+        meetingDate: summaryForm.meetingDate || undefined,
+        meetingId: summaryForm.meetingId || undefined,
+        ...(currentMemberId ? { authorId: currentMemberId } : {}),
+      };
       if (editingSummaryId) {
-        await api.patch(`/service-units/${id}/meeting-summaries/${editingSummaryId}`, summaryForm);
+        await api.patch(`/service-units/${id}/meeting-summaries/${editingSummaryId}`, {
+          title: payload.title,
+          body: payload.body,
+          meetingDate: payload.meetingDate || null,
+        });
         toast.success('Summary updated');
       } else {
-        await api.post(`/service-units/${id}/meeting-summaries`, {
-          ...summaryForm,
-          authorId: currentMemberId,
-        });
-        toast.success('Summary published');
+        await api.post(`/service-units/${id}/meeting-summaries`, payload);
+        toast.success('Summary published — pastors and admins notified');
       }
-      setSummaryForm({ title: '', body: '', meetingDate: '' });
+      setSummaryForm({ title: '', body: '', meetingDate: '', meetingId: '' });
       setEditingSummaryId(null);
       refresh();
     } catch {
@@ -566,6 +580,10 @@ export default function ServiceUnitDetailPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Schedule meeting</CardTitle>
+              <CardDescription>
+                After the meeting, publish a summary below — it stays on this page and is sent to pastors
+                and admins.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={addMeeting} className="grid gap-3 md:grid-cols-3">
@@ -616,6 +634,25 @@ export default function ServiceUnitDetailPage() {
                       <td className="py-3 text-muted-foreground">{m.location ?? '—'}</td>
                       {canManage && (
                         <td className="py-3 text-right">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setEditingSummaryId(null);
+                              setSummaryForm({
+                                title: `${m.title} — summary`,
+                                body: '',
+                                meetingDate: new Date(m.startsAt).toISOString().slice(0, 16),
+                                meetingId: m.id,
+                              });
+                              document
+                                .getElementById('meeting-summary-form')
+                                ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                            }}
+                          >
+                            Summarize
+                          </Button>
                           <Button type="button" variant="ghost" size="sm" onClick={() => deleteMeeting(m.id)}>
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
@@ -634,18 +671,16 @@ export default function ServiceUnitDetailPage() {
               </table>
             </CardContent>
           </Card>
-        </div>
-      )}
 
-      {tab === 'summaries' && (
-        <div className="space-y-6">
           {canManage && (
-            <Card>
+            <Card id="meeting-summary-form">
               <CardHeader>
                 <CardTitle className="text-base">
                   {editingSummaryId ? 'Edit meeting summary' : 'Publish meeting summary'}
                 </CardTitle>
-                <CardDescription>Visible to all unit members. Only unit admins can edit.</CardDescription>
+                <CardDescription>
+                  Saves to this unit, emails pastors and admins, and appears on the reports dashboard.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={saveSummary} className="space-y-3">
@@ -655,6 +690,31 @@ export default function ServiceUnitDetailPage() {
                     onChange={(e) => setSummaryForm({ ...summaryForm, title: e.target.value })}
                     required
                   />
+                  <select
+                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    value={summaryForm.meetingId}
+                    onChange={(e) => {
+                      const meetingId = e.target.value;
+                      const meeting = data.meetings.find((m) => m.id === meetingId);
+                      setSummaryForm({
+                        ...summaryForm,
+                        meetingId,
+                        meetingDate: meeting
+                          ? new Date(meeting.startsAt).toISOString().slice(0, 16)
+                          : summaryForm.meetingDate,
+                        title:
+                          summaryForm.title ||
+                          (meeting ? `${meeting.title} — summary` : summaryForm.title),
+                      });
+                    }}
+                  >
+                    <option value="">Link to scheduled meeting (optional)</option>
+                    {data.meetings.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.title} · {formatDateTime(m.startsAt)}
+                      </option>
+                    ))}
+                  </select>
                   <Input
                     type="datetime-local"
                     value={summaryForm.meetingDate}
@@ -675,7 +735,7 @@ export default function ServiceUnitDetailPage() {
                         variant="outline"
                         onClick={() => {
                           setEditingSummaryId(null);
-                          setSummaryForm({ title: '', body: '', meetingDate: '' });
+                          setSummaryForm({ title: '', body: '', meetingDate: '', meetingId: '' });
                         }}
                       >
                         Cancel
@@ -688,6 +748,7 @@ export default function ServiceUnitDetailPage() {
           )}
 
           <div className="space-y-4">
+            <h2 className="text-sm font-semibold text-foreground">Published summaries</h2>
             {(data.meetingSummaries ?? []).map((s) => (
               <Card key={s.id}>
                 <CardHeader className="pb-2">
@@ -713,7 +774,11 @@ export default function ServiceUnitDetailPage() {
                               meetingDate: s.meetingDate
                                 ? new Date(s.meetingDate).toISOString().slice(0, 16)
                                 : '',
+                              meetingId: '',
                             });
+                            document
+                              .getElementById('meeting-summary-form')
+                              ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                           }}
                         >
                           Edit

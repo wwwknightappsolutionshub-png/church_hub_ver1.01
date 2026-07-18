@@ -480,28 +480,118 @@ export class ServiceUnitsService {
       body: string;
       meetingDate?: string;
       meetingId?: string;
-      authorId: string;
+      authorId?: string;
     },
   ) {
     const ctx = await this.requireUnitManager(userId, churchId, serviceUnitId);
-    if (!ctx.memberId && !this.moduleAccess.isChurchStaff(ctx)) {
-      throw new ForbiddenException('Author member required');
-    }
     await this.getUnit(churchId, serviceUnitId);
-    return this.prisma.serviceUnitMeetingSummary.create({
+
+    let authorId = data.authorId?.trim() || ctx.memberId || undefined;
+    if (!authorId) {
+      const linked = await this.prisma.member.findFirst({
+        where: { churchId, userId },
+        select: { id: true },
+      });
+      authorId = linked?.id;
+    }
+    if (!authorId) {
+      throw new BadRequestException(
+        'Could not resolve author — link your user to a congregant record or join this unit first',
+      );
+    }
+
+    if (data.meetingId) {
+      const meeting = await this.prisma.serviceUnitMeeting.findFirst({
+        where: { id: data.meetingId, churchId, serviceUnitId },
+      });
+      if (!meeting) throw new NotFoundException('Linked meeting not found');
+    }
+
+    const row = await this.prisma.serviceUnitMeetingSummary.create({
       data: {
         churchId,
         serviceUnitId,
-        title: data.title,
-        body: data.body,
+        title: data.title.trim(),
+        body: data.body.trim(),
         meetingDate: data.meetingDate ? new Date(data.meetingDate) : undefined,
-        meetingId: data.meetingId,
-        authorId: data.authorId,
+        meetingId: data.meetingId || null,
+        authorId,
       },
       include: {
         author: { select: { id: true, firstName: true, lastName: true } },
+        serviceUnit: { select: { id: true, name: true } },
       },
     });
+
+    await this.notifyLeadershipOfMeetingSummary(churchId, serviceUnitId, row);
+    return row;
+  }
+
+  private async notifyLeadershipOfMeetingSummary(
+    churchId: string,
+    serviceUnitId: string,
+    row: {
+      id: string;
+      title: string;
+      body: string;
+      meetingDate: Date | null;
+      createdAt: Date;
+      author: { firstName: string; lastName: string };
+      serviceUnit: { name: string };
+    },
+  ) {
+    const dateLabel = row.meetingDate
+      ? row.meetingDate.toLocaleDateString(undefined, {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        })
+      : new Date(row.createdAt).toLocaleDateString(undefined, {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        });
+    const unitName = row.serviceUnit.name;
+    const authorName = `${row.author.firstName} ${row.author.lastName}`.trim();
+    const timestamp = new Date().toISOString();
+    const title = `[Meeting Summary] ${unitName} — ${row.title}`;
+    const body = [
+      `Service Unit: ${unitName}`,
+      `Title: ${row.title}`,
+      `Date: ${dateLabel}`,
+      `Author: ${authorName}`,
+      `Timestamp: ${timestamp}`,
+      ``,
+      row.body,
+    ].join('\n');
+
+    const staffUsers = await this.prisma.user.findMany({
+      where: {
+        churchId,
+        isActive: true,
+        roles: { some: { role: { name: { in: ['ADMIN', 'PASTOR'] } } } },
+      },
+      select: { id: true },
+    });
+
+    for (const staff of staffUsers) {
+      await this.commQueue.enqueue(churchId, {
+        kind: 'DEPARTMENT_WEEKLY_REPORT',
+        title,
+        body,
+        channels: ['IN_APP', 'EMAIL'],
+        targetUserId: staff.id,
+        serviceUnitId,
+        metadata: {
+          reportType: 'Meeting Summary',
+          serviceUnitId,
+          serviceUnitName: unitName,
+          summaryId: row.id,
+          date: dateLabel,
+          timestamp,
+        },
+      });
+    }
   }
 
   async updateMeetingSummary(

@@ -10,12 +10,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-type WeeklyAttendanceForm = {
+type AttendanceForm = {
   meetingDate: string;
   maleCount: string;
   femaleCount: string;
-  boysCount: string;
-  girlsCount: string;
   testifiersCount: string;
   firstTimersCount: string;
 };
@@ -34,21 +32,17 @@ export type ServiceUnitAttendanceRecord = {
   createdAt: string;
 };
 
-const emptyForm = (): WeeklyAttendanceForm => ({
+const emptyForm = (): AttendanceForm => ({
   meetingDate: new Date().toISOString().slice(0, 10),
   maleCount: '',
   femaleCount: '',
-  boysCount: '',
-  girlsCount: '',
   testifiersCount: '',
   firstTimersCount: '',
 });
 
-const FIELDS: { key: keyof WeeklyAttendanceForm; label: string }[] = [
+const FIELDS: { key: keyof AttendanceForm; label: string }[] = [
   { key: 'maleCount', label: 'Male' },
   { key: 'femaleCount', label: 'Female' },
-  { key: 'boysCount', label: 'Boys' },
-  { key: 'girlsCount', label: 'Girls' },
   { key: 'testifiersCount', label: 'Testifiers' },
   { key: 'firstTimersCount', label: 'First Timers' },
 ];
@@ -67,7 +61,7 @@ export function ServiceUnitWeeklyAttendancePanel({
   unitName: string;
   canManage: boolean;
 }) {
-  const [form, setForm] = useState<WeeklyAttendanceForm>(emptyForm);
+  const [form, setForm] = useState<AttendanceForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -82,13 +76,9 @@ export function ServiceUnitWeeklyAttendancePanel({
     setEditingId(null);
   }, [unitId]);
 
-  const demoTotal =
-    (Number(form.maleCount) || 0) +
-    (Number(form.femaleCount) || 0) +
-    (Number(form.boysCount) || 0) +
-    (Number(form.girlsCount) || 0);
+  const demoTotal = (Number(form.maleCount) || 0) + (Number(form.femaleCount) || 0);
 
-  const patchForm = (patch: Partial<WeeklyAttendanceForm>) =>
+  const patchForm = (patch: Partial<AttendanceForm>) =>
     setForm((prev) => ({ ...prev, ...patch }));
 
   const startEdit = (row: ServiceUnitAttendanceRecord) => {
@@ -97,8 +87,6 @@ export function ServiceUnitWeeklyAttendancePanel({
       meetingDate: toDateInput(row.meetingDate ?? row.weekStart),
       maleCount: String(row.maleCount ?? 0),
       femaleCount: String(row.femaleCount ?? 0),
-      boysCount: String(row.boysCount ?? 0),
-      girlsCount: String(row.girlsCount ?? 0),
       testifiersCount: String(row.testifiersCount ?? 0),
       firstTimersCount: String(row.firstTimersCount ?? 0),
     });
@@ -117,15 +105,18 @@ export function ServiceUnitWeeklyAttendancePanel({
     const day = weekStart.getDay();
     weekStart.setDate(weekStart.getDate() + (day === 0 ? -6 : 1 - day));
     weekStart.setHours(0, 0, 0, 0);
+    const maleCount = Number(form.maleCount) || 0;
+    const femaleCount = Number(form.femaleCount) || 0;
     return {
       weekStart: weekStart.toISOString(),
       meetingDate: meetingDate.toISOString(),
-      maleCount: Number(form.maleCount) || 0,
-      femaleCount: Number(form.femaleCount) || 0,
-      boysCount: Number(form.boysCount) || 0,
-      girlsCount: Number(form.girlsCount) || 0,
+      maleCount,
+      femaleCount,
+      boysCount: 0,
+      girlsCount: 0,
       testifiersCount: Number(form.testifiersCount) || 0,
       firstTimersCount: Number(form.firstTimersCount) || 0,
+      presentCount: maleCount + femaleCount,
     };
   };
 
@@ -152,7 +143,7 @@ export function ServiceUnitWeeklyAttendancePanel({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Weekly attendance — {unitName}</CardTitle>
+        <CardTitle className="text-base">Attendance — {unitName}</CardTitle>
         <CardDescription>
           Record demographic attendance. Reports appear on Pastor and Admin reports dashboards.
         </CardDescription>
@@ -170,12 +161,12 @@ export function ServiceUnitWeeklyAttendancePanel({
               disabled={!canManage}
             />
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {FIELDS.map(({ key, label }) => (
               <div key={key}>
-                <Label htmlFor={`unit-weekly-${key}`}>{label}</Label>
+                <Label htmlFor={`unit-att-${key}`}>{label}</Label>
                 <Input
-                  id={`unit-weekly-${key}`}
+                  id={`unit-att-${key}`}
                   type="number"
                   inputMode="numeric"
                   min={0}
@@ -229,8 +220,8 @@ export function ServiceUnitWeeklyAttendancePanel({
                     <div>
                       <p className="font-medium">{dateLabel}</p>
                       <p className="text-xs text-muted-foreground">
-                        Total {row.presentCount} · M {row.maleCount} · F {row.femaleCount} · B{' '}
-                        {row.boysCount} · G {row.girlsCount} · FT {row.firstTimersCount}
+                        Total {row.presentCount} · M {row.maleCount} · F {row.femaleCount} · FT{' '}
+                        {row.firstTimersCount}
                       </p>
                     </div>
                     {canManage ? (
