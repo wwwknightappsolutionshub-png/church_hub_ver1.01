@@ -110,6 +110,7 @@ model Church {
   communicationQueueItems  CommunicationQueueItem[]
   conversations            Conversation[]
   serviceUnitWeeklyReports ServiceUnitWeeklyReport[]
+  serviceUnitAttendance    ServiceUnitAttendance[]
   usheringWeeklyHeadcounts UsheringWeeklyHeadcount[]
   automationSettings       ChurchAutomationSettings?
   automationRunLogs        AutomationRunLog[]
@@ -371,6 +372,7 @@ model User {
   cellBranchesLed           CellBranch[]       @relation("CellBranchLeader")
   cellReportsSubmitted      CellReport[]       @relation("CellReportSubmitter")
   cellAttendanceRecorded    CellAttendance[]   @relation("CellAttendanceRecorder")
+  serviceUnitAttendanceRecorded ServiceUnitAttendance[] @relation("ServiceUnitAttendanceRecorder")
   cellIncidentsReported     CellIncident[]     @relation("CellIncidentReporter")
   cellMessagesSent          CellMessage[]      @relation("CellMessageFrom")
   cellMessagesReceived      CellMessage[]      @relation("CellMessageTo")
@@ -2065,6 +2067,7 @@ model ServiceUnit {
   attendanceRecords AttendanceRecord[]
   communicationQueueItems CommunicationQueueItem[]
   weeklyReports ServiceUnitWeeklyReport[]
+  attendanceReports ServiceUnitAttendance[]
   usheringHeadcounts  UsheringWeeklyHeadcount[]
   deptSchedules       DeptSchedule[]
   deptAssignments     DeptAssignment[]
@@ -2121,6 +2124,35 @@ model ServiceUnitWeeklyReport {
   @@unique([serviceUnitId, weekStart])
   @@index([churchId, weekStart])
   @@map("service_unit_weekly_reports")
+}
+
+/// Demographic weekly attendance for any service unit (mirrors CellAttendance).
+model ServiceUnitAttendance {
+  id                 String   @id @default(uuid())
+  churchId           String
+  serviceUnitId      String
+  weekStart          DateTime
+  meetingDate        DateTime?
+  presentCount       Int
+  absentCount        Int?
+  maleCount          Int      @default(0)
+  femaleCount        Int      @default(0)
+  boysCount          Int      @default(0)
+  girlsCount         Int      @default(0)
+  testifiersCount    Int      @default(0)
+  firstTimersCount   Int      @default(0)
+  notes              String?
+  recordedByUserId   String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceUnit ServiceUnit @relation(fields: [serviceUnitId], references: [id], onDelete: Cascade)
+  recordedBy  User        @relation("ServiceUnitAttendanceRecorder", fields: [recordedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([churchId, serviceUnitId, weekStart])
+  @@index([churchId, meetingDate])
+  @@map("service_unit_attendance")
 }
 
 /// Ushering service unit — weekly sanctuary headcounts (Male / Female / Babies / Children / Total)

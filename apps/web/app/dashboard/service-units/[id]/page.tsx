@@ -31,6 +31,7 @@ import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { ServiceUnitJoinSheet } from '@/components/service-units/ServiceUnitJoinSheet';
 import { ServiceUnitAdminPanel } from '@/components/service-units/ServiceUnitAdminPanel';
 import { ServiceUnitMembersPanel } from '@/components/service-units/ServiceUnitMembersPanel';
+import { ServiceUnitWeeklyAttendancePanel } from '@/components/service-units/ServiceUnitWeeklyAttendancePanel';
 import {
   DepartmentToolsRouter,
 } from '@/components/departments/DepartmentToolsRouter';
@@ -42,6 +43,7 @@ type Tab =
   | 'meetings'
   | 'summaries'
   | 'leaders'
+  | 'weekly'
   | 'forum'
   | 'admin'
   | 'department';
@@ -114,6 +116,7 @@ const baseTabs: { id: Tab; label: string; icon: typeof Users }[] = [
   { id: 'meetings', label: 'Meetings', icon: Calendar },
   { id: 'summaries', label: 'Meeting summary', icon: ClipboardList },
   { id: 'leaders', label: 'Members', icon: Users },
+  { id: 'weekly', label: 'Weekly', icon: ClipboardList },
   { id: 'forum', label: 'Forum', icon: MessageSquare },
   { id: 'admin', label: 'Unit admin', icon: Shield },
 ];
@@ -741,6 +744,14 @@ export default function ServiceUnitDetailPage() {
 
       {tab === 'leaders' && (
         <ServiceUnitMembersPanel unitId={id} canManage={canManage} isOnline={isOnline} />
+      )}
+
+      {tab === 'weekly' && unit.data && (
+        <ServiceUnitWeeklyAttendancePanel
+          unitId={id}
+          unitName={unit.data.name}
+          canManage={canManage}
+        />
       )}
 
       {tab === 'admin' && canManage && unit.data && (

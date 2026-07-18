@@ -5,6 +5,8 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { ModuleAccessService, UserMemberContext } from '../access/module-access.service';
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
 import { MembershipService } from '../membership/membership.service';
+import { MembershipRegistryService } from '../membership/membership-registry.service';
+import { CommunicationsQueueService } from '../communications/communications-queue.service';
 import type { AssignServiceUnitMemberDto, UpdateServiceUnitMemberDto } from './dto/assign-service-unit-member.dto';
 
 const unitInclude = {
@@ -41,6 +43,8 @@ export class ServiceUnitsService {
     private readonly moduleAccess: ModuleAccessService,
     private readonly email: EmailAdapter,
     private readonly membership: MembershipService,
+    private readonly registry: MembershipRegistryService,
+    private readonly commQueue: CommunicationsQueueService,
   ) {}
 
   private async ensureCatalogUnits(churchId: string) {
@@ -583,6 +587,322 @@ export class ServiceUnitsService {
     body: AssignServiceUnitMemberDto,
   ) {
     return this.assignUnitMember(userId, churchId, serviceUnitId, body);
+  }
+
+  /** Full congregant create via global membership form, then attach to this unit. */
+  async createMemberAndAdd(
+    userId: string,
+    churchId: string,
+    serviceUnitId: string,
+    data: Record<string, unknown>,
+  ) {
+    await this.requireUnitManager(userId, churchId, serviceUnitId);
+    await this.getUnit(churchId, serviceUnitId);
+
+    const firstName = String(data.firstName ?? '').trim();
+    const lastName = String(data.lastName ?? '').trim();
+    if (!firstName || !lastName) {
+      throw new BadRequestException('First name and last name are required');
+    }
+
+    const incomingUnits = Array.isArray(data.serviceUnitIds)
+      ? data.serviceUnitIds.map((id) => String(id)).filter(Boolean)
+      : [];
+    const serviceUnitIds = Array.from(new Set([...incomingUnits, serviceUnitId]));
+
+    const created = await this.membership.createMember(churchId, {
+      ...(data as Parameters<MembershipService['createMember']>[1]),
+      firstName,
+      lastName,
+      serviceUnitIds,
+      startOnboarding: data.startOnboarding === true,
+      requireContactFields: data.requireContactFields !== false,
+    });
+
+    const membership = await this.prisma.serviceUnitMember.findUnique({
+      where: { serviceUnitId_memberId: { serviceUnitId, memberId: created.id } },
+    });
+    if (!membership) {
+      await this.applyUnitRole(serviceUnitId, created.id, 'MEMBER');
+    }
+
+    return created;
+  }
+
+  async getRegistryCatalog(churchId: string) {
+    return this.registry.getRegistryCatalog(churchId);
+  }
+
+  private nonNegInt(value: unknown, field: string): number {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 0) {
+      throw new BadRequestException(`${field} must be a non-negative number`);
+    }
+    return Math.floor(n);
+  }
+
+  private startOfWeek(date: Date): Date {
+    const d = new Date(date);
+    const day = d.getDay();
+    d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  async listAttendance(userId: string, churchId: string, serviceUnitId: string) {
+    const access = await this.checkUnitAccess(userId, churchId, serviceUnitId);
+    if (!access.canView) {
+      throw new ForbiddenException('You are not a member of this service unit');
+    }
+    return this.prisma.serviceUnitAttendance.findMany({
+      where: { churchId, serviceUnitId },
+      orderBy: [{ meetingDate: 'desc' }, { weekStart: 'desc' }, { createdAt: 'desc' }],
+      take: 52,
+    });
+  }
+
+  async recordAttendance(
+    userId: string,
+    churchId: string,
+    serviceUnitId: string,
+    body: {
+      weekStart?: string;
+      meetingDate?: string;
+      presentCount?: number;
+      absentCount?: number;
+      maleCount?: number;
+      femaleCount?: number;
+      boysCount?: number;
+      girlsCount?: number;
+      testifiersCount?: number;
+      firstTimersCount?: number;
+      notes?: string;
+    },
+  ) {
+    await this.requireUnitManager(userId, churchId, serviceUnitId);
+    await this.getUnit(churchId, serviceUnitId);
+
+    const maleCount = this.nonNegInt(body.maleCount ?? 0, 'maleCount');
+    const femaleCount = this.nonNegInt(body.femaleCount ?? 0, 'femaleCount');
+    const boysCount = this.nonNegInt(body.boysCount ?? 0, 'boysCount');
+    const girlsCount = this.nonNegInt(body.girlsCount ?? 0, 'girlsCount');
+    const testifiersCount = this.nonNegInt(body.testifiersCount ?? 0, 'testifiersCount');
+    const firstTimersCount = this.nonNegInt(body.firstTimersCount ?? 0, 'firstTimersCount');
+    const demographicTotal = maleCount + femaleCount + boysCount + girlsCount;
+    const presentCount =
+      body.presentCount != null && Number.isFinite(Number(body.presentCount))
+        ? this.nonNegInt(body.presentCount, 'presentCount')
+        : demographicTotal;
+
+    const meetingDate = body.meetingDate
+      ? new Date(body.meetingDate)
+      : body.weekStart
+        ? new Date(body.weekStart)
+        : new Date();
+    if (Number.isNaN(meetingDate.getTime())) {
+      throw new BadRequestException('Invalid meeting date');
+    }
+    const weekStart = body.weekStart ? new Date(body.weekStart) : this.startOfWeek(meetingDate);
+    if (Number.isNaN(weekStart.getTime())) {
+      throw new BadRequestException('Invalid week start');
+    }
+
+    const row = await this.prisma.serviceUnitAttendance.create({
+      data: {
+        churchId,
+        serviceUnitId,
+        weekStart,
+        meetingDate,
+        presentCount,
+        absentCount:
+          body.absentCount != null && Number.isFinite(body.absentCount)
+            ? Math.floor(body.absentCount)
+            : null,
+        maleCount,
+        femaleCount,
+        boysCount,
+        girlsCount,
+        testifiersCount,
+        firstTimersCount,
+        notes: body.notes?.trim() || null,
+        recordedByUserId: userId,
+      },
+    });
+    await this.notifyLeadershipOfAttendance(churchId, serviceUnitId, row, 'created');
+    return row;
+  }
+
+  async updateAttendance(
+    userId: string,
+    churchId: string,
+    serviceUnitId: string,
+    attendanceId: string,
+    body: {
+      weekStart?: string;
+      meetingDate?: string;
+      presentCount?: number;
+      absentCount?: number;
+      maleCount?: number;
+      femaleCount?: number;
+      boysCount?: number;
+      girlsCount?: number;
+      testifiersCount?: number;
+      firstTimersCount?: number;
+      notes?: string;
+    },
+  ) {
+    await this.requireUnitManager(userId, churchId, serviceUnitId);
+    const existing = await this.prisma.serviceUnitAttendance.findFirst({
+      where: { id: attendanceId, churchId, serviceUnitId },
+    });
+    if (!existing) throw new NotFoundException('Attendance record not found');
+
+    const maleCount =
+      body.maleCount != null ? this.nonNegInt(body.maleCount, 'maleCount') : existing.maleCount;
+    const femaleCount =
+      body.femaleCount != null
+        ? this.nonNegInt(body.femaleCount, 'femaleCount')
+        : existing.femaleCount;
+    const boysCount =
+      body.boysCount != null ? this.nonNegInt(body.boysCount, 'boysCount') : existing.boysCount;
+    const girlsCount =
+      body.girlsCount != null ? this.nonNegInt(body.girlsCount, 'girlsCount') : existing.girlsCount;
+    const testifiersCount =
+      body.testifiersCount != null
+        ? this.nonNegInt(body.testifiersCount, 'testifiersCount')
+        : existing.testifiersCount;
+    const firstTimersCount =
+      body.firstTimersCount != null
+        ? this.nonNegInt(body.firstTimersCount, 'firstTimersCount')
+        : existing.firstTimersCount;
+    const demographicTotal = maleCount + femaleCount + boysCount + girlsCount;
+    const presentCount =
+      body.presentCount != null && Number.isFinite(Number(body.presentCount))
+        ? this.nonNegInt(body.presentCount, 'presentCount')
+        : demographicTotal > 0
+          ? demographicTotal
+          : existing.presentCount;
+
+    const meetingDate = body.meetingDate
+      ? new Date(body.meetingDate)
+      : existing.meetingDate ?? existing.weekStart;
+    if (Number.isNaN(meetingDate.getTime())) {
+      throw new BadRequestException('Invalid meeting date');
+    }
+    const weekStart = body.weekStart
+      ? new Date(body.weekStart)
+      : this.startOfWeek(meetingDate);
+    if (Number.isNaN(weekStart.getTime())) {
+      throw new BadRequestException('Invalid week start');
+    }
+
+    const row = await this.prisma.serviceUnitAttendance.update({
+      where: { id: attendanceId },
+      data: {
+        weekStart,
+        meetingDate,
+        presentCount,
+        absentCount:
+          body.absentCount != null && Number.isFinite(body.absentCount)
+            ? Math.floor(body.absentCount)
+            : existing.absentCount,
+        maleCount,
+        femaleCount,
+        boysCount,
+        girlsCount,
+        testifiersCount,
+        firstTimersCount,
+        notes: body.notes !== undefined ? body.notes.trim() || null : existing.notes,
+      },
+    });
+    await this.notifyLeadershipOfAttendance(churchId, serviceUnitId, row, 'updated');
+    return row;
+  }
+
+  private async notifyLeadershipOfAttendance(
+    churchId: string,
+    serviceUnitId: string,
+    row: {
+      id: string;
+      weekStart: Date;
+      meetingDate: Date | null;
+      presentCount: number;
+      maleCount: number;
+      femaleCount: number;
+      boysCount: number;
+      girlsCount: number;
+      testifiersCount: number;
+      firstTimersCount: number;
+      createdAt: Date;
+    },
+    action: 'created' | 'updated',
+  ) {
+    const unit = await this.prisma.serviceUnit.findFirst({
+      where: { id: serviceUnitId, churchId },
+      select: { name: true },
+    });
+    const unitName = unit?.name ?? 'Service unit';
+    const meetingDate = row.meetingDate ?? row.weekStart;
+    const dateLabel = meetingDate.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+    const timestamp = new Date().toISOString();
+    const title = `[Attendance Report] ${unitName} — ${dateLabel}`;
+    const body = [
+      `Tags: Service Unit Name · Date · Attendance Report · Timestamp`,
+      ``,
+      `Service Unit Name: ${unitName}`,
+      `Date: ${dateLabel}`,
+      `Attendance Report: ${action === 'created' ? 'New' : 'Updated'} weekly attendance`,
+      `Timestamp: ${timestamp}`,
+      ``,
+      `Male: ${row.maleCount}`,
+      `Female: ${row.femaleCount}`,
+      `Boys: ${row.boysCount}`,
+      `Girls: ${row.girlsCount}`,
+      `Testifiers: ${row.testifiersCount}`,
+      `First Timers: ${row.firstTimersCount}`,
+      `Total present: ${row.presentCount}`,
+    ].join('\n');
+
+    const staffUsers = await this.prisma.user.findMany({
+      where: {
+        churchId,
+        isActive: true,
+        roles: { some: { role: { name: { in: ['ADMIN', 'PASTOR'] } } } },
+      },
+      select: { id: true },
+    });
+
+    for (const staff of staffUsers) {
+      await this.commQueue.enqueue(churchId, {
+        kind: 'DEPARTMENT_WEEKLY_REPORT',
+        title,
+        body,
+        channels: ['IN_APP', 'EMAIL'],
+        targetUserId: staff.id,
+        serviceUnitId,
+        metadata: {
+          tags: ['Service Unit Name', 'Date', 'Attendance Report', 'Timestamp'],
+          serviceUnitId,
+          serviceUnitName: unitName,
+          date: dateLabel,
+          reportType: 'Attendance Report',
+          timestamp,
+          attendanceId: row.id,
+          action,
+          presentCount: row.presentCount,
+          maleCount: row.maleCount,
+          femaleCount: row.femaleCount,
+          boysCount: row.boysCount,
+          girlsCount: row.girlsCount,
+          firstTimersCount: row.firstTimersCount,
+          testifiersCount: row.testifiersCount,
+        },
+      });
+    }
   }
 
   async updateUnitMember(

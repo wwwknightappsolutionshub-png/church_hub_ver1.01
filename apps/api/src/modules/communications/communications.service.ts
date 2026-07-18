@@ -307,49 +307,52 @@ export class CommunicationsService {
   }
 
   async getPastorReportsInbox(churchId: string, userId: string) {
-    const [deptReports, weeklyReports, queueItems, notifications, inApp] = await Promise.all([
-      this.prisma.deptModuleReport.findMany({
-        where: { churchId },
-        orderBy: { submittedAt: 'desc' },
-        take: 120,
-        include: {
-          author: {
-            select: { id: true, userId: true, firstName: true, lastName: true },
+    const [deptReports, weeklyReports, cellAttendance, unitAttendance, queueItems, notifications, inApp] =
+      await Promise.all([
+        this.prisma.deptModuleReport.findMany({
+          where: { churchId },
+          orderBy: { submittedAt: 'desc' },
+          take: 120,
+          include: {
+            author: {
+              select: { id: true, userId: true, firstName: true, lastName: true },
+            },
+            serviceUnit: { select: { id: true, name: true, departmentCode: true } },
           },
-          serviceUnit: { select: { id: true, name: true, departmentCode: true } },
-        },
-      }),
-      this.prisma.serviceUnitWeeklyReport.findMany({
-        where: { churchId },
-        orderBy: { createdAt: 'desc' },
-        take: 120,
-        include: { serviceUnit: { select: { id: true, name: true, departmentCode: true } } },
-      }),
-      this.prisma.communicationQueueItem.findMany({
-        where: {
-          churchId,
-          kind: { in: ['DEPARTMENT_WEEKLY_REPORT', 'PASTORAL_ALERT', 'DIRECT_ALERT'] },
-          OR: [{ targetUserId: null }, { targetUserId: userId }],
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 200,
-        include: { serviceUnit: { select: { id: true, name: true, departmentCode: true } } },
-      }),
-      this.prisma.notification.findMany({
-        where: { churchId, OR: [{ userId: null }, { userId }] },
-        orderBy: { sentAt: 'desc' },
-        take: 200,
-      }),
-      this.prisma.inAppMessage.findMany({
-        where: { churchId, OR: [{ recipientId: userId }, { senderId: userId }] },
-        orderBy: { createdAt: 'desc' },
-        take: 200,
-        include: {
-          sender: { select: { id: true, firstName: true, lastName: true } },
-          recipient: { select: { id: true, firstName: true, lastName: true } },
-        },
-      }),
-    ]);
+        }),
+        this.prisma.serviceUnitWeeklyReport.findMany({
+          where: { churchId },
+          orderBy: { createdAt: 'desc' },
+          take: 120,
+          include: { serviceUnit: { select: { id: true, name: true, departmentCode: true } } },
+        }),
+        this.listCellAttendanceReports(churchId),
+        this.listServiceUnitAttendanceReports(churchId),
+        this.prisma.communicationQueueItem.findMany({
+          where: {
+            churchId,
+            kind: { in: ['DEPARTMENT_WEEKLY_REPORT', 'PASTORAL_ALERT', 'DIRECT_ALERT'] },
+            OR: [{ targetUserId: null }, { targetUserId: userId }],
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 200,
+          include: { serviceUnit: { select: { id: true, name: true, departmentCode: true } } },
+        }),
+        this.prisma.notification.findMany({
+          where: { churchId, OR: [{ userId: null }, { userId }] },
+          orderBy: { sentAt: 'desc' },
+          take: 200,
+        }),
+        this.prisma.inAppMessage.findMany({
+          where: { churchId, OR: [{ recipientId: userId }, { senderId: userId }] },
+          orderBy: { createdAt: 'desc' },
+          take: 200,
+          include: {
+            sender: { select: { id: true, firstName: true, lastName: true } },
+            recipient: { select: { id: true, firstName: true, lastName: true } },
+          },
+        }),
+      ]);
 
     const replyTargets = this.buildReplyTargets(deptReports, inApp, queueItems);
 
@@ -357,6 +360,8 @@ export class CommunicationsService {
       reports: {
         department: deptReports,
         weekly: weeklyReports,
+        cellAttendance,
+        unitAttendance,
       },
       queue: queueItems,
       notifications,
@@ -367,8 +372,16 @@ export class CommunicationsService {
 
   /** Church-wide inbox for ADMIN — all reports, queue items, notifications, and in-app messages. */
   async getAdminReportsInbox(churchId: string) {
-    const [deptReports, weeklyReports, queueItems, notifications, inApp, staffUsers] =
-      await Promise.all([
+    const [
+      deptReports,
+      weeklyReports,
+      cellAttendance,
+      unitAttendance,
+      queueItems,
+      notifications,
+      inApp,
+      staffUsers,
+    ] = await Promise.all([
         this.prisma.deptModuleReport.findMany({
           where: { churchId },
           orderBy: { submittedAt: 'desc' },
@@ -386,6 +399,8 @@ export class CommunicationsService {
           take: 200,
           include: { serviceUnit: { select: { id: true, name: true, departmentCode: true } } },
         }),
+        this.listCellAttendanceReports(churchId),
+        this.listServiceUnitAttendanceReports(churchId),
         this.prisma.communicationQueueItem.findMany({
           where: { churchId },
           orderBy: { createdAt: 'desc' },
@@ -410,7 +425,8 @@ export class CommunicationsService {
           where: {
             churchId,
             isActive: true,
-            roles: { some: { role: { name: { in: ['PASTOR', 'ADMIN', 'LEADER'] } } } } },
+            roles: { some: { role: { name: { in: ['PASTOR', 'ADMIN', 'LEADER'] } } } },
+          },
           select: {
             id: true,
             firstName: true,
@@ -435,12 +451,96 @@ export class CommunicationsService {
       reports: {
         department: deptReports,
         weekly: weeklyReports,
+        cellAttendance,
+        unitAttendance,
       },
       queue: queueItems,
       notifications,
       messages: inApp,
       replyTargets,
     };
+  }
+
+  /** Ministry/Cells weekly attendance for pastor & admin report dashboards. */
+  private async listCellAttendanceReports(churchId: string) {
+    const rows = await this.prisma.cellAttendance.findMany({
+      where: { churchId },
+      orderBy: [{ meetingDate: 'desc' }, { weekStart: 'desc' }, { createdAt: 'desc' }],
+      take: 120,
+      include: {
+        branch: { select: { id: true, name: true, location: true } },
+        recordedBy: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+
+    return rows.map((row) => {
+      const meetingDate = row.meetingDate ?? row.weekStart;
+      const demoTotal = row.maleCount + row.femaleCount + row.boysCount + row.girlsCount;
+      return {
+        id: row.id,
+        branchId: row.branchId,
+        branchName: row.branch.name,
+        location: row.branch.location,
+        meetingDate: meetingDate.toISOString(),
+        weekStart: row.weekStart.toISOString(),
+        createdAt: row.createdAt.toISOString(),
+        presentCount: demoTotal > 0 ? demoTotal : row.presentCount,
+        maleCount: row.maleCount,
+        femaleCount: row.femaleCount,
+        boysCount: row.boysCount,
+        girlsCount: row.girlsCount,
+        testifiersCount: row.testifiersCount,
+        firstTimersCount: row.firstTimersCount,
+        recordedBy: row.recordedBy
+          ? {
+              id: row.recordedBy.id,
+              firstName: row.recordedBy.firstName,
+              lastName: row.recordedBy.lastName,
+            }
+          : null,
+      };
+    });
+  }
+
+  /** Service unit demographic attendance for pastor & admin report dashboards. */
+  private async listServiceUnitAttendanceReports(churchId: string) {
+    const rows = await this.prisma.serviceUnitAttendance.findMany({
+      where: { churchId },
+      orderBy: [{ meetingDate: 'desc' }, { weekStart: 'desc' }, { createdAt: 'desc' }],
+      take: 120,
+      include: {
+        serviceUnit: { select: { id: true, name: true, departmentCode: true } },
+        recordedBy: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+
+    return rows.map((row) => {
+      const meetingDate = row.meetingDate ?? row.weekStart;
+      const demoTotal = row.maleCount + row.femaleCount + row.boysCount + row.girlsCount;
+      return {
+        id: row.id,
+        serviceUnitId: row.serviceUnitId,
+        serviceUnitName: row.serviceUnit.name,
+        departmentCode: row.serviceUnit.departmentCode,
+        meetingDate: meetingDate.toISOString(),
+        weekStart: row.weekStart.toISOString(),
+        createdAt: row.createdAt.toISOString(),
+        presentCount: demoTotal > 0 ? demoTotal : row.presentCount,
+        maleCount: row.maleCount,
+        femaleCount: row.femaleCount,
+        boysCount: row.boysCount,
+        girlsCount: row.girlsCount,
+        testifiersCount: row.testifiersCount,
+        firstTimersCount: row.firstTimersCount,
+        recordedBy: row.recordedBy
+          ? {
+              id: row.recordedBy.id,
+              firstName: row.recordedBy.firstName,
+              lastName: row.recordedBy.lastName,
+            }
+          : null,
+      };
+    });
   }
 
   private buildReplyTargets(

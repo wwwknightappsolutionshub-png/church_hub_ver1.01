@@ -16,12 +16,56 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
 type QueueStatus = 'PENDING' | 'PROCESSING' | 'SENT' | 'FAILED';
-type TriageKind = 'all' | 'department' | 'weekly' | 'queue' | 'notification' | 'message';
+type TriageKind =
+  | 'all'
+  | 'department'
+  | 'weekly'
+  | 'cell'
+  | 'unit'
+  | 'queue'
+  | 'notification'
+  | 'message';
 
 interface ReplyTarget {
   userId: string;
   label: string;
   source: string;
+}
+
+export interface CellAttendanceReportItem {
+  id: string;
+  branchId: string;
+  branchName: string;
+  location: string | null;
+  meetingDate: string;
+  weekStart: string;
+  createdAt: string;
+  presentCount: number;
+  maleCount: number;
+  femaleCount: number;
+  boysCount: number;
+  girlsCount: number;
+  testifiersCount: number;
+  firstTimersCount: number;
+  recordedBy: { id: string; firstName: string; lastName: string } | null;
+}
+
+export interface UnitAttendanceReportItem {
+  id: string;
+  serviceUnitId: string;
+  serviceUnitName: string;
+  departmentCode: string | null;
+  meetingDate: string;
+  weekStart: string;
+  createdAt: string;
+  presentCount: number;
+  maleCount: number;
+  femaleCount: number;
+  boysCount: number;
+  girlsCount: number;
+  testifiersCount: number;
+  firstTimersCount: number;
+  recordedBy: { id: string; firstName: string; lastName: string } | null;
 }
 
 export interface ReportsInboxData {
@@ -42,6 +86,8 @@ export interface ReportsInboxData {
       stats?: Record<string, unknown> | null;
       serviceUnit: { id: string; name: string; departmentCode: string | null };
     }>;
+    cellAttendance?: CellAttendanceReportItem[];
+    unitAttendance?: UnitAttendanceReportItem[];
   };
   queue: Array<{
     id: string;
@@ -58,6 +104,13 @@ export interface ReportsInboxData {
       date?: string;
       reportType?: string;
       timestamp?: string;
+      presentCount?: number;
+      maleCount?: number;
+      femaleCount?: number;
+      boysCount?: number;
+      girlsCount?: number;
+      firstTimersCount?: number;
+      testifiersCount?: number;
     } | null;
   }>;
   notifications: Array<{ id: string; title: string; body: string; type: string; sentAt: string }>;
@@ -84,6 +137,8 @@ const KIND_OPTIONS: Array<{ value: TriageKind; label: string }> = [
   { value: 'all', label: 'All types' },
   { value: 'department', label: 'Department reports' },
   { value: 'weekly', label: 'Weekly reports' },
+  { value: 'cell', label: 'Ministry / Cells' },
+  { value: 'unit', label: 'Service units' },
   { value: 'queue', label: 'Queue alerts' },
   { value: 'notification', label: 'Notifications' },
   { value: 'message', label: 'In-app messages' },
@@ -208,6 +263,118 @@ function WeeklyReportItem({ report }: { report: ReportsInboxData['reports']['wee
   );
 }
 
+function CellAttendanceReportItemCard({ report }: { report: CellAttendanceReportItem }) {
+  const dateLabel = new Date(report.meetingDate).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+  const details = [
+    { label: 'Male', value: report.maleCount },
+    { label: 'Female', value: report.femaleCount },
+    { label: 'Boys', value: report.boysCount },
+    { label: 'Girls', value: report.girlsCount },
+    { label: 'First timers', value: report.firstTimersCount },
+  ];
+
+  return (
+    <article className={cn('rounded-lg border px-3 py-2.5 text-sm', URGENCY_META.low.card)}>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-medium leading-snug">{report.branchName}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {report.location ? `${report.location} · ` : ''}
+            {dateLabel}
+            {report.recordedBy
+              ? ` · ${report.recordedBy.firstName} ${report.recordedBy.lastName}`
+              : ''}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <Badge variant="secondary" className="text-[10px]">
+            Ministry / Cells
+          </Badge>
+          <p className="text-lg font-bold tabular-nums leading-none">{report.presentCount}</p>
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Total attendance</p>
+        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+        {details.map((d) => (
+          <div
+            key={d.label}
+            className="rounded-md border border-border/60 bg-background/70 px-2 py-1.5 text-center"
+          >
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{d.label}</p>
+            <p className="text-sm font-semibold tabular-nums">{d.value}</p>
+          </div>
+        ))}
+      </div>
+      {report.testifiersCount > 0 ? (
+        <p className="mt-2 text-xs text-muted-foreground">Testifiers: {report.testifiersCount}</p>
+      ) : null}
+      <p className="mt-2 text-[10px] text-muted-foreground">
+        Recorded {new Date(report.createdAt).toLocaleString()}
+      </p>
+    </article>
+  );
+}
+
+function UnitAttendanceReportItemCard({ report }: { report: UnitAttendanceReportItem }) {
+  const dateLabel = new Date(report.meetingDate).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+  const details = [
+    { label: 'Male', value: report.maleCount },
+    { label: 'Female', value: report.femaleCount },
+    { label: 'Boys', value: report.boysCount },
+    { label: 'Girls', value: report.girlsCount },
+    { label: 'First timers', value: report.firstTimersCount },
+  ];
+
+  return (
+    <article className={cn('rounded-lg border px-3 py-2.5 text-sm', URGENCY_META.low.card)}>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-medium leading-snug">{report.serviceUnitName}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {report.departmentCode ? `${report.departmentCode} · ` : ''}
+            {dateLabel}
+            {report.recordedBy
+              ? ` · ${report.recordedBy.firstName} ${report.recordedBy.lastName}`
+              : ''}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <Badge variant="secondary" className="text-[10px]">
+            Service unit
+          </Badge>
+          <p className="text-lg font-bold tabular-nums leading-none">{report.presentCount}</p>
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Total attendance</p>
+        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+        {details.map((d) => (
+          <div
+            key={d.label}
+            className="rounded-md border border-border/60 bg-background/70 px-2 py-1.5 text-center"
+          >
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{d.label}</p>
+            <p className="text-sm font-semibold tabular-nums">{d.value}</p>
+          </div>
+        ))}
+      </div>
+      {report.testifiersCount > 0 ? (
+        <p className="mt-2 text-xs text-muted-foreground">Testifiers: {report.testifiersCount}</p>
+      ) : null}
+      <p className="mt-2 text-[10px] text-muted-foreground">
+        Recorded {new Date(report.createdAt).toLocaleString()}
+      </p>
+    </article>
+  );
+}
+
 type UrgencyLevel = 'critical' | 'high' | 'medium' | 'low' | 'info';
 
 function queueUrgency(status: string): UrgencyLevel {
@@ -313,6 +480,22 @@ export function ReportsInboxPanel({
     });
   }, [data, kindFilter, search]);
 
+  const cellAttendanceReports = useMemo(() => {
+    if (kindFilter !== 'all' && kindFilter !== 'cell') return [];
+    return (data?.reports.cellAttendance ?? []).filter((r) => {
+      const blob = `${r.branchName} ${r.location ?? ''} ${r.presentCount} ${r.maleCount} ${r.femaleCount} ${r.boysCount} ${r.girlsCount} ${r.firstTimersCount}`;
+      return matchesSearch(blob, search);
+    });
+  }, [data, kindFilter, search]);
+
+  const unitAttendanceReports = useMemo(() => {
+    if (kindFilter !== 'all' && kindFilter !== 'unit') return [];
+    return (data?.reports.unitAttendance ?? []).filter((r) => {
+      const blob = `${r.serviceUnitName} ${r.departmentCode ?? ''} ${r.presentCount} ${r.maleCount} ${r.femaleCount} ${r.boysCount} ${r.girlsCount} ${r.firstTimersCount}`;
+      return matchesSearch(blob, search);
+    });
+  }, [data, kindFilter, search]);
+
   const queueItems = useMemo(() => {
     if (kindFilter !== 'all' && kindFilter !== 'queue') return [];
     return (data?.queue ?? []).filter((q) => {
@@ -339,7 +522,13 @@ export function ReportsInboxPanel({
   }, [data, kindFilter, search]);
 
   const triageCount =
-    deptReports.length + weeklyReports.length + queueItems.length + notifications.length + messages.length;
+    deptReports.length +
+    weeklyReports.length +
+    cellAttendanceReports.length +
+    unitAttendanceReports.length +
+    queueItems.length +
+    notifications.length +
+    messages.length;
 
   const urgencyCounts = useMemo(() => {
     const counts: Record<UrgencyLevel, number> = {
@@ -355,8 +544,17 @@ export function ReportsInboxPanel({
     }
     if (deptReports.length) counts.medium += deptReports.length;
     if (weeklyReports.length) counts.info += weeklyReports.length;
+    if (cellAttendanceReports.length) counts.low += cellAttendanceReports.length;
+    if (unitAttendanceReports.length) counts.low += unitAttendanceReports.length;
     return counts;
-  }, [data?.queue, deptReports.length, weeklyReports.length, statusFilter]);
+  }, [
+    data?.queue,
+    deptReports.length,
+    weeklyReports.length,
+    cellAttendanceReports.length,
+    unitAttendanceReports.length,
+    statusFilter,
+  ]);
 
   const submitReply = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -389,7 +587,11 @@ export function ReportsInboxPanel({
       badge={
         <Badge variant="success" className="gap-1 border-emerald-600/50 bg-emerald-900/40 text-emerald-100">
           <Mail className="h-3 w-3" />
-          {(data?.reports.department.length ?? 0) + (data?.reports.weekly.length ?? 0)} reports ·{' '}
+          {(data?.reports.department.length ?? 0) +
+            (data?.reports.weekly.length ?? 0) +
+            (data?.reports.cellAttendance?.length ?? 0) +
+            (data?.reports.unitAttendance?.length ?? 0)}{' '}
+          reports ·{' '}
           {data?.messages.length ?? 0} messages
         </Badge>
       }
@@ -533,6 +735,30 @@ export function ReportsInboxPanel({
               ))}
             </InboxScrollCard>
           </div>
+
+          <InboxScrollCard
+            title="Ministry / Cells attendance"
+            description="Branch and cell weekly attendance with demographic breakdown."
+            count={cellAttendanceReports.length}
+            emptyMessage="No Ministry/Cells attendance reports yet. Record attendance from a branch Weekly tab."
+            testId="reports-cell-attendance-inbox"
+          >
+            {cellAttendanceReports.map((r) => (
+              <CellAttendanceReportItemCard key={r.id} report={r} />
+            ))}
+          </InboxScrollCard>
+
+          <InboxScrollCard
+            title="Service unit attendance"
+            description="Service unit weekly attendance with demographic breakdown."
+            count={unitAttendanceReports.length}
+            emptyMessage="No service unit attendance reports yet. Record attendance from a unit Weekly tab."
+            testId="reports-unit-attendance-inbox"
+          >
+            {unitAttendanceReports.map((r) => (
+              <UnitAttendanceReportItemCard key={r.id} report={r} />
+            ))}
+          </InboxScrollCard>
 
           <div className="grid gap-4 xl:grid-cols-2 xl:items-stretch">
             <InboxScrollCard

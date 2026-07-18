@@ -68,6 +68,9 @@ interface CongregantEditorFormProps {
   /** Pre-select and lock this cell branch on create. */
   defaultCellBranchId?: string;
   lockCellBranch?: boolean;
+  /** Pre-select and lock these service units on create. */
+  defaultServiceUnitIds?: string[];
+  lockServiceUnit?: boolean;
   dialogTitle?: string;
   submitLabel?: string;
   addAnotherLabel?: string;
@@ -146,6 +149,8 @@ export function CongregantEditorForm({
   defaultFamilyId,
   defaultCellBranchId,
   lockCellBranch = false,
+  defaultServiceUnitIds,
+  lockServiceUnit = false,
   dialogTitle,
   submitLabel,
   addAnotherLabel = 'Save & Add Another',
@@ -172,6 +177,16 @@ export function CongregantEditorForm({
     if (!defaultCellBranchId || memberId) return;
     setForm((prev) => ({ ...prev, cellBranchId: defaultCellBranchId }));
   }, [defaultCellBranchId, memberId]);
+
+  useEffect(() => {
+    if (!defaultServiceUnitIds?.length || memberId) return;
+    setForm((prev) => ({
+      ...prev,
+      serviceUnitIds: Array.from(
+        new Set([...(prev.serviceUnitIds ?? []), ...defaultServiceUnitIds]),
+      ),
+    }));
+  }, [defaultServiceUnitIds, memberId]);
 
   useEffect(() => {
     if (!memberId) return;
@@ -254,6 +269,7 @@ export function CongregantEditorForm({
   };
 
   const toggleServiceUnit = (unitId: string) => {
+    if (lockServiceUnit && defaultServiceUnitIds?.includes(unitId)) return;
     setForm((prev) => {
       const ids = prev.serviceUnitIds ?? [];
       return {
@@ -366,6 +382,9 @@ export function CongregantEditorForm({
           setForm({
             ...(defaultFamilyId ? { ...emptyForm(), familyChoice: defaultFamilyId } : emptyForm()),
             ...(defaultCellBranchId ? { cellBranchId: defaultCellBranchId } : {}),
+            ...(defaultServiceUnitIds?.length
+              ? { serviceUnitIds: [...defaultServiceUnitIds] }
+              : {}),
           });
           setStep(0);
         } else {
@@ -659,7 +678,9 @@ export function CongregantEditorForm({
               <div>
                 <FieldLabel>Unit Member</FieldLabel>
                 <p className="mb-2 text-xs text-slate-500">
-                  Select one or more department / service units this person belongs to.
+                  {lockServiceUnit && defaultServiceUnitIds?.length
+                    ? 'This congregant will be added to the current service unit (you may also assign additional units).'
+                    : 'Select one or more department / service units this person belongs to.'}
                 </p>
                 {serviceUnits.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-500">
@@ -683,6 +704,9 @@ export function CongregantEditorForm({
                             type="checkbox"
                             className="mt-1"
                             checked={checked}
+                            disabled={
+                              lockServiceUnit && defaultServiceUnitIds?.includes(unit.id)
+                            }
                             onChange={() => toggleServiceUnit(unit.id)}
                           />
                           <span className="min-w-0 flex-1">

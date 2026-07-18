@@ -8,6 +8,7 @@ import type { AxiosError } from 'axios';
 import { api } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-errors';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
+import { LazyCongregantEditorForm } from '@/lib/membership-lazy';
 import { formatMemberName } from '@/lib/service-unit-utils';
 import { MemberWithPresence } from '@/components/service-units/OnlineIndicator';
 import { Badge } from '@/components/ui/badge';
@@ -39,14 +40,10 @@ interface ChurchMemberOption {
   email?: string | null;
 }
 
-const emptyNewForm = {
-  firstName: '',
-  lastName: '',
-  email: '',
-  phone: '',
-  unitRole: 'MEMBER' as UnitRole,
-  designation: '',
-};
+interface FamilyOption {
+  id: string;
+  name: string;
+}
 
 export function ServiceUnitMembersPanel({
   unitId,
@@ -61,9 +58,9 @@ export function ServiceUnitMembersPanel({
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<'existing' | 'new'>('existing');
   const [existingMemberId, setExistingMemberId] = useState('');
-  const [newForm, setNewForm] = useState(emptyNewForm);
   const [existingRole, setExistingRole] = useState<UnitRole>('MEMBER');
   const [existingDesignation, setExistingDesignation] = useState('');
+  const [showCongregantEditor, setShowCongregantEditor] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
     firstName: '',
@@ -85,6 +82,12 @@ export function ServiceUnitMembersPanel({
     { enabled: canManage },
   );
 
+  const { data: families = [] } = useApiQuery<FamilyOption[]>(
+    ['membership-families'],
+    '/membership/families',
+    { enabled: canManage && showCongregantEditor },
+  );
+
   const unitMemberIds = useMemo(() => new Set(rows.map((r) => r.memberId)), [rows]);
 
   const availableMembers = useMemo(
@@ -96,45 +99,30 @@ export function ServiceUnitMembersPanel({
     refetch();
     queryClient.invalidateQueries({ queryKey: ['service-unit', unitId] });
     queryClient.invalidateQueries({ queryKey: ['service-units'] });
+    queryClient.invalidateQueries({ queryKey: ['membership-members-picker'] });
   };
 
-  const addMember = async (e: React.FormEvent) => {
+  const addExistingMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canManage) return;
+    if (!existingMemberId) {
+      toast.error('Select a church member');
+      return;
+    }
     setBusy(true);
     try {
-      if (mode === 'existing') {
-        if (!existingMemberId) {
-          toast.error('Select a church member');
-          return;
-        }
-        await api.post(`/service-units/${unitId}/members`, {
-          memberId: existingMemberId,
-          unitRole: existingRole,
-          designation: existingDesignation.trim() || undefined,
-        });
-      } else {
-        if (!newForm.firstName.trim() || !newForm.lastName.trim()) {
-          toast.error('First and last name are required');
-          return;
-        }
-        await api.post(`/service-units/${unitId}/members`, {
-          firstName: newForm.firstName.trim(),
-          lastName: newForm.lastName.trim(),
-          email: newForm.email.trim() || undefined,
-          phone: newForm.phone.trim() || undefined,
-          unitRole: newForm.unitRole,
-          designation: newForm.designation.trim() || undefined,
-        });
-      }
+      await api.post(`/service-units/${unitId}/members`, {
+        memberId: existingMemberId,
+        unitRole: existingRole,
+        designation: existingDesignation.trim() || undefined,
+      });
       toast.success('Member added to unit');
       setExistingMemberId('');
       setExistingRole('MEMBER');
       setExistingDesignation('');
-      setNewForm(emptyNewForm);
       invalidate();
-    } catch (e) {
-      toast.error(apiErrorMessage(e as AxiosError, 'Could not add member'));
+    } catch (err) {
+      toast.error(apiErrorMessage(err as AxiosError, 'Could not add member'));
     } finally {
       setBusy(false);
     }
@@ -166,8 +154,8 @@ export function ServiceUnitMembersPanel({
       toast.success('Member updated');
       setEditingId(null);
       invalidate();
-    } catch (e) {
-      toast.error(apiErrorMessage(e as AxiosError, 'Could not update member'));
+    } catch (err) {
+      toast.error(apiErrorMessage(err as AxiosError, 'Could not update member'));
     } finally {
       setBusy(false);
     }
@@ -181,8 +169,8 @@ export function ServiceUnitMembersPanel({
       toast.success('Member removed from unit');
       if (editingId === memberId) setEditingId(null);
       invalidate();
-    } catch (e) {
-      toast.error(apiErrorMessage(e as AxiosError, 'Could not remove member'));
+    } catch (err) {
+      toast.error(apiErrorMessage(err as AxiosError, 'Could not remove member'));
     } finally {
       setBusy(false);
     }
@@ -198,8 +186,8 @@ export function ServiceUnitMembersPanel({
               Add member
             </CardTitle>
             <CardDescription>
-              Add someone from the church roster or create a new person, then assign them as a
-              unit member or unit admin.
+              Add someone from the church roster or create a new congregant in the global membership
+              database, then assign them as a unit member or unit admin.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -208,7 +196,10 @@ export function ServiceUnitMembersPanel({
                 type="button"
                 size="sm"
                 variant={mode === 'existing' ? 'default' : 'outline'}
-                onClick={() => setMode('existing')}
+                onClick={() => {
+                  setMode('existing');
+                  setShowCongregantEditor(false);
+                }}
               >
                 From church roster
               </Button>
@@ -216,76 +207,48 @@ export function ServiceUnitMembersPanel({
                 type="button"
                 size="sm"
                 variant={mode === 'new' ? 'default' : 'outline'}
-                onClick={() => setMode('new')}
+                onClick={() => {
+                  setMode('new');
+                  setShowCongregantEditor(true);
+                }}
               >
                 Create new person
               </Button>
             </div>
 
-            <form onSubmit={addMember} className="space-y-3">
-              {mode === 'existing' ? (
-                <>
-                  <select
-                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                    value={existingMemberId}
-                    onChange={(e) => setExistingMemberId(e.target.value)}
-                    required
-                  >
-                    <option value="">Select church member…</option>
-                    {availableMembers.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {formatMemberName(m)}
-                        {m.email ? ` (${m.email})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <RoleFields
-                    unitRole={existingRole}
-                    designation={existingDesignation}
-                    onRoleChange={setExistingRole}
-                    onDesignationChange={setExistingDesignation}
-                  />
-                </>
-              ) : (
-                <>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <Input
-                      placeholder="First name"
-                      value={newForm.firstName}
-                      onChange={(e) => setNewForm({ ...newForm, firstName: e.target.value })}
-                      required
-                    />
-                    <Input
-                      placeholder="Last name"
-                      value={newForm.lastName}
-                      onChange={(e) => setNewForm({ ...newForm, lastName: e.target.value })}
-                      required
-                    />
-                    <Input
-                      placeholder="Email (optional)"
-                      type="email"
-                      value={newForm.email}
-                      onChange={(e) => setNewForm({ ...newForm, email: e.target.value })}
-                    />
-                    <Input
-                      placeholder="Phone (optional)"
-                      value={newForm.phone}
-                      onChange={(e) => setNewForm({ ...newForm, phone: e.target.value })}
-                    />
-                  </div>
-                  <RoleFields
-                    unitRole={newForm.unitRole}
-                    designation={newForm.designation}
-                    onRoleChange={(unitRole) => setNewForm({ ...newForm, unitRole })}
-                    onDesignationChange={(designation) => setNewForm({ ...newForm, designation })}
-                  />
-                </>
-              )}
-              <Button type="submit" disabled={busy} className="gap-1">
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                Add to unit
-              </Button>
-            </form>
+            {mode === 'existing' ? (
+              <form onSubmit={addExistingMember} className="space-y-3">
+                <select
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={existingMemberId}
+                  onChange={(e) => setExistingMemberId(e.target.value)}
+                  required
+                >
+                  <option value="">Select church member…</option>
+                  {availableMembers.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {formatMemberName(m)}
+                      {m.email ? ` (${m.email})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <RoleFields
+                  unitRole={existingRole}
+                  designation={existingDesignation}
+                  onRoleChange={setExistingRole}
+                  onDesignationChange={setExistingDesignation}
+                />
+                <Button type="submit" disabled={busy} className="gap-1">
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                  Add to unit
+                </Button>
+              </form>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Use the Add New Congregant form to save them to the global membership database and
+                attach them to this unit.
+              </p>
+            )}
           </CardContent>
         </Card>
       )}
@@ -439,6 +402,28 @@ export function ServiceUnitMembersPanel({
           )}
         </CardContent>
       </Card>
+
+      {showCongregantEditor && canManage && (
+        <LazyCongregantEditorForm
+          families={(families ?? []).map((f) => ({ id: f.id, name: f.name }))}
+          createMemberPath={`/service-units/${unitId}/members/create`}
+          catalogPath="/service-units/registry-catalog"
+          defaultServiceUnitIds={[unitId]}
+          lockServiceUnit
+          dialogTitle="Add congregant to this service unit"
+          submitLabel="Create & add to unit"
+          onClose={() => {
+            setShowCongregantEditor(false);
+            setMode('existing');
+          }}
+          onSaved={() => {
+            setShowCongregantEditor(false);
+            setMode('existing');
+            toast.success('Congregant saved to membership and added to this unit');
+            invalidate();
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -744,6 +744,13 @@ export class MinistryCellsService {
           timestamp,
           attendanceId: row.id,
           action,
+          presentCount: row.presentCount,
+          maleCount: row.maleCount,
+          femaleCount: row.femaleCount,
+          boysCount: row.boysCount,
+          girlsCount: row.girlsCount,
+          firstTimersCount: row.firstTimersCount,
+          testifiersCount: row.testifiersCount,
         },
       });
     }

@@ -50,6 +50,12 @@ export class ServiceUnitsController {
     return this.departmentUnits.listDepartments(churchId);
   }
 
+  @Get('registry-catalog')
+  @ApiOperation({ summary: 'Membership registry catalog for unit congregant create forms' })
+  registryCatalog(@ChurchId() churchId: string) {
+    return this.serviceUnits.getRegistryCatalog(churchId);
+  }
+
   @Get(':id/access')
   @ApiOperation({ summary: 'Check current user access to a service unit' })
   checkAccess(
@@ -165,6 +171,61 @@ export class ServiceUnitsController {
     @Body() body: AssignServiceUnitMemberDto,
   ) {
     return this.serviceUnits.addMember(user.userId, churchId, id, body);
+  }
+
+  @Post(':id/members/create')
+  @ApiOperation({ summary: 'Create congregant via global form and add to this service unit' })
+  createMemberAndAdd(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.serviceUnits.createMemberAndAdd(user.userId, churchId, id, body);
+  }
+
+  @Get(':id/attendance')
+  @ApiOperation({ summary: 'List demographic weekly attendance for this service unit' })
+  listAttendance(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.serviceUnits.listAttendance(user.userId, churchId, id);
+  }
+
+  @Post(':id/attendance')
+  @ApiOperation({ summary: 'Record demographic weekly attendance for this service unit' })
+  recordAttendance(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.serviceUnits.recordAttendance(
+      user.userId,
+      churchId,
+      id,
+      body as Parameters<ServiceUnitsService['recordAttendance']>[3],
+    );
+  }
+
+  @Patch(':id/attendance/:attendanceId')
+  @ApiOperation({ summary: 'Update a demographic attendance record' })
+  updateAttendance(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('attendanceId') attendanceId: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.serviceUnits.updateAttendance(
+      user.userId,
+      churchId,
+      id,
+      attendanceId,
+      body as Parameters<ServiceUnitsService['updateAttendance']>[4],
+    );
   }
 
   @Patch(':id/members/:memberId')
