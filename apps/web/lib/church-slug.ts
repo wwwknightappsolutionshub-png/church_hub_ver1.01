@@ -4,6 +4,19 @@ export function churchPublicPath(slug: string): string {
   return `/c/${encodeURIComponent(slug)}`;
 }
 
+/** URL-safe slug from a church display name (e.g. "Grace Community" → "grace-community"). */
+export function slugifyChurchName(name: string): string {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64);
+  return slug || 'church';
+}
+
 /** Optional cache-bust query after CMS saves (forces fresh HTML even with an old service worker). */
 export function churchPublicPreviewPath(slug: string, version?: number): string {
   const base = churchPublicPath(slug);

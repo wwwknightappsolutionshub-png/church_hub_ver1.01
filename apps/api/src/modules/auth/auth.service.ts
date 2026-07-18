@@ -49,6 +49,13 @@ export class AuthService {
     firstName: string;
     lastName: string;
   }) {
+    const churchSlug =
+      (input.churchSlug ?? '').trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '') ||
+      this.slugifyChurchName(input.churchName);
+    if (!churchSlug) {
+      throw new BadRequestException('Church name is required to create a URL slug');
+    }
+
     const existing = await this.prisma.user.findFirst({
       where: { email: input.email },
     });
@@ -57,7 +64,7 @@ export class AuthService {
     }
 
     const slugTaken = await this.prisma.church.findUnique({
-      where: { slug: input.churchSlug },
+      where: { slug: churchSlug },
     });
     if (slugTaken) {
       throw new ConflictException('Church slug already taken');
@@ -80,7 +87,7 @@ export class AuthService {
     const church = await this.prisma.church.create({
       data: {
         name: input.churchName,
-        slug: input.churchSlug,
+        slug: churchSlug,
         settings: {
           landing: createDefaultChurchLanding(input.churchName, 'classic'),
           landingMembershipForm: DEFAULT_LANDING_MEMBERSHIP_FORM,
@@ -109,6 +116,18 @@ export class AuthService {
       .catch(() => undefined);
 
     return this.issueTokens(user.id, user.churchId, user.email);
+  }
+
+  private slugifyChurchName(name: string): string {
+    const slug = name
+      .trim()
+      .toLowerCase()
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 64);
+    return slug || 'church';
   }
 
   async login(email: string, password: string) {

@@ -1,38 +1,55 @@
 'use client';
 
+import { useRef } from 'react';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
 import { api, setAuthTokens } from '@/lib/api';
+import { slugifyChurchName } from '@/lib/church-slug';
 import { AuthMobileBrand } from '@/components/auth/AuthMobileBrand';
 import { AuthSideVisual } from '@/components/auth/AuthSideVisual';
 import { BrandMark } from '@/components/brand/BrandMark';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
+type RegisterForm = {
+  churchName: string;
+  churchSlug: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+};
+
 export default function RegisterPage() {
   const router = useRouter();
-  const { register, handleSubmit } = useForm<{
-    churchName: string;
-    churchSlug: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-    password: string;
-  }>();
+  const slugTouched = useRef(false);
+  const { register, handleSubmit, setValue, watch } = useForm<RegisterForm>({
+    defaultValues: {
+      churchName: '',
+      churchSlug: '',
+      firstName: '',
+      lastName: '',
+      email: '',
+      password: '',
+    },
+  });
 
-  const onSubmit = async (data: {
-    churchName: string;
-    churchSlug: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-    password: string;
-  }) => {
+  const churchSlug = watch('churchSlug');
+
+  const onSubmit = async (data: RegisterForm) => {
+    const slug = data.churchSlug.trim() || slugifyChurchName(data.churchName);
+    if (!slug) {
+      toast.error('Enter a church name so we can create your URL slug');
+      return;
+    }
     try {
-      const res = await api.post('/auth/register', data);
+      const res = await api.post('/auth/register', {
+        ...data,
+        churchSlug: slug,
+      });
       setAuthTokens(res.data.accessToken, res.data.refreshToken);
       toast.success('Church workspace created!');
       router.push('/dashboard');
@@ -70,11 +87,35 @@ export default function RegisterPage() {
           <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-4">
             <div>
               <label className="mb-1.5 block text-sm font-medium">Church name</label>
-              <Input placeholder="Grace Community Church" {...register('churchName')} required />
+              <Input
+                placeholder="Grace Community Church"
+                {...register('churchName', {
+                  required: true,
+                  onChange: (e) => {
+                    if (slugTouched.current) return;
+                    setValue('churchSlug', slugifyChurchName(e.target.value), {
+                      shouldDirty: true,
+                    });
+                  },
+                })}
+                required
+              />
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium">Church URL slug</label>
-              <Input placeholder="grace-community" {...register('churchSlug')} required />
+              <Input
+                placeholder="grace-community-church"
+                {...register('churchSlug', {
+                  onChange: () => {
+                    slugTouched.current = true;
+                  },
+                })}
+              />
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                {churchSlug
+                  ? `Your public page: /c/${churchSlug}`
+                  : 'Filled automatically from the church name — edit anytime'}
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
