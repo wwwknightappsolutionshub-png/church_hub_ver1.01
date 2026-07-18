@@ -5377,8 +5377,16 @@ model CellAttendance {
   branchId           String
   meetingId          String?
   weekStart          DateTime
+  /// Meeting / report date (defaults to weekStart when not provided).
+  meetingDate        DateTime?
   presentCount       Int
   absentCount        Int?
+  maleCount          Int      @default(0)
+  femaleCount        Int      @default(0)
+  boysCount          Int      @default(0)
+  girlsCount         Int      @default(0)
+  testifiersCount    Int      @default(0)
+  firstTimersCount   Int      @default(0)
   notes              String?
   recordedByUserId   String
   createdAt          DateTime @default(now())

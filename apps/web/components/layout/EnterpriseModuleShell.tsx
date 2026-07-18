@@ -19,9 +19,9 @@ export function EnterpriseShell({ children, className }: { children: ReactNode; 
 }
 
 export function EnterpriseHero({
-  eyebrow,
-  title,
-  description,
+  eyebrow: _eyebrow,
+  title: _title,
+  description: _description,
   badge,
   actions,
 }: {
@@ -31,34 +31,17 @@ export function EnterpriseHero({
   badge?: ReactNode;
   actions?: ReactNode;
 }) {
-  const showEyebrow =
-    eyebrow?.trim() &&
-    eyebrow.trim().toLowerCase() !== title.trim().toLowerCase();
+  // Module title banners are hidden app-wide; keep a compact strip only when
+  // the page still needs hero actions or a status badge.
+  if (!actions && !badge) return null;
 
   return (
-    <header className="relative overflow-visible border-b border-slate-200/80 bg-slate-900 text-white dark:border-slate-800">
-      <div
-        className="pointer-events-none absolute inset-0 opacity-40"
-        style={{
-          backgroundImage:
-            'linear-gradient(135deg, rgba(15,23,42,0.95) 0%, rgba(30,58,95,0.9) 50%, rgba(15,23,42,0.95) 100%)',
-        }}
-        aria-hidden
-      />
-      <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 md:py-10 md:px-8">
-        {showEyebrow ? (
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{eyebrow}</p>
-        ) : null}
-        <div className={cn('flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between', showEyebrow && 'mt-2')}>
-          <div className="min-w-0 flex-1">
-            <h1 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
-            <p className="mt-2 max-w-2xl text-sm text-slate-300 sm:text-base">{description}</p>
-            {actions && <div className="mt-4 flex flex-wrap gap-2">{actions}</div>}
-          </div>
-          {badge}
-        </div>
+    <div className="border-b border-slate-200/80 bg-white/95 dark:border-slate-800 dark:bg-slate-950/95">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-end gap-2 px-4 py-3 sm:px-6 md:px-8">
+        {badge}
+        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
       </div>
-    </header>
+    </div>
   );
 }
 

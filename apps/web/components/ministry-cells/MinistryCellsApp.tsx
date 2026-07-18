@@ -25,7 +25,10 @@ import {
   EnterpriseTabNav,
 } from '@/components/layout/EnterpriseModuleShell';
 import { BranchLeaderSelect } from '@/components/ministry-cells/BranchLeaderSelect';
-import { CellBranchDetailPanel } from '@/components/ministry-cells/CellBranchDetailPanel';
+import {
+  CellBranchDetailPanel,
+  type WeeklyAttendanceForm,
+} from '@/components/ministry-cells/CellBranchDetailPanel';
 import { CellBranchesList } from '@/components/ministry-cells/CellBranchesList';
 import { MINISTRY_CELLS_DESKTOP_MQ } from '@/components/ministry-cells/layout';
 import { MinistryCellsAnalyticsPanel } from '@/components/ministry-cells/MinistryCellsAnalyticsPanel';
@@ -66,7 +69,15 @@ export function MinistryCellsApp() {
   const [branchSaving, setBranchSaving] = useState(false);
   const [messageBody, setMessageBody] = useState('');
   const [reportFormId, setReportFormId] = useState('');
-  const [attendanceCount, setAttendanceCount] = useState('');
+  const [weeklyForm, setWeeklyForm] = useState<WeeklyAttendanceForm>({
+    meetingDate: new Date().toISOString().slice(0, 10),
+    maleCount: '',
+    femaleCount: '',
+    boysCount: '',
+    girlsCount: '',
+    testifiersCount: '',
+    firstTimersCount: '',
+  });
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['ministry-cells'] });
@@ -228,10 +239,25 @@ export function MinistryCellsApp() {
 
   const submitReport = async () => {
     if (!selectedBranchId || !reportFormId) return;
+    const present =
+      (Number(weeklyForm.maleCount) || 0) +
+      (Number(weeklyForm.femaleCount) || 0) +
+      (Number(weeklyForm.boysCount) || 0) +
+      (Number(weeklyForm.girlsCount) || 0);
     try {
       await api.post(`/ministry-cells/branches/${selectedBranchId}/reports`, {
         formId: reportFormId,
-        payload: { attendance: Number(attendanceCount) || 0, highlights: 'Submitted from dashboard' },
+        payload: {
+          attendance: present,
+          male: Number(weeklyForm.maleCount) || 0,
+          female: Number(weeklyForm.femaleCount) || 0,
+          boys: Number(weeklyForm.boysCount) || 0,
+          girls: Number(weeklyForm.girlsCount) || 0,
+          testifiers: Number(weeklyForm.testifiersCount) || 0,
+          firstTimers: Number(weeklyForm.firstTimersCount) || 0,
+          date: weeklyForm.meetingDate,
+          highlights: 'Submitted from dashboard',
+        },
       });
       toast.success('Report submitted');
       invalidate();
@@ -242,14 +268,34 @@ export function MinistryCellsApp() {
 
   const recordAttendance = async () => {
     if (!selectedBranchId) return;
-    const weekStart = new Date();
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    const meetingDate = weeklyForm.meetingDate
+      ? new Date(`${weeklyForm.meetingDate}T12:00:00`)
+      : new Date();
+    const weekStart = new Date(meetingDate);
+    const day = weekStart.getDay();
+    weekStart.setDate(weekStart.getDate() + (day === 0 ? -6 : 1 - day));
+    weekStart.setHours(0, 0, 0, 0);
     try {
       await api.post(`/ministry-cells/branches/${selectedBranchId}/attendance`, {
         weekStart: weekStart.toISOString(),
-        presentCount: Number(attendanceCount) || 0,
+        meetingDate: meetingDate.toISOString(),
+        maleCount: Number(weeklyForm.maleCount) || 0,
+        femaleCount: Number(weeklyForm.femaleCount) || 0,
+        boysCount: Number(weeklyForm.boysCount) || 0,
+        girlsCount: Number(weeklyForm.girlsCount) || 0,
+        testifiersCount: Number(weeklyForm.testifiersCount) || 0,
+        firstTimersCount: Number(weeklyForm.firstTimersCount) || 0,
       });
       toast.success('Attendance recorded');
+      setWeeklyForm((prev) => ({
+        ...prev,
+        maleCount: '',
+        femaleCount: '',
+        boysCount: '',
+        girlsCount: '',
+        testifiersCount: '',
+        firstTimersCount: '',
+      }));
       invalidate();
     } catch {
       toast.error('Failed to record attendance');
@@ -291,7 +337,7 @@ export function MinistryCellsApp() {
           editLocation,
           editLeaderId,
           branchSaving,
-          attendanceCount,
+          weeklyForm,
           reportFormId,
           messageBody,
           incidentCount: branches.find((b) => b.id === selectedBranchId)?.incidentCount ?? 0,
@@ -300,7 +346,8 @@ export function MinistryCellsApp() {
           onEditLocation: setEditLocation,
           onEditLeaderId: setEditLeaderId,
           onSaveBranch: saveBranchEdit,
-          onAttendanceChange: setAttendanceCount,
+          onWeeklyFormChange: (patch: Partial<WeeklyAttendanceForm>) =>
+            setWeeklyForm((prev) => ({ ...prev, ...patch })),
           onReportFormId: setReportFormId,
           onRecordAttendance: recordAttendance,
           onSubmitReport: submitReport,

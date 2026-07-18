@@ -13,6 +13,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { AuthUser } from '../auth/current-user.decorator';
+import { MembershipService } from '../membership/membership.service';
 import {
   MinistryCellsAccessService,
   type MinistryCellsRole,
@@ -48,6 +49,7 @@ export class MinistryCellsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: MinistryCellsAccessService,
+    private readonly membership: MembershipService,
   ) {}
 
   async getContext(user: AuthUser, churchId: string) {
@@ -248,6 +250,45 @@ export class MinistryCellsService {
     });
   }
 
+  /**
+   * Create a new church member when search finds no match, then attach to this branch.
+   */
+  async createMemberAndAdd(
+    user: AuthUser,
+    churchId: string,
+    branchId: string,
+    data: {
+      firstName: string;
+      lastName: string;
+      email?: string;
+      phone?: string;
+    },
+  ) {
+    await this.access.assertBranchAccess(user, churchId, branchId);
+    await this.getBranchOrThrow(churchId, branchId);
+    const firstName = data.firstName?.trim() ?? '';
+    const lastName = data.lastName?.trim() ?? '';
+    if (!firstName || !lastName) {
+      throw new BadRequestException('First name and last name are required');
+    }
+    const created = await this.membership.createMember(churchId, {
+      firstName,
+      lastName,
+      email: data.email?.trim() || undefined,
+      phone: data.phone?.trim() || undefined,
+      status: 'NEW_MEMBER',
+      cellBranchId: branchId,
+      requireContactFields: false,
+    });
+    const row = await this.prisma.cellBranchMember.findUnique({
+      where: { churchId_memberId: { churchId, memberId: created.id } },
+    });
+    if (!row) {
+      return this.addMember(user, churchId, branchId, created.id);
+    }
+    return { ...row, member: created };
+  }
+
   async removeMember(
     user: AuthUser,
     churchId: string,
@@ -445,27 +486,92 @@ export class MinistryCellsService {
     });
   }
 
+  private nonNegInt(value: unknown, field: string): number {
+    const n = Number(value ?? 0);
+    if (!Number.isFinite(n) || n < 0) {
+      throw new BadRequestException(`${field} must be a non-negative number`);
+    }
+    return Math.floor(n);
+  }
+
+  private startOfWeek(date: Date): Date {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    d.setDate(d.getDate() + diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  private formatWeekLabel(date: Date): string {
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
   async recordAttendance(
     user: AuthUser,
     churchId: string,
     branchId: string,
     body: {
-      weekStart: string;
-      presentCount: number;
+      weekStart?: string;
+      meetingDate?: string;
+      presentCount?: number;
       absentCount?: number;
+      maleCount?: number;
+      femaleCount?: number;
+      boysCount?: number;
+      girlsCount?: number;
+      testifiersCount?: number;
+      firstTimersCount?: number;
       notes?: string;
       meetingId?: string;
     },
   ) {
     await this.access.assertBranchAccess(user, churchId, branchId);
+
+    const maleCount = this.nonNegInt(body.maleCount, 'maleCount');
+    const femaleCount = this.nonNegInt(body.femaleCount, 'femaleCount');
+    const boysCount = this.nonNegInt(body.boysCount, 'boysCount');
+    const girlsCount = this.nonNegInt(body.girlsCount, 'girlsCount');
+    const testifiersCount = this.nonNegInt(body.testifiersCount, 'testifiersCount');
+    const firstTimersCount = this.nonNegInt(body.firstTimersCount, 'firstTimersCount');
+
+    const demographicTotal = maleCount + femaleCount + boysCount + girlsCount;
+    const presentCount =
+      body.presentCount != null && Number.isFinite(Number(body.presentCount))
+        ? this.nonNegInt(body.presentCount, 'presentCount')
+        : demographicTotal;
+
+    const meetingDate = body.meetingDate
+      ? new Date(body.meetingDate)
+      : body.weekStart
+        ? new Date(body.weekStart)
+        : new Date();
+    if (Number.isNaN(meetingDate.getTime())) {
+      throw new BadRequestException('Invalid meeting date');
+    }
+    const weekStart = body.weekStart ? new Date(body.weekStart) : this.startOfWeek(meetingDate);
+    if (Number.isNaN(weekStart.getTime())) {
+      throw new BadRequestException('Invalid week start');
+    }
+
     return this.prisma.cellAttendance.create({
       data: {
         churchId,
         branchId,
         meetingId: body.meetingId || null,
-        weekStart: new Date(body.weekStart),
-        presentCount: body.presentCount,
-        absentCount: body.absentCount ?? null,
+        weekStart,
+        meetingDate,
+        presentCount,
+        absentCount:
+          body.absentCount != null && Number.isFinite(body.absentCount)
+            ? Math.floor(body.absentCount)
+            : null,
+        maleCount,
+        femaleCount,
+        boysCount,
+        girlsCount,
+        testifiersCount,
+        firstTimersCount,
         notes: body.notes?.trim() || null,
         recordedByUserId: user.userId,
       },
@@ -479,6 +585,134 @@ export class MinistryCellsService {
       orderBy: { weekStart: 'desc' },
       take: 26,
     });
+  }
+
+  /** Last 4 weeks of demographic totals + growth for a single branch. */
+  async getBranchAnalytics(user: AuthUser, churchId: string, branchId: string) {
+    await this.access.assertBranchAccess(user, churchId, branchId);
+    await this.getBranchOrThrow(churchId, branchId);
+
+    const now = new Date();
+    const windowStart = this.startOfWeek(new Date(now));
+    windowStart.setDate(windowStart.getDate() - 21);
+
+    const rows = await this.prisma.cellAttendance.findMany({
+      where: {
+        churchId,
+        branchId,
+        weekStart: { gte: windowStart },
+      },
+      orderBy: { weekStart: 'asc' },
+      select: {
+        weekStart: true,
+        meetingDate: true,
+        presentCount: true,
+        maleCount: true,
+        femaleCount: true,
+        boysCount: true,
+        girlsCount: true,
+        testifiersCount: true,
+        firstTimersCount: true,
+      },
+    });
+
+    type Bucket = {
+      weekStart: string;
+      label: string;
+      male: number;
+      female: number;
+      boys: number;
+      girls: number;
+      testifiers: number;
+      firstTimers: number;
+      total: number;
+    };
+
+    const byWeek = new Map<string, Bucket>();
+    for (const row of rows) {
+      const key = this.startOfWeek(row.weekStart).toISOString().slice(0, 10);
+      const existing = byWeek.get(key) ?? {
+        weekStart: key,
+        label: this.formatWeekLabel(this.startOfWeek(row.weekStart)),
+        male: 0,
+        female: 0,
+        boys: 0,
+        girls: 0,
+        testifiers: 0,
+        firstTimers: 0,
+        total: 0,
+      };
+      existing.male += row.maleCount;
+      existing.female += row.femaleCount;
+      existing.boys += row.boysCount;
+      existing.girls += row.girlsCount;
+      existing.testifiers += row.testifiersCount;
+      existing.firstTimers += row.firstTimersCount;
+      const demoSum = row.maleCount + row.femaleCount + row.boysCount + row.girlsCount;
+      existing.total += demoSum > 0 ? demoSum : row.presentCount;
+      byWeek.set(key, existing);
+    }
+
+    const weeks: Bucket[] = [];
+    for (let i = 3; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i * 7);
+      const start = this.startOfWeek(d);
+      const key = start.toISOString().slice(0, 10);
+      weeks.push(
+        byWeek.get(key) ?? {
+          weekStart: key,
+          label: this.formatWeekLabel(start),
+          male: 0,
+          female: 0,
+          boys: 0,
+          girls: 0,
+          testifiers: 0,
+          firstTimers: 0,
+          total: 0,
+        },
+      );
+    }
+
+    const totals = weeks.reduce(
+      (acc, w) => ({
+        male: acc.male + w.male,
+        female: acc.female + w.female,
+        boys: acc.boys + w.boys,
+        girls: acc.girls + w.girls,
+        testifiers: acc.testifiers + w.testifiers,
+        firstTimers: acc.firstTimers + w.firstTimers,
+        total: acc.total + w.total,
+      }),
+      { male: 0, female: 0, boys: 0, girls: 0, testifiers: 0, firstTimers: 0, total: 0 },
+    );
+
+    const firstHalf = weeks.slice(0, 2).reduce((s, w) => s + w.total, 0);
+    const secondHalf = weeks.slice(2, 4).reduce((s, w) => s + w.total, 0);
+    const growthPercent =
+      firstHalf === 0
+        ? secondHalf > 0
+          ? 100
+          : 0
+        : Math.round(((secondHalf - firstHalf) / firstHalf) * 1000) / 10;
+
+    const demographicPie = [
+      { name: 'Male', value: totals.male },
+      { name: 'Female', value: totals.female },
+      { name: 'Boys', value: totals.boys },
+      { name: 'Girls', value: totals.girls },
+    ].filter((d) => d.value > 0);
+
+    return {
+      periodWeeks: 4,
+      windowStart: windowStart.toISOString(),
+      weeks,
+      totals,
+      growthPercent,
+      demographicPie,
+      firstTimersTotal: totals.firstTimers,
+      testifiersTotal: totals.testifiers,
+    };
   }
 
   async listIncidents(user: AuthUser, churchId: string, branchId: string) {

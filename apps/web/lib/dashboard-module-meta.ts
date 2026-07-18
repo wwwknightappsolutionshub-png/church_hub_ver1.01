@@ -1,6 +1,7 @@
 /**
- * In-page module headers (EnterpriseHero / DashboardModuleShell / YouthHubHero).
- * When true, the mobile app bar shows only the church name — not a duplicate page title.
+ * Routes that previously had in-page EnterpriseHero / YouthHubHero banners.
+ * Heroes are now hidden, but we still suppress a duplicate mobile app-bar title
+ * (the top bar already shows the church name).
  */
 const MODULE_PAGE_CHROME_PREFIXES = [
   '/dashboard',

@@ -86,6 +86,22 @@ export class MinistryCellsController {
     return this.service.addMember(user, churchId, id, body.memberId);
   }
 
+  @Post('branches/:id/members/create')
+  createMemberAndAdd(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body()
+    body: {
+      firstName: string;
+      lastName: string;
+      email?: string;
+      phone?: string;
+    },
+  ) {
+    return this.service.createMemberAndAdd(user, churchId, id, body);
+  }
+
   @Delete('branches/:branchId/members/:memberId')
   removeMember(
     @ChurchId() churchId: string,
@@ -184,9 +200,16 @@ export class MinistryCellsController {
     @Param('id') id: string,
     @Body()
     body: {
-      weekStart: string;
-      presentCount: number;
+      weekStart?: string;
+      meetingDate?: string;
+      presentCount?: number;
       absentCount?: number;
+      maleCount?: number;
+      femaleCount?: number;
+      boysCount?: number;
+      girlsCount?: number;
+      testifiersCount?: number;
+      firstTimersCount?: number;
       notes?: string;
       meetingId?: string;
     },
@@ -201,6 +224,15 @@ export class MinistryCellsController {
     @Param('id') id: string,
   ) {
     return this.service.listAttendance(user, churchId, id);
+  }
+
+  @Get('branches/:id/analytics')
+  branchAnalytics(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.service.getBranchAnalytics(user, churchId, id);
   }
 
   @Get('branches/:id/incidents')

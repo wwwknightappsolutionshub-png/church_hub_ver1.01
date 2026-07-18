@@ -42,36 +42,20 @@ export function DevotionalHubShell({ children }: { children: React.ReactNode }) 
 }
 
 export function DevotionalHubHero({
-  title,
-  description,
+  title: _title,
+  description: _description,
   badge,
 }: {
   title: string;
   description: string;
   badge?: React.ReactNode;
 }) {
+  // Match app-wide module chrome: hide dark title banner; keep badge if provided.
+  if (!badge) return null;
+
   return (
-    <header className="relative overflow-hidden border-b border-slate-200/80 bg-slate-900 text-white dark:border-slate-800">
-      <div
-        className="pointer-events-none absolute inset-0 opacity-50"
-        style={{
-          backgroundImage:
-            'linear-gradient(120deg, rgba(6,78,59,0.85) 0%, rgba(15,23,42,0.95) 55%, rgba(15,23,42,1) 100%)',
-        }}
-        aria-hidden
-      />
-      <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 md:py-10 md:px-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-300/90">
-          Devotional Hub
-        </p>
-        <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
-            <p className="mt-2 max-w-2xl text-sm text-slate-300 sm:text-base">{description}</p>
-          </div>
-          {badge}
-        </div>
-      </div>
-    </header>
+    <div className="border-b border-slate-200/80 bg-white/95 dark:border-slate-800 dark:bg-slate-950/95">
+      <div className="mx-auto flex max-w-7xl justify-end px-4 py-3 sm:px-6 md:px-8">{badge}</div>
+    </div>
   );
 }

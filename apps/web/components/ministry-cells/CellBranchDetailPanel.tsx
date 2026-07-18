@@ -10,6 +10,7 @@ import {
   Send,
   Users,
 } from 'lucide-react';
+import { BranchAnalyticsPanel } from '@/components/ministry-cells/BranchAnalyticsPanel';
 import { BranchLeaderSelect } from '@/components/ministry-cells/BranchLeaderSelect';
 import { BranchMembersPanel } from '@/components/ministry-cells/BranchMembersPanel';
 import { CellBranchMembersSheet } from '@/components/ministry-cells/CellBranchMembersSheet';
@@ -23,7 +24,17 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
-type WorkspaceSection = 'overview' | 'members' | 'weekly' | 'connect';
+type WorkspaceSection = 'overview' | 'members' | 'weekly' | 'connect' | 'analytics';
+
+export type WeeklyAttendanceForm = {
+  meetingDate: string;
+  maleCount: string;
+  femaleCount: string;
+  boysCount: string;
+  girlsCount: string;
+  testifiersCount: string;
+  firstTimersCount: string;
+};
 
 export function CellBranchDetailPanel({
   ctx,
@@ -37,7 +48,7 @@ export function CellBranchDetailPanel({
   editLocation,
   editLeaderId,
   branchSaving,
-  attendanceCount,
+  weeklyForm,
   reportFormId,
   messageBody,
   onClose,
@@ -46,7 +57,7 @@ export function CellBranchDetailPanel({
   onEditLocation,
   onEditLeaderId,
   onSaveBranch,
-  onAttendanceChange,
+  onWeeklyFormChange,
   onReportFormId,
   onRecordAttendance,
   onSubmitReport,
@@ -73,7 +84,7 @@ export function CellBranchDetailPanel({
   editLocation: string;
   editLeaderId: string;
   branchSaving: boolean;
-  attendanceCount: string;
+  weeklyForm: WeeklyAttendanceForm;
   reportFormId: string;
   messageBody: string;
   onClose?: () => void;
@@ -82,7 +93,7 @@ export function CellBranchDetailPanel({
   onEditLocation: (v: string) => void;
   onEditLeaderId: (v: string) => void;
   onSaveBranch: (e: React.FormEvent) => void;
-  onAttendanceChange: (v: string) => void;
+  onWeeklyFormChange: (patch: Partial<WeeklyAttendanceForm>) => void;
   onReportFormId: (v: string) => void;
   onRecordAttendance: () => void;
   onSubmitReport: () => void;
@@ -109,6 +120,22 @@ export function CellBranchDetailPanel({
     { id: 'members', label: 'Members' },
     { id: 'weekly', label: 'Weekly' },
     { id: 'connect', label: 'Connect' },
+    { id: 'analytics', label: 'Analytics' },
+  ];
+
+  const demoTotal =
+    (Number(weeklyForm.maleCount) || 0) +
+    (Number(weeklyForm.femaleCount) || 0) +
+    (Number(weeklyForm.boysCount) || 0) +
+    (Number(weeklyForm.girlsCount) || 0);
+
+  const weeklyFields: { key: keyof WeeklyAttendanceForm; label: string }[] = [
+    { key: 'maleCount', label: 'Male' },
+    { key: 'femaleCount', label: 'Female' },
+    { key: 'boysCount', label: 'Boys' },
+    { key: 'girlsCount', label: 'Girls' },
+    { key: 'testifiersCount', label: 'Testifiers' },
+    { key: 'firstTimersCount', label: 'First Timers' },
   ];
 
   const stats = [
@@ -296,25 +323,43 @@ export function CellBranchDetailPanel({
             <CardTitle className="text-base">Weekly reporting</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="w-28">
-                <Label htmlFor="attendance-count">Attendance</Label>
-                <Input
-                  id="attendance-count"
-                  type="number"
-                  inputMode="numeric"
-                  className="mt-1 h-10"
-                  value={attendanceCount}
-                  onChange={(e) => onAttendanceChange(e.target.value)}
-                  min={0}
-                />
-              </div>
+            <div>
+              <Label htmlFor="meeting-date">Date</Label>
+              <Input
+                id="meeting-date"
+                type="date"
+                className="mt-1 h-10 max-w-xs"
+                value={weeklyForm.meetingDate}
+                onChange={(e) => onWeeklyFormChange({ meetingDate: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+              {weeklyFields.map(({ key, label }) => (
+                <div key={key}>
+                  <Label htmlFor={`weekly-${key}`}>{label}</Label>
+                  <Input
+                    id={`weekly-${key}`}
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    className="mt-1 h-10"
+                    value={weeklyForm[key]}
+                    onChange={(e) => onWeeklyFormChange({ [key]: e.target.value })}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-sm text-muted-foreground">
+                Total present:{' '}
+                <span className="font-semibold text-foreground tabular-nums">{demoTotal}</span>
+              </p>
               <Button type="button" variant="outline" className="h-10" onClick={onRecordAttendance}>
                 Record attendance
               </Button>
             </div>
             {forms.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
                 <select
                   className="h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm sm:max-w-xs"
                   value={reportFormId}
@@ -411,6 +456,10 @@ export function CellBranchDetailPanel({
             </CardContent>
           </Card>
         )}
+      </div>
+
+      <div className={cn(section !== 'analytics' && 'hidden')} aria-hidden={section !== 'analytics'}>
+        {section === 'analytics' ? <BranchAnalyticsPanel branchId={selectedBranchId} /> : null}
       </div>
 
       {rosterOpen && (
