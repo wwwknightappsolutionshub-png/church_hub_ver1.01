@@ -48,7 +48,18 @@ export function Providers({ children }: { children: React.ReactNode }) {
           expand
           visibleToasts={4}
           offset="calc(3.5rem + env(safe-area-inset-top))"
-          toastOptions={{ duration: 5000 }}
+          gap={10}
+          toastOptions={{
+            duration: 4500,
+            classNames: {
+              toast: 'churchhub-toast group',
+              title: 'churchhub-toast-title',
+              description: 'churchhub-toast-description',
+              success: 'churchhub-toast-success',
+              error: 'churchhub-toast-error',
+              closeButton: 'churchhub-toast-close',
+            },
+          }}
           style={{ zIndex: 9999 }}
         />
       </ThemeProvider>

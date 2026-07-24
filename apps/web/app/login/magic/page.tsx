@@ -43,7 +43,10 @@ export default function MagicLoginPage() {
         return;
       }
       await queryClient.clear();
-      toast.success('Welcome back');
+      toast.success('Welcome back', {
+        description: 'Opening your church workspace…',
+        duration: 3500,
+      });
       try {
         const { data } = await api.get<{
           isPlatformAdmin?: boolean;
