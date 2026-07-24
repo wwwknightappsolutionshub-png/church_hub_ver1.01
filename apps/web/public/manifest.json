@@ -1,16 +1,16 @@
 {
   "name": "Church_Hub",
   "short_name": "ChurchHub",
-  "description": "Church community — members, events, prayer, and ministry tools in one app.",
+  "description": "Enterprise church community platform — members, discipleship, prayer, and ministry tools in one app.",
   "start_url": "/",
   "scope": "/",
   "id": "/",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait-primary",
-  "background_color": "#312e81",
-  "theme_color": "#4338ca",
-  "categories": ["lifestyle", "social"],
+  "background_color": "#1e1b4b",
+  "theme_color": "#312e81",
+  "categories": ["lifestyle", "social", "productivity"],
   "icons": [
     {
       "src": "/icons/icon.svg",

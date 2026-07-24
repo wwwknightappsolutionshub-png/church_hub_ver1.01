@@ -2,6 +2,7 @@ import { ChurchHomeRedirect } from '@/components/marketing/ChurchHomeRedirect';
 import { MarketingHeader } from '@/components/marketing/MarketingHeader';
 import { HeroSection } from '@/components/marketing/HeroSection';
 import { StatsStrip } from '@/components/marketing/StatsStrip';
+import { WhyChurchesSection } from '@/components/marketing/WhyChurchesSection';
 import { FeaturesGrid } from '@/components/marketing/FeaturesGrid';
 import { HowItWorks } from '@/components/marketing/HowItWorks';
 import { SecuritySection } from '@/components/marketing/SecuritySection';
@@ -16,6 +17,7 @@ export default function HomePage() {
       <main>
         <HeroSection />
         <StatsStrip />
+        <WhyChurchesSection />
         <FeaturesGrid />
         <HowItWorks />
         <SecuritySection />

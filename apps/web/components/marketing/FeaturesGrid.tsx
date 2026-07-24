@@ -72,7 +72,7 @@ export function FeaturesGrid() {
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
             Replace scattered spreadsheets and disconnected apps with a unified system
-            built for how churches actually operate.
+            built for how churches actually operate — from first visit to lifelong discipleship.
           </p>
         </div>
 

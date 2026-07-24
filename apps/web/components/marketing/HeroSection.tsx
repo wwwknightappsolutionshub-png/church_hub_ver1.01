@@ -32,7 +32,7 @@ export function HeroSection() {
 
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
             Church_Hub unifies membership, discipleship, evangelism, youth, business networking,
-            and bus ministry — with enterprise security and ministry-first workflows.
+            and bus ministry — so pastors and leaders shepherd people with clarity, not chaos.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">

@@ -15,8 +15,8 @@ export function CTASection() {
           Ready to unify your church community?
         </h2>
         <p className="mt-4 text-lg text-primary-foreground/80">
-          Join hundreds of churches using Church_Hub to manage membership, discipleship,
-          and every ministry from one platform.
+          Join churches using Church_Hub to shepherd members, close the follow-up gap,
+          and run every ministry from one secure platform.
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Button size="lg" variant="secondary" className="shadow-lg" asChild>

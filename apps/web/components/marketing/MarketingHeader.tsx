@@ -7,7 +7,7 @@ import { BrandMark } from '@/components/brand/BrandMark';
 import { Button } from '@/components/ui/button';
 
 const navLinks = [
-  { href: '#platform', label: 'Platform' },
+  { href: '#why-churches', label: 'Why churches' },
   { href: '#modules', label: 'Modules' },
   { href: '#how-it-works', label: 'How it works' },
   { href: '#security', label: 'Security' },

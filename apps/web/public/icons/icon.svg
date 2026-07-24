@@ -1,19 +1,31 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Church Hub">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#312e81"/>
-      <stop offset="45%" stop-color="#4338ca"/>
-      <stop offset="100%" stop-color="#6366f1"/>
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="45%" stop-color="#312e81"/>
+      <stop offset="100%" stop-color="#4338ca"/>
     </linearGradient>
     <linearGradient id="shine" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.28"/>
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.22"/>
       <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e8c878"/>
+      <stop offset="100%" stop-color="#d4a853"/>
     </linearGradient>
   </defs>
   <rect width="512" height="512" rx="112" fill="url(#bg)"/>
   <rect width="512" height="256" rx="112" fill="url(#shine)"/>
-  <circle cx="256" cy="188" r="72" fill="none" stroke="#ffffff" stroke-width="16" opacity="0.95"/>
-  <path fill="#ffffff" d="M256 128v120M196 188h120" stroke="#ffffff" stroke-width="16" stroke-linecap="round"/>
-  <path fill="#ffffff" d="M176 292c0-44 36-80 80-80s80 36 80 80v88H176V292z" opacity="0.95"/>
-  <path fill="#c7d2fe" d="M128 380c48-36 96-54 128-54s80 18 128 54v24H128v-24z" opacity="0.85"/>
+  <!-- Hub ring -->
+  <circle cx="256" cy="256" r="118" fill="none" stroke="#ffffff" stroke-width="14" opacity="0.92"/>
+  <!-- Cardinal nodes -->
+  <circle cx="256" cy="118" r="26" fill="url(#gold)"/>
+  <circle cx="256" cy="394" r="22" fill="#ffffff" opacity="0.92"/>
+  <circle cx="118" cy="256" r="22" fill="#ffffff" opacity="0.92"/>
+  <circle cx="394" cy="256" r="22" fill="#ffffff" opacity="0.92"/>
+  <!-- Center -->
+  <circle cx="256" cy="256" r="42" fill="url(#gold)"/>
+  <!-- Spokes -->
+  <path d="M256 168v52M256 292v52M168 256h52M292 256h52"
+        stroke="#ffffff" stroke-width="14" stroke-linecap="round" opacity="0.88"/>
 </svg>
