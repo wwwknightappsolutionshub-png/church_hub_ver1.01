@@ -63,6 +63,14 @@ export const metadata: Metadata = {
     description,
     images: [
       {
+        // Prefer extensionless Next OG route (aaPanel often 404s static *.png from disk).
+        url: '/opengraph-image',
+        width: 1200,
+        height: 630,
+        alt: 'Church_Hub OS — Evangelism, follow-up, membership & ministry in one place',
+        type: 'image/png',
+      },
+      {
         url: '/images/og-image.png',
         width: 1200,
         height: 630,
@@ -74,7 +82,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title,
     description,
-    images: ['/images/og-image.png'],
+    images: [`${siteUrl}/opengraph-image`],
   },
   alternates: {
     canonical: '/',

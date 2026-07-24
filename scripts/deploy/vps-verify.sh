@@ -15,6 +15,10 @@ fi
 curl -sf -o /dev/null -w "GET /login -> %{http_code}\n" "$PUBLIC_BASE/login"
 curl -sf -o /dev/null -w "GET /images/auth-side-visual.svg -> %{http_code}\n" \
   "$PUBLIC_BASE/images/auth-side-visual.svg"
+curl -sf -o /dev/null -w "GET /opengraph-image -> %{http_code}\n" \
+  "$PUBLIC_BASE/opengraph-image" || echo "WARN: /opengraph-image not reachable"
+curl -s -o /dev/null -w "GET /images/og-image.png -> %{http_code}\n" \
+  "$PUBLIC_BASE/images/og-image.png" || true
 curl -sf -o /dev/null -w "GET /c/demo-church -> %{http_code}\n" "$PUBLIC_BASE/c/demo-church"
 
 HTML_PUBLIC="$(curl -sf "$PUBLIC_BASE/login" | head -c 20000)"

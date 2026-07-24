@@ -38,8 +38,7 @@ export async function generateMetadata({
   const title = `${data.churchName} — Welcome`;
   const canonical = `/c/${params.slug}`;
   const siteUrl = getSiteUrl();
-  // Prefer dedicated OG art (1200×630) for WhatsApp/email; church logos are usually square.
-  const ogImage = `${siteUrl}/images/og-image.png`;
+  const ogImage = `${siteUrl}/opengraph-image`;
 
   return {
     title,
@@ -56,6 +55,7 @@ export async function generateMetadata({
           width: 1200,
           height: 630,
           alt: `${data.churchName} — powered by Church_Hub`,
+          type: 'image/png',
         },
       ],
     },
