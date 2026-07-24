@@ -1,4 +1,12 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { randomBytes } from 'crypto';
+import * as bcrypt from 'bcrypt';
 import {
   createDefaultChurchLanding,
   DEFAULT_LANDING_MEMBERSHIP_FORM,
@@ -15,17 +23,22 @@ import {
 } from '../../common/department-module-settings';
 import { CreateChurchDto } from './dto/create-church.dto';
 import { UpdateChurchDto } from './dto/update-church.dto';
+import { ResetTenantUserPasswordDto } from './dto/reset-tenant-user-password.dto';
 import { PlatformProvisioningService } from './platform-provisioning.service';
 import { MembershipConfigService } from '../membership/membership-config.service';
+import { EmailAdapter } from '../notifications/adapters/email.adapter';
 
 const STAFF_ROLE_NAMES = ['ADMIN', 'PASTOR', 'LEADER', 'MEMBER', 'DRIVER'] as const;
 
 @Injectable()
 export class PlatformService {
+  private readonly logger = new Logger(PlatformService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly provisioning: PlatformProvisioningService,
     private readonly membershipConfig: MembershipConfigService,
+    private readonly email: EmailAdapter,
   ) {}
 
   getModuleCatalog() {
@@ -130,6 +143,7 @@ export class PlatformService {
         phone: true,
         lastLoginAt: true,
         createdAt: true,
+        mustChangePassword: true,
         roles: { include: { role: { select: { name: true, description: true } } } },
         member: { select: { id: true, status: true } },
       },
@@ -280,6 +294,129 @@ export class PlatformService {
     return { id: churchId, deleted: true };
   }
 
+  /**
+   * Platform admin sets or regenerates a tenant user's password.
+   * Always scoped to the church; cannot target PLATFORM_ADMIN accounts.
+   */
+  async resetTenantUserPassword(
+    churchId: string,
+    userId: string,
+    dto: ResetTenantUserPasswordDto,
+    actor: { userId: string; email: string },
+  ) {
+    const church = await this.prisma.church.findUnique({
+      where: { id: churchId },
+      select: { id: true, name: true, slug: true },
+    });
+    if (!church) throw new NotFoundException('Church not found');
+
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, churchId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        isActive: true,
+        roles: { include: { role: { select: { name: true } } } },
+      },
+    });
+    if (!user) throw new NotFoundException('User not found in this tenant');
+    if (!user.isActive) throw new BadRequestException('Cannot reset password for an inactive user');
+
+    const roleNames = user.roles.map((r) => r.role.name);
+    if (roleNames.includes('PLATFORM_ADMIN')) {
+      throw new BadRequestException('Cannot reset a platform admin password from tenant tools');
+    }
+
+    const custom = dto.newPassword?.trim() || '';
+    const generated = !custom;
+    const plainPassword = custom || randomBytes(9).toString('base64url').slice(0, 12);
+    if (plainPassword.length < 8) {
+      throw new BadRequestException('Password must be at least 8 characters');
+    }
+
+    const mustChangePassword = dto.mustChangePassword ?? true;
+    const notifyUser = dto.notifyUser ?? true;
+    const passwordHash = await bcrypt.hash(plainPassword, 12);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash, mustChangePassword },
+    });
+
+    await this.prisma.refreshToken.updateMany({
+      where: { userId: user.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
+    await this.prisma.loginFailureBucket.deleteMany({
+      where: { emailKey: user.email.trim().toLowerCase() },
+    });
+
+    let emailSent = false;
+    if (notifyUser) {
+      const appUrl =
+        process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3001';
+      const loginUrl = `${appUrl}/login?church=${encodeURIComponent(church.slug)}`;
+      const subject = `Your Church_Hub password was reset — ${church.name}`;
+      const body = [
+        `Hi ${user.firstName},`,
+        '',
+        `A Church_Hub platform administrator reset the password for your account at ${church.name}.`,
+        '',
+        `Email: ${user.email}`,
+        `Temporary password: ${plainPassword}`,
+        '',
+        `Sign in: ${loginUrl}`,
+        mustChangePassword
+          ? 'You will be asked to choose a new password the first time you sign in.'
+          : 'You can sign in with this password right away.',
+        '',
+        'If you did not expect this change, contact your church administrator.',
+      ].join('\n');
+
+      try {
+        await this.email.send({
+          churchId: church.id,
+          to: user.email,
+          subject,
+          body,
+          html: `<p>Hi ${user.firstName},</p>
+<p>A Church_Hub platform administrator reset the password for your account at <strong>${church.name}</strong>.</p>
+<p><strong>Email:</strong> ${user.email}<br/>
+<strong>Temporary password:</strong> <code>${plainPassword}</code></p>
+<p><a href="${loginUrl}">Sign in to Church_Hub</a></p>
+<p>${
+            mustChangePassword
+              ? 'You will be asked to choose a new password the first time you sign in.'
+              : 'You can sign in with this password right away.'
+          }</p>
+<p style="color:#64748b;font-size:13px;">If you did not expect this change, contact your church administrator.</p>`,
+        });
+        emailSent = true;
+      } catch (err) {
+        this.logger.warn(
+          `Password reset email failed for ${user.email}: ${err instanceof Error ? err.message : err}`,
+        );
+      }
+    }
+
+    this.logger.log(
+      `Platform admin ${actor.email} reset password for tenant user ${user.email} (church ${church.slug})`,
+    );
+
+    return {
+      success: true,
+      userId: user.id,
+      email: user.email,
+      mustChangePassword,
+      emailSent,
+      /** Only returned when a temporary password was generated (so the operator can copy it). */
+      temporaryPassword: generated ? plainPassword : undefined,
+    };
+  }
+
   private mapStaffUser(u: {
     id: string;
     email: string;
@@ -288,6 +425,7 @@ export class PlatformService {
     phone: string | null;
     lastLoginAt: Date | null;
     createdAt: Date;
+    mustChangePassword: boolean;
     roles: { role: { name: string; description: string | null } }[];
     member: { id: string; status: string } | null;
   }) {
@@ -299,6 +437,7 @@ export class PlatformService {
       phone: u.phone,
       lastLoginAt: u.lastLoginAt,
       createdAt: u.createdAt,
+      mustChangePassword: u.mustChangePassword,
       roles: u.roles.map((r) => ({
         name: r.role.name,
         description: r.role.description,

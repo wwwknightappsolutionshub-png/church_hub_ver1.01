@@ -1,9 +1,11 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PlatformService } from './platform.service';
 import { Roles } from '../auth/decorators';
+import { AuthUser, CurrentUser } from '../auth/current-user.decorator';
 import { CreateChurchDto } from './dto/create-church.dto';
 import { UpdateChurchDto } from './dto/update-church.dto';
+import { ResetTenantUserPasswordDto } from './dto/reset-tenant-user-password.dto';
 
 @ApiTags('platform')
 @ApiBearerAuth()
@@ -40,5 +42,19 @@ export class PlatformController {
   @Delete('churches/:id')
   deleteChurch(@Param('id') id: string) {
     return this.platform.deleteChurch(id);
+  }
+
+  @Post('churches/:churchId/users/:userId/reset-password')
+  @ApiOperation({ summary: 'Set or regenerate a tenant user password (platform admin)' })
+  resetTenantUserPassword(
+    @Param('churchId') churchId: string,
+    @Param('userId') userId: string,
+    @Body() body: ResetTenantUserPasswordDto,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.platform.resetTenantUserPassword(churchId, userId, body, {
+      userId: actor.userId,
+      email: actor.email,
+    });
   }
 }

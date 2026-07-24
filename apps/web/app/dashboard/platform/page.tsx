@@ -7,6 +7,7 @@ import Link from 'next/link';
 import {
   Building2,
   ChevronRight,
+  Key,
   Loader2,
   Mail,
   BarChart3,
@@ -74,6 +75,7 @@ interface StaffUser {
   email: string;
   firstName: string;
   lastName: string;
+  mustChangePassword?: boolean;
   roles: { name: string; description: string | null }[];
 }
 
@@ -630,7 +632,11 @@ export default function PlatformConsolePage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <StaffList users={detail.pastors} />
+                    <StaffList
+                      users={detail.pastors}
+                      churchId={selectedId}
+                      onPasswordReset={refresh}
+                    />
                   </CardContent>
                 </Card>
                 <Card>
@@ -641,7 +647,11 @@ export default function PlatformConsolePage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <StaffList users={detail.admins} />
+                    <StaffList
+                      users={detail.admins}
+                      churchId={selectedId}
+                      onPasswordReset={refresh}
+                    />
                   </CardContent>
                 </Card>
               </div>
@@ -653,27 +663,188 @@ export default function PlatformConsolePage() {
   );
 }
 
-function StaffList({ users }: { users: StaffUser[] }) {
+function StaffList({
+  users,
+  churchId,
+  onPasswordReset,
+}: {
+  users: StaffUser[];
+  churchId: string;
+  onPasswordReset: () => void;
+}) {
+  const [openUserId, setOpenUserId] = useState<string | null>(null);
+  const [customPassword, setCustomPassword] = useState('');
+  const [mustChangePassword, setMustChangePassword] = useState(true);
+  const [notifyUser, setNotifyUser] = useState(true);
+  const [busyUserId, setBusyUserId] = useState<string | null>(null);
+  const [lastTempPassword, setLastTempPassword] = useState<string | null>(null);
+
   if (users.length === 0) {
     return <p className="text-xs text-muted-foreground">None</p>;
   }
+
+  const resetPassword = async (user: StaffUser, generate: boolean) => {
+    if (!generate && customPassword.trim().length < 8) {
+      toast.error('Custom password must be at least 8 characters');
+      return;
+    }
+    setBusyUserId(user.id);
+    setLastTempPassword(null);
+    try {
+      const { data } = await api.post<{
+        success: boolean;
+        email: string;
+        emailSent: boolean;
+        mustChangePassword: boolean;
+        temporaryPassword?: string;
+      }>(`/platform/churches/${churchId}/users/${user.id}/reset-password`, {
+        newPassword: generate ? undefined : customPassword.trim(),
+        mustChangePassword,
+        notifyUser,
+      });
+      if (data.temporaryPassword) {
+        setLastTempPassword(data.temporaryPassword);
+        toast.success(
+          data.emailSent
+            ? `Temporary password emailed to ${data.email}`
+            : `Password reset for ${data.email} — copy the temporary password below (email not sent)`,
+        );
+      } else {
+        toast.success(
+          data.emailSent
+            ? `Password updated and emailed to ${data.email}`
+            : `Password updated for ${data.email}`,
+        );
+      }
+      setCustomPassword('');
+      onPasswordReset();
+    } catch (err) {
+      toast.error(apiErrorMessage(err, 'Could not reset password'));
+    } finally {
+      setBusyUserId(null);
+    }
+  };
+
   return (
     <ul className="space-y-2">
-      {users.map((u) => (
-        <li key={u.id} className="rounded-md border border-border px-3 py-2 text-sm">
-          <p className="font-medium">
-            {u.firstName} {u.lastName}
-          </p>
-          <p className="font-mono text-[11px] text-muted-foreground">{u.email}</p>
-          <div className="mt-1 flex flex-wrap gap-1">
-            {u.roles.map((r) => (
-              <Badge key={r.name} variant="outline" className="text-[10px]">
-                {r.name}
-              </Badge>
-            ))}
-          </div>
-        </li>
-      ))}
+      {users.map((u) => {
+        const open = openUserId === u.id;
+        const busy = busyUserId === u.id;
+        return (
+          <li key={u.id} className="rounded-md border border-border px-3 py-2 text-sm">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-medium">
+                  {u.firstName} {u.lastName}
+                </p>
+                <p className="font-mono text-[11px] text-muted-foreground">{u.email}</p>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {u.roles.map((r) => (
+                    <Badge key={r.name} variant="outline" className="text-[10px]">
+                      {r.name}
+                    </Badge>
+                  ))}
+                  {u.mustChangePassword ? (
+                    <Badge variant="gold" className="text-[10px]">
+                      Must change password
+                    </Badge>
+                  ) : null}
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0 gap-1"
+                onClick={() => {
+                  setOpenUserId(open ? null : u.id);
+                  setLastTempPassword(null);
+                  setCustomPassword('');
+                  setMustChangePassword(true);
+                  setNotifyUser(true);
+                }}
+              >
+                <Key className="h-3.5 w-3.5" />
+                {open ? 'Close' : 'Password'}
+              </Button>
+            </div>
+
+            {open ? (
+              <div className="mt-3 space-y-3 rounded-md border border-dashed bg-muted/30 p-3">
+                <p className="text-xs text-muted-foreground">
+                  Set a new password or generate a temporary one. Active sessions are signed out.
+                </p>
+                <Input
+                  type="text"
+                  autoComplete="new-password"
+                  placeholder="Custom password (optional, min 8 chars)"
+                  value={customPassword}
+                  onChange={(e) => setCustomPassword(e.target.value)}
+                  disabled={busy}
+                />
+                <label className="flex items-center gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={mustChangePassword}
+                    onChange={(e) => setMustChangePassword(e.target.checked)}
+                    disabled={busy}
+                  />
+                  Require password change on next sign-in
+                </label>
+                <label className="flex items-center gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={notifyUser}
+                    onChange={(e) => setNotifyUser(e.target.checked)}
+                    disabled={busy}
+                  />
+                  Email credentials to the user
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => void resetPassword(u, true)}
+                  >
+                    {busy ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+                    Generate temporary
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy || customPassword.trim().length < 8}
+                    onClick={() => void resetPassword(u, false)}
+                  >
+                    Set custom password
+                  </Button>
+                </div>
+                {lastTempPassword && openUserId === u.id ? (
+                  <div className="rounded-md border border-amber-300/50 bg-amber-50 px-3 py-2 text-xs dark:bg-amber-950/40">
+                    <p className="font-medium text-amber-900 dark:text-amber-100">Temporary password</p>
+                    <p className="mt-1 break-all font-mono text-sm text-amber-950 dark:text-amber-50">
+                      {lastTempPassword}
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="mt-2"
+                      onClick={async () => {
+                        await navigator.clipboard.writeText(lastTempPassword);
+                        toast.success('Copied to clipboard');
+                      }}
+                    >
+                      Copy
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </li>
+        );
+      })}
     </ul>
   );
 }
