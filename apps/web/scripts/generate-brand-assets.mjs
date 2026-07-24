@@ -72,7 +72,7 @@ const ogSvg = `<?xml version="1.0" encoding="UTF-8"?>
   <text x="208" y="230" font-family="Arial, Helvetica, sans-serif" font-size="52" font-weight="700" fill="#ffffff">Church<tspan fill="#d4a853">_Hub</tspan></text>
   <text x="208" y="268" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#94a3b8">Enterprise Ministry Platform</text>
 
-  <text x="88" y="360" font-family="Arial, Helvetica, sans-serif" font-size="40" font-weight="700" fill="#ffffff">One platform for your entire</text>
+  <text x="88" y="360" font-family="Arial, Helvetica, sans-serif" font-size="40" font-weight="700" fill="#ffffff">One platform for the entire</text>
   <text x="88" y="412" font-family="Arial, Helvetica, sans-serif" font-size="40" font-weight="700" fill="#c7d2fe">church community</text>
   <text x="88" y="470" font-family="Arial, Helvetica, sans-serif" font-size="22" fill="#cbd5e1">Membership · Discipleship · Outreach · Youth · Operations</text>
 

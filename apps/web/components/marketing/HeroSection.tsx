@@ -26,7 +26,7 @@ export function HeroSection() {
           </Badge>
 
           <h1 className="font-heading text-4xl font-bold leading-[1.1] text-foreground sm:text-5xl lg:text-6xl">
-            One platform for your{' '}
+            One platform for the{' '}
             <span className="text-primary">entire church community</span>
           </h1>
 

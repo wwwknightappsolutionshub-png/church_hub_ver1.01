@@ -36,6 +36,7 @@ import { SermonNotesModule } from './modules/sermon-notes/sermon-notes.module';
 import { Wisdom365Module } from './modules/wisdom365/wisdom365.module';
 import { MinistryCellsModule } from './modules/ministry-cells/ministry-cells.module';
 import { ChurchCalendarModule } from './modules/church-calendar/church-calendar.module';
+import { MarketingTrialModule } from './modules/marketing-trial/marketing-trial.module';
 import { CacheModule } from './common/cache/cache.module';
 import { ObservabilityModule } from './common/observability/observability.module';
 
@@ -95,6 +96,7 @@ const redisEnabled = process.env.REDIS_ENABLED !== 'false';
     Wisdom365Module,
     MinistryCellsModule,
     ChurchCalendarModule,
+    MarketingTrialModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

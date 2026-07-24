@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -8,6 +8,10 @@ import { useRouter } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
 import { api, setAuthTokens } from '@/lib/api';
 import { slugifyChurchName } from '@/lib/church-slug';
+import {
+  clearTrialRegisterPrefill,
+  readTrialRegisterPrefill,
+} from '@/lib/marketing-trial';
 import { AuthMobileBrand } from '@/components/auth/AuthMobileBrand';
 import { AuthSideVisual } from '@/components/auth/AuthSideVisual';
 import { BrandMark } from '@/components/brand/BrandMark';
@@ -26,6 +30,7 @@ type RegisterForm = {
 export default function RegisterPage() {
   const router = useRouter();
   const slugTouched = useRef(false);
+  const [fromTrial, setFromTrial] = useState(false);
   const { register, handleSubmit, setValue, watch } = useForm<RegisterForm>({
     defaultValues: {
       churchName: '',
@@ -39,6 +44,15 @@ export default function RegisterPage() {
 
   const churchSlug = watch('churchSlug');
 
+  useEffect(() => {
+    const prefill = readTrialRegisterPrefill();
+    if (!prefill) return;
+    setFromTrial(true);
+    setValue('email', prefill.email);
+    setValue('firstName', prefill.firstName);
+    setValue('lastName', prefill.lastName);
+  }, [setValue]);
+
   const onSubmit = async (data: RegisterForm) => {
     const slug = data.churchSlug.trim() || slugifyChurchName(data.churchName);
     if (!slug) {
@@ -51,6 +65,7 @@ export default function RegisterPage() {
         churchSlug: slug,
       });
       setAuthTokens(res.data.accessToken, res.data.refreshToken);
+      clearTrialRegisterPrefill();
       toast.success('Church workspace created!');
       router.push('/dashboard');
     } catch (err: unknown) {
@@ -129,11 +144,14 @@ export default function RegisterPage() {
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium">Admin email</label>
-              <Input type="email" {...register('email')} required />
+              <Input type="email" {...register('email')} required readOnly={fromTrial} />
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium">Password</label>
               <Input type="password" {...register('password')} required minLength={8} />
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Please enter a new password — not the temporary password from your email.
+              </p>
             </div>
             <Button type="submit" className="w-full shadow-brand">
               Create workspace

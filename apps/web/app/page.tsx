@@ -8,6 +8,7 @@ import { HowItWorks } from '@/components/marketing/HowItWorks';
 import { SecuritySection } from '@/components/marketing/SecuritySection';
 import { CTASection } from '@/components/marketing/CTASection';
 import { MarketingFooter } from '@/components/marketing/MarketingFooter';
+import { MarketingTrialModal } from '@/components/marketing/MarketingTrialModal';
 
 export default function HomePage() {
   return (
@@ -24,6 +25,7 @@ export default function HomePage() {
         <CTASection />
       </main>
       <MarketingFooter />
+      <MarketingTrialModal />
     </div>
   );
 }

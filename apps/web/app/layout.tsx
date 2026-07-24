@@ -21,9 +21,10 @@ const anek = Anek_Latin({
 });
 
 const siteUrl = getSiteUrl();
-const title = 'Church_Hub — Enterprise Church Management Platform';
+const title =
+  'Church_Hub OS — Simplifying Evangelism, Follow-up, Membership, & Ministry in one place';
 const description =
-  'Unified platform for membership, discipleship, evangelism, youth ministry, business community, and bus operations — built for churches.';
+  'Stop losing first-time guests in WhatsApp groups and Excel Sheets. Church_Hub helps your team shepherd people from visit to membership. Start free — no credit card needed.';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -65,7 +66,7 @@ export const metadata: Metadata = {
         url: '/images/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'Church_Hub — Enterprise church management platform',
+        alt: 'Church_Hub OS — Evangelism, follow-up, membership & ministry in one place',
       },
     ],
   },

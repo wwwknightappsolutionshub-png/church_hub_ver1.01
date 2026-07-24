@@ -469,6 +469,24 @@ model LoginFailureBucket {
   @@map("login_failure_buckets")
 }
 
+/// SaaS marketing exit-intent / timed-modal trial leads (pre-registration).
+model MarketingTrialLead {
+  id             String    @id @default(uuid())
+  email          String
+  emailKey       String
+  firstName      String
+  lastName       String
+  passwordHash   String
+  tokenHash      String    @unique
+  expiresAt      DateTime
+  consumedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([emailKey])
+  @@map("marketing_trial_leads")
+}
+
 // ─── Membership ──────────────────────────────────────────────
 
 enum MemberStatus {
