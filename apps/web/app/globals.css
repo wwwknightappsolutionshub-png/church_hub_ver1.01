@@ -246,11 +246,6 @@
     animation: app-splash-status-cycle 4.5s ease-in-out infinite;
   }
 
-  .app-splash-status-line:nth-child(2),
-  .app-splash-status-line:nth-child(3) {
-    /* delay set inline */
-  }
-
   /* Polished Sonner toasts */
   [data-sonner-toaster][data-y-position='top'] {
     --width: min(22rem, calc(100vw - 1.5rem));
