@@ -41,14 +41,48 @@ export function UnifiedAdminHub({ hub }: UnifiedAdminHubProps) {
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total Members" value={metrics.membership.total.toLocaleString()} icon={Users} />
-        <StatCard label="Outreach Contacts" value={metrics.evangelism.totalContacts.toLocaleString()} icon={Megaphone} />
+        <StatCard
+          label="Total Members"
+          value={metrics.membership.total.toLocaleString()}
+          change={metrics.membership.changePct}
+          changeLabel={
+            metrics.membership.addedThisMonth === 1
+              ? '1 added this month'
+              : `${metrics.membership.addedThisMonth} added this month`
+          }
+          icon={Users}
+        />
+        <StatCard
+          label="Outreach Contacts"
+          value={metrics.evangelism.totalContacts.toLocaleString()}
+          change={metrics.evangelism.changePct}
+          changeLabel={
+            metrics.evangelism.thisMonth === 1
+              ? '1 this month'
+              : `${metrics.evangelism.thisMonth} this month`
+          }
+          icon={Megaphone}
+        />
         <StatCard
           label="Follow-up Rate"
           value={`${Math.round(metrics.followUp.completionRate * 100)}%`}
+          changeLabel={
+            metrics.followUp.pending === 1
+              ? '1 pending'
+              : `${metrics.followUp.pending} pending`
+          }
           icon={HeartHandshake}
         />
-        <StatCard label="Active Rides" value={metrics.bus.activeRides} icon={Bus} />
+        <StatCard
+          label="Active Rides"
+          value={metrics.bus.activeRides}
+          changeLabel={
+            metrics.bus.completedToday === 1
+              ? '1 completed today'
+              : `${metrics.bus.completedToday} completed today`
+          }
+          icon={Bus}
+        />
       </div>
 
       <CelebrationColumnsPanel compact />

@@ -2,6 +2,19 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.module';
 import { MembershipService } from '../membership/membership.service';
 
+function pctChange(current: number, previous: number): number {
+  if (previous <= 0) return current > 0 ? 100 : 0;
+  return Math.round(((current - previous) / previous) * 100);
+}
+
+function monthKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function monthLabel(d: Date): string {
+  return d.toLocaleDateString('en-US', { month: 'short' });
+}
+
 @Injectable()
 export class AdminService {
   constructor(
@@ -10,6 +23,12 @@ export class AdminService {
   ) {}
 
   async getDashboardMetrics(churchId: string) {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+
     const [
       memberCount,
       membersByStatus,
@@ -19,6 +38,19 @@ export class AdminService {
       businessCount,
       rideCount,
       sermonCount,
+      membersAtStartOfMonth,
+      membersAddedThisMonth,
+      membersAddedPrevMonth,
+      outreachThisMonth,
+      outreachPrevMonth,
+      completedFollowUps,
+      totalFollowUps,
+      pendingFollowUps,
+      ridesCompletedToday,
+      recentMembers,
+      recentOutreach,
+      membersBeforeWindow,
+      outreachBeforeWindow,
     ] = await Promise.all([
       this.prisma.member.count({ where: { churchId } }),
       this.prisma.member.groupBy({ by: ['status'], where: { churchId }, _count: true }),
@@ -27,27 +59,104 @@ export class AdminService {
       this.prisma.youthGroup.count({ where: { churchId, isActive: true } }),
       this.prisma.businessProfile.count({ where: { churchId, verificationStatus: 'VERIFIED' } }),
       this.prisma.rideRequest.count({
-        where: { churchId, status: { in: ['REQUESTED', 'SCHEDULED', 'IN_TRANSIT'] } },
+        where: { churchId, status: { in: ['REQUESTED', 'SCHEDULED', 'IN_TRANSIT', 'PICKED_UP'] } },
       }),
       this.prisma.sermon.count({ where: { churchId } }),
+      this.prisma.member.count({ where: { churchId, createdAt: { lt: startOfMonth } } }),
+      this.prisma.member.count({ where: { churchId, createdAt: { gte: startOfMonth } } }),
+      this.prisma.member.count({
+        where: { churchId, createdAt: { gte: startOfPrevMonth, lt: startOfMonth } },
+      }),
+      this.prisma.outreachContact.count({ where: { churchId, createdAt: { gte: startOfMonth } } }),
+      this.prisma.outreachContact.count({
+        where: { churchId, createdAt: { gte: startOfPrevMonth, lt: startOfMonth } },
+      }),
+      this.prisma.followUp.count({ where: { churchId, stage: 'JOINED_GROUP' } }),
+      this.prisma.followUp.count({ where: { churchId } }),
+      this.prisma.followUp.count({
+        where: { churchId, stage: { not: 'JOINED_GROUP' } },
+      }),
+      this.prisma.rideRequest.count({
+        where: {
+          churchId,
+          status: 'DROPPED_OFF',
+          droppedOffAt: { gte: startOfToday },
+        },
+      }),
+      this.prisma.member.findMany({
+        where: { churchId, createdAt: { gte: sixMonthsAgo } },
+        select: { createdAt: true },
+      }),
+      this.prisma.outreachContact.findMany({
+        where: { churchId, createdAt: { gte: sixMonthsAgo } },
+        select: { createdAt: true },
+      }),
+      this.prisma.member.count({ where: { churchId, createdAt: { lt: sixMonthsAgo } } }),
+      this.prisma.outreachContact.count({
+        where: { churchId, createdAt: { lt: sixMonthsAgo } },
+      }),
     ]);
 
-    const completedFollowUps = await this.prisma.followUp.count({
-      where: { churchId, stage: 'JOINED_GROUP' },
+    const monthBuckets: Array<{ key: string; month: string; membersAdded: number; outreachAdded: number }> =
+      [];
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+      monthBuckets.push({
+        key: monthKey(d),
+        month: monthLabel(d),
+        membersAdded: 0,
+        outreachAdded: 0,
+      });
+    }
+    const bucketIndex = new Map(monthBuckets.map((b, i) => [b.key, i]));
+    for (const row of recentMembers) {
+      const idx = bucketIndex.get(monthKey(new Date(row.createdAt)));
+      if (idx !== undefined) monthBuckets[idx].membersAdded += 1;
+    }
+    for (const row of recentOutreach) {
+      const idx = bucketIndex.get(monthKey(new Date(row.createdAt)));
+      if (idx !== undefined) monthBuckets[idx].outreachAdded += 1;
+    }
+
+    let membersRunning = membersBeforeWindow;
+    let outreachRunning = outreachBeforeWindow;
+    const growth = monthBuckets.map((b) => {
+      membersRunning += b.membersAdded;
+      outreachRunning += b.outreachAdded;
+      return {
+        month: b.month,
+        members: membersRunning,
+        outreach: outreachRunning,
+      };
     });
-    const totalFollowUps = await this.prisma.followUp.count({ where: { churchId } });
 
     return {
-      membership: { total: memberCount, byStatus: membersByStatus },
+      membership: {
+        total: memberCount,
+        byStatus: membersByStatus,
+        changePct: pctChange(memberCount, membersAtStartOfMonth),
+        addedThisMonth: membersAddedThisMonth,
+        addedPrevMonth: membersAddedPrevMonth,
+      },
       followUp: {
         byStage: followUpByStage,
         completionRate: totalFollowUps > 0 ? completedFollowUps / totalFollowUps : 0,
+        pending: pendingFollowUps,
+        completed: completedFollowUps,
       },
-      evangelism: { totalContacts: outreachCount },
+      evangelism: {
+        totalContacts: outreachCount,
+        thisMonth: outreachThisMonth,
+        changePct: pctChange(outreachThisMonth, outreachPrevMonth),
+      },
       youth: { activeGroups: youthGroupCount },
       business: { verifiedProfiles: businessCount },
-      bus: { activeRides: rideCount },
+      bus: {
+        activeRides: rideCount,
+        completedToday: ridesCompletedToday,
+      },
       communications: { sermonCount },
+      growth,
     };
   }
 

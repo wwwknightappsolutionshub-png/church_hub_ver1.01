@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import {
@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { normalizeDashboardMetrics, type DashboardMetrics } from '@/lib/dashboard-metrics';
+import { personalGreeting } from '@/lib/greeting';
 import { DASHBOARD_QUICK_ACTIONS } from '@/lib/quick-actions';
 import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { DashboardAttendanceChart } from '@/components/dashboard/DashboardAttendanceChart';
@@ -35,22 +36,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 const chartTick = { fontSize: 12, fontFamily: 'Montserrat' };
 const chartTickSm = { fontSize: 11, fontFamily: 'Montserrat' };
 
-const growthData = [
-  { month: 'Jan', members: 2100, outreach: 820 },
-  { month: 'Feb', members: 2250, outreach: 910 },
-  { month: 'Mar', members: 2380, outreach: 980 },
-  { month: 'Apr', members: 2510, outreach: 1050 },
-  { month: 'May', members: 2680, outreach: 1180 },
-  { month: 'Jun', members: 2847, outreach: 1248 },
-];
-
 export default function DashboardPage() {
   const router = useRouter();
-  const { isPlatformAdmin, isChurchStaff, isLoading: accessLoading } = useModuleAccess();
-  const [metrics, setMetrics] = useState<DashboardMetrics>(() =>
-    normalizeDashboardMetrics(null),
-  );
-  const [isDemo, setIsDemo] = useState(true);
+  const {
+    isPlatformAdmin,
+    isChurchStaff,
+    isLoading: accessLoading,
+    user,
+    member,
+  } = useModuleAccess();
+  const [metrics, setMetrics] = useState<DashboardMetrics>(() => normalizeDashboardMetrics(null));
+  const [metricsLoaded, setMetricsLoaded] = useState(false);
+  const [metricsError, setMetricsError] = useState(false);
+  const [greeting, setGreeting] = useState(() => personalGreeting(user, member));
+
+  useEffect(() => {
+    setGreeting(personalGreeting(user, member));
+  }, [user, member]);
 
   useEffect(() => {
     if (accessLoading) return;
@@ -65,13 +67,24 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (isPlatformAdmin) return;
+    let cancelled = false;
     api
       .get('/admin/dashboard')
       .then((r) => {
+        if (cancelled) return;
         setMetrics(normalizeDashboardMetrics(r.data));
-        setIsDemo(false);
+        setMetricsLoaded(true);
+        setMetricsError(false);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (cancelled) return;
+        setMetrics(normalizeDashboardMetrics(null));
+        setMetricsLoaded(true);
+        setMetricsError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [isPlatformAdmin]);
 
   const chartData = metrics.membership.byStatus.map((s) => ({
@@ -79,22 +92,79 @@ export default function DashboardPage() {
     count: s._count,
   }));
 
+  const growthData = useMemo(() => metrics.growth, [metrics.growth]);
+  const hasGrowth = growthData.some((g) => g.members > 0 || g.outreach > 0);
+
   return (
     <DashboardModuleShell
       eyebrow="Executive overview"
-      title="Good morning, Pastor"
+      title={greeting}
       description={MODULE_DESCRIPTIONS.dashboard}
-      badge={isDemo ? <Badge variant="gold">Demo data</Badge> : undefined}
+      badge={
+        metricsError ? (
+          <Badge variant="destructive">Could not load live metrics</Badge>
+        ) : metricsLoaded ? (
+          <Badge variant="outline">Live</Badge>
+        ) : undefined
+      }
       actions={
         <QuickActionsMenu actions={DASHBOARD_QUICK_ACTIONS} scrollTargetId="quick-actions" />
       }
     >
       <div className="space-y-6">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Total Members" value={metrics.membership.total.toLocaleString()} change={12} changeLabel="vs last month" icon={Users} />
-          <StatCard label="Outreach Contacts" value={metrics.evangelism.totalContacts.toLocaleString()} change={24} changeLabel="89 this month" icon={Megaphone} />
-          <StatCard label="Follow-up Rate" value={`${Math.round(metrics.followUp.completionRate * 100)}%`} change={5} changeLabel="34 pending" icon={HeartHandshake} />
-          <StatCard label="Active Rides" value={metrics.bus.activeRides} change={-3} changeLabel="41 completed today" icon={Bus} />
+          <StatCard
+            label="Total Members"
+            value={metricsLoaded ? metrics.membership.total.toLocaleString() : '—'}
+            change={metricsLoaded ? metrics.membership.changePct : undefined}
+            changeLabel={
+              metricsLoaded
+                ? metrics.membership.addedThisMonth === 1
+                  ? '1 added this month'
+                  : `${metrics.membership.addedThisMonth} added this month`
+                : undefined
+            }
+            icon={Users}
+          />
+          <StatCard
+            label="Outreach Contacts"
+            value={metricsLoaded ? metrics.evangelism.totalContacts.toLocaleString() : '—'}
+            change={metricsLoaded ? metrics.evangelism.changePct : undefined}
+            changeLabel={
+              metricsLoaded
+                ? metrics.evangelism.thisMonth === 1
+                  ? '1 this month'
+                  : `${metrics.evangelism.thisMonth} this month`
+                : undefined
+            }
+            icon={Megaphone}
+          />
+          <StatCard
+            label="Follow-up Rate"
+            value={
+              metricsLoaded ? `${Math.round(metrics.followUp.completionRate * 100)}%` : '—'
+            }
+            changeLabel={
+              metricsLoaded
+                ? metrics.followUp.pending === 1
+                  ? '1 pending'
+                  : `${metrics.followUp.pending} pending`
+                : undefined
+            }
+            icon={HeartHandshake}
+          />
+          <StatCard
+            label="Active Rides"
+            value={metricsLoaded ? metrics.bus.activeRides : '—'}
+            changeLabel={
+              metricsLoaded
+                ? metrics.bus.completedToday === 1
+                  ? '1 completed today'
+                  : `${metrics.bus.completedToday} completed today`
+                : undefined
+            }
+            icon={Bus}
+          />
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
@@ -104,31 +174,50 @@ export default function DashboardPage() {
                 <CardTitle className="text-base">Growth Overview</CardTitle>
                 <CardDescription>Members & outreach over 6 months</CardDescription>
               </div>
-              <Badge variant="outline">{isDemo ? 'Sample' : 'Live'}</Badge>
+              <Badge variant="outline">{metricsLoaded && !metricsError ? 'Live' : '—'}</Badge>
             </CardHeader>
             <CardContent className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={growthData}>
-                  <defs>
-                    <linearGradient id="memberGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                      <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="month" tick={chartTick} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis tick={chartTick} stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: 8,
-                      border: '1px solid hsl(var(--border))',
-                      fontFamily: 'Montserrat',
-                    }}
-                  />
-                  <Area type="monotone" dataKey="members" stroke="hsl(var(--primary))" fill="url(#memberGrad)" strokeWidth={2} />
-                  <Area type="monotone" dataKey="outreach" stroke="hsl(var(--gold))" fill="transparent" strokeWidth={2} strokeDasharray="4 4" />
-                </AreaChart>
-              </ResponsiveContainer>
+              {!hasGrowth ? (
+                <p className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                  No growth history yet — new members and outreach will appear here.
+                </p>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={growthData}>
+                    <defs>
+                      <linearGradient id="memberGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                        <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="month" tick={chartTick} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis tick={chartTick} stroke="hsl(var(--muted-foreground))" />
+                    <Tooltip
+                      contentStyle={{
+                        borderRadius: 8,
+                        border: '1px solid hsl(var(--border))',
+                        fontFamily: 'Montserrat',
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="members"
+                      stroke="hsl(var(--primary))"
+                      fill="url(#memberGrad)"
+                      strokeWidth={2}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="outreach"
+                      stroke="hsl(var(--gold))"
+                      fill="transparent"
+                      strokeWidth={2}
+                      strokeDasharray="4 4"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
 
