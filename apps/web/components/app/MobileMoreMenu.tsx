@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Lock, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ChevronDown, Lock, X } from 'lucide-react';
 import { LogoutButton } from '@/components/app/LogoutButton';
 import { MOBILE_TAB_HREFS, type DashboardNavItem } from '@/lib/member-nav';
 import { cn } from '@/lib/utils';
@@ -15,6 +16,8 @@ interface MobileMoreMenuProps {
   staffNav: DashboardNavItem[];
   staffCommunityNav: DashboardNavItem[];
   isChurchStaff: boolean;
+  /** When true (church admin / pastor), Community starts collapsed. */
+  communityCollapsedByDefault?: boolean;
 }
 
 export function MobileMoreMenu({
@@ -25,8 +28,15 @@ export function MobileMoreMenu({
   staffNav,
   staffCommunityNav,
   isChurchStaff,
+  communityCollapsedByDefault = false,
 }: MobileMoreMenuProps) {
   const pathname = usePathname();
+  const [communityOpen, setCommunityOpen] = useState(!communityCollapsedByDefault);
+
+  useEffect(() => {
+    if (!open) return;
+    setCommunityOpen(!communityCollapsedByDefault);
+  }, [open, communityCollapsedByDefault]);
 
   if (!open) return null;
 
@@ -88,32 +98,46 @@ export function MobileMoreMenu({
           {isChurchStaff ? (
             staffCommunityNav.length > 0 && (
               <>
-                <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Community
-                </p>
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                  {staffCommunityNav.map((item) => {
-                    const Icon = item.icon;
-                    const active =
-                      pathname === item.href || pathname.startsWith(`${item.href}/`);
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={onClose}
-                        className={cn(
-                          'flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3 text-center transition',
-                          active
-                            ? 'bg-primary/10 text-primary'
-                            : 'bg-muted/50 text-foreground hover:bg-muted',
-                        )}
-                      >
-                        <Icon className="h-5 w-5 shrink-0" />
-                        <span className="text-[10px] font-medium leading-tight">{item.label}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setCommunityOpen((o) => !o)}
+                  className="mb-2 flex w-full items-center justify-between px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+                  aria-expanded={communityOpen}
+                >
+                  <span>Community</span>
+                  <ChevronDown
+                    className={cn(
+                      'h-3.5 w-3.5 transition-transform',
+                      communityOpen ? 'rotate-0' : '-rotate-90',
+                    )}
+                    aria-hidden
+                  />
+                </button>
+                {communityOpen ? (
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                    {staffCommunityNav.map((item) => {
+                      const Icon = item.icon;
+                      const active =
+                        pathname === item.href || pathname.startsWith(`${item.href}/`);
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={onClose}
+                          className={cn(
+                            'flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3 text-center transition',
+                            active
+                              ? 'bg-primary/10 text-primary'
+                              : 'bg-muted/50 text-foreground hover:bg-muted',
+                          )}
+                        >
+                          <Icon className="h-5 w-5 shrink-0" />
+                          <span className="text-[10px] font-medium leading-tight">{item.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ) : null}
               </>
             )
           ) : (

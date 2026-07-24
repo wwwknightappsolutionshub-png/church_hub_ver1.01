@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import {
   MEMBER_NAV,
@@ -24,6 +24,7 @@ import {
   Bell,
   Building2,
   BarChart3,
+  ChevronDown,
   Mail,
 } from 'lucide-react';
 import { BrandMark } from '@/components/brand/BrandMark';
@@ -117,6 +118,14 @@ function DesktopSidebar({ onNavigate }: { onNavigate?: () => void }) {
     isChurchAdminRole(userRoles) || isPastorRole(userRoles) || isChurchStaff;
   const isPastor = isPastorRole(userRoles);
   const isChurchAdmin = isChurchAdminRole(userRoles);
+  /** Pastors and church admins start with Community collapsed; they can expand it. */
+  const [communityOpen, setCommunityOpen] = useState(false);
+
+  useEffect(() => {
+    if (accessLoading) return;
+    setCommunityOpen(!(isPastor || isChurchAdmin));
+  }, [accessLoading, isPastor, isChurchAdmin]);
+
   const staffNav = useMemo(
     () =>
       filterStaffNav(
@@ -184,14 +193,33 @@ function DesktopSidebar({ onNavigate }: { onNavigate?: () => void }) {
               </>
             )}
             {staffCommunityNav.length > 0 && (
-              <>
-                <p className="mb-2 mt-4 px-3 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
-                  Community
-                </p>
-                {staffCommunityNav.map((item) => (
-                  <NavLink key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} />
-                ))}
-              </>
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => setCommunityOpen((o) => !o)}
+                  className="mb-2 flex w-full items-center justify-between px-3 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40 hover:text-sidebar-foreground/70"
+                  aria-expanded={communityOpen}
+                >
+                  <span>Community</span>
+                  <ChevronDown
+                    className={cn(
+                      'h-3.5 w-3.5 shrink-0 transition-transform',
+                      communityOpen ? 'rotate-0' : '-rotate-90',
+                    )}
+                    aria-hidden
+                  />
+                </button>
+                {communityOpen
+                  ? staffCommunityNav.map((item) => (
+                      <NavLink
+                        key={item.href}
+                        item={item}
+                        pathname={pathname}
+                        onNavigate={onNavigate}
+                      />
+                    ))
+                  : null}
+              </div>
             )}
           </>
         ) : (
@@ -434,6 +462,7 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
               staffNav={staffNav}
               staffCommunityNav={staffCommunityNav}
               isChurchStaff={isChurchStaff}
+              communityCollapsedByDefault={isPastor || isChurchAdmin}
             />
           </>
         )}
