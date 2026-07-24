@@ -4,6 +4,13 @@ import type { ReactNode } from 'react';
 import { useModuleHeroStickyTitle } from '@/components/layout/useStickyModuleTitle';
 import { cn } from '@/lib/utils';
 
+/** High-contrast chip styles for controls placed on the dark enterprise hero. */
+export const enterpriseHeroChipClass =
+  'border-white/30 bg-white/12 font-semibold text-white shadow-sm backdrop-blur-sm hover:bg-white/22 hover:text-white';
+
+export const enterpriseHeroBadgeGoldClass =
+  'border border-amber-200/45 bg-amber-400/25 px-3 py-1 text-amber-50 shadow-sm';
+
 /** Shared corporate / enterprise module chrome (Kingdom Konnect style). */
 export function EnterpriseShell({ children, className }: { children: ReactNode; className?: string }) {
   return (
@@ -39,33 +46,58 @@ export function EnterpriseHero({
   return (
     <header
       ref={headerRef}
-      className="relative overflow-visible border-b border-slate-200/80 bg-slate-900 text-white dark:border-slate-800"
+      className="relative overflow-hidden border-b border-white/10 bg-[#0b1220] text-white"
       data-module-hero
     >
       <div
-        className="pointer-events-none absolute inset-0 opacity-40"
+        className="pointer-events-none absolute inset-0"
         style={{
           backgroundImage:
-            'linear-gradient(135deg, rgba(15,23,42,0.95) 0%, rgba(30,58,95,0.9) 50%, rgba(15,23,42,0.95) 100%)',
+            'linear-gradient(135deg, #0b1220 0%, #152238 42%, #1a2744 68%, #0b1220 100%)',
         }}
         aria-hidden
       />
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.35]"
+        style={{
+          backgroundImage:
+            'linear-gradient(rgba(148,163,184,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.12) 1px, transparent 1px)',
+          backgroundSize: '44px 44px',
+          maskImage: 'radial-gradient(ellipse at 30% 40%, black 15%, transparent 70%)',
+        }}
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute -left-16 top-0 h-56 w-56 rounded-full bg-indigo-500/25 blur-3xl"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute -right-10 bottom-0 h-48 w-48 rounded-full bg-amber-400/20 blur-3xl"
+        aria-hidden
+      />
+
       <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 md:py-10 md:px-8">
         {showEyebrow ? (
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{eyebrow}</p>
+          <p className="inline-flex items-center rounded-full border border-amber-300/35 bg-amber-400/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100">
+            {eyebrow}
+          </p>
         ) : null}
         <div
           className={cn(
-            'flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between',
-            showEyebrow && 'mt-2',
+            'flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between',
+            showEyebrow && 'mt-3',
           )}
         >
           <div className="min-w-0 flex-1">
-            <h1 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
-            <p className="mt-2 max-w-2xl text-sm text-slate-300 sm:text-base">{description}</p>
+            <h1 className="font-heading text-2xl font-bold tracking-tight text-white sm:text-3xl">
+              {title}
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-100/90 sm:text-base">
+              {description}
+            </p>
             {actions && <div className="mt-4 flex flex-wrap gap-2">{actions}</div>}
           </div>
-          {badge}
+          {badge ? <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">{badge}</div> : null}
         </div>
       </div>
     </header>

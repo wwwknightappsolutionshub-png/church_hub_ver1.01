@@ -18,6 +18,7 @@ import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { apiErrorMessage } from '@/lib/api-errors';
 import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
+import { enterpriseHeroChipClass } from '@/components/layout/EnterpriseModuleShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -126,12 +127,7 @@ export default function PlatformAnalyticsPage() {
       title="Business analytics"
       description={MODULE_DESCRIPTIONS.platformAnalytics}
       actions={
-        <Button
-          variant="outline"
-          size="sm"
-          className="border-foreground/30 bg-background font-semibold shadow-sm"
-          asChild
-        >
+        <Button variant="outline" size="sm" className={enterpriseHeroChipClass} asChild>
           <Link href="/dashboard/platform">
             <ChevronLeft className="mr-1 h-4 w-4" /> Platform
           </Link>

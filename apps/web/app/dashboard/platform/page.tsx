@@ -30,6 +30,10 @@ import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
+import {
+  enterpriseHeroBadgeGoldClass,
+  enterpriseHeroChipClass,
+} from '@/components/layout/EnterpriseModuleShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -332,45 +336,30 @@ export default function PlatformConsolePage() {
       title="SaaS owner console"
       description={MODULE_DESCRIPTIONS.platform}
       badge={
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="gold" className="gap-1">
-            <Building2 className="h-3 w-3" />
+        <>
+          <Badge variant="gold" className={cn('gap-1.5', enterpriseHeroBadgeGoldClass)}>
+            <Building2 className="h-3.5 w-3.5" />
             {churches?.length ?? 0} tenants
           </Badge>
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-primary/35 bg-primary/5 font-semibold text-primary hover:bg-primary/10"
-            asChild
-          >
+          <Button variant="outline" size="sm" className={enterpriseHeroChipClass} asChild>
             <Link href="/dashboard/platform/analytics">
               <BarChart3 className="mr-1.5 h-3.5 w-3.5" />
               Analytics
             </Link>
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-primary/35 bg-primary/5 font-semibold text-primary hover:bg-primary/10"
-            asChild
-          >
+          <Button variant="outline" size="sm" className={enterpriseHeroChipClass} asChild>
             <Link href="/dashboard/platform/wisdom365">
               <Sparkles className="mr-1.5 h-3.5 w-3.5" />
               Wisdom365+
             </Link>
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-primary/35 bg-primary/5 font-semibold text-primary hover:bg-primary/10"
-            asChild
-          >
+          <Button variant="outline" size="sm" className={enterpriseHeroChipClass} asChild>
             <Link href="/dashboard/platform/marketing">
               <Mail className="mr-1.5 h-3.5 w-3.5" />
               Marketing
             </Link>
           </Button>
-        </div>
+        </>
       }
     >
       <div className="grid gap-6 xl:grid-cols-[minmax(280px,360px)_1fr]">

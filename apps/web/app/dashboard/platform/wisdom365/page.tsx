@@ -12,6 +12,7 @@ import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
+import { enterpriseHeroChipClass } from '@/components/layout/EnterpriseModuleShell';
 import { Wisdom365VariantEditor, type VariantRow } from '@/components/platform/wisdom365/Wisdom365VariantEditor';
 import { Wisdom365ContentManager } from '@/components/platform/wisdom365/Wisdom365ContentManager';
 import { Wisdom365SubscriptionsTab } from '@/components/platform/wisdom365/Wisdom365SubscriptionsTab';
@@ -129,12 +130,7 @@ export default function PlatformWisdom365Page() {
       title="Wisdom365+ Management"
       description={MODULE_DESCRIPTIONS.platformWisdom365}
       actions={
-        <Button
-          variant="outline"
-          size="sm"
-          className="border-foreground/30 bg-background font-semibold shadow-sm"
-          asChild
-        >
+        <Button variant="outline" size="sm" className={enterpriseHeroChipClass} asChild>
           <Link href="/dashboard/platform">
             <ChevronLeft className="mr-1 h-4 w-4" /> Platform
           </Link>
