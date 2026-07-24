@@ -38,7 +38,8 @@ export async function generateMetadata({
   const title = `${data.churchName} — Welcome`;
   const canonical = `/c/${params.slug}`;
   const siteUrl = getSiteUrl();
-  const ogImage = `${siteUrl}/opengraph-image`;
+  const ogImage = `${siteUrl}/images/og-image.png`;
+  const ogImageAlt = `${siteUrl}/opengraph-image`;
 
   return {
     title,
@@ -57,13 +58,20 @@ export async function generateMetadata({
           alt: `${data.churchName} — powered by Church_Hub`,
           type: 'image/png',
         },
+        {
+          url: ogImageAlt,
+          width: 1200,
+          height: 630,
+          alt: `${data.churchName} — powered by Church_Hub`,
+          type: 'image/png',
+        },
       ],
     },
     twitter: {
       card: 'summary_large_image',
       title: data.churchName,
       description,
-      images: [ogImage],
+      images: [ogImage, ogImageAlt],
     },
     alternates: { canonical },
   };

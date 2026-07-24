@@ -63,18 +63,19 @@ export const metadata: Metadata = {
     description,
     images: [
       {
-        // Prefer extensionless Next OG route (aaPanel often 404s static *.png from disk).
-        url: '/opengraph-image',
+        // Static PNG first (reliable when nginx proxies /images/ to Next).
+        url: '/images/og-image.png',
         width: 1200,
         height: 630,
         alt: 'Church_Hub OS — Evangelism, follow-up, membership & ministry in one place',
         type: 'image/png',
       },
       {
-        url: '/images/og-image.png',
+        url: '/opengraph-image',
         width: 1200,
         height: 630,
         alt: 'Church_Hub OS — Evangelism, follow-up, membership & ministry in one place',
+        type: 'image/png',
       },
     ],
   },
@@ -82,7 +83,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title,
     description,
-    images: [`${siteUrl}/opengraph-image`],
+    images: [`${siteUrl}/images/og-image.png`, `${siteUrl}/opengraph-image`],
   },
   alternates: {
     canonical: '/',
