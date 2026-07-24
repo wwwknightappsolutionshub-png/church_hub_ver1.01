@@ -69,7 +69,7 @@ export default function OpenGraphImage() {
               maxWidth: 920,
             }}
           >
-            One platform for the entire church community
+            One platform for the entire church management
           </div>
           <div style={{ fontSize: 22, color: '#cbd5e1', marginTop: 16, display: 'flex' }}>
             Membership | Discipleship | Outreach | Youth | Operations

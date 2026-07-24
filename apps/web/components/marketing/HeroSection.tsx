@@ -27,12 +27,13 @@ export function HeroSection() {
 
           <h1 className="font-heading text-4xl font-bold leading-[1.1] text-foreground sm:text-5xl lg:text-6xl">
             One platform for the{' '}
-            <span className="text-primary">entire church community</span>
+            <span className="text-primary">entire church management</span>
           </h1>
 
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
-            Church_Hub unifies membership, discipleship, evangelism, youth, business networking,
-            and bus ministry — so pastors and leaders shepherd people with clarity, not chaos.
+            Church_Hub unifies managing evangelism drives, membership, discipleship, youth & teens,
+            business networking, and unit reporting — so pastors and leaders shepherd people with
+            clarity, not chaos.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -41,9 +42,6 @@ export function HeroSection() {
                 Start 14-day free trial
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
-            </Button>
-            <Button size="lg" variant="outline" asChild>
-              <Link href="/dashboard">View live demo</Link>
             </Button>
           </div>
 
