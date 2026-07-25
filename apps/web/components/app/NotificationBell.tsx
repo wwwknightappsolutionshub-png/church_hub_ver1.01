@@ -87,12 +87,12 @@ export function NotificationBell() {
   };
 
   return (
-    <div className="relative" ref={panelRef}>
+    <div className="relative z-50" ref={panelRef}>
       <Button
         variant="ghost"
         size="sm"
         type="button"
-        className="relative h-10 w-10 shrink-0 rounded-full p-0"
+        className="relative h-10 w-10 shrink-0 rounded-full p-0 text-foreground hover:bg-muted"
         aria-label="Notifications"
         aria-expanded={open}
         onClick={() => {
@@ -100,7 +100,7 @@ export function NotificationBell() {
           if (!open) void load();
         }}
       >
-        <Bell className="h-5 w-5" />
+        <Bell className="h-5 w-5 text-foreground" strokeWidth={2} />
         {unread > 0 ? (
           <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
             {unread > 9 ? '9+' : unread}

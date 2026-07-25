@@ -388,16 +388,25 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
           <header className="app-top-bar sticky top-0 z-40 flex h-[calc(3rem+env(safe-area-inset-top))] shrink-0 items-end border-b border-border/80 bg-card/90 px-4 pb-2 backdrop-blur-xl xl:h-16 xl:items-center xl:px-6">
             <div className="flex w-full items-center gap-2 pt-[env(safe-area-inset-top)] xl:pt-0">
               {showMobileApp ? (
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {stickyModuleTitle ?? churchName ?? 'Church Hub'}
+                  </p>
+                  {showMobilePageTitle && !stickyModuleTitle ? (
+                    <h1 className="truncate font-heading text-lg font-bold leading-tight">{pageTitle}</h1>
+                  ) : null}
+                </div>
+              ) : (
                 <>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      {stickyModuleTitle ?? churchName ?? 'Church Hub'}
-                    </p>
-                    {showMobilePageTitle && !stickyModuleTitle ? (
-                      <h1 className="truncate font-heading text-lg font-bold leading-tight">{pageTitle}</h1>
-                    ) : null}
-                  </div>
-                  <NotificationBell />
+                  <Link href={homeHref} className="xl:hidden">
+                    <BrandMark variant="dark" />
+                  </Link>
+                  <div className="min-w-0 flex-1" />
+                </>
+              )}
+              <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
+                <NotificationBell />
+                {showMobileApp ? (
                   <Link
                     href="/dashboard/settings"
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full ring-2 ring-border"
@@ -413,18 +422,9 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
                       </Avatar>
                     )}
                   </Link>
-                  <LogoutButton variant="header" />
-                </>
-              ) : (
-                <>
-                  <Link href={homeHref} className="xl:hidden">
-                    <BrandMark variant="dark" />
-                  </Link>
-                  <div className="ml-auto flex items-center gap-2">
-                    <LogoutButton variant="header" className="h-9 w-9 px-0" />
-                  </div>
-                </>
-              )}
+                ) : null}
+                <LogoutButton variant="header" className={showMobileApp ? undefined : 'h-9 w-9 px-0'} />
+              </div>
             </div>
           </header>
 
