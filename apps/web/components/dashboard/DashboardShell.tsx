@@ -18,14 +18,15 @@ import { memberInitials } from '@/lib/member-initials';
 import { accountAvatarUrl, userDisplayName } from '@/lib/user-display';
 import { UserAvatar } from '@/components/app/UserAvatar';
 import { LogoutButton } from '@/components/app/LogoutButton';
+import { NotificationBell } from '@/components/app/NotificationBell';
 import { MobileTabBar } from '@/components/app/MobileTabBar';
 import { MobileMoreMenu } from '@/components/app/MobileMoreMenu';
 import {
-  Bell,
   Building2,
   BarChart3,
   ChevronDown,
   Mail,
+  MessageSquare,
 } from 'lucide-react';
 import { BrandMark } from '@/components/brand/BrandMark';
 import { SkipToMain } from '@/components/accessibility/SkipToMain';
@@ -36,6 +37,7 @@ import { ModuleChromeProvider, useModuleChrome } from '@/components/layout/Modul
 
 const platformNav: DashboardNavItem[] = [
   { href: '/dashboard/platform', label: 'Platform console', icon: Building2, exact: false },
+  { href: '/dashboard/platform/inbox', label: 'Messaging', icon: MessageSquare, exact: false },
   { href: '/dashboard/platform/analytics', label: 'Analytics', icon: BarChart3, exact: false },
   { href: '/dashboard/platform/marketing', label: 'Marketing', icon: Mail, exact: false },
 ];
@@ -395,19 +397,7 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
                       <h1 className="truncate font-heading text-lg font-bold leading-tight">{pageTitle}</h1>
                     ) : null}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    type="button"
-                    className="relative h-10 w-10 shrink-0 rounded-full p-0"
-                    aria-label="Notifications"
-                    asChild
-                  >
-                    <Link href="/dashboard/communications">
-                      <Bell className="h-5 w-5" />
-                      <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive" />
-                    </Link>
-                  </Button>
+                  <NotificationBell />
                   <Link
                     href="/dashboard/settings"
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full ring-2 ring-border"

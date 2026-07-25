@@ -6,11 +6,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import {
   Building2,
+  ChevronDown,
   ChevronRight,
   Key,
   Loader2,
   Mail,
   BarChart3,
+  MessageSquare,
   Plus,
   Save,
   Shield,
@@ -167,6 +169,13 @@ export default function PlatformConsolePage() {
   const { isPlatformAdmin, userRoles, isLoading: accessLoading } = useModuleAccess();
   const canAccess = isPlatformAdmin || userRoles.includes('PLATFORM_ADMIN');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [workspaceTab, setWorkspaceTab] = useState<'tenant' | 'modules' | 'departments' | 'staff'>(
+    'tenant',
+  );
+  /** Accordion: only one module group open at a time (null = both collapsed). */
+  const [openModuleGroup, setOpenModuleGroup] = useState<string | null>(null);
+  /** Accordion: only one department open at a time. */
+  const [openDept, setOpenDept] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState({
@@ -344,6 +353,12 @@ export default function PlatformConsolePage() {
             {churches?.length ?? 0} tenants
           </Badge>
           <Button variant="outline" size="sm" className={enterpriseHeroChipClass} asChild>
+            <Link href="/dashboard/platform/inbox">
+              <MessageSquare className="mr-1.5 h-3.5 w-3.5" />
+              Messaging
+            </Link>
+          </Button>
+          <Button variant="outline" size="sm" className={enterpriseHeroChipClass} asChild>
             <Link href="/dashboard/platform/analytics">
               <BarChart3 className="mr-1.5 h-3.5 w-3.5" />
               Analytics
@@ -429,7 +444,12 @@ export default function PlatformConsolePage() {
               <button
                 key={c.id}
                 type="button"
-                onClick={() => setSelectedId(c.id)}
+                onClick={() => {
+                  setSelectedId(c.id);
+                  setWorkspaceTab('tenant');
+                  setOpenModuleGroup(null);
+                  setOpenDept(null);
+                }}
                 className={cn(
                   'flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors',
                   selectedId === c.id
@@ -462,17 +482,39 @@ export default function PlatformConsolePage() {
           </CardContent>
         </Card>
 
-        <div className="space-y-6">
+        <div className="space-y-4">
           <Card>
-            <CardHeader>
+            <CardHeader className="pb-3">
               <CardTitle className="text-base">
                 {detail?.church.name ?? selectedRow?.name ?? 'Select a tenant'}
               </CardTitle>
+              {selectedId && detail && !detailLoading ? (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {(
+                    [
+                      { id: 'tenant' as const, label: 'Overview' },
+                      { id: 'modules' as const, label: 'Modules' },
+                      { id: 'departments' as const, label: 'Departments' },
+                      { id: 'staff' as const, label: 'Staff' },
+                    ] as const
+                  ).map((t) => (
+                    <Button
+                      key={t.id}
+                      size="sm"
+                      variant={workspaceTab === t.id ? 'default' : 'outline'}
+                      className="h-8"
+                      onClick={() => setWorkspaceTab(t.id)}
+                    >
+                      {t.label}
+                    </Button>
+                  ))}
+                </div>
+              ) : null}
             </CardHeader>
             <CardContent>
               {!selectedId && (
                 <p className="text-sm text-muted-foreground">
-                  Choose a church to edit details, staff roster, and enabled modules.
+                  Choose a church to configure tenants, modules, departments, and staff.
                 </p>
               )}
               {selectedId && detailLoading && (
@@ -480,9 +522,10 @@ export default function PlatformConsolePage() {
                   <Loader2 className="h-6 w-6 animate-spin" />
                 </div>
               )}
-              {selectedId && detail && !detailLoading && (
-                <div className="space-y-4">
-                  <div className="grid gap-3 sm:grid-cols-2">
+
+              {selectedId && detail && !detailLoading && workspaceTab === 'tenant' && (
+                <div className="space-y-3">
+                  <div className="grid gap-2 sm:grid-cols-2">
                     <Input
                       placeholder="Name"
                       value={editForm.name}
@@ -513,150 +556,179 @@ export default function PlatformConsolePage() {
                     Tenant active (members can sign in)
                   </label>
                   <div className="flex flex-wrap gap-2">
-                    <Button onClick={saveChurch} disabled={busy}>
+                    <Button size="sm" onClick={saveChurch} disabled={busy}>
                       <Save className="mr-1.5 h-4 w-4" />
                       Save tenant
                     </Button>
-                    <Button variant="destructive" onClick={removeChurch} disabled={busy}>
+                    <Button size="sm" variant="destructive" onClick={removeChurch} disabled={busy}>
                       <Trash2 className="mr-1.5 h-4 w-4" />
                       Remove / deactivate
                     </Button>
                   </div>
                 </div>
               )}
-            </CardContent>
-          </Card>
 
-          {selectedId && detail && !detailLoading && (
-            <>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Enabled modules</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {MODULE_GROUPS.map((group) => (
-                    <div key={group.title}>
-                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        {group.title}
-                      </p>
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        {group.ids.map((id) => (
-                          <label
-                            key={id}
-                            className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={moduleDraft[id] !== false}
-                              onChange={(e) =>
-                                setModuleDraft({ ...moduleDraft, [id]: e.target.checked })
-                              }
-                            />
-                            {CHURCH_TENANT_MODULE_LABELS[id]}
-                          </label>
-                        ))}
+              {selectedId && detail && !detailLoading && workspaceTab === 'modules' && (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    Open one section at a time. Changes save with the button below.
+                  </p>
+                  {MODULE_GROUPS.map((group) => {
+                    const open = openModuleGroup === group.title;
+                    return (
+                      <div key={group.title} className="overflow-hidden rounded-lg border">
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between bg-muted/40 px-3 py-2.5 text-left text-sm font-semibold"
+                          aria-expanded={open}
+                          onClick={() =>
+                            setOpenModuleGroup((cur) => (cur === group.title ? null : group.title))
+                          }
+                        >
+                          <span className="uppercase tracking-wide text-xs text-muted-foreground">
+                            {group.title}
+                          </span>
+                          <ChevronDown
+                            className={cn(
+                              'h-4 w-4 text-muted-foreground transition-transform',
+                              open ? 'rotate-0' : '-rotate-90',
+                            )}
+                          />
+                        </button>
+                        {open ? (
+                          <div className="grid gap-1.5 p-2 sm:grid-cols-2">
+                            {group.ids.map((id) => (
+                              <label
+                                key={id}
+                                className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/50"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={moduleDraft[id] !== false}
+                                  onChange={(e) =>
+                                    setModuleDraft({ ...moduleDraft, [id]: e.target.checked })
+                                  }
+                                />
+                                {CHURCH_TENANT_MODULE_LABELS[id]}
+                              </label>
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
-                    </div>
-                  ))}
-                  <Button onClick={saveChurch} disabled={busy}>
+                    );
+                  })}
+                  <Button size="sm" className="mt-2" onClick={saveChurch} disabled={busy}>
                     Save module access
                   </Button>
-                </CardContent>
-              </Card>
+                </div>
+              )}
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Department module controls</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
+              {selectedId && detail && !detailLoading && workspaceTab === 'departments' && (
+                <div className="space-y-2">
                   <p className="text-xs text-muted-foreground">
-                    Super admin can activate/deactivate department modules and individual tabs per tenant.
+                    Only one department expands at a time.
                   </p>
                   {DEPT_MODULE_CODES.map((code) => {
                     const enabled = deptDraft.enabledModules[code] !== false;
                     const tabs = DEPT_TABS[code];
+                    const open = openDept === code;
                     return (
-                      <div key={code} className="rounded-lg border p-3">
-                        <label className="mb-2 flex items-center gap-2 text-sm font-medium">
+                      <div key={code} className="overflow-hidden rounded-lg border">
+                        <div className="flex items-center gap-2 bg-muted/40 px-3 py-2">
                           <input
                             type="checkbox"
                             checked={enabled}
                             onChange={(e) =>
                               setDeptDraft((prev) => ({
                                 ...prev,
-                                enabledModules: { ...prev.enabledModules, [code]: e.target.checked },
+                                enabledModules: {
+                                  ...prev.enabledModules,
+                                  [code]: e.target.checked,
+                                },
                               }))
                             }
                           />
-                          {DEPT_MODULE_LABELS[code]}
-                        </label>
-                        <div className="grid gap-2 sm:grid-cols-3">
-                          {tabs.map((tabId) => (
-                            <label key={`${code}-${tabId}`} className="flex items-center gap-2 text-xs">
-                              <input
-                                type="checkbox"
-                                checked={(deptDraft.tabs[code]?.[tabId] ?? true) && enabled}
-                                disabled={!enabled}
-                                onChange={(e) =>
-                                  setDeptDraft((prev) => ({
-                                    ...prev,
-                                    tabs: {
-                                      ...prev.tabs,
-                                      [code]: {
-                                        ...(prev.tabs[code] ?? {}),
-                                        [tabId]: e.target.checked,
-                                      },
-                                    },
-                                  }))
-                                }
-                              />
-                              {tabId}
-                            </label>
-                          ))}
+                          <button
+                            type="button"
+                            className="flex flex-1 items-center justify-between text-left text-sm font-medium"
+                            aria-expanded={open}
+                            onClick={() => setOpenDept((cur) => (cur === code ? null : code))}
+                          >
+                            <span>{DEPT_MODULE_LABELS[code]}</span>
+                            <ChevronDown
+                              className={cn(
+                                'h-4 w-4 text-muted-foreground transition-transform',
+                                open ? 'rotate-0' : '-rotate-90',
+                              )}
+                            />
+                          </button>
                         </div>
+                        {open ? (
+                          <div className="grid gap-1 p-2 sm:grid-cols-3">
+                            {tabs.map((tabId) => (
+                              <label
+                                key={`${code}-${tabId}`}
+                                className="flex items-center gap-1.5 text-xs"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={(deptDraft.tabs[code]?.[tabId] ?? true) && enabled}
+                                  disabled={!enabled}
+                                  onChange={(e) =>
+                                    setDeptDraft((prev) => ({
+                                      ...prev,
+                                      tabs: {
+                                        ...prev.tabs,
+                                        [code]: {
+                                          ...(prev.tabs[code] ?? {}),
+                                          [tabId]: e.target.checked,
+                                        },
+                                      },
+                                    }))
+                                  }
+                                />
+                                {tabId}
+                              </label>
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
                     );
                   })}
-                  <Button onClick={saveChurch} disabled={busy}>
-                    Save department module controls
+                  <Button size="sm" className="mt-2" onClick={saveChurch} disabled={busy}>
+                    Save department controls
                   </Button>
-                </CardContent>
-              </Card>
+                </div>
+              )}
 
-              <div className="grid gap-6 md:grid-cols-2">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
+              {selectedId && detail && !detailLoading && workspaceTab === 'staff' && (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <p className="mb-2 flex items-center gap-2 text-sm font-semibold">
                       <Shield className="h-4 w-4 text-gold" />
                       Pastors ({detail.pastors.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                    </p>
                     <StaffList
                       users={detail.pastors}
                       churchId={selectedId}
                       onPasswordReset={refresh}
                     />
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
+                  </div>
+                  <div>
+                    <p className="mb-2 flex items-center gap-2 text-sm font-semibold">
                       <Users className="h-4 w-4 text-primary" />
                       Church admins ({detail.admins.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                    </p>
                     <StaffList
                       users={detail.admins}
                       churchId={selectedId}
                       onPasswordReset={refresh}
                     />
-                  </CardContent>
-                </Card>
-              </div>
-            </>
-          )}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
     </DashboardModuleShell>

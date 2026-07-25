@@ -9,10 +9,23 @@ import { PlatformMarketingDripService } from './platform-marketing-drip.service'
 import { PlatformMarketingDripSchedulerService } from './platform-marketing-drip-scheduler.service';
 import { PlatformAnalyticsService } from './platform-analytics.service';
 import { PlatformAnalyticsController } from './platform-analytics.controller';
+import { PlatformMessagingService } from './platform-messaging.service';
+import {
+  PlatformMessagingController,
+  TenantSupportController,
+  UserNotificationsController,
+} from './platform-messaging.controller';
 
 @Module({
   imports: [MembershipModule],
-  controllers: [PlatformController, PlatformMarketingController, PlatformAnalyticsController],
+  controllers: [
+    PlatformController,
+    PlatformMarketingController,
+    PlatformAnalyticsController,
+    PlatformMessagingController,
+    TenantSupportController,
+    UserNotificationsController,
+  ],
   providers: [
     PlatformService,
     PlatformProvisioningService,
@@ -20,7 +33,14 @@ import { PlatformAnalyticsController } from './platform-analytics.controller';
     PlatformMarketingDripService,
     PlatformMarketingDripSchedulerService,
     PlatformAnalyticsService,
+    PlatformMessagingService,
   ],
-  exports: [PlatformService, PlatformMarketingService, PlatformMarketingDripService, PlatformAnalyticsService],
+  exports: [
+    PlatformService,
+    PlatformMarketingService,
+    PlatformMarketingDripService,
+    PlatformAnalyticsService,
+    PlatformMessagingService,
+  ],
 })
 export class PlatformModule {}
