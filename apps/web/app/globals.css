@@ -27,10 +27,10 @@
     --input: 220 13% 90%;
     --ring: 234 56% 42%;
     --radius: 0.75rem;
-    --sidebar: 234 45% 14%;
-    --sidebar-foreground: 220 20% 96%;
-    --sidebar-muted: 234 30% 22%;
-    --sidebar-accent: 234 56% 55%;
+    --sidebar: 234 45% 12%;
+    --sidebar-foreground: 210 25% 98%;
+    --sidebar-muted: 234 32% 26%;
+    --sidebar-accent: 43 80% 58%;
     --gold: 43 74% 49%;
     --success: 152 60% 36%;
   }
@@ -52,9 +52,9 @@
     --input: 222 25% 18%;
     --ring: 234 70% 62%;
     --sidebar: 222 47% 5%;
-    --sidebar-foreground: 220 20% 96%;
-    --sidebar-muted: 222 35% 12%;
-    --sidebar-accent: 234 70% 62%;
+    --sidebar-foreground: 210 25% 98%;
+    --sidebar-muted: 222 32% 16%;
+    --sidebar-accent: 43 80% 58%;
   }
 
   * {

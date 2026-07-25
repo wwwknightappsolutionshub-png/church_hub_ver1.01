@@ -36,7 +36,7 @@ import { cn } from '@/lib/utils';
 import { ModuleChromeProvider, useModuleChrome } from '@/components/layout/ModuleChromeContext';
 
 const platformNav: DashboardNavItem[] = [
-  { href: '/dashboard/platform', label: 'Platform console', icon: Building2, exact: false },
+  { href: '/dashboard/platform', label: 'Platform console', icon: Building2, exact: true },
   { href: '/dashboard/platform/inbox', label: 'Messaging', icon: MessageSquare, exact: false },
   { href: '/dashboard/platform/analytics', label: 'Analytics', icon: BarChart3, exact: false },
   { href: '/dashboard/platform/marketing', label: 'Marketing', icon: Mail, exact: false },
@@ -59,13 +59,16 @@ function NavLink({
       href={href}
       onClick={onNavigate}
       className={cn(
-        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
+        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
         active
-          ? 'bg-sidebar-accent/20 text-sidebar-accent'
-          : 'text-sidebar-foreground/70 hover:bg-sidebar-muted hover:text-sidebar-foreground',
+          ? 'bg-sidebar-muted text-sidebar-foreground ring-1 ring-white/15'
+          : 'text-sidebar-foreground/90 hover:bg-sidebar-muted/70 hover:text-sidebar-foreground',
       )}
     >
-      <Icon className="h-4 w-4 shrink-0" />
+      <Icon
+        className={cn('h-4 w-4 shrink-0', active ? 'text-secondary' : 'text-sidebar-foreground/80')}
+        aria-hidden
+      />
       <span className="flex-1">{label}</span>
     </Link>
   );
