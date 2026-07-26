@@ -91,16 +91,7 @@ function CaptureForm() {
   }
 
   if (done) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
-        <CheckCircle2 className="h-14 w-14 text-emerald-600" />
-        <h1 className="font-heading text-2xl font-bold">Thank you, {form.firstName}!</h1>
-        <p className="max-w-md text-muted-foreground">
-          {info.church.name} has received your details. You should receive a welcome message shortly.
-          We look forward to seeing you!
-        </p>
-      </div>
-    );
+    return <ThankYouSuccess firstName={form.firstName} churchName={info.church.name} />;
   }
 
   return (
@@ -162,6 +153,63 @@ function CaptureForm() {
           </CardContent>
         </Card>
       </div>
+    </div>
+  );
+}
+
+const AUTO_CLOSE_SECONDS = 5;
+
+function ThankYouSuccess({
+  firstName,
+  churchName,
+}: {
+  firstName: string;
+  churchName: string;
+}) {
+  const [secondsLeft, setSecondsLeft] = useState(AUTO_CLOSE_SECONDS);
+
+  useEffect(() => {
+    const tick = setInterval(() => {
+      setSecondsLeft((s) => Math.max(0, s - 1));
+    }, 1000);
+
+    const closeTimer = setTimeout(() => {
+      try {
+        window.close();
+      } catch {
+        // ignored — browsers block close unless opened by script
+      }
+      // Fallback when the tab cannot be closed programmatically (typical for QR/NFC opens).
+      setTimeout(() => {
+        if (!document.hidden) {
+          if (window.history.length > 1) {
+            window.history.back();
+          } else {
+            window.location.replace('about:blank');
+          }
+        }
+      }, 150);
+    }, AUTO_CLOSE_SECONDS * 1000);
+
+    return () => {
+      clearInterval(tick);
+      clearTimeout(closeTimer);
+    };
+  }, []);
+
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
+      <CheckCircle2 className="h-14 w-14 text-emerald-600" />
+      <h1 className="font-heading text-2xl font-bold">Thank you, {firstName}!</h1>
+      <p className="max-w-md text-muted-foreground">
+        {churchName} has received your details. You should receive a welcome message shortly. We look
+        forward to seeing you!
+      </p>
+      <p className="text-sm text-muted-foreground">
+        {secondsLeft > 0
+          ? `This page will close in ${secondsLeft} second${secondsLeft === 1 ? '' : 's'}…`
+          : 'Closing…'}
+      </p>
     </div>
   );
 }
