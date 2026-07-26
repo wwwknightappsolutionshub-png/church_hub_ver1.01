@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import Redis from 'ioredis';
+import { resolveRedisConnection, resolveRedisUrl } from '../redis/redis-connection';
 
 const DEFAULT_TTL_SEC = 60;
 
@@ -24,13 +25,12 @@ export class RedisCacheService implements OnModuleDestroy {
       this.logger.log('Cache disabled (CACHE_ENABLED=false)');
       return;
     }
-    const url = process.env.REDIS_URL;
-    const host = process.env.REDIS_HOST ?? 'localhost';
-    const port = parseInt(process.env.REDIS_PORT ?? '6379', 10);
     try {
+      const url = resolveRedisUrl();
+      const opts = resolveRedisConnection({ maxRetriesPerRequest: 1 });
       this.redis = url
         ? new Redis(url, { maxRetriesPerRequest: 1, lazyConnect: true })
-        : new Redis({ host, port, maxRetriesPerRequest: 1, lazyConnect: true });
+        : new Redis({ ...opts, lazyConnect: true });
       this.redis.on('connect', () => {
         this.redisReady = true;
         this.logger.log('Redis cache connected');

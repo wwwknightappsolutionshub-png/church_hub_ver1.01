@@ -40,6 +40,7 @@ import { MarketingTrialModule } from './modules/marketing-trial/marketing-trial.
 import { GeoModule } from './modules/geo/geo.module';
 import { CacheModule } from './common/cache/cache.module';
 import { ObservabilityModule } from './common/observability/observability.module';
+import { resolveRedisConnection } from './common/redis/redis-connection';
 
 const redisEnabled = process.env.REDIS_ENABLED !== 'false';
 
@@ -62,10 +63,7 @@ const redisEnabled = process.env.REDIS_ENABLED !== 'false';
     ...(redisEnabled
       ? [
           BullModule.forRoot({
-            connection: {
-              host: process.env.REDIS_HOST ?? 'localhost',
-              port: parseInt(process.env.REDIS_PORT ?? '6379', 10),
-            },
+            connection: resolveRedisConnection({ maxRetriesPerRequest: null }),
           }),
         ]
       : []),
