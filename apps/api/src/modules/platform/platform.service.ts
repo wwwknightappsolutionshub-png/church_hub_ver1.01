@@ -27,6 +27,8 @@ import { ResetTenantUserPasswordDto } from './dto/reset-tenant-user-password.dto
 import { PlatformProvisioningService } from './platform-provisioning.service';
 import { MembershipConfigService } from '../membership/membership-config.service';
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
+import { UploadsService } from '../uploads/uploads.service';
+import { PurgeChurchDto } from './dto/purge-church.dto';
 
 const STAFF_ROLE_NAMES = ['ADMIN', 'PASTOR', 'LEADER', 'MEMBER', 'DRIVER'] as const;
 
@@ -39,6 +41,7 @@ export class PlatformService {
     private readonly provisioning: PlatformProvisioningService,
     private readonly membershipConfig: MembershipConfigService,
     private readonly email: EmailAdapter,
+    private readonly uploads: UploadsService,
   ) {}
 
   getModuleCatalog() {
@@ -283,15 +286,92 @@ export class PlatformService {
 
     const userCount = await this.prisma.user.count({ where: { churchId } });
     if (userCount > 0) {
-      return this.prisma.church.update({
+      const row = await this.prisma.church.update({
         where: { id: churchId },
         data: { isActive: false },
         select: { id: true, isActive: true },
       });
+      return { id: row.id, isActive: row.isActive, deleted: false, deactivated: true };
     }
 
     await this.prisma.church.delete({ where: { id: churchId } });
-    return { id: churchId, deleted: true };
+    return { id: churchId, deleted: true, deactivated: false };
+  }
+
+  /**
+   * Irreversible purge: deletes the church row (cascades tenant data + users/emails),
+   * marketing trial leads for those emails, and on-disk uploads.
+   */
+  async permanentlyDeleteChurch(
+    churchId: string,
+    dto: PurgeChurchDto,
+    actor: { userId: string; email: string },
+  ) {
+    const church = await this.prisma.church.findUnique({
+      where: { id: churchId },
+      select: { id: true, name: true, slug: true, isActive: true },
+    });
+    if (!church) throw new NotFoundException('Church not found');
+
+    if (dto.confirmSlug !== church.slug.toLowerCase()) {
+      throw new BadRequestException('Confirmation slug does not match this tenant');
+    }
+    if (dto.confirmPhrase !== 'DELETE') {
+      throw new BadRequestException('Type DELETE to confirm permanent deletion');
+    }
+
+    const users = await this.prisma.user.findMany({
+      where: { churchId },
+      select: { id: true, email: true, firstName: true, lastName: true },
+    });
+    const emails = users.map((u) => u.email.toLowerCase());
+    const emailKeys = [...new Set(emails)];
+
+    const memberCount = await this.prisma.member.count({ where: { churchId } });
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        if (emailKeys.length) {
+          await tx.marketingTrialLead.deleteMany({
+            where: { emailKey: { in: emailKeys } },
+          });
+        }
+
+        // Explicit user wipe first so auth tokens / refresh sessions go with them
+        // even if a related table blocks church cascade in edge cases.
+        if (users.length) {
+          await tx.user.deleteMany({ where: { churchId } });
+        }
+
+        await tx.church.delete({ where: { id: churchId } });
+      });
+    } catch (err) {
+      this.logger.error(
+        `Permanent delete failed for church ${churchId}: ${err instanceof Error ? err.message : err}`,
+      );
+      throw new BadRequestException(
+        'Could not permanently delete this tenant. Deactivate it instead, or contact support with the server logs.',
+      );
+    }
+
+    const storage = await this.uploads.deleteChurchStorage(churchId);
+
+    this.logger.warn(
+      `PLATFORM PURGE by ${actor.email} (${actor.userId}): church=${church.slug} (${church.id}) ` +
+        `users=${users.length} members=${memberCount} emails=[${emailKeys.join(', ')}] ` +
+        `uploadsRemoved=${storage.removed.length}`,
+    );
+
+    return {
+      id: churchId,
+      slug: church.slug,
+      name: church.name,
+      permanentlyDeleted: true,
+      usersRemoved: users.length,
+      membersRemoved: memberCount,
+      emailsRemoved: emailKeys,
+      uploadsCleaned: storage.removed.length > 0,
+    };
   }
 
   /**

@@ -6,6 +6,7 @@ import { AuthUser, CurrentUser } from '../auth/current-user.decorator';
 import { CreateChurchDto } from './dto/create-church.dto';
 import { UpdateChurchDto } from './dto/update-church.dto';
 import { ResetTenantUserPasswordDto } from './dto/reset-tenant-user-password.dto';
+import { PurgeChurchDto } from './dto/purge-church.dto';
 
 @ApiTags('platform')
 @ApiBearerAuth()
@@ -40,8 +41,25 @@ export class PlatformController {
   }
 
   @Delete('churches/:id')
+  @ApiOperation({ summary: 'Deactivate tenant (or hard-delete if it has no users)' })
   deleteChurch(@Param('id') id: string) {
     return this.platform.deleteChurch(id);
+  }
+
+  @Post('churches/:id/purge')
+  @ApiOperation({
+    summary:
+      'Permanently delete tenant, all DB rows (users/emails/members), and upload files. Irreversible.',
+  })
+  permanentlyDeleteChurch(
+    @Param('id') id: string,
+    @Body() body: PurgeChurchDto,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.platform.permanentlyDeleteChurch(id, body, {
+      userId: actor.userId,
+      email: actor.email,
+    });
   }
 
   @Post('churches/:churchId/users/:userId/reset-password')

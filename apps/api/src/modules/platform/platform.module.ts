@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MembershipModule } from '../membership/membership.module';
+import { UploadsModule } from '../uploads/uploads.module';
 import { PlatformController } from './platform.controller';
 import { PlatformMarketingController } from './platform-marketing.controller';
 import { PlatformService } from './platform.service';
@@ -17,7 +18,7 @@ import {
 } from './platform-messaging.controller';
 
 @Module({
-  imports: [MembershipModule],
+  imports: [MembershipModule, UploadsModule],
   controllers: [
     PlatformController,
     PlatformMarketingController,

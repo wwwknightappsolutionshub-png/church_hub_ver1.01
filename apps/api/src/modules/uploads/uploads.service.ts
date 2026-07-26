@@ -5,7 +5,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { mkdir, writeFile } from 'fs/promises';
+import { mkdir, writeFile, rm } from 'fs/promises';
 import { join, extname } from 'path';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.module';
@@ -118,6 +118,32 @@ export class UploadsService implements OnModuleInit {
   saveLandingMessageMp3(churchId: string, file: Express.Multer.File): Promise<UploadResult> {
     this.assertMime(file, /^audio\//, 'MP3 or audio file required');
     return this.saveFile(['churches', churchId, 'landing', 'message'], file);
+  }
+
+  /** Remove on-disk upload trees for a purged tenant (best-effort). */
+  async deleteChurchStorage(churchId: string): Promise<{ removed: string[] }> {
+    const safeId = churchId.replace(/[^a-zA-Z0-9_-]/g, '');
+    if (!safeId || safeId !== churchId) {
+      throw new BadRequestException('Invalid church id for storage cleanup');
+    }
+    const candidates = [
+      join(this.rootDir, 'churches', churchId),
+      join(this.rootDir, 'departments', churchId),
+      join(this.rootDir, 'sermons', churchId),
+      join(this.rootDir, 'members', churchId),
+    ];
+    const removed: string[] = [];
+    for (const dir of candidates) {
+      try {
+        await rm(dir, { recursive: true, force: true });
+        removed.push(dir);
+      } catch (err) {
+        this.logger.warn(
+          `Upload cleanup skipped for ${dir}: ${err instanceof Error ? err.message : err}`,
+        );
+      }
+    }
+    return { removed };
   }
 
   private async patchUserAvatar(userId: string, url: string) {

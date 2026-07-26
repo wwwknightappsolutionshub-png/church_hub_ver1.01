@@ -178,6 +178,9 @@ export default function PlatformConsolePage() {
   const [openDept, setOpenDept] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+  const [purgeOpen, setPurgeOpen] = useState(false);
+  const [purgeSlug, setPurgeSlug] = useState('');
+  const [purgePhrase, setPurgePhrase] = useState('');
   const [createForm, setCreateForm] = useState({
     name: '',
     slug: '',
@@ -319,15 +322,54 @@ export default function PlatformConsolePage() {
 
   const removeChurch = async () => {
     if (!selectedId || !selectedRow) return;
-    if (!window.confirm(`Remove or deactivate "${selectedRow.name}"?`)) return;
+    if (
+      !window.confirm(
+        `Deactivate "${selectedRow.name}"? Users keep their data but cannot sign in. Use Permanently delete to wipe everything.`,
+      )
+    ) {
+      return;
+    }
     setBusy(true);
     try {
-      await api.delete(`/platform/churches/${selectedId}`);
-      toast.success('Tenant removed or deactivated');
+      const { data } = await api.delete<{ deactivated?: boolean; deleted?: boolean }>(
+        `/platform/churches/${selectedId}`,
+      );
+      toast.success(
+        data?.deleted
+          ? 'Empty tenant deleted'
+          : 'Tenant deactivated — data retained',
+      );
       setSelectedId(null);
       refresh();
     } catch {
-      toast.error('Could not remove tenant');
+      toast.error('Could not deactivate tenant');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const permanentlyDeleteChurch = async () => {
+    if (!selectedId || !selectedRow) return;
+    setBusy(true);
+    try {
+      const { data } = await api.post<{
+        emailsRemoved: string[];
+        usersRemoved: number;
+        membersRemoved: number;
+      }>(`/platform/churches/${selectedId}/purge`, {
+        confirmSlug: purgeSlug.trim().toLowerCase(),
+        confirmPhrase: purgePhrase.trim().toUpperCase(),
+      });
+      toast.success(
+        `Permanently deleted ${selectedRow.name} (${data.usersRemoved} users, ${data.membersRemoved} members)`,
+      );
+      setPurgeOpen(false);
+      setPurgeSlug('');
+      setPurgePhrase('');
+      setSelectedId(null);
+      refresh();
+    } catch (err) {
+      toast.error(apiErrorMessage(err, 'Could not permanently delete tenant'));
     } finally {
       setBusy(false);
     }
@@ -560,11 +602,74 @@ export default function PlatformConsolePage() {
                       <Save className="mr-1.5 h-4 w-4" />
                       Save tenant
                     </Button>
-                    <Button size="sm" variant="destructive" onClick={removeChurch} disabled={busy}>
+                    <Button size="sm" variant="outline" onClick={removeChurch} disabled={busy}>
+                      Deactivate
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={busy}
+                      onClick={() => {
+                        setPurgeOpen(true);
+                        setPurgeSlug('');
+                        setPurgePhrase('');
+                      }}
+                    >
                       <Trash2 className="mr-1.5 h-4 w-4" />
-                      Remove / deactivate
+                      Permanently delete
                     </Button>
                   </div>
+                  {purgeOpen ? (
+                    <div className="mt-4 space-y-3 rounded-lg border border-destructive/40 bg-destructive/5 p-4">
+                      <p className="text-sm font-semibold text-destructive">
+                        Permanent delete — irreversible
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        This removes the church, all members, users, emails, messages, and uploaded
+                        files from the database. Type the tenant slug{' '}
+                        <strong className="text-foreground">{selectedRow?.slug}</strong> and{' '}
+                        <strong className="text-foreground">DELETE</strong> to confirm.
+                      </p>
+                      <Input
+                        placeholder={`Type slug: ${selectedRow?.slug ?? ''}`}
+                        value={purgeSlug}
+                        onChange={(e) => setPurgeSlug(e.target.value)}
+                        autoComplete="off"
+                      />
+                      <Input
+                        placeholder='Type DELETE'
+                        value={purgePhrase}
+                        onChange={(e) => setPurgePhrase(e.target.value)}
+                        autoComplete="off"
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={
+                            busy ||
+                            purgeSlug.trim().toLowerCase() !== (selectedRow?.slug ?? '').toLowerCase() ||
+                            purgePhrase.trim().toUpperCase() !== 'DELETE'
+                          }
+                          onClick={() => void permanentlyDeleteChurch()}
+                        >
+                          Confirm permanent delete
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={busy}
+                          onClick={() => {
+                            setPurgeOpen(false);
+                            setPurgeSlug('');
+                            setPurgePhrase('');
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               )}
 
