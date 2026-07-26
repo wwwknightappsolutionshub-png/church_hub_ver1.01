@@ -199,115 +199,111 @@ export function FollowUpPipeline({
         }}
       />
 
-      {/* Journey rail */}
-      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm md:p-5">
-        <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Discipleship journey
-        </p>
-        <div className="grid gap-3 md:grid-cols-3">
+      {/* Journey + phases share one 3-col grid so columns line up */}
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-border bg-card px-4 py-3 shadow-sm md:px-5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Discipleship journey
+          </p>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-primary transition-all"
+              style={{
+                width: total
+                  ? `${Math.min(100, (items.filter((f) => f.stage === 'JOINED_GROUP').length / total) * 100 + 10)}%`
+                  : '8%',
+              }}
+            />
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {total} people in pipeline · drag-free kanban by stage below
+          </p>
+        </div>
+
+        <div className="grid gap-5 md:grid-cols-3">
           {PIPELINE_COLUMNS.map((col, i) => {
             const Icon = PHASE_ICONS[col.id] ?? Users;
             const count = items.filter((f) =>
               (col.stages as readonly string[]).includes(f.stage),
             ).length;
             return (
-              <div key={col.id} className="relative flex gap-3">
+              <div key={col.id} className="relative flex min-w-0 flex-col gap-4">
                 {i < PIPELINE_COLUMNS.length - 1 && (
-                  <ArrowRight className="absolute -right-2 top-5 hidden h-5 w-5 text-muted-foreground/40 md:block" />
+                  <ArrowRight className="absolute -right-3 top-5 z-10 hidden h-5 w-5 text-muted-foreground/40 md:block" />
                 )}
-                <div
-                  className={cn(
-                    'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
-                    col.headerClass,
-                  )}
-                >
-                  <Icon className={cn('h-5 w-5', col.titleClass)} strokeWidth={2} />
+
+                <div className={cn('rounded-xl border px-4 py-3.5', col.headerClass)}>
+                  <div className="flex gap-3">
+                    <div
+                      className={cn(
+                        'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-card/70',
+                        col.headerClass,
+                      )}
+                    >
+                      <Icon className={cn('h-5 w-5', col.titleClass)} strokeWidth={2} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className={cn('h-2 w-2 rounded-full', col.dotClass)} />
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                          Phase {col.step}
+                        </span>
+                      </div>
+                      <h3 className={cn('mt-0.5 font-heading text-base font-bold', col.titleClass)}>
+                        {col.title}
+                      </h3>
+                      <p className={cn('text-sm', col.subtitleClass)}>{col.subtitle}</p>
+                      <p className="mt-1 text-xs font-medium text-muted-foreground">
+                        {count} in this phase
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className={cn('text-sm font-bold', col.titleClass)}>{col.title}</p>
-                  <p className={cn('text-xs', col.subtitleClass)}>{col.subtitle}</p>
-                  <p className="mt-1 text-xs font-medium text-muted-foreground">
-                    {count} in this phase
-                  </p>
-                </div>
+
+                {col.stages.map((stage) => {
+                  const stageItems = items.filter((f) => f.stage === stage);
+                  const accent =
+                    col.stageAccent[stage as keyof typeof col.stageAccent] ?? 'border-t-slate-400';
+                  return (
+                    <div key={stage} className="flex flex-col gap-2">
+                      <div className="flex items-center justify-between px-1">
+                        <span className="text-sm font-bold text-foreground">
+                          {STAGE_LABELS[stage]}
+                        </span>
+                        <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-foreground">
+                          {stageItems.length}
+                        </span>
+                      </div>
+                      <div className="flex min-h-[120px] flex-col gap-2.5 rounded-xl bg-muted/30 p-2">
+                        {stageItems.length === 0 ? (
+                          <p className="flex flex-1 items-center justify-center px-2 py-8 text-center text-xs text-muted-foreground">
+                            No one here yet
+                          </p>
+                        ) : (
+                          stageItems.map((item) => (
+                            <LeadCard
+                              key={item.id}
+                              item={item}
+                              selected={selectedId === item.id}
+                              stageAccent={accent}
+                              onSelect={() => onSelect(item.id)}
+                              onRequestProgress={(s) =>
+                                setPending({
+                                  id: item.id,
+                                  contactName: item.contactName,
+                                  stage: s,
+                                })
+                              }
+                            />
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             );
           })}
-        </div>
-        <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
-          <div
-            className="h-full rounded-full bg-primary transition-all"
-            style={{
-              width: total ? `${Math.min(100, ((items.filter((f) => f.stage === 'JOINED_GROUP').length / total) * 100) + 10)}%` : '8%',
-            }}
-          />
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          {total} people in pipeline · drag-free kanban by stage below
-        </p>
-      </div>
-
-      {/* Stage columns grouped by phase */}
-      <div className="overflow-x-auto pb-2">
-        <div className="flex min-w-max gap-5">
-          {PIPELINE_COLUMNS.map((col) => (
-            <div key={col.id} className="flex w-[min(100vw-2rem,340px)] shrink-0 flex-col gap-4">
-              <div className={cn('rounded-xl border px-4 py-3.5', col.headerClass)}>
-                <div className="flex items-center gap-2">
-                  <span className={cn('h-2 w-2 rounded-full', col.dotClass)} />
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Phase {col.step}
-                  </span>
-                </div>
-                <h3 className={cn('mt-1 font-heading text-base font-bold', col.titleClass)}>
-                  {col.title}
-                </h3>
-                <p className={cn('text-sm', col.subtitleClass)}>{col.subtitle}</p>
-              </div>
-
-              {col.stages.map((stage) => {
-                const stageItems = items.filter((f) => f.stage === stage);
-                const accent =
-                  col.stageAccent[stage as keyof typeof col.stageAccent] ?? 'border-t-slate-400';
-                return (
-                  <div key={stage} className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between px-1">
-                      <span className="text-sm font-bold text-foreground">
-                        {STAGE_LABELS[stage]}
-                      </span>
-                      <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-foreground">
-                        {stageItems.length}
-                      </span>
-                    </div>
-                    <div className="flex min-h-[120px] flex-col gap-2.5 rounded-xl bg-muted/30 p-2">
-                      {stageItems.length === 0 ? (
-                        <p className="flex flex-1 items-center justify-center px-2 py-8 text-center text-xs text-muted-foreground">
-                          No one here yet
-                        </p>
-                      ) : (
-                        stageItems.map((item) => (
-                          <LeadCard
-                            key={item.id}
-                            item={item}
-                            selected={selectedId === item.id}
-                            stageAccent={accent}
-                            onSelect={() => onSelect(item.id)}
-                            onRequestProgress={(s) =>
-                              setPending({
-                                id: item.id,
-                                contactName: item.contactName,
-                                stage: s,
-                              })
-                            }
-                          />
-                        ))
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ))}
         </div>
       </div>
 
