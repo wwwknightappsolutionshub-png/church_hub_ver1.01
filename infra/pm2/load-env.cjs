@@ -37,7 +37,11 @@ function loadChurchHubEnv(root) {
   const fileEnv = loadEnvFile(file);
   const pick = (key, fallback) => process.env[key] || fileEnv[key] || fallback;
   const gitSha = resolveGitSha(root) || pick('GIT_COMMIT', '') || pick('BUILD_SHA', '');
+
+  // Pass through the full root .env (SMTP_*, JWT_*, REDIS_*, etc.).
+  // Previously only a whitelist was exported, so magic-link / email silently stubbed.
   return {
+    ...fileEnv,
     NODE_ENV: pick('NODE_ENV', 'production'),
     DATABASE_URL: pick('DATABASE_URL', ''),
     SERVER_API_URL: pick('SERVER_API_URL', 'http://127.0.0.1:4000'),

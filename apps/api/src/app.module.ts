@@ -45,7 +45,11 @@ const redisEnabled = process.env.REDIS_ENABLED !== 'false';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      // PM2 cwd is apps/api; root .env lives two levels up on the VPS.
+      envFilePath: ['.env', '../.env', '../../.env'],
+    }),
     ThrottlerModule.forRoot([
       {
         ttl: parseInt(process.env.THROTTLE_TTL_MS ?? '60000', 10),
