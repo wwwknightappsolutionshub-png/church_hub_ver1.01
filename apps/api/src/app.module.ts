@@ -47,8 +47,9 @@ const redisEnabled = process.env.REDIS_ENABLED !== 'false';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      // PM2 cwd is apps/api; root .env lives two levels up on the VPS.
-      envFilePath: ['.env', '../.env', '../../.env'],
+      // Root .env first so empty SMTP_* in apps/api/.env cannot block Hostinger settings.
+      // Nest only assigns keys that are not already set on process.env.
+      envFilePath: ['../../.env', '../.env', '.env'],
     }),
     ThrottlerModule.forRoot([
       {

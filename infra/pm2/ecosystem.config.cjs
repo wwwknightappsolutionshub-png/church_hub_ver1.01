@@ -3,6 +3,9 @@
  *
  * Start:  pm2 start ecosystem.config.cjs
  * Reload: pm2 reload ecosystem.config.cjs --update-env
+ * After SMTP/.env changes, prefer delete+start so the live process gets env:
+ *   pm2 delete church-hub-api church-hub-web
+ *   pm2 start infra/pm2/ecosystem.config.cjs --update-env && pm2 save
  */
 const path = require('path');
 const { loadChurchHubEnv } = require('./load-env.cjs');
