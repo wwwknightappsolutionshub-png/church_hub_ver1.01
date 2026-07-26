@@ -75,4 +75,4 @@ export interface CellProvinceRow {
   leader: { id: string; name: string; email: string };
 }
 
-export type MinistryCellsTab = 'branches' | 'analytics' | 'province' | 'setup';
+export type MinistryCellsTab = 'branches' | 'analytics' | 'province';

@@ -6,7 +6,6 @@ import type { AxiosError } from 'axios';
 import {
   AlertTriangle,
   BarChart3,
-  BookOpen,
   Loader2,
   Network,
   Plus,
@@ -344,7 +343,6 @@ export function MinistryCellsApp() {
     ...(ctx.canViewAnalytics && ctx.role !== 'provincialLeader'
       ? [{ id: 'analytics' as const, label: 'Analytics', icon: BarChart3 }]
       : []),
-    ...(ctx.canManage ? [{ id: 'setup' as const, label: 'Setup', icon: BookOpen }] : []),
   ];
 
   const showBranchDetail = Boolean(selectedBranchId && branchDetail && detailProps);
@@ -374,16 +372,16 @@ export function MinistryCellsApp() {
       {tab === 'branches' && (
         <div className="space-y-4">
           {!showWorkspace && (
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch lg:justify-between">
-              <MinistryCellsKpiStrip branches={branches} className="lg:flex-1" />
+            <div className="flex flex-row items-stretch gap-2 sm:gap-3">
+              <MinistryCellsKpiStrip branches={branches} className="min-w-0 flex-1" />
               {ctx.canManage && (
                 <Button
                   size="sm"
-                  className="h-10 w-full shrink-0 rounded-xl lg:w-auto"
+                  className="h-auto min-h-[3.25rem] shrink-0 self-stretch rounded-xl px-3 text-xs sm:px-4 sm:text-sm"
                   onClick={() => setShowCreateBranch((v) => !v)}
                 >
-                  <Plus className="mr-2 h-4 w-4" />
-                  New branch
+                  <Plus className="mr-1.5 h-4 w-4 shrink-0 sm:mr-2" />
+                  <span className="whitespace-nowrap">Add New Cell</span>
                 </Button>
               )}
             </div>
@@ -392,7 +390,7 @@ export function MinistryCellsApp() {
           {showCreateBranch && ctx.canManage && !showWorkspace && (
             <Card className="overflow-hidden rounded-2xl border-primary/20 shadow-sm">
               <div className="border-b border-border/60 bg-muted/30 px-4 py-2">
-                <p className="text-sm font-semibold">Create cell branch</p>
+                <p className="text-sm font-semibold">Add New Cell</p>
               </div>
               <CardContent className="py-4">
                 <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5" onSubmit={createBranch}>
@@ -424,7 +422,7 @@ export function MinistryCellsApp() {
                   </div>
                   <div className="flex gap-2 sm:col-span-2 lg:col-span-1 lg:items-end">
                     <Button type="submit" className="h-10 flex-1">
-                      Create branch
+                      Create cell
                     </Button>
                     <Button type="button" variant="ghost" className="h-10" onClick={() => setShowCreateBranch(false)}>
                       Cancel
@@ -457,6 +455,45 @@ export function MinistryCellsApp() {
               </div>
             </div>
           )}
+
+          {ctx.canManage && !showWorkspace && (
+            <div className="space-y-6 border-t border-border/60 pt-4">
+              <div>
+                <h3 className="mb-2 text-sm font-semibold">Provinces & provincial leaders</h3>
+                <ProvincesSetupPanel onChanged={invalidate} />
+              </div>
+              <div>
+                <h3 className="mb-2 text-sm font-semibold">Map cells to provinces</h3>
+                <div className="space-y-2">
+                  {branches.map((b) => (
+                    <div
+                      key={b.id}
+                      className="flex flex-col gap-2 rounded-lg border border-border/60 p-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div>
+                        <p className="text-sm font-medium">{b.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {b.postcode ?? 'No postcode'}
+                          {b.location ? ` · ${b.location}` : ''}
+                        </p>
+                      </div>
+                      <MapCellProvinceControl branch={b} onChanged={invalidate} />
+                    </div>
+                  ))}
+                  {branches.length === 0 && (
+                    <p className="text-sm text-muted-foreground">Create cells first, then map them.</p>
+                  )}
+                </div>
+              </div>
+              <MinistryCellsSetupPanel
+                forms={forms}
+                teaching={teaching}
+                branchOptions={branches.map((b) => ({ id: b.id, name: b.name }))}
+                onSeedForms={seedForms}
+                onChanged={invalidate}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -478,45 +515,6 @@ export function MinistryCellsApp() {
           analytics={analytics}
           loading={analyticsLoading}
         />
-      )}
-
-      {tab === 'setup' && ctx.canManage && (
-        <div className="space-y-6">
-          <div>
-            <h3 className="mb-2 text-sm font-semibold">Provinces & provincial leaders</h3>
-            <ProvincesSetupPanel onChanged={invalidate} />
-          </div>
-          <div>
-            <h3 className="mb-2 text-sm font-semibold">Map cells to provinces</h3>
-            <div className="space-y-2">
-              {branches.map((b) => (
-                <div
-                  key={b.id}
-                  className="flex flex-col gap-2 rounded-lg border border-border/60 p-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div>
-                    <p className="text-sm font-medium">{b.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {b.postcode ?? 'No postcode'}
-                      {b.location ? ` · ${b.location}` : ''}
-                    </p>
-                  </div>
-                  <MapCellProvinceControl branch={b} onChanged={invalidate} />
-                </div>
-              ))}
-              {branches.length === 0 && (
-                <p className="text-sm text-muted-foreground">Create cells first, then map them.</p>
-              )}
-            </div>
-          </div>
-          <MinistryCellsSetupPanel
-            forms={forms}
-            teaching={teaching}
-            branchOptions={branches.map((b) => ({ id: b.id, name: b.name }))}
-            onSeedForms={seedForms}
-            onChanged={invalidate}
-          />
-        </div>
       )}
     </div>
   );
