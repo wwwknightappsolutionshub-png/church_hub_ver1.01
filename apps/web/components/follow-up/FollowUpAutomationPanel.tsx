@@ -2,13 +2,14 @@
 
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, Zap } from 'lucide-react';
+import { ChevronDown, Loader2, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface Rule {
   id: string;
@@ -23,9 +24,11 @@ interface Rule {
 
 export function FollowUpAutomationPanel() {
   const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
   const { data: rules, isLoading } = useApiQuery<Rule[]>(
     ['follow-up-automation'],
     '/follow-up/automation-rules',
+    { enabled: open },
   );
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -53,47 +56,65 @@ export function FollowUpAutomationPanel() {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Zap className="h-4 w-4 text-primary" />
-          Follow-up automation
-        </CardTitle>
-        <p className="text-xs text-muted-foreground">
-          Delayed WhatsApp/email reminders and assignee alerts. Processed every minute via
-          notification queue + fail-safe scheduler.
-        </p>
+        <button
+          type="button"
+          className="flex w-full items-start justify-between gap-3 text-left"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+        >
+          <div className="min-w-0">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Zap className="h-4 w-4 shrink-0 text-primary" />
+              Follow-up automation
+            </CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Delayed WhatsApp/email reminders and assignee alerts. Processed every minute via
+              notification queue + fail-safe scheduler.
+            </p>
+          </div>
+          <ChevronDown
+            className={cn(
+              'mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform',
+              open ? 'rotate-0' : '-rotate-90',
+            )}
+            aria-hidden
+          />
+        </button>
       </CardHeader>
-      <CardContent>
-        {isLoading && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
-        <ul className="space-y-2">
-          {rules?.map((r) => (
-            <li
-              key={r.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2"
-            >
-              <div>
-                <p className="text-sm font-medium">{r.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {r.trigger}
-                  {r.stage ? ` · ${r.stage}` : ''} · after {r.delayHours}h · {r.channel}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant={r.isActive ? 'default' : 'outline'}>
-                  {r.isActive ? 'Active' : 'Off'}
-                </Badge>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={busy === r.id}
-                  onClick={() => toggle(r)}
-                >
-                  {busy === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Toggle'}
-                </Button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </CardContent>
+      {open ? (
+        <CardContent>
+          {isLoading && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
+          <ul className="space-y-2">
+            {rules?.map((r) => (
+              <li
+                key={r.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2"
+              >
+                <div>
+                  <p className="text-sm font-medium">{r.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {r.trigger}
+                    {r.stage ? ` · ${r.stage}` : ''} · after {r.delayHours}h · {r.channel}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant={r.isActive ? 'default' : 'outline'}>
+                    {r.isActive ? 'Active' : 'Off'}
+                  </Badge>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy === r.id}
+                    onClick={() => void toggle(r)}
+                  >
+                    {busy === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Toggle'}
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      ) : null}
     </Card>
   );
 }
