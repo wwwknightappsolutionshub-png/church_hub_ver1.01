@@ -79,20 +79,24 @@ test.describe('Dashboard extensions API', () => {
     expect(res.ok()).toBeTruthy();
   });
 
-  test('GET automation email templates (5 branded defaults)', async ({ request }) => {
+  test('GET automation email templates (branded defaults)', async ({ request }) => {
     const res = await request.get(`${API_URL}/automation/email-templates`, { headers });
     expect(res.ok(), `email-templates → ${res.status()}`).toBeTruthy();
     const templates = await res.json();
-    expect(templates.length).toBeGreaterThanOrEqual(5);
+    expect(templates.length).toBeGreaterThanOrEqual(6);
     const codes = templates.map((t: { code: string }) => t.code);
     expect(codes).toContain('STAFF_WELCOME');
     expect(codes).toContain('ABSENTEE_FOLLOWUP');
     expect(codes).toContain('NEW_MEMBER_WELCOME');
     expect(codes).toContain('WEEKLY_DIGEST');
     expect(codes).toContain('EVENT_REMINDER');
+    expect(codes).toContain('OUTREACH_WELCOME');
     const staffWelcome = templates.find((t: { code: string }) => t.code === 'STAFF_WELCOME');
     expect(staffWelcome.bodyHtml).toContain('{{temporaryPassword}}');
     expect(staffWelcome.bodyHtml).toContain('{{email}}');
+    const outreachWelcome = templates.find((t: { code: string }) => t.code === 'OUTREACH_WELCOME');
+    expect(outreachWelcome.bodyHtml).toContain('outreach team');
+    expect(outreachWelcome.bodyHtml).toContain('{{churchName}}');
   });
 
   test('POST PATCH DELETE custom automation template', async ({ request }) => {

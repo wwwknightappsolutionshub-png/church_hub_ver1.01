@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MembershipAutomationController } from './membership-automation.controller';
 import { MembershipAutomationService } from './membership-automation.service';
 import { MembershipAutomationScheduler } from './membership-automation.scheduler';
@@ -16,7 +16,7 @@ import { ServiceUnitsModule } from '../service-units/service-units.module';
     CommunicationsModule,
     FollowUpModule,
     MembershipModule,
-    OutreachModule,
+    forwardRef(() => OutreachModule),
     ServiceUnitsModule,
   ],
   controllers: [MembershipAutomationController, AutomationEmailTemplatesController],

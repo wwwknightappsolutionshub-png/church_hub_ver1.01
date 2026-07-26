@@ -69,6 +69,20 @@ const SYSTEM_DEFAULTS: Record<
       bodyHtml: `<p>Dear {{firstName}},</p><p>This is a friendly reminder about <strong>{{eventTitle}}</strong>.</p><p>{{eventDetails}}</p>`,
     }),
   },
+  OUTREACH_WELCOME: {
+    name: 'Outreach Welcome',
+    subject: 'Welcome from {{churchName}}',
+    sortOrder: 6,
+    bodyHtml: celebrationEmailShell({
+      eyebrow: 'Evangelism',
+      headline: 'Welcome, {{firstName}}!',
+      subhead: 'We are glad you connected with our outreach team',
+      bodyHtml: `<p>Dear {{firstName}},</p>
+<p>Thank you for taking time to speak with our outreach team today. We are delighted to connect with you and would love to see you at our next service.</p>
+<p>If you have any questions, simply reply to this message.</p>
+<p style="margin-top:24px;color:#64748b;font-size:14px;">Blessings,<br/><strong>{{churchName}} Evangelism Team</strong></p>`,
+    }),
+  },
 };
 
 export function applyAutomationTemplate(template: string, vars: Record<string, string>): string {

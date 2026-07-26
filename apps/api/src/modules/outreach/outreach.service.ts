@@ -1,4 +1,4 @@
-import { BadRequestException, forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, forwardRef, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import * as QRCode from 'qrcode';
@@ -6,6 +6,7 @@ import { PrismaService } from '../../prisma/prisma.module';
 import { FollowUpService } from '../follow-up/follow-up.service';
 import { SmsAdapter } from '../notifications/adapters/sms.adapter';
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
+import { AutomationEmailTemplatesService } from '../automation/automation-email-templates.service';
 import {
   DEFAULT_WELCOME_EMAIL_BODY,
   DEFAULT_WELCOME_EMAIL_SUBJECT,
@@ -19,11 +20,14 @@ import {
 
 @Injectable()
 export class OutreachService {
+  private readonly logger = new Logger(OutreachService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly followUp: FollowUpService,
     private readonly sms: SmsAdapter,
     private readonly email: EmailAdapter,
+    private readonly emailTemplates: AutomationEmailTemplatesService,
     @Inject(forwardRef(() => OutreachSyncConflictService))
     private readonly syncConflicts: OutreachSyncConflictService,
   ) {}
@@ -220,14 +224,38 @@ export class OutreachService {
     const church = await this.prisma.church.findUnique({ where: { id: churchId } });
     const churchName = church?.name ?? 'Our church';
     const name = contact.firstName;
+    const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ').trim() || name;
 
     if (contact.email) {
-      await this.email.send({
-        to: contact.email,
-        subject: this.applyTemplate(DEFAULT_WELCOME_EMAIL_SUBJECT, name, churchName),
-        body: this.applyTemplate(DEFAULT_WELCOME_EMAIL_BODY, name, churchName),
-        churchId,
-      });
+      try {
+        const rendered = await this.emailTemplates.render(churchId, 'OUTREACH_WELCOME', {
+          churchName,
+          firstName: name,
+          fullName,
+          name,
+          church: churchName,
+        });
+        const plain = rendered.bodyHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        await this.email.send({
+          to: contact.email,
+          subject: rendered.subject,
+          body: plain,
+          html: rendered.bodyHtml,
+          churchId,
+        });
+      } catch (err) {
+        this.logger.warn(
+          `Branded outreach welcome failed for ${contact.email}; falling back to plain text: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+        await this.email.send({
+          to: contact.email,
+          subject: this.applyTemplate(DEFAULT_WELCOME_EMAIL_SUBJECT, name, churchName),
+          body: this.applyTemplate(DEFAULT_WELCOME_EMAIL_BODY, name, churchName),
+          churchId,
+        });
+      }
     }
     if (contact.phone) {
       await this.sms.sendWhatsApp({
