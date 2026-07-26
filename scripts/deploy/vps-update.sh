@@ -36,9 +36,16 @@ if [[ "${SKIP_GIT:-0}" != "1" ]]; then
   fi
 fi
 
+# Load .env safely: unquoted spaces (e.g. NAME=my church) break `source` and abort deploy.
 set -a
 # shellcheck disable=SC1091
-source .env
+if ! source .env; then
+  echo "ERROR: failed to source .env — quote any value that contains spaces, e.g.:" >&2
+  echo '  SMTP_FROM="Church Hub <noreply@example.com>"' >&2
+  echo '  SOME_NAME="my church"' >&2
+  echo "Inspect with:  sed -n '20,40p' .env" >&2
+  exit 1
+fi
 set +a
 
 export GIT_COMMIT="$(git rev-parse --short HEAD)"
