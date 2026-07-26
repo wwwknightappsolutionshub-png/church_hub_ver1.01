@@ -21,7 +21,7 @@ export const MODULE_DESCRIPTIONS = {
   churchLanding:
     'Edit your public church site — hero slides, service times, announcements, contact details, and membership form.',
   staff:
-    'Create staff logins, assign ADMIN/PASTOR/LEADER roles, and send welcome emails with temporary passwords.',
+    'Create staff logins, assign ADMIN/PASTOR/LEADER/PROVINCIAL_LEADER roles, and send welcome emails with temporary passwords.',
   communications:
     'Send push notifications, edit email templates, read the message inbox, and manage sermon audio and video.',
   pastorReports:

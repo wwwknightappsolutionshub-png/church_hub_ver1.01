@@ -16,7 +16,14 @@ import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
-const ASSIGNABLE_ROLES = ['ADMIN', 'PASTOR', 'LEADER', 'MEMBER', 'DRIVER'] as const;
+const ASSIGNABLE_ROLES = [
+  'ADMIN',
+  'PASTOR',
+  'LEADER',
+  'PROVINCIAL_LEADER',
+  'MEMBER',
+  'DRIVER',
+] as const;
 
 interface StaffUser {
   id: string;
