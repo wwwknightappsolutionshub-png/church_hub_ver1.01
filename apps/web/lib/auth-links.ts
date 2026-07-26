@@ -51,10 +51,33 @@ export async function requestMagicLink(email: string): Promise<{ ok: true; messa
 export async function consumeMagicLink(token: string): Promise<LoginResult> {
   try {
     const res = await api.post<{
-      accessToken: string;
-      refreshToken: string;
+      accessToken?: string;
+      refreshToken?: string;
       mustChangePassword?: boolean;
+      requires2fa?: boolean;
+      challengeId?: string;
+      email?: string;
+      message?: string;
     }>('/auth/magic-link/consume', { token });
+
+    if (
+      res.data.requires2fa === true &&
+      typeof res.data.challengeId === 'string' &&
+      typeof res.data.email === 'string'
+    ) {
+      return {
+        ok: true,
+        requires2fa: true,
+        challengeId: res.data.challengeId,
+        email: res.data.email,
+        message: res.data.message,
+      };
+    }
+
+    if (!res.data.accessToken || !res.data.refreshToken) {
+      return { ok: false, message: 'Unexpected sign-in response' };
+    }
+
     setAuthTokens(res.data.accessToken, res.data.refreshToken);
     if (res.data.mustChangePassword) {
       return { ok: true, mustChangePassword: true };

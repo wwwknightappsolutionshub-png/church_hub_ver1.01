@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -9,7 +9,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { churchPublicPath } from '@/lib/church-slug';
 import { applyAuthSessionFromMe } from '@/lib/apply-auth-session';
 import { ArrowRight, Loader2, Mail } from 'lucide-react';
-import { loginWithCredentials } from '@/lib/auth-login';
+import { loginWithCredentials, verifyLogin2fa, isLogin2faChallenge, isLoginSuccess } from '@/lib/auth-login';
 import { requestMagicLink } from '@/lib/auth-links';
 import { api } from '@/lib/api';
 import { checkApiReachable } from '@/lib/api-health';
@@ -23,6 +23,11 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 type LoginMode = 'password' | 'magic';
+
+type TwoFaState = {
+  challengeId: string;
+  email: string;
+};
 
 function useLoginSearchParams() {
   const [params, setParams] = useState({
@@ -72,6 +77,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [trialLoading, setTrialLoading] = useState(false);
   const [magicSent, setMagicSent] = useState(false);
+  const [twoFa, setTwoFa] = useState<TwoFaState | null>(null);
+  const [otp, setOtp] = useState('');
   const [apiOnline, setApiOnline] = useState<boolean | null>(null);
   const { register, handleSubmit, setValue, getValues } = useForm<{
     email: string;
@@ -184,7 +191,13 @@ export default function LoginPage() {
 
     const result = await loginWithCredentials(data.email, data.password);
     setLoading(false);
-    if (result.ok) {
+    if (isLogin2faChallenge(result)) {
+      setTwoFa({ challengeId: result.challengeId, email: result.email });
+      setOtp('');
+      toast.message(result.message ?? 'Enter the verification code we emailed you');
+      return;
+    }
+    if (isLoginSuccess(result)) {
       void completeLogin(result.mustChangePassword);
       return;
     }
@@ -203,6 +216,22 @@ export default function LoginPage() {
     }
 
     toast.error(result.message);
+  };
+
+  const onTwoFaSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!twoFa) return;
+    setLoading(true);
+    const result = await verifyLogin2fa(twoFa.challengeId, otp);
+    setLoading(false);
+    if (isLoginSuccess(result)) {
+      setTwoFa(null);
+      void completeLogin(result.mustChangePassword);
+      return;
+    }
+    if (!result.ok) {
+      toast.error(result.message);
+    }
   };
 
   const onMagicSubmit = async (data: { email: string }) => {
@@ -224,14 +253,20 @@ export default function LoginPage() {
       <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto bg-background p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:p-6 lg:min-h-[100dvh]">
         <div className="w-full max-w-md">
           <h1 className="text-2xl font-bold">
-            {trialToken ? 'Continue your Church_Hub trial' : 'Welcome back'}
+            {trialToken
+              ? 'Continue your Church_Hub trial'
+              : twoFa
+                ? 'Verify sign-in'
+                : 'Welcome back'}
           </h1>
           <p className="mt-2 text-muted-foreground">
             {trialToken
               ? 'Enter the temporary password from your email to open registration.'
-              : mode === 'magic'
-                ? 'We will email you a one-time sign-in link'
-                : 'Sign in to your church workspace'}
+              : twoFa
+                ? `Enter the 6-digit code we sent to ${twoFa.email}`
+                : mode === 'magic'
+                  ? 'We will email you a one-time sign-in link'
+                  : 'Sign in to your church workspace'}
           </p>
           {apiOnline === false ? (
             <div
@@ -280,7 +315,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          {!trialToken ? (
+          {!trialToken && !twoFa ? (
             <div className="mt-6 flex gap-2 rounded-lg border bg-muted/40 p-1">
               <button
                 type="button"
@@ -311,7 +346,47 @@ export default function LoginPage() {
             </div>
           ) : null}
 
-          {mode === 'magic' && !trialToken ? (
+          {twoFa ? (
+            <form onSubmit={onTwoFaSubmit} className="mt-6 space-y-4">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Verification code</label>
+                <Input
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="6-digit code"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  required
+                  minLength={6}
+                  maxLength={6}
+                />
+              </div>
+              <Button type="submit" className="w-full shadow-brand" disabled={loading || otp.length !== 6}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Verifying…
+                  </>
+                ) : (
+                  <>
+                    Verify and continue
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setTwoFa(null);
+                  setOtp('');
+                }}
+              >
+                Back to sign in
+              </Button>
+            </form>
+          ) : mode === 'magic' && !trialToken ? (
             magicSent ? (
               <div className="mt-6 rounded-xl border border-primary/30 bg-primary/5 p-5 text-center">
                 <Mail className="mx-auto h-8 w-8 text-primary" />
@@ -403,7 +478,7 @@ export default function LoginPage() {
             </form>
           )}
 
-          {showTestLogins && !trialToken && mode === 'password' ? (
+          {showTestLogins && !trialToken && mode === 'password' && !twoFa ? (
             <LoginTestAccountsPanel
               onUseAccount={(email, password) => {
                 setValue('email', email);

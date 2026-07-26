@@ -19,6 +19,7 @@ import { PlatformMarketingDripService } from '../platform/platform-marketing-dri
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
 import { RedisCacheService } from '../../common/cache/redis-cache.service';
 import { buildAuthLinkEmail } from './auth-link-email';
+import { userRequiresLogin2fa } from './login-2fa.constants';
 
 export interface JwtPayload {
   sub: string;
@@ -29,6 +30,8 @@ export interface JwtPayload {
 const AUTH_LINK_TTL_MINUTES = 30;
 const REGISTER_OTP_TTL_SEC = 15 * 60;
 const REGISTER_OTP_MAX_ATTEMPTS = 5;
+const LOGIN_2FA_TTL_SEC = 15 * 60;
+const LOGIN_2FA_MAX_ATTEMPTS = 5;
 const GENERIC_LINK_SENT =
   'If an account exists for that email, we sent a link. Check your inbox (and spam folder).';
 /** Failed password attempts in this window before clearing the password field. */
@@ -47,6 +50,16 @@ interface PendingRegistration {
   lastName: string;
   otpHash: string;
   attempts: number;
+}
+
+interface PendingLogin2fa {
+  userId: string;
+  email: string;
+  firstName: string;
+  otpHash: string;
+  attempts: number;
+  mustChangePassword: boolean;
+  churchId: string | null;
 }
 
 @Injectable()
@@ -256,6 +269,7 @@ export class AuthService {
     const emailKey = email.trim().toLowerCase();
     const user = await this.prisma.user.findFirst({
       where: { email: { equals: emailKey, mode: 'insensitive' }, isActive: true },
+      include: { roles: { include: { role: { select: { name: true } } } } },
     });
 
     if (!user) {
@@ -269,14 +283,44 @@ export class AuthService {
 
     await this.clearLoginFailures(emailKey);
 
-    await this.prisma.user.update({
-      where: { id: user!.id },
-      data: { lastLoginAt: new Date() },
-    });
+    const roleNames = user!.roles.map((r) => r.role.name);
+    if (userRequiresLogin2fa(roleNames)) {
+      return this.startLogin2faChallenge(user!);
+    }
 
-    const tokenChurchId = await this.tokenChurchIdForUser(user!.id, user!.churchId);
-    const tokens = await this.issueTokens(user!.id, tokenChurchId, user!.email);
-    return { ...tokens, mustChangePassword: user!.mustChangePassword };
+    return this.completeLoginSession(user!);
+  }
+
+  /** Verify email OTP from password or magic-link challenge; then issue tokens. */
+  async verifyLogin2fa(challengeId: string, otp: string) {
+    const key = `login:2fa:${challengeId}`;
+    const pending = await this.cache.get<PendingLogin2fa>(key);
+    if (!pending) {
+      throw new BadRequestException('Verification expired or not found. Sign in again.');
+    }
+
+    if (pending.attempts >= LOGIN_2FA_MAX_ATTEMPTS) {
+      await this.cache.del(key);
+      throw new BadRequestException('Too many incorrect codes. Sign in again.');
+    }
+
+    const otpOk = this.hashToken(otp.trim()) === pending.otpHash;
+    if (!otpOk) {
+      pending.attempts += 1;
+      await this.cache.set(key, pending, LOGIN_2FA_TTL_SEC);
+      throw new BadRequestException('Incorrect verification code');
+    }
+
+    await this.cache.del(key);
+
+    const user = await this.prisma.user.findFirst({
+      where: { id: pending.userId, isActive: true },
+    });
+    if (!user) {
+      throw new UnauthorizedException('Account is no longer available');
+    }
+
+    return this.completeLoginSession(user);
   }
 
   /**
@@ -411,19 +455,18 @@ export class AuthService {
     const record = await this.consumeAuthLink(token, AuthLinkPurpose.MAGIC_LOGIN);
     const user = await this.prisma.user.findFirst({
       where: { id: record.userId, isActive: true },
+      include: { roles: { include: { role: { select: { name: true } } } } },
     });
     if (!user) {
       throw new UnauthorizedException('This sign-in link is no longer valid');
     }
 
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() },
-    });
+    const roleNames = user.roles.map((r) => r.role.name);
+    if (userRequiresLogin2fa(roleNames)) {
+      return this.startLogin2faChallenge(user);
+    }
 
-    const tokenChurchId = await this.tokenChurchIdForUser(user.id, user.churchId);
-    const tokens = await this.issueTokens(user.id, tokenChurchId, user.email);
-    return { ...tokens, mustChangePassword: user.mustChangePassword };
+    return this.completeLoginSession(user);
   }
 
   private async issueAuthLink(email: string, purpose: AuthLinkPurpose) {
@@ -631,6 +674,74 @@ export class AuthService {
     }
 
     return updated;
+  }
+
+  private async startLogin2faChallenge(user: {
+    id: string;
+    email: string;
+    firstName: string;
+    churchId: string | null;
+    mustChangePassword: boolean;
+  }) {
+    const otp = String(randomInt(100_000, 1_000_000));
+    const challengeId = randomUUID();
+    const pending: PendingLogin2fa = {
+      userId: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      otpHash: this.hashToken(otp),
+      attempts: 0,
+      mustChangePassword: user.mustChangePassword,
+      churchId: user.churchId,
+    };
+
+    await this.cache.set(`login:2fa:${challengeId}`, pending, LOGIN_2FA_TTL_SEC);
+
+    try {
+      await this.email.send({
+        to: user.email,
+        subject: 'Your Church_Hub sign-in code',
+        body: `Hi ${user.firstName || 'there'},\n\nYour sign-in verification code is ${otp}.\n\nIt expires in 15 minutes.\n\nIf you did not try to sign in, ignore this email.\n\n— Church_Hub`,
+        html: `<p>Hi ${user.firstName || 'there'},</p><p>Your sign-in verification code is <strong style="font-size:1.25rem;letter-spacing:0.1em">${otp}</strong>.</p><p>It expires in 15 minutes.</p><p>If you did not try to sign in, ignore this email.</p><p>— Church_Hub</p>`,
+        churchId: user.churchId,
+      });
+    } catch (err) {
+      await this.cache.del(`login:2fa:${challengeId}`);
+      this.logger.warn(
+        `Login 2FA email failed for ${user.email}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      throw new BadRequestException(
+        'Could not send verification email. Check email settings and try again.',
+      );
+    }
+
+    if (process.env.NODE_ENV !== 'production' && !process.env.SMTP_HOST) {
+      this.logger.log(`[login-2fa] ${user.email} → ${otp}`);
+    }
+
+    return {
+      requires2fa: true as const,
+      challengeId,
+      email: user.email,
+      message: 'We sent a 6-digit verification code to your email.',
+      expiresInSeconds: LOGIN_2FA_TTL_SEC,
+    };
+  }
+
+  private async completeLoginSession(user: {
+    id: string;
+    email: string;
+    churchId: string | null;
+    mustChangePassword: boolean;
+  }) {
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    const tokenChurchId = await this.tokenChurchIdForUser(user.id, user.churchId);
+    const tokens = await this.issueTokens(user.id, tokenChurchId, user.email);
+    return { ...tokens, mustChangePassword: user.mustChangePassword };
   }
 
   /** SaaS operators always get a global token (no church scope), even if mis-linked in DB. */

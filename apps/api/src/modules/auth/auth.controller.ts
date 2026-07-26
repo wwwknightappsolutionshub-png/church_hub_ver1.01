@@ -23,7 +23,12 @@ import {
   ResetPasswordDto,
   ConsumeMagicLinkDto,
 } from './dto/auth-link.dto';
-import { LoginDto, RegisterStartDto, RegisterVerifyDto } from './dto/register.dto';
+import {
+  Login2faVerifyDto,
+  LoginDto,
+  RegisterStartDto,
+  RegisterVerifyDto,
+} from './dto/register.dto';
 import { Public } from './decorators';
 import { TEST_ACCOUNTS, TEST_PASSWORD } from './test-accounts';
 import { CurrentUser, AuthUser } from './current-user.decorator';
@@ -89,9 +94,22 @@ export class AuthController {
   @Public()
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   @Post('login')
-  @ApiOperation({ summary: 'Login with email and password' })
+  @ApiOperation({
+    summary:
+      'Login with email and password (ADMIN/PASTOR/PLATFORM_ADMIN receive email OTP challenge)',
+  })
   login(@Body() body: LoginDto) {
     return this.authService.login(body.email, body.password);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Post('login/2fa')
+  @ApiOperation({
+    summary: 'Verify login email OTP for ADMIN/PASTOR/PLATFORM_ADMIN and issue tokens',
+  })
+  login2fa(@Body() body: Login2faVerifyDto) {
+    return this.authService.verifyLogin2fa(body.challengeId, body.otp);
   }
 
   @Public()
@@ -121,7 +139,10 @@ export class AuthController {
   @Public()
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('magic-link/consume')
-  @ApiOperation({ summary: 'Exchange a magic sign-in token for session tokens' })
+  @ApiOperation({
+    summary:
+      'Exchange a magic sign-in token for session tokens (or email OTP challenge for ADMIN/PASTOR/PLATFORM_ADMIN)',
+  })
   consumeMagicLink(@Body() body: ConsumeMagicLinkDto) {
     return this.authService.consumeMagicLink(body.token);
   }

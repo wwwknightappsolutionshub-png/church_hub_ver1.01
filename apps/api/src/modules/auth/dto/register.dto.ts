@@ -86,3 +86,13 @@ export class LoginDto {
   @MaxLength(128)
   password!: string;
 }
+
+export class Login2faVerifyDto {
+  @IsUUID()
+  challengeId!: string;
+
+  @Transform(({ value }) => String(value ?? '').replace(/\D/g, '').slice(0, 6))
+  @IsString()
+  @Length(6, 6)
+  otp!: string;
+}
