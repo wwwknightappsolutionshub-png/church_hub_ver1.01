@@ -9,7 +9,6 @@ import { Camera, Loader2, MapPin, WifiOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import {
-  cacheForm,
   clearCachedForm,
   getCachedForm,
   queueOutreachCapture,
@@ -93,6 +92,11 @@ function OutreachCaptureFormInner({
     let cancelled = false;
     getCachedForm(OUTREACH_FORM_CACHE_ID).then((cached) => {
       if (cancelled || !allowDraftRestore.current || !cached?.data) return;
+      // Submitted payloads (clientId/capturedAt) must never re-fill the form after save/refresh.
+      if (cached.data.clientId || cached.data.capturedAt) {
+        void clearCachedForm(OUTREACH_FORM_CACHE_ID);
+        return;
+      }
       Object.entries(cached.data).forEach(([k, v]) => {
         if (v !== undefined) setValue(k as keyof FormData, v as never);
       });
@@ -237,9 +241,6 @@ function OutreachCaptureFormInner({
       longitude: coords?.lng ?? data.longitude,
     };
 
-    // Keep a draft only until save completes (crash safety while request is in flight).
-    await cacheForm(OUTREACH_FORM_CACHE_ID, payload);
-
     try {
       if (!navigator.onLine) {
         await queueOutreachCapture(payload as Record<string, unknown>);
@@ -257,8 +258,20 @@ function OutreachCaptureFormInner({
     }
   };
 
+  /** Chrome ignores autocomplete=off unless fields start read-only. */
+  const unlockAutofill = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.currentTarget.removeAttribute('readOnly');
+  };
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      className="space-y-4"
+      autoComplete="off"
+      data-lpignore="true"
+      data-1p-ignore
+      data-bwignore
+    >
       {!online && (
         <div className="flex items-center gap-2 rounded-lg border border-amber-300/50 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
           <WifiOff className="h-4 w-4 shrink-0" />
@@ -267,10 +280,54 @@ function OutreachCaptureFormInner({
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Input placeholder="First name *" {...register('firstName')} required />
-        <Input placeholder="Last name" {...register('lastName')} />
-        <Input placeholder="Phone" {...register('phone')} />
-        <Input placeholder="Email" type="email" {...register('email')} />
+        <Input
+          placeholder="First name *"
+          {...register('firstName')}
+          required
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
+          readOnly
+          onFocus={unlockAutofill}
+          data-lpignore="true"
+          data-1p-ignore
+          data-form-type="other"
+        />
+        <Input
+          placeholder="Last name"
+          {...register('lastName')}
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
+          readOnly
+          onFocus={unlockAutofill}
+          data-lpignore="true"
+          data-1p-ignore
+          data-form-type="other"
+        />
+        <Input
+          placeholder="Phone"
+          {...register('phone')}
+          autoComplete="off"
+          inputMode="tel"
+          readOnly
+          onFocus={unlockAutofill}
+          data-lpignore="true"
+          data-1p-ignore
+          data-form-type="other"
+        />
+        <Input
+          placeholder="Email"
+          type="text"
+          inputMode="email"
+          {...register('email')}
+          autoComplete="off"
+          readOnly
+          onFocus={unlockAutofill}
+          data-lpignore="true"
+          data-1p-ignore
+          data-form-type="other"
+        />
         <div className="relative sm:col-span-2">
           <div className="flex gap-2">
             <Input
@@ -282,7 +339,9 @@ function OutreachCaptureFormInner({
                   void applyPostcodeLookup(postcode);
                 }
               }}
-              autoComplete="postal-code"
+              autoComplete="off"
+              data-lpignore="true"
+              data-1p-ignore
             />
             <Button
               type="button"
