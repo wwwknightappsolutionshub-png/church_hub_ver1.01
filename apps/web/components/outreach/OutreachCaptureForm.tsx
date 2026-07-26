@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import {
   cacheForm,
+  clearCachedForm,
   getCachedForm,
   queueOutreachCapture,
   OUTREACH_FORM_CACHE_ID,
@@ -22,6 +23,26 @@ import { cn } from '@/lib/utils';
 const formSchema = OutreachCaptureSchema;
 type FormData = z.infer<typeof formSchema>;
 
+const EMPTY_FORM: Partial<FormData> = {
+  firstName: '',
+  lastName: '',
+  phone: '',
+  email: '',
+  postcode: '',
+  locationLabel: '',
+  notes: '',
+  voiceNotes: '',
+  needsBusPickup: false,
+  pickupAddress: '',
+  busPickupNotes: '',
+  photoConsent: false,
+  photoUrl: undefined,
+  latitude: undefined,
+  longitude: undefined,
+  clientId: undefined,
+  capturedAt: undefined,
+};
+
 interface OutreachCaptureFormProps {
   online: boolean;
   onSuccess: () => void;
@@ -29,12 +50,25 @@ interface OutreachCaptureFormProps {
   qrCodeId?: string;
 }
 
-export function OutreachCaptureForm({
+/** Remounts after each save so the form is blank for the next capture. */
+export function OutreachCaptureForm(props: OutreachCaptureFormProps) {
+  const [sessionKey, setSessionKey] = useState(0);
+  return (
+    <OutreachCaptureFormInner
+      key={sessionKey}
+      {...props}
+      onReadyForNext={() => setSessionKey((k) => k + 1)}
+    />
+  );
+}
+
+function OutreachCaptureFormInner({
   online,
   onSuccess,
   evangelistId,
   qrCodeId,
-}: OutreachCaptureFormProps) {
+  onReadyForNext,
+}: OutreachCaptureFormProps & { onReadyForNext: () => void }) {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -42,11 +76,12 @@ export function OutreachCaptureForm({
   const [postcodeBusy, setPostcodeBusy] = useState(false);
   const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lookupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const allowDraftRestore = useRef(true);
 
   const { register, handleSubmit, reset, setValue, watch, formState: { isSubmitting } } =
     useForm<FormData>({
       resolver: zodResolver(formSchema),
-      defaultValues: { photoConsent: false },
+      defaultValues: EMPTY_FORM,
     });
 
   const photoConsent = watch('photoConsent');
@@ -55,13 +90,16 @@ export function OutreachCaptureForm({
   const postcode = watch('postcode') ?? '';
 
   useEffect(() => {
+    let cancelled = false;
     getCachedForm(OUTREACH_FORM_CACHE_ID).then((cached) => {
-      if (cached?.data) {
-        Object.entries(cached.data).forEach(([k, v]) => {
-          if (v !== undefined) setValue(k as keyof FormData, v as never);
-        });
-      }
+      if (cancelled || !allowDraftRestore.current || !cached?.data) return;
+      Object.entries(cached.data).forEach(([k, v]) => {
+        if (v !== undefined) setValue(k as keyof FormData, v as never);
+      });
     });
+    return () => {
+      cancelled = true;
+    };
   }, [setValue]);
 
   useEffect(() => {
@@ -177,6 +215,17 @@ export function OutreachCaptureForm({
     reader.readAsDataURL(file);
   };
 
+  const prepareNextCapture = async () => {
+    allowDraftRestore.current = false;
+    await clearCachedForm(OUTREACH_FORM_CACHE_ID);
+    reset(EMPTY_FORM);
+    setPhotoPreview(null);
+    setCoords(null);
+    setPostcodeHints([]);
+    onSuccess();
+    onReadyForNext();
+  };
+
   const onSubmit = async (data: FormData) => {
     const payload: FormData = {
       ...data,
@@ -188,30 +237,23 @@ export function OutreachCaptureForm({
       longitude: coords?.lng ?? data.longitude,
     };
 
+    // Keep a draft only until save completes (crash safety while request is in flight).
     await cacheForm(OUTREACH_FORM_CACHE_ID, payload);
 
     try {
       if (!navigator.onLine) {
         await queueOutreachCapture(payload as Record<string, unknown>);
         toast.success('Saved offline — will sync when connected');
-        reset({ photoConsent: false });
-        setPhotoPreview(null);
-        setCoords(null);
-        onSuccess();
+        await prepareNextCapture();
         return;
       }
       await api.post('/outreach/capture', payload);
       toast.success('Contact captured — follow-up team notified & welcome sent');
-      reset({ photoConsent: false });
-      setPhotoPreview(null);
-      setCoords(null);
-      onSuccess();
+      await prepareNextCapture();
     } catch {
       await queueOutreachCapture(payload as Record<string, unknown>);
       toast.info('Queued offline — will sync automatically');
-      reset({ photoConsent: false });
-      setPhotoPreview(null);
-      onSuccess();
+      await prepareNextCapture();
     }
   };
 

@@ -1,5 +1,14 @@
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
+import {
+  CreateCellBranchSchema,
+  CreateCellProvinceSchema,
+  CreateChurchStaffSchema,
+  CreatePlatformChurchSchema,
+  LoginCredentialsSchema,
+  RefreshTokenSchema,
+  RegisterStartSchema,
+} from '@church-hub/shared-types';
 import { CreateChurchStaffDto } from '../church-staff/dto/church-staff.dto';
 import { CreateChurchDto } from '../platform/dto/create-church.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -87,5 +96,70 @@ describe('B2 auth/staff/platform DTO validation', () => {
       pastorEmail: 'pastor@demo.church',
     });
     expect(errors).toHaveLength(0);
+  });
+});
+
+describe('B2–B4 shared Zod schemas (API contract)', () => {
+  it('LoginCredentialsSchema rejects invalid email', () => {
+    expect(LoginCredentialsSchema.safeParse({ email: 'bad', password: 'x' }).success).toBe(
+      false,
+    );
+  });
+
+  it('RefreshTokenSchema rejects short token', () => {
+    expect(RefreshTokenSchema.safeParse({ refreshToken: 'short' }).success).toBe(false);
+  });
+
+  it('RegisterStartSchema rejects short password', () => {
+    const parsed = RegisterStartSchema.safeParse({
+      churchName: 'Test Church',
+      firstName: 'Ann',
+      lastName: 'Admin',
+      email: 'ann@example.com',
+      password: 'short',
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it('CreateChurchStaffSchema rejects unknown role', () => {
+    const parsed = CreateChurchStaffSchema.safeParse({
+      email: 'staff@demo.church',
+      password: 'ChurchHub123!',
+      firstName: 'Ann',
+      lastName: 'Admin',
+      roles: ['NOT_A_ROLE'],
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it('CreatePlatformChurchSchema rejects empty slug', () => {
+    const parsed = CreatePlatformChurchSchema.safeParse({
+      name: 'Demo Church',
+      slug: '!!!',
+      adminEmail: 'admin@demo.church',
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it('CreateCellBranchSchema rejects invalid postcode and blank name', () => {
+    expect(
+      CreateCellBranchSchema.safeParse({ name: '  ', postcode: 'N1 1AA' }).success,
+    ).toBe(false);
+    expect(
+      CreateCellBranchSchema.safeParse({
+        name: 'Cell',
+        postcode: 'NOTAPOSTCODE',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('CreateCellProvinceSchema rejects invalid coverage postcode', () => {
+    expect(
+      CreateCellProvinceSchema.safeParse({
+        name: 'North',
+        leaderUserId: 'user_1',
+        postcodes: ['bad'],
+      }).success,
+    ).toBe(false);
   });
 });

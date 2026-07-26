@@ -127,4 +127,9 @@ export async function getCachedForm(formId: string) {
   return db.get('form_cache', formId);
 }
 
+export async function clearCachedForm(formId: string) {
+  const db = await getDb();
+  await db.delete('form_cache', formId);
+}
+
 export const OUTREACH_FORM_CACHE_ID = 'outreach-capture-draft';
