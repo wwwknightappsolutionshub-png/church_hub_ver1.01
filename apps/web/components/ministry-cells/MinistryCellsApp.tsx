@@ -33,6 +33,9 @@ import { MINISTRY_CELLS_DESKTOP_MQ } from '@/components/ministry-cells/layout';
 import { MinistryCellsAnalyticsPanel } from '@/components/ministry-cells/MinistryCellsAnalyticsPanel';
 import { MinistryCellsKpiStrip } from '@/components/ministry-cells/MinistryCellsKpiStrip';
 import { MinistryCellsSetupPanel } from '@/components/ministry-cells/MinistryCellsSetupPanel';
+import { ProvincesSetupPanel } from '@/components/ministry-cells/ProvincesSetupPanel';
+import { ProvinceAttendancePanel } from '@/components/ministry-cells/ProvinceAttendancePanel';
+import { MapCellProvinceControl } from '@/components/ministry-cells/MapCellProvinceControl';
 import type {
   BranchDetail,
   BranchRow,
@@ -64,6 +67,7 @@ export function MinistryCellsApp() {
   const [editBranchOpen, setEditBranchOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editLocation, setEditLocation] = useState('');
+  const [editPostcode, setEditPostcode] = useState('');
   const [editLeaderId, setEditLeaderId] = useState('');
   const [branchSaving, setBranchSaving] = useState(false);
   const [reportFormId, setReportFormId] = useState('');
@@ -172,9 +176,16 @@ export function MinistryCellsApp() {
   }, [ctx, selectedBranchId]);
 
   useEffect(() => {
+    if (ctx?.role === 'provincialLeader' && ctx.leaderProvinceId && tab === 'branches') {
+      // keep branches tab; province attendance is separate tab
+    }
+  }, [ctx, tab]);
+
+  useEffect(() => {
     if (!branchDetail || !editBranchOpen) return;
     setEditName(branchDetail.name);
     setEditLocation(branchDetail.location ?? '');
+    setEditPostcode(branchDetail.postcode ?? '');
     setEditLeaderId(branchDetail.leader?.id ?? '');
   }, [branchDetail, editBranchOpen]);
 
@@ -185,6 +196,7 @@ export function MinistryCellsApp() {
       await api.post('/ministry-cells/branches', {
         name: fd.get('name'),
         location: fd.get('location') || undefined,
+        postcode: fd.get('postcode'),
         leaderUserId: createLeaderId || undefined,
       });
       toast.success('Cell branch created');
@@ -192,8 +204,11 @@ export function MinistryCellsApp() {
       setShowCreateBranch(false);
       setCreateLeaderId('');
       (e.target as HTMLFormElement).reset();
-    } catch {
-      toast.error('Failed to create branch');
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string | string[] } } })?.response?.data
+          ?.message;
+      toast.error(Array.isArray(msg) ? msg[0] : msg || 'Failed to create branch');
     }
   };
 
@@ -205,13 +220,17 @@ export function MinistryCellsApp() {
       await api.patch(`/ministry-cells/branches/${selectedBranchId}`, {
         name: editName.trim(),
         location: editLocation.trim() || null,
+        postcode: editPostcode.trim(),
         leaderUserId: editLeaderId || null,
       });
       toast.success('Branch updated');
       setEditBranchOpen(false);
       invalidate();
-    } catch {
-      toast.error('Failed to update branch');
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string | string[] } } })?.response?.data
+          ?.message;
+      toast.error(Array.isArray(msg) ? msg[0] : msg || 'Failed to update branch');
     } finally {
       setBranchSaving(false);
     }
@@ -274,6 +293,7 @@ export function MinistryCellsApp() {
           editBranchOpen,
           editName,
           editLocation,
+          editPostcode,
           editLeaderId,
           branchSaving,
           reportFormId,
@@ -282,6 +302,7 @@ export function MinistryCellsApp() {
           onEditToggle: () => setEditBranchOpen((v) => !v),
           onEditName: setEditName,
           onEditLocation: setEditLocation,
+          onEditPostcode: setEditPostcode,
           onEditLeaderId: setEditLeaderId,
           onSaveBranch: saveBranchEdit,
           onReportFormId: setReportFormId,
@@ -317,7 +338,12 @@ export function MinistryCellsApp() {
 
   const tabs = [
     { id: 'branches' as const, label: 'Branches', icon: Network },
-    ...(ctx.canViewAnalytics ? [{ id: 'analytics' as const, label: 'Analytics', icon: BarChart3 }] : []),
+    ...(ctx.role === 'provincialLeader' && ctx.leaderProvinceId
+      ? [{ id: 'province' as const, label: 'Province attendance', icon: BarChart3 }]
+      : []),
+    ...(ctx.canViewAnalytics && ctx.role !== 'provincialLeader'
+      ? [{ id: 'analytics' as const, label: 'Analytics', icon: BarChart3 }]
+      : []),
     ...(ctx.canManage ? [{ id: 'setup' as const, label: 'Setup', icon: BookOpen }] : []),
   ];
 
@@ -369,10 +395,20 @@ export function MinistryCellsApp() {
                 <p className="text-sm font-semibold">Create cell branch</p>
               </div>
               <CardContent className="py-4">
-                <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" onSubmit={createBranch}>
+                <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5" onSubmit={createBranch}>
                   <div>
                     <Label htmlFor="name">Name</Label>
                     <Input id="name" name="name" className="mt-1 h-10" required />
+                  </div>
+                  <div>
+                    <Label htmlFor="postcode">Postcode</Label>
+                    <Input
+                      id="postcode"
+                      name="postcode"
+                      className="mt-1 h-10"
+                      placeholder="N1 1AA"
+                      required
+                    />
                   </div>
                   <div>
                     <Label htmlFor="location">Location</Label>
@@ -424,7 +460,11 @@ export function MinistryCellsApp() {
         </div>
       )}
 
-      {tab === 'analytics' && ctx.canViewAnalytics && (
+      {tab === 'province' && ctx.role === 'provincialLeader' && ctx.leaderProvinceId && (
+        <ProvinceAttendancePanel provinceId={ctx.leaderProvinceId} />
+      )}
+
+      {tab === 'analytics' && ctx.canViewAnalytics && ctx.role !== 'provincialLeader' && (
         <MinistryCellsAnalyticsPanel
           branches={branches}
           analyticsFrom={analyticsFrom}
@@ -441,13 +481,42 @@ export function MinistryCellsApp() {
       )}
 
       {tab === 'setup' && ctx.canManage && (
-        <MinistryCellsSetupPanel
-          forms={forms}
-          teaching={teaching}
-          branchOptions={branches.map((b) => ({ id: b.id, name: b.name }))}
-          onSeedForms={seedForms}
-          onChanged={invalidate}
-        />
+        <div className="space-y-6">
+          <div>
+            <h3 className="mb-2 text-sm font-semibold">Provinces & provincial leaders</h3>
+            <ProvincesSetupPanel onChanged={invalidate} />
+          </div>
+          <div>
+            <h3 className="mb-2 text-sm font-semibold">Map cells to provinces</h3>
+            <div className="space-y-2">
+              {branches.map((b) => (
+                <div
+                  key={b.id}
+                  className="flex flex-col gap-2 rounded-lg border border-border/60 p-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div>
+                    <p className="text-sm font-medium">{b.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {b.postcode ?? 'No postcode'}
+                      {b.location ? ` · ${b.location}` : ''}
+                    </p>
+                  </div>
+                  <MapCellProvinceControl branch={b} onChanged={invalidate} />
+                </div>
+              ))}
+              {branches.length === 0 && (
+                <p className="text-sm text-muted-foreground">Create cells first, then map them.</p>
+              )}
+            </div>
+          </div>
+          <MinistryCellsSetupPanel
+            forms={forms}
+            teaching={teaching}
+            branchOptions={branches.map((b) => ({ id: b.id, name: b.name }))}
+            onSeedForms={seedForms}
+            onChanged={invalidate}
+          />
+        </div>
       )}
     </div>
   );

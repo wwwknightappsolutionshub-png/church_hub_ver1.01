@@ -156,6 +156,7 @@ model Church {
   platformMarketingDrips PlatformMarketingDrip[]
   cellBranches              CellBranch[]
   cellBranchMembers         CellBranchMember[]
+  cellProvinces             CellProvince[]
   cellFormDefinitions       CellFormDefinition[]
   cellReports               CellReport[]
   cellMeetings              CellMeeting[]
@@ -375,6 +376,7 @@ model User {
   wisdom365MemberPrefs      Wisdom365MemberPrefs[]
   platformMarketingDrips    PlatformMarketingDrip[]
   cellBranchesLed           CellBranch[]       @relation("CellBranchLeader")
+  cellProvincesLed          CellProvince[]     @relation("CellProvinceLeader")
   cellReportsSubmitted      CellReport[]       @relation("CellReportSubmitter")
   cellAttendanceRecorded    CellAttendance[]   @relation("CellAttendanceRecorder")
   serviceUnitAttendanceRecorded ServiceUnitAttendance[] @relation("ServiceUnitAttendanceRecorder")
@@ -5534,16 +5536,53 @@ enum CellPrayerStatus {
   CLOSED
 }
 
+model CellProvince {
+  id           String   @id @default(uuid())
+  churchId     String
+  name         String
+  leaderUserId String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  church    Church                 @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  leader    User                   @relation("CellProvinceLeader", fields: [leaderUserId], references: [id], onDelete: Restrict)
+  postcodes CellProvincePostcode[]
+  branches  CellBranch[]
+
+  @@unique([churchId, name])
+  @@unique([churchId, leaderUserId])
+  @@index([churchId])
+  @@map("cell_provinces")
+}
+
+/// Normalized UK postcode or outward code in a province's coverage (unique per church).
+model CellProvincePostcode {
+  id                 String @id @default(uuid())
+  churchId           String
+  provinceId         String
+  postcodeNormalized String
+
+  province CellProvince @relation(fields: [provinceId], references: [id], onDelete: Cascade)
+
+  @@unique([churchId, postcodeNormalized])
+  @@index([provinceId])
+  @@map("cell_province_postcodes")
+}
+
 model CellBranch {
   id           String   @id @default(uuid())
   churchId     String
   name         String
   location     String?
+  /// UK postcode (full preferred); used to auto-join a province by coverage.
+  postcode     String?
+  provinceId   String?
   leaderUserId String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   church     Church              @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  province   CellProvince?       @relation(fields: [provinceId], references: [id], onDelete: SetNull)
   leader     User?               @relation("CellBranchLeader", fields: [leaderUserId], references: [id], onDelete: SetNull)
   members    CellBranchMember[]
   reports    CellReport[]
@@ -5556,6 +5595,8 @@ model CellBranch {
 
   @@index([churchId, name])
   @@index([churchId, leaderUserId])
+  @@index([churchId, provinceId])
+  @@index([churchId, postcode])
   @@map("cell_branches")
 }
 

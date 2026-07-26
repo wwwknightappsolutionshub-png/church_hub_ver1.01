@@ -32,10 +32,68 @@ export function sanitizeSlug(value: unknown): string {
 /** UK outward+inward postcode (loose, allows optional space). */
 export const UK_POSTCODE_REGEX = /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i;
 
+/** UK outward code only (e.g. N1, SW1A) — used for province coverage areas. */
+export const UK_OUTWARD_POSTCODE_REGEX = /^[A-Z]{1,2}\d[A-Z\d]?$/i;
+
 export function sanitizeUkPostcode(value: unknown): string {
   const raw = sanitizeText(value, 12).toUpperCase().replace(/\s+/g, '');
   if (raw.length < 5) return raw;
   return `${raw.slice(0, -3)} ${raw.slice(-3)}`;
+}
+
+/** Compact uppercase key with no spaces (for storage / equality). */
+export function normalizeUkPostcodeKey(value: unknown): string {
+  return sanitizeText(value, 12).toUpperCase().replace(/\s+/g, '');
+}
+
+/** Outward portion of a full postcode key, or the key itself if already outward-only. */
+export function ukPostcodeOutward(value: unknown): string {
+  const key = normalizeUkPostcodeKey(value);
+  if (!key) return '';
+  if (UK_OUTWARD_POSTCODE_REGEX.test(key) && !UK_POSTCODE_REGEX.test(sanitizeUkPostcode(key))) {
+    return key;
+  }
+  const spaced = sanitizeUkPostcode(key);
+  if (UK_POSTCODE_REGEX.test(spaced)) {
+    return spaced.split(/\s+/)[0] ?? key;
+  }
+  return key;
+}
+
+export function isUkOutwardOnlyPostcode(value: unknown): boolean {
+  const key = normalizeUkPostcodeKey(value);
+  return UK_OUTWARD_POSTCODE_REGEX.test(key) && !UK_POSTCODE_REGEX.test(sanitizeUkPostcode(key));
+}
+
+/**
+ * Cell matches province coverage when:
+ * - normalized cell postcode equals a coverage entry, OR
+ * - coverage entry is outward-only and equals the cell's outward code.
+ */
+export function cellPostcodeMatchesCoverage(
+  cellPostcode: unknown,
+  coverageEntries: readonly string[],
+): boolean {
+  const cellKey = normalizeUkPostcodeKey(cellPostcode);
+  if (!cellKey) return false;
+  const cellOut = ukPostcodeOutward(cellKey);
+  for (const entry of coverageEntries) {
+    const e = normalizeUkPostcodeKey(entry);
+    if (!e) continue;
+    if (cellKey === e) return true;
+    if (isUkOutwardOnlyPostcode(e) && cellOut === e) return true;
+  }
+  return false;
+}
+
+/** Accept full UK postcode or outward-only code for province coverage lists. */
+export function sanitizeProvincePostcodeEntry(value: unknown): string {
+  const key = normalizeUkPostcodeKey(value);
+  if (!key) return '';
+  if (isUkOutwardOnlyPostcode(key)) return key;
+  const spaced = sanitizeUkPostcode(key);
+  if (UK_POSTCODE_REGEX.test(spaced)) return normalizeUkPostcodeKey(spaced);
+  return '';
 }
 
 export const emailSchema = z

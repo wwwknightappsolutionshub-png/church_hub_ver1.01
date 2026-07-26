@@ -41,7 +41,13 @@ export class MinistryCellsController {
   createBranch(
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
-    @Body() body: { name: string; location?: string; leaderUserId?: string },
+    @Body()
+    body: {
+      name: string;
+      location?: string;
+      postcode: string;
+      leaderUserId?: string;
+    },
   ) {
     return this.service.createBranch(user, churchId, body);
   }
@@ -61,9 +67,90 @@ export class MinistryCellsController {
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
-    @Body() body: { name?: string; location?: string; leaderUserId?: string | null },
+    @Body()
+    body: {
+      name?: string;
+      location?: string;
+      postcode?: string;
+      leaderUserId?: string | null;
+    },
   ) {
     return this.service.updateBranch(user, churchId, id, body);
+  }
+
+  @Post('branches/:id/map-province')
+  @Roles('ADMIN', 'PASTOR')
+  mapBranchProvince(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { provinceId: string },
+  ) {
+    return this.service.mapBranchToProvince(user, churchId, id, body.provinceId);
+  }
+
+  @Get('provinces')
+  listProvinces(@ChurchId() churchId: string, @CurrentUser() user: AuthUser) {
+    return this.service.listProvinces(user, churchId);
+  }
+
+  @Post('provinces')
+  @Roles('ADMIN', 'PASTOR')
+  createProvince(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Body() body: { name: string; leaderUserId: string; postcodes: string[] },
+  ) {
+    return this.service.createProvince(user, churchId, body);
+  }
+
+  @Patch('provinces/:id')
+  @Roles('ADMIN', 'PASTOR')
+  updateProvince(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { name?: string; leaderUserId?: string; postcodes?: string[] },
+  ) {
+    return this.service.updateProvince(user, churchId, id, body);
+  }
+
+  @Delete('provinces/:id')
+  @Roles('ADMIN', 'PASTOR')
+  deleteProvince(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.service.deleteProvince(user, churchId, id);
+  }
+
+  @Get('provincial-leader-candidates')
+  @Roles('ADMIN', 'PASTOR')
+  provincialLeaderCandidates(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Query('excludeProvinceId') excludeProvinceId?: string,
+  ) {
+    return this.service.listProvincialLeaderCandidates(
+      user,
+      churchId,
+      excludeProvinceId,
+    );
+  }
+
+  @Get('provinces/:id/attendance-report')
+  provinceAttendanceReport(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.service.getProvinceAttendanceReport(user, churchId, id, {
+      from,
+      to,
+    });
   }
 
   @Delete('branches/:id')
@@ -386,7 +473,7 @@ export class MinistryCellsController {
   }
 
   @Get('analytics')
-  @Roles('ADMIN', 'PASTOR')
+  @Roles('ADMIN', 'PASTOR', 'PROVINCIAL_LEADER')
   analytics(
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,

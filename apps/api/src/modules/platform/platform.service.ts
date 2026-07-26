@@ -30,7 +30,14 @@ import { EmailAdapter } from '../notifications/adapters/email.adapter';
 import { UploadsService } from '../uploads/uploads.service';
 import { PurgeChurchDto } from './dto/purge-church.dto';
 
-const STAFF_ROLE_NAMES = ['ADMIN', 'PASTOR', 'LEADER', 'MEMBER', 'DRIVER'] as const;
+const STAFF_ROLE_NAMES = [
+  'ADMIN',
+  'PASTOR',
+  'LEADER',
+  'PROVINCIAL_LEADER',
+  'MEMBER',
+  'DRIVER',
+] as const;
 
 @Injectable()
 export class PlatformService {

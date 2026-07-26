@@ -63,6 +63,11 @@ function BranchGridCard({
                 <span className="truncate">{branch.location}</span>
               </p>
             )}
+            {(branch.postcode || branch.province) && (
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                {[branch.postcode, branch.province?.name].filter(Boolean).join(' · ')}
+              </p>
+            )}
           </div>
         </div>
 

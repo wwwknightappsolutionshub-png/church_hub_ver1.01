@@ -53,6 +53,21 @@ async function main() {
   });
 
   await prisma.role.upsert({
+    where: { name: 'PROVINCIAL_LEADER' },
+    update: {},
+    create: {
+      name: 'PROVINCIAL_LEADER',
+      description: 'Provincial leader — attendance oversight for allocated Ministry/Cells province',
+      permissions: {
+        create: [
+          { resource: 'ministry-cells', action: 'read' },
+          { resource: 'ministry-cells', action: 'province-report' },
+        ],
+      },
+    },
+  });
+
+  await prisma.role.upsert({
     where: { name: 'YOUTH_ADMIN' },
     update: {},
     create: {

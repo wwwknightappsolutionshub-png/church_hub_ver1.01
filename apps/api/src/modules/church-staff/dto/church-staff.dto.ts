@@ -14,6 +14,7 @@ export const CHURCH_ASSIGNABLE_ROLES = [
   'ADMIN',
   'PASTOR',
   'LEADER',
+  'PROVINCIAL_LEADER',
   'MEMBER',
   'DRIVER',
 ] as const;

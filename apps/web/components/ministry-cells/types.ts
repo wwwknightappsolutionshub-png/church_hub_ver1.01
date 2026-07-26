@@ -1,9 +1,18 @@
 import type { BranchListMember } from '@/components/ministry-cells/CellBranchMembersSheet';
 
+export interface BranchProvinceSummary {
+  id: string;
+  name: string;
+  leader: { id: string; name: string; email: string } | null;
+}
+
 export interface BranchRow {
   id: string;
   name: string;
   location: string | null;
+  postcode: string | null;
+  provinceId: string | null;
+  province: BranchProvinceSummary | null;
   createdAt: string;
   memberCount: number;
   incidentCount: number;
@@ -12,8 +21,9 @@ export interface BranchRow {
 }
 
 export interface MinistryCellsContext {
-  role: 'admin' | 'pastor' | 'cellLeader' | 'none';
+  role: 'admin' | 'pastor' | 'provincialLeader' | 'cellLeader' | 'none';
   leaderBranchId: string | null;
+  leaderProvinceId: string | null;
   canManage: boolean;
   canViewAnalytics: boolean;
 }
@@ -22,6 +32,9 @@ export interface BranchDetail {
   id: string;
   name: string;
   location: string | null;
+  postcode: string | null;
+  provinceId: string | null;
+  province: BranchProvinceSummary | null;
   createdAt?: string;
   memberCount: number;
   leader: { id: string; name: string; email: string } | null;
@@ -52,4 +65,14 @@ export interface TeachingResource {
   fileUrl: string | null;
 }
 
-export type MinistryCellsTab = 'branches' | 'analytics' | 'setup';
+export interface CellProvinceRow {
+  id: string;
+  name: string;
+  postcodes: string[];
+  branchCount: number;
+  createdAt: string;
+  updatedAt: string;
+  leader: { id: string; name: string; email: string };
+}
+
+export type MinistryCellsTab = 'branches' | 'analytics' | 'province' | 'setup';

@@ -20,9 +20,23 @@ import {
   MinistryCellsAccessService,
   type MinistryCellsRole,
 } from './ministry-cells-access.service';
+import {
+  assertCoverageIncludesCell,
+  findMatchingProvinceId,
+  normalizeCoveragePostcodes,
+  requireCellPostcode,
+} from './cell-province.util';
 
 const branchInclude = {
   leader: { select: { id: true, firstName: true, lastName: true, email: true } },
+  province: {
+    select: {
+      id: true,
+      name: true,
+      leaderUserId: true,
+      leader: { select: { id: true, firstName: true, lastName: true, email: true } },
+    },
+  },
   _count: { select: { members: true, incidents: true } },
 } satisfies Prisma.CellBranchInclude;
 
@@ -62,14 +76,24 @@ export class MinistryCellsService {
     return {
       role: ctx.role,
       leaderBranchId: ctx.leaderBranchId,
+      leaderProvinceId: ctx.leaderProvinceId,
       canManage: ctx.role === 'admin' || ctx.role === 'pastor',
-      canViewAnalytics: ctx.role === 'admin' || ctx.role === 'pastor',
+      canViewAnalytics:
+        ctx.role === 'admin' || ctx.role === 'pastor' || ctx.role === 'provincialLeader',
     };
   }
 
-  private branchWhere(churchId: string, role: MinistryCellsRole, leaderBranchId: string | null) {
+  private branchWhere(
+    churchId: string,
+    role: MinistryCellsRole,
+    leaderBranchId: string | null,
+    leaderProvinceId: string | null,
+  ) {
     if (role === 'cellLeader' && leaderBranchId) {
       return { churchId, id: leaderBranchId };
+    }
+    if (role === 'provincialLeader' && leaderProvinceId) {
+      return { churchId, provinceId: leaderProvinceId };
     }
     return { churchId };
   }
@@ -77,14 +101,40 @@ export class MinistryCellsService {
   async listBranches(user: AuthUser, churchId: string) {
     const ctx = await this.access.assertCanAccess(user, churchId);
     const branches = await this.prisma.cellBranch.findMany({
-      where: this.branchWhere(churchId, ctx.role, ctx.leaderBranchId),
+      where: this.branchWhere(
+        churchId,
+        ctx.role,
+        ctx.leaderBranchId,
+        ctx.leaderProvinceId,
+      ),
       include: branchListInclude,
       orderBy: { name: 'asc' },
     });
-    return branches.map((b) => ({
+    return branches.map((b) => this.mapBranchListRow(b));
+  }
+
+  private mapBranchListRow(
+    b: Prisma.CellBranchGetPayload<{ include: typeof branchListInclude }>,
+  ) {
+    return {
       id: b.id,
       name: b.name,
       location: b.location,
+      postcode: b.postcode,
+      provinceId: b.provinceId,
+      province: b.province
+        ? {
+            id: b.province.id,
+            name: b.province.name,
+            leader: b.province.leader
+              ? {
+                  id: b.province.leader.id,
+                  name: `${b.province.leader.firstName} ${b.province.leader.lastName}`.trim(),
+                  email: b.province.leader.email,
+                }
+              : null,
+          }
+        : null,
       createdAt: b.createdAt,
       memberCount: b._count.members,
       incidentCount: b._count.incidents,
@@ -108,23 +158,33 @@ export class MinistryCellsService {
             email: b.leader.email,
           }
         : null,
-    }));
+    };
   }
 
   async createBranch(
     user: AuthUser,
     churchId: string,
-    body: { name: string; location?: string; leaderUserId?: string },
+    body: {
+      name: string;
+      location?: string;
+      postcode: string;
+      leaderUserId?: string;
+    },
   ) {
     await this.access.assertLeadership(user, churchId);
+    if (!body.name?.trim()) throw new BadRequestException('Branch name is required');
+    const postcode = requireCellPostcode(body.postcode);
     if (body.leaderUserId) {
       await this.assertLeaderAvailable(churchId, body.leaderUserId);
     }
+    const provinceId = await this.resolveProvinceIdForPostcode(churchId, postcode);
     return this.prisma.cellBranch.create({
       data: {
         churchId,
         name: body.name.trim(),
         location: body.location?.trim() || null,
+        postcode,
+        provinceId,
         leaderUserId: body.leaderUserId || null,
       },
       include: branchInclude,
@@ -135,20 +195,33 @@ export class MinistryCellsService {
     user: AuthUser,
     churchId: string,
     branchId: string,
-    body: { name?: string; location?: string; leaderUserId?: string | null },
+    body: {
+      name?: string;
+      location?: string;
+      postcode?: string;
+      leaderUserId?: string | null;
+    },
   ) {
     await this.access.assertLeadership(user, churchId);
     await this.getBranchOrThrow(churchId, branchId);
     if (body.leaderUserId) {
       await this.assertLeaderAvailable(churchId, body.leaderUserId, branchId);
     }
+
+    const data: Prisma.CellBranchUncheckedUpdateInput = {};
+    if (body.name !== undefined) data.name = body.name.trim();
+    if (body.location !== undefined) data.location = body.location?.trim() || null;
+    if (body.leaderUserId !== undefined) {
+      data.leaderUserId = body.leaderUserId;
+    }
+    if (body.postcode !== undefined) {
+      const postcode = requireCellPostcode(body.postcode);
+      data.postcode = postcode;
+      data.provinceId = await this.resolveProvinceIdForPostcode(churchId, postcode);
+    }
     return this.prisma.cellBranch.update({
       where: { id: branchId },
-      data: {
-        name: body.name?.trim(),
-        location: body.location !== undefined ? body.location?.trim() || null : undefined,
-        leaderUserId: body.leaderUserId,
-      },
+      data,
       include: branchInclude,
     });
   }
@@ -203,6 +276,21 @@ export class MinistryCellsService {
       id: branch.id,
       name: branch.name,
       location: branch.location,
+      postcode: branch.postcode,
+      provinceId: branch.provinceId,
+      province: branch.province
+        ? {
+            id: branch.province.id,
+            name: branch.province.name,
+            leader: branch.province.leader
+              ? {
+                  id: branch.province.leader.id,
+                  name: `${branch.province.leader.firstName} ${branch.province.leader.lastName}`.trim(),
+                  email: branch.province.leader.email,
+                }
+              : null,
+          }
+        : null,
       createdAt: branch.createdAt,
       leader: branch.leader
         ? {
@@ -728,13 +816,26 @@ export class MinistryCellsService {
       select: { id: true },
     });
 
-    for (const staff of staffUsers) {
+    const recipientIds = new Set(staffUsers.map((u) => u.id));
+    const branchMeta = await this.prisma.cellBranch.findFirst({
+      where: { id: branchId, churchId },
+      select: {
+        provinceId: true,
+        province: { select: { leaderUserId: true, leader: { select: { id: true, isActive: true } } } },
+      },
+    });
+    const pl = branchMeta?.province?.leader;
+    if (pl?.isActive) {
+      recipientIds.add(pl.id);
+    }
+
+    for (const targetUserId of recipientIds) {
       await this.commQueue.enqueue(churchId, {
         kind: 'DEPARTMENT_WEEKLY_REPORT',
         title,
         body,
         channels: ['IN_APP', 'EMAIL'],
-        targetUserId: staff.id,
+        targetUserId,
         metadata: {
           tags: ['Branch/Cell Name', 'Date', 'Attendance Report', 'Timestamp'],
           branchId,
@@ -1118,12 +1219,22 @@ export class MinistryCellsService {
       to?: string;
     },
   ) {
-    await this.access.assertLeadership(user, churchId);
+    const ctx = await this.access.assertCanAccess(user, churchId);
+    if (
+      ctx.role !== 'admin' &&
+      ctx.role !== 'pastor' &&
+      ctx.role !== 'provincialLeader'
+    ) {
+      throw new ForbiddenException('Analytics access required');
+    }
 
     const from = filters.from ? new Date(filters.from) : new Date(Date.now() - 90 * 86400000);
     const to = filters.to ? new Date(filters.to) : new Date();
 
     const branchWhere: Prisma.CellBranchWhereInput = { churchId };
+    if (ctx.role === 'provincialLeader' && ctx.leaderProvinceId) {
+      branchWhere.provinceId = ctx.leaderProvinceId;
+    }
     if (filters.branchId) branchWhere.id = filters.branchId;
     if (filters.leaderUserId) branchWhere.leaderUserId = filters.leaderUserId;
     if (filters.location) branchWhere.location = { contains: filters.location, mode: 'insensitive' };
@@ -1289,5 +1400,430 @@ export class MinistryCellsService {
       where: { id: leaderUserId, churchId, isActive: true },
     });
     if (!user) throw new BadRequestException('Leader user not found in this church');
+    void excludeBranchId;
+  }
+
+  private async resolveProvinceIdForPostcode(
+    churchId: string,
+    postcode: string,
+  ): Promise<string | null> {
+    const provinces = await this.prisma.cellProvince.findMany({
+      where: { churchId },
+      select: {
+        id: true,
+        postcodes: { select: { postcodeNormalized: true } },
+      },
+    });
+    return findMatchingProvinceId(
+      postcode,
+      provinces.map((p) => ({
+        id: p.id,
+        postcodes: p.postcodes.map((c) => c.postcodeNormalized),
+      })),
+    );
+  }
+
+  private async recomputeBranchProvinces(churchId: string) {
+    const [provinces, branches] = await Promise.all([
+      this.prisma.cellProvince.findMany({
+        where: { churchId },
+        select: {
+          id: true,
+          postcodes: { select: { postcodeNormalized: true } },
+        },
+      }),
+      this.prisma.cellBranch.findMany({
+        where: { churchId },
+        select: { id: true, postcode: true, provinceId: true },
+      }),
+    ]);
+    const mapped = provinces.map((p) => ({
+      id: p.id,
+      postcodes: p.postcodes.map((c) => c.postcodeNormalized),
+    }));
+    for (const branch of branches) {
+      const provinceId = branch.postcode
+        ? findMatchingProvinceId(branch.postcode, mapped)
+        : null;
+      if (provinceId !== branch.provinceId) {
+        await this.prisma.cellBranch.update({
+          where: { id: branch.id },
+          data: { provinceId },
+        });
+      }
+    }
+  }
+
+  private async assertProvincialLeaderUser(churchId: string, leaderUserId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: leaderUserId,
+        churchId,
+        isActive: true,
+        roles: { some: { role: { name: 'PROVINCIAL_LEADER' } } },
+      },
+      select: { id: true },
+    });
+    if (!user) {
+      throw new BadRequestException(
+        'Province leader must be an active user with the PROVINCIAL_LEADER role',
+      );
+    }
+    const taken = await this.prisma.cellProvince.findFirst({
+      where: { churchId, leaderUserId },
+      select: { id: true, name: true },
+    });
+    if (taken) {
+      throw new BadRequestException(
+        `This user already leads province "${taken.name}". One user may lead only one province.`,
+      );
+    }
+  }
+
+  private serializeProvince(
+    p: Prisma.CellProvinceGetPayload<{
+      include: {
+        leader: { select: { id: true; firstName: true; lastName: true; email: true } };
+        postcodes: true;
+        _count: { select: { branches: true } };
+      };
+    }>,
+  ) {
+    return {
+      id: p.id,
+      name: p.name,
+      postcodes: p.postcodes.map((c) => c.postcodeNormalized),
+      branchCount: p._count.branches,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt,
+      leader: {
+        id: p.leader.id,
+        name: `${p.leader.firstName} ${p.leader.lastName}`.trim(),
+        email: p.leader.email,
+      },
+    };
+  }
+
+  async listProvinces(user: AuthUser, churchId: string) {
+    const ctx = await this.access.assertCanAccess(user, churchId);
+    const where =
+      ctx.role === 'provincialLeader' && ctx.leaderProvinceId
+        ? { churchId, id: ctx.leaderProvinceId }
+        : { churchId };
+    const rows = await this.prisma.cellProvince.findMany({
+      where,
+      include: {
+        leader: { select: { id: true, firstName: true, lastName: true, email: true } },
+        postcodes: { orderBy: { postcodeNormalized: 'asc' } },
+        _count: { select: { branches: true } },
+      },
+      orderBy: { name: 'asc' },
+    });
+    return rows.map((p) => this.serializeProvince(p));
+  }
+
+  async createProvince(
+    user: AuthUser,
+    churchId: string,
+    body: { name: string; leaderUserId: string; postcodes: string[] },
+  ) {
+    await this.access.assertLeadership(user, churchId);
+    const name = body.name?.trim();
+    if (!name) throw new BadRequestException('Province name is required');
+    if (!body.leaderUserId) throw new BadRequestException('Province leader is required');
+    const postcodes = normalizeCoveragePostcodes(body.postcodes ?? []);
+    await this.assertProvincialLeaderUser(churchId, body.leaderUserId);
+
+    const conflicting = await this.prisma.cellProvincePostcode.findMany({
+      where: { churchId, postcodeNormalized: { in: postcodes } },
+      select: { postcodeNormalized: true },
+    });
+    if (conflicting.length) {
+      throw new BadRequestException(
+        `Postcode(s) already used by another province: ${conflicting
+          .map((c) => c.postcodeNormalized)
+          .join(', ')}`,
+      );
+    }
+
+    const created = await this.prisma.cellProvince.create({
+      data: {
+        churchId,
+        name,
+        leaderUserId: body.leaderUserId,
+        postcodes: {
+          create: postcodes.map((postcodeNormalized) => ({
+            churchId,
+            postcodeNormalized,
+          })),
+        },
+      },
+      include: {
+        leader: { select: { id: true, firstName: true, lastName: true, email: true } },
+        postcodes: { orderBy: { postcodeNormalized: 'asc' } },
+        _count: { select: { branches: true } },
+      },
+    });
+    await this.recomputeBranchProvinces(churchId);
+    return this.serializeProvince(created);
+  }
+
+  async updateProvince(
+    user: AuthUser,
+    churchId: string,
+    provinceId: string,
+    body: { name?: string; leaderUserId?: string; postcodes?: string[] },
+  ) {
+    await this.access.assertLeadership(user, churchId);
+    const existing = await this.prisma.cellProvince.findFirst({
+      where: { id: provinceId, churchId },
+    });
+    if (!existing) throw new NotFoundException('Province not found');
+
+    if (body.leaderUserId && body.leaderUserId !== existing.leaderUserId) {
+      await this.assertProvincialLeaderUser(churchId, body.leaderUserId);
+    }
+
+    let postcodes: string[] | undefined;
+    if (body.postcodes !== undefined) {
+      postcodes = normalizeCoveragePostcodes(body.postcodes);
+      const conflicting = await this.prisma.cellProvincePostcode.findMany({
+        where: {
+          churchId,
+          postcodeNormalized: { in: postcodes },
+          NOT: { provinceId },
+        },
+        select: { postcodeNormalized: true },
+      });
+      if (conflicting.length) {
+        throw new BadRequestException(
+          `Postcode(s) already used by another province: ${conflicting
+            .map((c) => c.postcodeNormalized)
+            .join(', ')}`,
+        );
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      if (postcodes) {
+        await tx.cellProvincePostcode.deleteMany({ where: { provinceId } });
+        await tx.cellProvincePostcode.createMany({
+          data: postcodes.map((postcodeNormalized) => ({
+            churchId,
+            provinceId,
+            postcodeNormalized,
+          })),
+        });
+      }
+      await tx.cellProvince.update({
+        where: { id: provinceId },
+        data: {
+          name: body.name?.trim() || undefined,
+          leaderUserId: body.leaderUserId || undefined,
+        },
+      });
+    });
+
+    await this.recomputeBranchProvinces(churchId);
+
+    const updated = await this.prisma.cellProvince.findFirstOrThrow({
+      where: { id: provinceId },
+      include: {
+        leader: { select: { id: true, firstName: true, lastName: true, email: true } },
+        postcodes: { orderBy: { postcodeNormalized: 'asc' } },
+        _count: { select: { branches: true } },
+      },
+    });
+    return this.serializeProvince(updated);
+  }
+
+  async deleteProvince(user: AuthUser, churchId: string, provinceId: string) {
+    await this.access.assertLeadership(user, churchId);
+    const existing = await this.prisma.cellProvince.findFirst({
+      where: { id: provinceId, churchId },
+    });
+    if (!existing) throw new NotFoundException('Province not found');
+    await this.prisma.cellProvince.delete({ where: { id: provinceId } });
+    return { ok: true };
+  }
+
+  async listProvincialLeaderCandidates(
+    user: AuthUser,
+    churchId: string,
+    excludeProvinceId?: string,
+  ) {
+    await this.access.assertLeadership(user, churchId);
+    const leading = await this.prisma.cellProvince.findMany({
+      where: {
+        churchId,
+        ...(excludeProvinceId ? { NOT: { id: excludeProvinceId } } : {}),
+      },
+      select: { leaderUserId: true },
+    });
+    const taken = new Set(leading.map((p) => p.leaderUserId));
+    const users = await this.prisma.user.findMany({
+      where: {
+        churchId,
+        isActive: true,
+        roles: { some: { role: { name: 'PROVINCIAL_LEADER' } } },
+      },
+      select: { id: true, firstName: true, lastName: true, email: true },
+      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+    });
+    return users
+      .filter((u) => !taken.has(u.id))
+      .map((u) => ({
+        id: u.id,
+        name: `${u.firstName} ${u.lastName}`.trim(),
+        email: u.email,
+      }));
+  }
+
+  async mapBranchToProvince(
+    user: AuthUser,
+    churchId: string,
+    branchId: string,
+    provinceId: string,
+  ) {
+    await this.access.assertLeadership(user, churchId);
+    const branch = await this.getBranchOrThrow(churchId, branchId);
+    if (!branch.postcode) {
+      throw new BadRequestException('Set a postcode on this cell before mapping to a province');
+    }
+    const province = await this.prisma.cellProvince.findFirst({
+      where: { id: provinceId, churchId },
+      include: { postcodes: true },
+    });
+    if (!province) throw new NotFoundException('Province not found');
+    assertCoverageIncludesCell(
+      branch.postcode,
+      province.postcodes.map((p) => p.postcodeNormalized),
+    );
+    return this.prisma.cellBranch.update({
+      where: { id: branchId },
+      data: { provinceId },
+      include: branchInclude,
+    });
+  }
+
+  async getProvinceAttendanceReport(
+    user: AuthUser,
+    churchId: string,
+    provinceId: string,
+    filters: { from?: string; to?: string },
+  ) {
+    await this.access.assertProvinceLeadership(user, churchId, provinceId);
+    const province = await this.prisma.cellProvince.findFirst({
+      where: { id: provinceId, churchId },
+      include: {
+        leader: { select: { id: true, firstName: true, lastName: true, email: true } },
+        branches: {
+          select: { id: true, name: true, postcode: true, location: true },
+          orderBy: { name: 'asc' },
+        },
+      },
+    });
+    if (!province) throw new NotFoundException('Province not found');
+
+    const from = filters.from ? new Date(filters.from) : new Date(Date.now() - 90 * 86400000);
+    const to = filters.to ? new Date(filters.to) : new Date();
+    const branchIds = province.branches.map((b) => b.id);
+
+    const attendance = branchIds.length
+      ? await this.prisma.cellAttendance.findMany({
+          where: {
+            churchId,
+            branchId: { in: branchIds },
+            weekStart: { gte: from, lte: to },
+          },
+          orderBy: { weekStart: 'asc' },
+        })
+      : [];
+
+    const byBranch = province.branches.map((b) => {
+      const rows = attendance.filter((a) => a.branchId === b.id);
+      const totals = rows.reduce(
+        (acc, r) => ({
+          present: acc.present + r.presentCount,
+          male: acc.male + r.maleCount,
+          female: acc.female + r.femaleCount,
+          boys: acc.boys + r.boysCount,
+          girls: acc.girls + r.girlsCount,
+          testifiers: acc.testifiers + r.testifiersCount,
+          firstTimers: acc.firstTimers + r.firstTimersCount,
+          weeks: acc.weeks + 1,
+        }),
+        {
+          present: 0,
+          male: 0,
+          female: 0,
+          boys: 0,
+          girls: 0,
+          testifiers: 0,
+          firstTimers: 0,
+          weeks: 0,
+        },
+      );
+      return {
+        branchId: b.id,
+        name: b.name,
+        postcode: b.postcode,
+        location: b.location,
+        weeksRecorded: totals.weeks,
+        avgPresent:
+          totals.weeks > 0 ? Math.round((totals.present / totals.weeks) * 10) / 10 : 0,
+        totals: {
+          present: totals.present,
+          male: totals.male,
+          female: totals.female,
+          boys: totals.boys,
+          girls: totals.girls,
+          testifiers: totals.testifiers,
+          firstTimers: totals.firstTimers,
+        },
+        records: rows.map((r) => ({
+          id: r.id,
+          weekStart: r.weekStart,
+          meetingDate: r.meetingDate,
+          presentCount: r.presentCount,
+          maleCount: r.maleCount,
+          femaleCount: r.femaleCount,
+          boysCount: r.boysCount,
+          girlsCount: r.girlsCount,
+          testifiersCount: r.testifiersCount,
+          firstTimersCount: r.firstTimersCount,
+        })),
+      };
+    });
+
+    const provinceTotals = byBranch.reduce(
+      (acc, b) => ({
+        present: acc.present + b.totals.present,
+        male: acc.male + b.totals.male,
+        female: acc.female + b.totals.female,
+        boys: acc.boys + b.totals.boys,
+        girls: acc.girls + b.totals.girls,
+        testifiers: acc.testifiers + b.totals.testifiers,
+        firstTimers: acc.firstTimers + b.totals.firstTimers,
+      }),
+      { present: 0, male: 0, female: 0, boys: 0, girls: 0, testifiers: 0, firstTimers: 0 },
+    );
+
+    return {
+      province: {
+        id: province.id,
+        name: province.name,
+        leader: {
+          id: province.leader.id,
+          name: `${province.leader.firstName} ${province.leader.lastName}`.trim(),
+          email: province.leader.email,
+        },
+      },
+      from,
+      to,
+      branchCount: province.branches.length,
+      totals: provinceTotals,
+      branches: byBranch,
+    };
   }
 }

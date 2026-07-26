@@ -47,6 +47,7 @@ export function CellBranchDetailPanel({
   editBranchOpen,
   editName,
   editLocation,
+  editPostcode,
   editLeaderId,
   branchSaving,
   reportFormId,
@@ -55,6 +56,7 @@ export function CellBranchDetailPanel({
   onEditToggle,
   onEditName,
   onEditLocation,
+  onEditPostcode,
   onEditLeaderId,
   onSaveBranch,
   onReportFormId,
@@ -80,6 +82,7 @@ export function CellBranchDetailPanel({
   editBranchOpen: boolean;
   editName: string;
   editLocation: string;
+  editPostcode: string;
   editLeaderId: string;
   branchSaving: boolean;
   reportFormId: string;
@@ -88,6 +91,7 @@ export function CellBranchDetailPanel({
   onEditToggle: () => void;
   onEditName: (v: string) => void;
   onEditLocation: (v: string) => void;
+  onEditPostcode: (v: string) => void;
   onEditLeaderId: (v: string) => void;
   onSaveBranch: (e: React.FormEvent) => void;
   onReportFormId: (v: string) => void;
@@ -149,6 +153,8 @@ export function CellBranchDetailPanel({
               <h2 className="font-heading text-xl font-bold tracking-tight sm:text-2xl">{branchDetail.name}</h2>
               <p className="mt-1 text-sm text-slate-400">
                 {branchDetail.location ?? 'No location'}
+                {branchDetail.postcode ? ` · ${branchDetail.postcode}` : ''}
+                {branchDetail.province?.name ? ` · ${branchDetail.province.name}` : ''}
                 {branchDetail.leader ? ` · ${branchDetail.leader.name}` : ''}
                 {createdLabel ? ` · Since ${createdLabel}` : ''}
               </p>
@@ -230,6 +236,15 @@ export function CellBranchDetailPanel({
               <div>
                 <Label htmlFor="edit-name">Name</Label>
                 <Input id="edit-name" value={editName} onChange={(e) => onEditName(e.target.value)} required />
+              </div>
+              <div>
+                <Label htmlFor="edit-postcode">Postcode</Label>
+                <Input
+                  id="edit-postcode"
+                  value={editPostcode}
+                  onChange={(e) => onEditPostcode(e.target.value)}
+                  required
+                />
               </div>
               <div>
                 <Label htmlFor="edit-location">Location</Label>

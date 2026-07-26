@@ -7,7 +7,12 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { parseTenantModulesFromSettings } from '@church-hub/shared-types';
 import type { AuthUser } from '../auth/current-user.decorator';
 
-export type MinistryCellsRole = 'admin' | 'pastor' | 'cellLeader' | 'none';
+export type MinistryCellsRole =
+  | 'admin'
+  | 'pastor'
+  | 'provincialLeader'
+  | 'cellLeader'
+  | 'none';
 
 @Injectable()
 export class MinistryCellsAccessService {
@@ -38,28 +43,49 @@ export class MinistryCellsAccessService {
     return rows.map((r) => r.role.name);
   }
 
-  async resolveRole(user: AuthUser, churchId: string): Promise<{
+  async resolveRole(
+    user: AuthUser,
+    churchId: string,
+  ): Promise<{
     role: MinistryCellsRole;
     leaderBranchId: string | null;
+    leaderProvinceId: string | null;
   }> {
     if (!user.churchId || user.churchId !== churchId) {
-      return { role: 'none', leaderBranchId: null };
+      return { role: 'none', leaderBranchId: null, leaderProvinceId: null };
     }
     const roles = await this.userRoleNames(user);
     if (roles.includes('ADMIN')) {
-      return { role: 'admin', leaderBranchId: null };
+      return { role: 'admin', leaderBranchId: null, leaderProvinceId: null };
     }
     if (roles.includes('PASTOR')) {
-      return { role: 'pastor', leaderBranchId: null };
+      return { role: 'pastor', leaderBranchId: null, leaderProvinceId: null };
     }
+
+    const province = await this.prisma.cellProvince.findFirst({
+      where: { churchId, leaderUserId: user.userId },
+      select: { id: true },
+    });
+    if (province) {
+      return {
+        role: 'provincialLeader',
+        leaderBranchId: null,
+        leaderProvinceId: province.id,
+      };
+    }
+
     const branch = await this.prisma.cellBranch.findFirst({
       where: { churchId, leaderUserId: user.userId },
       select: { id: true },
     });
     if (branch) {
-      return { role: 'cellLeader', leaderBranchId: branch.id };
+      return {
+        role: 'cellLeader',
+        leaderBranchId: branch.id,
+        leaderProvinceId: null,
+      };
     }
-    return { role: 'none', leaderBranchId: null };
+    return { role: 'none', leaderBranchId: null, leaderProvinceId: null };
   }
 
   async assertCanAccess(user: AuthUser, churchId: string) {
@@ -71,13 +97,19 @@ export class MinistryCellsAccessService {
     return ctx;
   }
 
-  async assertBranchAccess(
-    user: AuthUser,
-    churchId: string,
-    branchId: string,
-  ) {
+  async assertBranchAccess(user: AuthUser, churchId: string, branchId: string) {
     const ctx = await this.assertCanAccess(user, churchId);
     if (ctx.role === 'admin' || ctx.role === 'pastor') return ctx;
+    if (ctx.role === 'provincialLeader' && ctx.leaderProvinceId) {
+      const branch = await this.prisma.cellBranch.findFirst({
+        where: { id: branchId, churchId, provinceId: ctx.leaderProvinceId },
+        select: { id: true },
+      });
+      if (!branch) {
+        throw new ForbiddenException('You can only access cells in your province');
+      }
+      return ctx;
+    }
     if (ctx.leaderBranchId !== branchId) {
       throw new ForbiddenException('You can only access your assigned cell branch');
     }
@@ -90,5 +122,14 @@ export class MinistryCellsAccessService {
       throw new ForbiddenException('Church admin or pastor access required');
     }
     return ctx;
+  }
+
+  async assertProvinceLeadership(user: AuthUser, churchId: string, provinceId: string) {
+    const ctx = await this.assertCanAccess(user, churchId);
+    if (ctx.role === 'admin' || ctx.role === 'pastor') return ctx;
+    if (ctx.role === 'provincialLeader' && ctx.leaderProvinceId === provinceId) {
+      return ctx;
+    }
+    throw new ForbiddenException('Provincial leader access required for this province');
   }
 }

@@ -162,9 +162,16 @@ export class ModuleAccessService {
     return ctx.userRoles.includes('PASTOR');
   }
 
-  /** Church admin, pastor, or assigned cell branch leader. */
+  /** Church admin, pastor, assigned provincial leader, or assigned cell branch leader. */
   async canAccessMinistryCells(ctx: UserMemberContext): Promise<boolean> {
     if (this.isChurchStaff(ctx)) return true;
+    if (ctx.userRoles.includes('PROVINCIAL_LEADER')) {
+      const province = await this.prisma.cellProvince.findFirst({
+        where: { churchId: ctx.churchId, leaderUserId: ctx.userId },
+        select: { id: true },
+      });
+      if (province) return true;
+    }
     const branch = await this.prisma.cellBranch.findFirst({
       where: { churchId: ctx.churchId, leaderUserId: ctx.userId },
       select: { id: true },
