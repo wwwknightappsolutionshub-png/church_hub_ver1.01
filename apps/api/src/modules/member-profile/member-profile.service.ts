@@ -1,4 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { MemberRoleType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.module';
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
 
@@ -33,10 +34,67 @@ export class MemberProfileService {
   }
 
   async getMyProfile(churchId: string, userId: string) {
-    const member = await this.prisma.member.findFirst({
+    let member = await this.prisma.member.findFirst({
       where: { churchId, userId },
+      select: { id: true },
     });
-    if (!member) throw new NotFoundException('No member profile linked to this account');
+
+    if (!member) {
+      const user = await this.prisma.user.findFirst({
+        where: { id: userId, churchId, isActive: true },
+        include: { roles: { include: { role: true } } },
+      });
+      if (!user) throw new NotFoundException('User not found');
+
+      // Link an existing member row that shares this account email (common for staff).
+      const byEmail = await this.prisma.member.findFirst({
+        where: {
+          churchId,
+          email: { equals: user.email, mode: 'insensitive' },
+          OR: [{ userId: null }, { userId }],
+        },
+        select: { id: true, userId: true },
+      });
+      if (byEmail) {
+        if (!byEmail.userId) {
+          await this.prisma.member.update({
+            where: { id: byEmail.id },
+            data: { userId },
+          });
+        }
+        member = { id: byEmail.id };
+      } else {
+        // Staff may open Profile without a Member row — create a linked profile from the user.
+        const roleNames = user.roles.map((r) => r.role.name);
+        const isStaff = roleNames.some((n) =>
+          ['ADMIN', 'PASTOR', 'LEADER', 'PROVINCIAL_LEADER'].includes(n),
+        );
+        if (!isStaff) {
+          throw new NotFoundException('No member profile linked to this account');
+        }
+        const created = await this.prisma.member.create({
+          data: {
+            churchId,
+            userId,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            phone: user.phone,
+            avatarUrl: user.avatarUrl,
+            nickname: user.nickname,
+            status: 'ACTIVE_MEMBER',
+            roles: roleNames.includes('PASTOR')
+              ? [MemberRoleType.PASTOR]
+              : roleNames.includes('ADMIN')
+                ? [MemberRoleType.ADMIN]
+                : [MemberRoleType.ADULT],
+          },
+          select: { id: true },
+        });
+        member = created;
+      }
+    }
+
     return this.getProfile(churchId, member.id);
   }
 

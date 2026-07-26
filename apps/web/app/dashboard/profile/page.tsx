@@ -59,7 +59,10 @@ function ProfilePageContent() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>('details');
   const [busy, setBusy] = useState(false);
-  const { data: profile, isLoading } = useApiQuery<Profile>(['profile-me'], '/member-profile/me');
+  const { data: profile, isLoading, isError, error, refetch } = useApiQuery<Profile>(
+    ['profile-me'],
+    '/member-profile/me',
+  );
   const { data: messages } = useApiQuery<Message[]>(
     ['profile-messages'],
     '/member-profile/messages/inbox',
@@ -88,10 +91,39 @@ function ProfilePageContent() {
     Array<{ id: string; title: string; status: string; createdAt: string }>
   >(['community-support-mine'], '/community-support/mine', { enabled: tab === 'community-support' });
 
-  if (isLoading || !profile) {
+  if (isLoading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (isError || !profile) {
+    const apiMessage =
+      (error?.response?.data as { message?: string | string[] } | undefined)?.message;
+    const message = Array.isArray(apiMessage)
+      ? apiMessage[0]
+      : apiMessage ||
+        'No member profile is linked to this account. Ask an admin to link your user to a membership record, or open Settings.';
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center p-4">
+        <Card className="max-w-md shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg">Profile unavailable</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm text-muted-foreground">
+            <p>{message}</p>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={() => void refetch()}>
+                Try again
+              </Button>
+              <Button asChild>
+                <Link href="/dashboard/settings">Open Settings</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
