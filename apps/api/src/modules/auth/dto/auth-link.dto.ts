@@ -1,12 +1,19 @@
 import { IsEmail, IsString, MaxLength, MinLength } from 'class-validator';
+import { Transform } from 'class-transformer';
+
+function trimLower(value: unknown) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : value;
+}
 
 export class ForgotPasswordDto {
+  @Transform(({ value }) => trimLower(value))
   @IsEmail()
   @MaxLength(255)
   email!: string;
 }
 
 export class RequestMagicLinkDto {
+  @Transform(({ value }) => trimLower(value))
   @IsEmail()
   @MaxLength(255)
   email!: string;

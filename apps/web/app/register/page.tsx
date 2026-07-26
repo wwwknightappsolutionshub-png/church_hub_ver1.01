@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
+import { RegisterStartSchema, type RegisterStartInput } from '@church-hub/shared-types';
 import { api, setAuthTokens } from '@/lib/api';
 import { slugifyChurchName } from '@/lib/church-slug';
 import { apiErrorMessage } from '@/lib/api-errors';
@@ -19,14 +21,7 @@ import { BrandMark } from '@/components/brand/BrandMark';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-type RegisterForm = {
-  churchName: string;
-  churchSlug: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  password: string;
-};
+type RegisterForm = RegisterStartInput;
 
 type Step = 'details' | 'otp';
 
@@ -39,10 +34,18 @@ export default function RegisterPage() {
   const [registrationId, setRegistrationId] = useState<string | null>(null);
   const [otpEmail, setOtpEmail] = useState('');
   const [otp, setOtp] = useState('');
-  const { register, handleSubmit, setValue, watch, getValues } = useForm<RegisterForm>({
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    getValues,
+    formState: { errors },
+  } = useForm<RegisterForm>({
+    resolver: zodResolver(RegisterStartSchema),
     defaultValues: {
       churchName: '',
-      churchSlug: '',
+      churchSlug: undefined,
       firstName: '',
       lastName: '',
       email: '',
@@ -62,7 +65,7 @@ export default function RegisterPage() {
   }, [setValue]);
 
   const onStart = async (data: RegisterForm) => {
-    const slug = data.churchSlug.trim() || slugifyChurchName(data.churchName);
+    const slug = (data.churchSlug ?? '').trim() || slugifyChurchName(data.churchName);
     if (!slug) {
       toast.error('Enter a church name so we can create your URL slug');
       return;
@@ -145,7 +148,6 @@ export default function RegisterPage() {
                 <Input
                   placeholder="Grace Community Church"
                   {...register('churchName', {
-                    required: true,
                     onChange: (e) => {
                       if (slugTouched.current) return;
                       setValue('churchSlug', slugifyChurchName(e.target.value), {
@@ -153,8 +155,10 @@ export default function RegisterPage() {
                       });
                     },
                   })}
-                  required
                 />
+                {errors.churchName ? (
+                  <p className="mt-1 text-xs text-destructive">{errors.churchName.message}</p>
+                ) : null}
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">Church URL slug</label>
@@ -166,32 +170,49 @@ export default function RegisterPage() {
                     },
                   })}
                 />
-                <p className="mt-1.5 text-xs text-muted-foreground">
-                  {churchSlug
-                    ? `Your public page: /c/${churchSlug}`
-                    : 'Filled automatically from the church name — edit anytime'}
-                </p>
+                {errors.churchSlug ? (
+                  <p className="mt-1 text-xs text-destructive">{errors.churchSlug.message}</p>
+                ) : (
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    {churchSlug
+                      ? `Your public page: /c/${churchSlug}`
+                      : 'Filled automatically from the church name — edit anytime'}
+                  </p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1.5 block text-sm font-medium">First name</label>
-                  <Input {...register('firstName')} required />
+                  <Input {...register('firstName')} />
+                  {errors.firstName ? (
+                    <p className="mt-1 text-xs text-destructive">{errors.firstName.message}</p>
+                  ) : null}
                 </div>
                 <div>
                   <label className="mb-1.5 block text-sm font-medium">Last name</label>
-                  <Input {...register('lastName')} required />
+                  <Input {...register('lastName')} />
+                  {errors.lastName ? (
+                    <p className="mt-1 text-xs text-destructive">{errors.lastName.message}</p>
+                  ) : null}
                 </div>
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">Admin email</label>
-                <Input type="email" {...register('email')} required readOnly={fromTrial} />
+                <Input type="email" {...register('email')} readOnly={fromTrial} />
+                {errors.email ? (
+                  <p className="mt-1 text-xs text-destructive">{errors.email.message}</p>
+                ) : null}
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">Password</label>
-                <Input type="password" {...register('password')} required minLength={8} />
-                <p className="mt-1.5 text-xs text-muted-foreground">
-                  Please enter a new password — not the temporary password from your email.
-                </p>
+                <Input type="password" {...register('password')} />
+                {errors.password ? (
+                  <p className="mt-1 text-xs text-destructive">{errors.password.message}</p>
+                ) : (
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    Please enter a new password — not the temporary password from your email.
+                  </p>
+                )}
               </div>
               <Button type="submit" className="w-full shadow-brand" disabled={busy}>
                 {busy ? (

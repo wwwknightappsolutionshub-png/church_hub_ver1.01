@@ -201,3 +201,100 @@ export type LoginCredentialsInput = z.infer<typeof LoginCredentialsSchema>;
 export const MagicLinkRequestSchema = z.object({
   email: emailSchema,
 });
+
+export const RefreshTokenSchema = z.object({
+  refreshToken: z.string().min(16).max(512),
+});
+export type RefreshTokenInput = z.infer<typeof RefreshTokenSchema>;
+
+export const ResetPasswordSchema = z.object({
+  token: z.string().min(32).max(128),
+  newPassword: passwordSchema,
+});
+export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;
+
+export const CHURCH_ASSIGNABLE_ROLE_VALUES = [
+  'ADMIN',
+  'PASTOR',
+  'LEADER',
+  'PROVINCIAL_LEADER',
+  'MEMBER',
+  'DRIVER',
+] as const;
+
+export const CreateChurchStaffSchema = z.object({
+  email: emailSchema,
+  password: passwordSchema,
+  firstName: z
+    .string()
+    .transform((v) => sanitizeText(v, 80))
+    .pipe(z.string().min(1, 'Required').max(80)),
+  lastName: z
+    .string()
+    .transform((v) => sanitizeText(v, 80))
+    .pipe(z.string().min(1, 'Required').max(80)),
+  phone: optionalPhoneSchema,
+  roles: z
+    .array(z.enum(CHURCH_ASSIGNABLE_ROLE_VALUES))
+    .min(1, 'Select at least one role'),
+});
+export type CreateChurchStaffInput = z.infer<typeof CreateChurchStaffSchema>;
+
+export const UpdateChurchStaffSchema = z.object({
+  email: emailSchema.optional(),
+  password: passwordSchema.optional(),
+  firstName: z
+    .string()
+    .transform((v) => sanitizeText(v, 80))
+    .pipe(z.string().min(1).max(80))
+    .optional(),
+  lastName: z
+    .string()
+    .transform((v) => sanitizeText(v, 80))
+    .pipe(z.string().min(1).max(80))
+    .optional(),
+  phone: optionalPhoneSchema,
+  roles: z.array(z.enum(CHURCH_ASSIGNABLE_ROLE_VALUES)).min(1).optional(),
+  isActive: z.boolean().optional(),
+});
+export type UpdateChurchStaffInput = z.infer<typeof UpdateChurchStaffSchema>;
+
+export const CreatePlatformChurchSchema = z.object({
+  name: z
+    .string()
+    .transform((v) => sanitizeText(v, 120))
+    .pipe(z.string().min(2, 'Church name is required').max(120)),
+  slug: churchSlugSchema,
+  adminEmail: emailSchema,
+  pastorEmail: optionalEmailSchema,
+  city: z
+    .union([z.string(), z.literal(''), z.undefined()])
+    .transform((v) => {
+      const s = sanitizeText(v ?? '', 120);
+      return s || undefined;
+    })
+    .pipe(z.union([z.string().max(120), z.undefined()])),
+  country: z
+    .union([z.string(), z.literal(''), z.undefined()])
+    .transform((v) => {
+      const s = sanitizeText(v ?? '', 120);
+      return s || undefined;
+    })
+    .pipe(z.union([z.string().max(120), z.undefined()])),
+  timezone: z
+    .union([z.string(), z.literal(''), z.undefined()])
+    .transform((v) => {
+      const s = sanitizeText(v ?? '', 64);
+      return s || undefined;
+    })
+    .pipe(z.union([z.string().max(64), z.undefined()])),
+  isActive: z.boolean().optional(),
+});
+export type CreatePlatformChurchInput = z.infer<typeof CreatePlatformChurchSchema>;
+
+export const ResetTenantUserPasswordSchema = z.object({
+  newPassword: passwordSchema.optional(),
+  mustChangePassword: z.boolean().optional(),
+  notifyUser: z.boolean().optional(),
+});
+export type ResetTenantUserPasswordInput = z.infer<typeof ResetTenantUserPasswordSchema>;

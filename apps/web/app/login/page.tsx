@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { churchPublicPath } from '@/lib/church-slug';
 import { applyAuthSessionFromMe } from '@/lib/apply-auth-session';
+import { LoginCredentialsSchema, MagicLinkRequestSchema } from '@church-hub/shared-types';
 import { ArrowRight, Loader2, Mail } from 'lucide-react';
 import { loginWithCredentials, verifyLogin2fa, isLogin2faChallenge, isLoginSuccess } from '@/lib/auth-login';
 import { requestMagicLink } from '@/lib/auth-links';
@@ -189,7 +190,14 @@ export default function LoginPage() {
       return;
     }
 
-    const result = await loginWithCredentials(data.email, data.password);
+    const parsed = LoginCredentialsSchema.safeParse(data);
+    if (!parsed.success) {
+      setLoading(false);
+      toast.error(parsed.error.issues[0]?.message ?? 'Enter a valid email and password');
+      return;
+    }
+
+    const result = await loginWithCredentials(parsed.data.email, parsed.data.password);
     setLoading(false);
     if (isLogin2faChallenge(result)) {
       setTwoFa({ challengeId: result.challengeId, email: result.email });
@@ -235,8 +243,13 @@ export default function LoginPage() {
   };
 
   const onMagicSubmit = async (data: { email: string }) => {
+    const parsed = MagicLinkRequestSchema.safeParse({ email: data.email });
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message ?? 'Enter a valid email');
+      return;
+    }
     setLoading(true);
-    const result = await requestMagicLink(data.email);
+    const result = await requestMagicLink(parsed.data.email);
     setLoading(false);
     if (!result.ok) {
       toast.error(result.message);

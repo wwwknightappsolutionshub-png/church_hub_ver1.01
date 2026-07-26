@@ -24,6 +24,7 @@ import { toast } from 'sonner';
 import {
   CHURCH_TENANT_MODULE_IDS,
   CHURCH_TENANT_MODULE_LABELS,
+  CreatePlatformChurchSchema,
   defaultTenantModules,
   type ChurchTenantModulesMap,
 } from '@church-hub/shared-types';
@@ -250,20 +251,21 @@ export default function PlatformConsolePage() {
 
   const createChurch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!createForm.name.trim() || !createForm.slug.trim() || !createForm.adminEmail.trim()) {
-      toast.error('Church name, slug, and admin email are required');
+    const parsed = CreatePlatformChurchSchema.safeParse({
+      name: createForm.name,
+      slug: createForm.slug,
+      adminEmail: createForm.adminEmail,
+      pastorEmail: createForm.pastorEmail || undefined,
+      city: createForm.city || undefined,
+      country: createForm.country || undefined,
+    });
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message ?? 'Church name, slug, and admin email are required');
       return;
     }
     setBusy(true);
     try {
-      const { data } = await api.post<ChurchRow>('/platform/churches', {
-        name: createForm.name.trim(),
-        slug: createForm.slug.trim().toLowerCase(),
-        adminEmail: createForm.adminEmail.trim(),
-        pastorEmail: createForm.pastorEmail.trim() || undefined,
-        city: createForm.city.trim() || undefined,
-        country: createForm.country.trim() || undefined,
-      });
+      const { data } = await api.post<ChurchRow>('/platform/churches', parsed.data);
       const parts: string[] = ['Tenant created'];
       if (data.provisionedStaff?.admin) {
         parts.push(

@@ -23,12 +23,8 @@ import {
   ResetPasswordDto,
   ConsumeMagicLinkDto,
 } from './dto/auth-link.dto';
-import {
-  Login2faVerifyDto,
-  LoginDto,
-  RegisterStartDto,
-  RegisterVerifyDto,
-} from './dto/register.dto';
+import { LoginDto, Login2faVerifyDto, RegisterStartDto, RegisterVerifyDto } from './dto/register.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { Public } from './decorators';
 import { TEST_ACCOUNTS, TEST_PASSWORD } from './test-accounts';
 import { CurrentUser, AuthUser } from './current-user.decorator';
@@ -150,14 +146,14 @@ export class AuthController {
   @Public()
   @Post('refresh')
   @ApiOperation({ summary: 'Refresh access token' })
-  refresh(@Body() body: { refreshToken: string }) {
+  refresh(@Body() body: RefreshTokenDto) {
     return this.authService.refresh(body.refreshToken);
   }
 
   @Public()
   @Post('logout')
   @ApiOperation({ summary: 'Revoke refresh token' })
-  logout(@Body() body: { refreshToken: string }) {
+  logout(@Body() body: RefreshTokenDto) {
     return this.authService.logout(body.refreshToken);
   }
 

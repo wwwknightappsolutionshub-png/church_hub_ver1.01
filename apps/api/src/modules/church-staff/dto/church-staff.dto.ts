@@ -9,6 +9,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export const CHURCH_ASSIGNABLE_ROLES = [
   'ADMIN',
@@ -21,8 +22,18 @@ export const CHURCH_ASSIGNABLE_ROLES = [
 
 export type ChurchAssignableRole = (typeof CHURCH_ASSIGNABLE_ROLES)[number];
 
+function trimLower(value: unknown) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : value;
+}
+
+function trimString(value: unknown) {
+  return typeof value === 'string' ? value.trim() : value;
+}
+
 export class CreateChurchStaffDto {
+  @Transform(({ value }) => trimLower(value))
   @IsEmail()
+  @MaxLength(255)
   email!: string;
 
   @IsString()
@@ -30,17 +41,20 @@ export class CreateChurchStaffDto {
   @MaxLength(128)
   password!: string;
 
+  @Transform(({ value }) => trimString(value))
   @IsString()
   @MinLength(1)
   @MaxLength(80)
   firstName!: string;
 
+  @Transform(({ value }) => trimString(value))
   @IsString()
   @MinLength(1)
   @MaxLength(80)
   lastName!: string;
 
   @IsOptional()
+  @Transform(({ value }) => trimString(value))
   @IsString()
   @MaxLength(40)
   phone?: string;
@@ -53,7 +67,9 @@ export class CreateChurchStaffDto {
 
 export class UpdateChurchStaffDto {
   @IsOptional()
+  @Transform(({ value }) => trimLower(value))
   @IsEmail()
+  @MaxLength(255)
   email?: string;
 
   @IsOptional()
@@ -63,18 +79,21 @@ export class UpdateChurchStaffDto {
   password?: string;
 
   @IsOptional()
+  @Transform(({ value }) => trimString(value))
   @IsString()
   @MinLength(1)
   @MaxLength(80)
   firstName?: string;
 
   @IsOptional()
+  @Transform(({ value }) => trimString(value))
   @IsString()
   @MinLength(1)
   @MaxLength(80)
   lastName?: string;
 
   @IsOptional()
+  @Transform(({ value }) => trimString(value))
   @IsString()
   @MaxLength(40)
   phone?: string;

@@ -15,6 +15,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import {
+  CreateChurchStaffSchema,
+  UpdateChurchStaffSchema,
+} from '@church-hub/shared-types';
 
 const ASSIGNABLE_ROLES = [
   'ADMIN',
@@ -99,10 +103,20 @@ export default function ChurchStaffPage() {
           roles: form.roles,
         };
         if (form.password) payload.password = form.password;
-        await api.patch(`/church-staff/${editingId}`, payload);
+        const parsed = UpdateChurchStaffSchema.safeParse(payload);
+        if (!parsed.success) {
+          toast.error(parsed.error.issues[0]?.message ?? 'Check the form fields');
+          return;
+        }
+        await api.patch(`/church-staff/${editingId}`, parsed.data);
         toast.success('Staff updated');
       } else {
-        await api.post('/church-staff', form);
+        const parsed = CreateChurchStaffSchema.safeParse(form);
+        if (!parsed.success) {
+          toast.error(parsed.error.issues[0]?.message ?? 'Check the form fields');
+          return;
+        }
+        await api.post('/church-staff', parsed.data);
         toast.success('Staff account created');
       }
       queryClient.invalidateQueries({ queryKey: ['church-staff'] });
