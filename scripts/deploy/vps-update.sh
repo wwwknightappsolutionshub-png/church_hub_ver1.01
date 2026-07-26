@@ -36,17 +36,35 @@ if [[ "${SKIP_GIT:-0}" != "1" ]]; then
   fi
 fi
 
-# Load .env safely: unquoted spaces (e.g. NAME=my church) break `source` and abort deploy.
-set -a
-# shellcheck disable=SC1091
-if ! source .env; then
-  echo "ERROR: failed to source .env — quote any value that contains spaces, e.g.:" >&2
-  echo '  SMTP_FROM="Church Hub <noreply@example.com>"' >&2
-  echo '  SOME_NAME="my church"' >&2
-  echo "Inspect with:  sed -n '20,40p' .env" >&2
+# Load KEY=VALUE from .env without `source` (passwords may contain | * $ ` etc.).
+load_dotenv() {
+  local file="$1" line key val
+  [[ -f "$file" ]] || {
+    echo "ERROR: $file missing" >&2
+    return 1
+  }
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%$'\r'}"
+    [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ "$line" =~ ^[[:space:]]*export[[:space:]]+ ]] && line="${line#*export }"
+    [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] || continue
+    key="${line%%=*}"
+    val="${line#*=}"
+    if [[ "$val" =~ ^\"(.*)\"$ ]]; then
+      val="${BASH_REMATCH[1]}"
+      val="${val//\\\"/\"}"
+    elif [[ "$val" =~ ^\'(.*)\'$ ]]; then
+      val="${BASH_REMATCH[1]}"
+    fi
+    printf -v "$key" '%s' "$val"
+    export "$key"
+  done <"$file"
+}
+
+if ! load_dotenv .env; then
+  echo "ERROR: failed to load .env" >&2
   exit 1
 fi
-set +a
 
 export GIT_COMMIT="$(git rev-parse --short HEAD)"
 export BUILD_SHA="$GIT_COMMIT"
