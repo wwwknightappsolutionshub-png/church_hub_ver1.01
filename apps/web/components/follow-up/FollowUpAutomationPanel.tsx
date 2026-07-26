@@ -22,6 +22,10 @@ interface Rule {
   notifyAssignee: boolean;
 }
 
+/**
+ * Collapsed by default — only a compact control is visible until opened.
+ * Rules are not fetched until the panel is expanded.
+ */
 export function FollowUpAutomationPanel() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -53,14 +57,32 @@ export function FollowUpAutomationPanel() {
     }
   };
 
+  if (!open) {
+    return (
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 gap-1.5 text-xs text-muted-foreground"
+          onClick={() => setOpen(true)}
+        >
+          <Zap className="h-3.5 w-3.5" />
+          Automation settings
+          <ChevronDown className="h-3.5 w-3.5 -rotate-90" aria-hidden />
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <Card>
       <CardHeader className="pb-2">
         <button
           type="button"
           className="flex w-full items-start justify-between gap-3 text-left"
-          aria-expanded={open}
-          onClick={() => setOpen((v) => !v)}
+          aria-expanded
+          onClick={() => setOpen(false)}
         >
           <div className="min-w-0">
             <CardTitle className="flex items-center gap-2 text-base">
@@ -72,49 +94,41 @@ export function FollowUpAutomationPanel() {
               notification queue + fail-safe scheduler.
             </p>
           </div>
-          <ChevronDown
-            className={cn(
-              'mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform',
-              open ? 'rotate-0' : '-rotate-90',
-            )}
-            aria-hidden
-          />
+          <ChevronDown className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
         </button>
       </CardHeader>
-      {open ? (
-        <CardContent>
-          {isLoading && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
-          <ul className="space-y-2">
-            {rules?.map((r) => (
-              <li
-                key={r.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2"
-              >
-                <div>
-                  <p className="text-sm font-medium">{r.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {r.trigger}
-                    {r.stage ? ` · ${r.stage}` : ''} · after {r.delayHours}h · {r.channel}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant={r.isActive ? 'default' : 'outline'}>
-                    {r.isActive ? 'Active' : 'Off'}
-                  </Badge>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busy === r.id}
-                    onClick={() => void toggle(r)}
-                  >
-                    {busy === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Toggle'}
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      ) : null}
+      <CardContent>
+        {isLoading && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
+        <ul className={cn('space-y-2', isLoading && 'opacity-60')}>
+          {rules?.map((r) => (
+            <li
+              key={r.id}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2"
+            >
+              <div>
+                <p className="text-sm font-medium">{r.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {r.trigger}
+                  {r.stage ? ` · ${r.stage}` : ''} · after {r.delayHours}h · {r.channel}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant={r.isActive ? 'default' : 'outline'}>
+                  {r.isActive ? 'Active' : 'Off'}
+                </Badge>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy === r.id}
+                  onClick={() => void toggle(r)}
+                >
+                  {busy === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Toggle'}
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
     </Card>
   );
 }

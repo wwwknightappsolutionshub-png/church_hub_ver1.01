@@ -229,9 +229,6 @@ function FollowUpPageContent() {
       />
 
       <EnterpriseContent className="max-w-[1600px]">
-        <div className="mb-6">
-          <FollowUpAutomationPanel />
-        </div>
         <div className="mb-6 flex flex-wrap items-center gap-3">
           <div className="relative min-w-[200px] flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -311,6 +308,10 @@ function FollowUpPageContent() {
             onAdvance={advanceStage}
           />
         )}
+
+        <div className="mt-8 border-t border-border/60 pt-4">
+          <FollowUpAutomationPanel />
+        </div>
       </EnterpriseContent>
 
       <FollowUpNewLeadSheet

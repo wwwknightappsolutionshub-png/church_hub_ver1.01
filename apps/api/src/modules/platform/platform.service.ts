@@ -299,6 +299,64 @@ export class PlatformService {
   }
 
   /**
+   * Clear Restrict FKs that point at tenant users so church/user cascade can complete.
+   * Prisma default onDelete is Restrict — deleting users (or cascading users via church)
+   * fails while Member.userId, Message.senderId, PastoralNote.authorId, etc. still reference them.
+   */
+  private async detachUsersForChurchPurge(
+    tx: Prisma.TransactionClient,
+    userIds: string[],
+  ) {
+    if (!userIds.length) return;
+
+    const byUser = { in: userIds };
+
+    // Optional Restrict → SetNull
+    await tx.member.updateMany({ where: { userId: byUser }, data: { userId: null } });
+    await tx.followUp.updateMany({ where: { assignedToId: byUser }, data: { assignedToId: null } });
+    await tx.notification.updateMany({ where: { userId: byUser }, data: { userId: null } });
+    await tx.serviceUnitJoinRequest.updateMany({
+      where: { reviewedById: byUser },
+      data: { reviewedById: null },
+    });
+    await tx.communitySupportRequest.updateMany({
+      where: { approvedById: byUser },
+      data: { approvedById: null },
+    });
+    await tx.mentorApplication.updateMany({
+      where: { approvedById: byUser },
+      data: { approvedById: null },
+    });
+    await tx.devotionalPlan.updateMany({
+      where: { createdById: byUser },
+      data: { createdById: null },
+    });
+    await tx.devotionalPdfImport.updateMany({
+      where: { uploadedById: byUser },
+      data: { uploadedById: null },
+    });
+    await tx.youthHelpRequest.updateMany({
+      where: { assignedToId: byUser },
+      data: { assignedToId: null },
+    });
+    await tx.youthQuestion.updateMany({
+      where: { assignedToId: byUser },
+      data: { assignedToId: null },
+    });
+
+    // Required Restrict → delete rows that would block user cascade
+    await tx.message.deleteMany({ where: { senderId: byUser } });
+    await tx.inAppMessage.deleteMany({
+      where: { OR: [{ senderId: byUser }, { recipientId: byUser }] },
+    });
+    await tx.pastoralNote.deleteMany({ where: { authorId: byUser } });
+    await tx.counselingSession.deleteMany({ where: { authorId: byUser } });
+    await tx.youthHelpResponse.deleteMany({ where: { authorId: byUser } });
+    await tx.youthAnswer.deleteMany({ where: { authorId: byUser } });
+    await tx.sermonNote.deleteMany({ where: { createdById: byUser } });
+  }
+
+  /**
    * Irreversible purge: deletes the church row (cascades tenant data + users/emails),
    * marketing trial leads for those emails, and on-disk uploads.
    */
@@ -324,33 +382,38 @@ export class PlatformService {
       where: { churchId },
       select: { id: true, email: true, firstName: true, lastName: true },
     });
+    const userIds = users.map((u) => u.id);
     const emails = users.map((u) => u.email.toLowerCase());
     const emailKeys = [...new Set(emails)];
 
     const memberCount = await this.prisma.member.count({ where: { churchId } });
 
     try {
-      await this.prisma.$transaction(async (tx) => {
-        if (emailKeys.length) {
-          await tx.marketingTrialLead.deleteMany({
-            where: { emailKey: { in: emailKeys } },
-          });
-        }
+      await this.prisma.$transaction(
+        async (tx) => {
+          if (emailKeys.length) {
+            await tx.marketingTrialLead.deleteMany({
+              where: { emailKey: { in: emailKeys } },
+            });
+          }
 
-        // Explicit user wipe first so auth tokens / refresh sessions go with them
-        // even if a related table blocks church cascade in edge cases.
-        if (users.length) {
-          await tx.user.deleteMany({ where: { churchId } });
-        }
-
-        await tx.church.delete({ where: { id: churchId } });
-      });
-    } catch (err) {
-      this.logger.error(
-        `Permanent delete failed for church ${churchId}: ${err instanceof Error ? err.message : err}`,
+          // Detach Restrict FKs, then delete church (cascades users + tenant data).
+          // Do NOT delete users first — that is what hits Restrict and fails purge.
+          await this.detachUsersForChurchPurge(tx, userIds);
+          await tx.church.delete({ where: { id: churchId } });
+        },
+        { timeout: 120_000 },
       );
+    } catch (err) {
+      const detail =
+        err instanceof Prisma.PrismaClientKnownRequestError
+          ? `${err.code}${err.meta ? ` ${JSON.stringify(err.meta)}` : ''}: ${err.message}`
+          : err instanceof Error
+            ? err.message
+            : String(err);
+      this.logger.error(`Permanent delete failed for church ${churchId}: ${detail}`);
       throw new BadRequestException(
-        'Could not permanently delete this tenant. Deactivate it instead, or contact support with the server logs.',
+        `Could not permanently delete this tenant (${detail.slice(0, 280)}). Deactivate it instead if you need to retain data.`,
       );
     }
 
