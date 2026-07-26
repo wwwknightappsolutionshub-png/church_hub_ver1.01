@@ -12,6 +12,10 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  CreateCellBranchSchema,
+  UpdateCellBranchSchema,
+} from '@church-hub/shared-types';
 import { api } from '@/lib/api';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useMediaQuery } from '@/lib/hooks/use-media-query';
@@ -191,13 +195,18 @@ export function MinistryCellsApp() {
   const createBranch = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
+    const parsed = CreateCellBranchSchema.safeParse({
+      name: fd.get('name'),
+      location: fd.get('location') || undefined,
+      postcode: fd.get('postcode'),
+      leaderUserId: createLeaderId || undefined,
+    });
+    if (!parsed.success) {
+      toast.error(parsed.error.errors[0]?.message || 'Check the cell details');
+      return;
+    }
     try {
-      await api.post('/ministry-cells/branches', {
-        name: fd.get('name'),
-        location: fd.get('location') || undefined,
-        postcode: fd.get('postcode'),
-        leaderUserId: createLeaderId || undefined,
-      });
+      await api.post('/ministry-cells/branches', parsed.data);
       toast.success('Cell branch created');
       invalidate();
       setShowCreateBranch(false);
@@ -214,14 +223,19 @@ export function MinistryCellsApp() {
   const saveBranchEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBranchId) return;
+    const parsed = UpdateCellBranchSchema.safeParse({
+      name: editName.trim(),
+      location: editLocation.trim() || null,
+      postcode: editPostcode.trim(),
+      leaderUserId: editLeaderId || null,
+    });
+    if (!parsed.success) {
+      toast.error(parsed.error.errors[0]?.message || 'Check the cell details');
+      return;
+    }
     setBranchSaving(true);
     try {
-      await api.patch(`/ministry-cells/branches/${selectedBranchId}`, {
-        name: editName.trim(),
-        location: editLocation.trim() || null,
-        postcode: editPostcode.trim(),
-        leaderUserId: editLeaderId || null,
-      });
+      await api.patch(`/ministry-cells/branches/${selectedBranchId}`, parsed.data);
       toast.success('Branch updated');
       setEditBranchOpen(false);
       invalidate();

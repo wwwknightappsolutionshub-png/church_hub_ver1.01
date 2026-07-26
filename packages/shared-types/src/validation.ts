@@ -298,3 +298,125 @@ export const ResetTenantUserPasswordSchema = z.object({
   notifyUser: z.boolean().optional(),
 });
 export type ResetTenantUserPasswordInput = z.infer<typeof ResetTenantUserPasswordSchema>;
+
+/** Optional location / address string (empty → undefined). */
+const optionalLocationSchema = z
+  .union([z.string(), z.literal(''), z.undefined(), z.null()])
+  .transform((v) => {
+    const s = sanitizeText(v ?? '', 200);
+    return s || undefined;
+  });
+
+/** Optional user id; empty string → undefined. */
+const optionalLeaderUserIdSchema = z
+  .union([z.string(), z.literal(''), z.undefined()])
+  .transform((v) => {
+    const s = sanitizeText(v ?? '', 64);
+    return s || undefined;
+  });
+
+/**
+ * Province coverage list — same rules as API `normalizeCoveragePostcodes`
+ * (sanitizeProvincePostcodeEntry + dedupe).
+ */
+export const provinceCoveragePostcodesSchema = z
+  .array(z.unknown())
+  .min(1, 'Province must include at least one postcode')
+  .superRefine((raw, ctx) => {
+    for (let i = 0; i < raw.length; i++) {
+      if (!sanitizeProvincePostcodeEntry(raw[i])) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [i],
+          message: `Invalid province postcode "${String(raw[i])}" — use a UK postcode or outward code (e.g. N1)`,
+        });
+      }
+    }
+  })
+  .transform((raw) => {
+    const keys: string[] = [];
+    const seen = new Set<string>();
+    for (const item of raw) {
+      const key = sanitizeProvincePostcodeEntry(item);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      keys.push(key);
+    }
+    return keys;
+  })
+  .pipe(z.array(z.string()).min(1, 'Province must include at least one postcode'));
+
+export const CreateCellBranchSchema = z.object({
+  name: z
+    .string()
+    .transform((v) => sanitizeText(v, 120))
+    .pipe(z.string().min(1, 'Branch name is required').max(120)),
+  location: optionalLocationSchema,
+  postcode: ukPostcodeSchema,
+  leaderUserId: optionalLeaderUserIdSchema,
+});
+export type CreateCellBranchInput = z.infer<typeof CreateCellBranchSchema>;
+
+export const UpdateCellBranchSchema = z.object({
+  name: z
+    .string()
+    .transform((v) => sanitizeText(v, 120))
+    .pipe(z.string().min(1, 'Branch name is required').max(120))
+    .optional(),
+  location: z
+    .union([z.string(), z.literal(''), z.null(), z.undefined()])
+    .transform((v) => {
+      if (v === undefined) return undefined;
+      if (v === null) return null;
+      const s = sanitizeText(v, 200);
+      return s || null;
+    })
+    .optional(),
+  postcode: ukPostcodeSchema.optional(),
+  leaderUserId: z
+    .union([z.string(), z.literal(''), z.null(), z.undefined()])
+    .transform((v) => {
+      if (v === undefined) return undefined;
+      if (v === null) return null;
+      const s = sanitizeText(v, 64);
+      return s || null;
+    })
+    .optional(),
+});
+export type UpdateCellBranchInput = z.infer<typeof UpdateCellBranchSchema>;
+
+export const CreateCellProvinceSchema = z.object({
+  name: z
+    .string()
+    .transform((v) => sanitizeText(v, 120))
+    .pipe(z.string().min(1, 'Province name is required').max(120)),
+  leaderUserId: z
+    .string()
+    .transform((v) => sanitizeText(v, 64))
+    .pipe(z.string().min(1, 'Province leader is required')),
+  postcodes: provinceCoveragePostcodesSchema,
+});
+export type CreateCellProvinceInput = z.infer<typeof CreateCellProvinceSchema>;
+
+export const UpdateCellProvinceSchema = z.object({
+  name: z
+    .string()
+    .transform((v) => sanitizeText(v, 120))
+    .pipe(z.string().min(1, 'Province name is required').max(120))
+    .optional(),
+  leaderUserId: z
+    .string()
+    .transform((v) => sanitizeText(v, 64))
+    .pipe(z.string().min(1, 'Province leader is required'))
+    .optional(),
+  postcodes: provinceCoveragePostcodesSchema.optional(),
+});
+export type UpdateCellProvinceInput = z.infer<typeof UpdateCellProvinceSchema>;
+
+export const MapBranchProvinceSchema = z.object({
+  provinceId: z
+    .string()
+    .transform((v) => sanitizeText(v, 64))
+    .pipe(z.string().min(1, 'Province is required')),
+});
+export type MapBranchProvinceInput = z.infer<typeof MapBranchProvinceSchema>;

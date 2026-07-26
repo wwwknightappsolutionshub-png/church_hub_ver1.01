@@ -32,10 +32,28 @@ test.describe('Ministry/Cells API smoke', () => {
     }
   });
 
+  test('POST branch rejects invalid postcode and missing name → 400', async ({ request }) => {
+    const badPostcode = await request.post(`${API_URL}/ministry-cells/branches`, {
+      headers,
+      data: { name: 'Validation Cell', postcode: 'NOTAPOSTCODE' },
+    });
+    expect(badPostcode.status()).toBe(400);
+
+    const missingName = await request.post(`${API_URL}/ministry-cells/branches`, {
+      headers,
+      data: { name: '  ', postcode: 'N1 1AA' },
+    });
+    expect(missingName.status()).toBe(400);
+  });
+
   test('POST branch, forms seed, teaching, reminder', async ({ request }) => {
     const branchRes = await request.post(`${API_URL}/ministry-cells/branches`, {
       headers,
-      data: { name: `API Smoke Branch ${Date.now()}`, location: 'Smoke test' },
+      data: {
+        name: `API Smoke Branch ${Date.now()}`,
+        location: 'Smoke test',
+        postcode: 'N1 1AA',
+      },
     });
     expect(branchRes.ok()).toBeTruthy();
     const branch = await branchRes.json();

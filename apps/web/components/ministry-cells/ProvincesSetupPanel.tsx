@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { CreateCellProvinceSchema } from '@church-hub/shared-types';
 import { api } from '@/lib/api';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import type { CellProvinceRow } from '@/components/ministry-cells/types';
@@ -32,17 +33,18 @@ export function ProvincesSetupPanel({ onChanged }: { onChanged: () => void }) {
       .split(/[,;\n]+/)
       .map((s) => s.trim())
       .filter(Boolean);
-    if (!name.trim() || !leaderUserId || !list.length) {
-      toast.error('Name, leader, and at least one postcode are required');
+    const parsed = CreateCellProvinceSchema.safeParse({
+      name,
+      leaderUserId,
+      postcodes: list,
+    });
+    if (!parsed.success) {
+      toast.error(parsed.error.errors[0]?.message || 'Check the province details');
       return;
     }
     setBusy(true);
     try {
-      await api.post('/ministry-cells/provinces', {
-        name: name.trim(),
-        leaderUserId,
-        postcodes: list,
-      });
+      await api.post('/ministry-cells/provinces', parsed.data);
       toast.success('Province created');
       setName('');
       setPostcodes('');

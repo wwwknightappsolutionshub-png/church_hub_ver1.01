@@ -197,7 +197,7 @@ export class MinistryCellsService {
     branchId: string,
     body: {
       name?: string;
-      location?: string;
+      location?: string | null;
       postcode?: string;
       leaderUserId?: string | null;
     },

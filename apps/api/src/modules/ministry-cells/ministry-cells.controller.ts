@@ -15,6 +15,19 @@ import {
   CellIncidentStatus,
   CellPrayerStatus,
 } from '@prisma/client';
+import {
+  CreateCellBranchSchema,
+  CreateCellProvinceSchema,
+  MapBranchProvinceSchema,
+  UpdateCellBranchSchema,
+  UpdateCellProvinceSchema,
+  type CreateCellBranchInput,
+  type CreateCellProvinceInput,
+  type MapBranchProvinceInput,
+  type UpdateCellBranchInput,
+  type UpdateCellProvinceInput,
+} from '@church-hub/shared-types';
+import { ZodBody } from '../../common/decorators/zod-body.decorator';
 import { MinistryCellsService } from './ministry-cells.service';
 import { ChurchId, CurrentUser, AuthUser } from '../auth/current-user.decorator';
 import { Roles } from '../auth/decorators';
@@ -41,13 +54,7 @@ export class MinistryCellsController {
   createBranch(
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
-    @Body()
-    body: {
-      name: string;
-      location?: string;
-      postcode: string;
-      leaderUserId?: string;
-    },
+    @ZodBody(CreateCellBranchSchema) body: CreateCellBranchInput,
   ) {
     return this.service.createBranch(user, churchId, body);
   }
@@ -67,13 +74,7 @@ export class MinistryCellsController {
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
-    @Body()
-    body: {
-      name?: string;
-      location?: string;
-      postcode?: string;
-      leaderUserId?: string | null;
-    },
+    @ZodBody(UpdateCellBranchSchema) body: UpdateCellBranchInput,
   ) {
     return this.service.updateBranch(user, churchId, id, body);
   }
@@ -84,7 +85,7 @@ export class MinistryCellsController {
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
-    @Body() body: { provinceId: string },
+    @ZodBody(MapBranchProvinceSchema) body: MapBranchProvinceInput,
   ) {
     return this.service.mapBranchToProvince(user, churchId, id, body.provinceId);
   }
@@ -99,7 +100,7 @@ export class MinistryCellsController {
   createProvince(
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
-    @Body() body: { name: string; leaderUserId: string; postcodes: string[] },
+    @ZodBody(CreateCellProvinceSchema) body: CreateCellProvinceInput,
   ) {
     return this.service.createProvince(user, churchId, body);
   }
@@ -110,7 +111,7 @@ export class MinistryCellsController {
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
-    @Body() body: { name?: string; leaderUserId?: string; postcodes?: string[] },
+    @ZodBody(UpdateCellProvinceSchema) body: UpdateCellProvinceInput,
   ) {
     return this.service.updateProvince(user, churchId, id, body);
   }
