@@ -12,8 +12,6 @@ import { OutreachCaptureForm } from '@/components/outreach/OutreachCaptureForm';
 import { EvangelistQrPanel } from '@/components/outreach/EvangelistQrPanel';
 import { SyncQueuePanel } from '@/components/outreach/SyncQueuePanel';
 import { SyncConflictsPanel } from '@/components/outreach/SyncConflictsPanel';
-import { ConvertPipelinePanel } from '@/components/outreach/ConvertPipelinePanel';
-import { OutreachContactsList, type OutreachContactRow } from '@/components/outreach/OutreachContactsList';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -33,19 +31,13 @@ export default function OutreachPage() {
   const refreshData = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['outreach'] });
     queryClient.invalidateQueries({ queryKey: ['outreach-stats'] });
-    queryClient.invalidateQueries({ queryKey: ['outreach-contacts'] });
     queryClient.invalidateQueries({ queryKey: ['follow-up'] });
     queryClient.invalidateQueries({ queryKey: ['follow-up-stats'] });
-    queryClient.invalidateQueries({ queryKey: ['outreach-pipeline'] });
   }, [queryClient]);
 
   const { pendingCount, online, syncing, syncNow } = useOfflineSync(refreshData);
 
   const { data: stats } = useApiQuery<OutreachStats>(['outreach-stats'], '/outreach/stats');
-  const { data: contacts } = useApiQuery<OutreachContactRow[]>(
-    ['outreach-contacts'],
-    '/outreach/contacts',
-  );
 
   const handleSync = async () => {
     try {
@@ -116,15 +108,17 @@ export default function OutreachPage() {
                 <CardTitle>Fast capture form</CardTitle>
                 <CardDescription>
                   Offline-first capture. Creates a New Lead in Follow-Up, auto-assigns when possible,
-                  and alerts the follow-up team (in-app + email).
+                  and alerts the follow-up team (in-app + email). View and progress leads on{' '}
+                  <Link href="/dashboard/follow-up" className="font-medium text-primary underline-offset-2 hover:underline">
+                    Follow-Up
+                  </Link>
+                  .
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <OutreachCaptureForm online={online} onSuccess={refreshData} />
               </CardContent>
             </Card>
-            <ConvertPipelinePanel onRefresh={refreshData} />
-            <OutreachContactsList contacts={contacts ?? []} onRefresh={refreshData} />
           </div>
 
           <div className="space-y-4">

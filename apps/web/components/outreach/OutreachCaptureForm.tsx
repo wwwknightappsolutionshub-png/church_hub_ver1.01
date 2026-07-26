@@ -249,7 +249,7 @@ function OutreachCaptureFormInner({
         return;
       }
       await api.post('/outreach/capture', payload);
-      toast.success('Contact captured — follow-up team notified & welcome sent');
+      toast.success('Successfully Added');
       await prepareNextCapture();
     } catch {
       await queueOutreachCapture(payload as Record<string, unknown>);

@@ -15,7 +15,9 @@ export default function OutreachFieldPage() {
   const queryClient = useQueryClient();
   const refresh = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['outreach'] });
-    queryClient.invalidateQueries({ queryKey: ['outreach-pipeline'] });
+    queryClient.invalidateQueries({ queryKey: ['outreach-stats'] });
+    queryClient.invalidateQueries({ queryKey: ['follow-up'] });
+    queryClient.invalidateQueries({ queryKey: ['follow-up-stats'] });
   }, [queryClient]);
 
   const { pendingCount, online, syncing, syncNow } = useOfflineSync(refresh);
