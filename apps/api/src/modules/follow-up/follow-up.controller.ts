@@ -123,10 +123,18 @@ export class FollowUpController {
   @Patch(':id/stage')
   updateStage(
     @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
-    @Body() body: { stage: FollowUpStage; notes?: string },
+    @Body()
+    body: {
+      stage: FollowUpStage;
+      notes?: string;
+      whatWasDone?: string;
+      whatNext?: string;
+      dueAt?: string | null;
+    },
   ) {
-    return this.followUpService.updateStage(churchId, id, body.stage, body.notes);
+    return this.followUpService.updateStage(churchId, id, user.userId, body);
   }
 
   @Get(':id/reminders')

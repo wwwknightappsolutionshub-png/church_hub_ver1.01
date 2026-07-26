@@ -224,21 +224,74 @@ export class FollowUpService {
     });
   }
 
-  async updateStage(churchId: string, id: string, stage: FollowUpStage, notes?: string) {
+  async updateStage(
+    churchId: string,
+    id: string,
+    authorId: string,
+    data: {
+      stage: FollowUpStage;
+      notes?: string;
+      whatWasDone?: string;
+      whatNext?: string;
+      dueAt?: string | null;
+    },
+  ) {
     const existing = await this.prisma.followUp.findFirst({ where: { id, churchId } });
     if (!existing) throw new NotFoundException('Follow-up not found');
 
-    const updated = await this.prisma.followUp.update({
-      where: { id },
-      data: {
-        stage,
-        notes: notes ?? existing.notes,
-        completedAt: stage === 'JOINED_GROUP' ? new Date() : null,
-      },
-      include: followUpInclude,
+    const whatWasDone = data.whatWasDone?.trim() ?? '';
+    const whatNext = data.whatNext?.trim() ?? '';
+    let dueAt: Date | null | undefined = undefined;
+    if (data.dueAt === null) dueAt = null;
+    else if (typeof data.dueAt === 'string' && data.dueAt.trim()) {
+      const parsed = new Date(data.dueAt);
+      if (Number.isNaN(parsed.getTime())) throw new BadRequestException('Invalid due date');
+      dueAt = parsed;
+    }
+
+    const progressNoteParts: string[] = [];
+    if (whatWasDone) progressNoteParts.push(`What was done:\n${whatWasDone}`);
+    if (whatNext) progressNoteParts.push(`What should be done next:\n${whatNext}`);
+    if (dueAt) {
+      progressNoteParts.push(
+        `When it should be done:\n${dueAt.toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        })}`,
+      );
+    }
+    const progressNote = progressNoteParts.join('\n\n');
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.followUp.update({
+        where: { id },
+        data: {
+          stage: data.stage,
+          notes: data.notes ?? (progressNote || existing.notes),
+          ...(dueAt !== undefined ? { dueAt } : {}),
+          completedAt: data.stage === 'JOINED_GROUP' ? new Date() : null,
+        },
+        include: followUpInclude,
+      });
+
+      if (progressNote) {
+        await tx.pastoralNote.create({
+          data: {
+            churchId,
+            authorId,
+            followUpId: id,
+            memberId: existing.memberId,
+            content: progressNote,
+            isConfidential: false,
+          },
+        });
+      }
+
+      return row;
     });
 
-    await this.automation.onFollowUpEvent(churchId, id, { stage });
+    await this.automation.onFollowUpEvent(churchId, id, { stage: data.stage });
 
     return updated;
   }

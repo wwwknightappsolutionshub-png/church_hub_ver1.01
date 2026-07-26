@@ -19,7 +19,7 @@ import {
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
-import { FollowUpPipeline, type FollowUpCard } from '@/components/follow-up/FollowUpPipeline';
+import { FollowUpPipeline, type FollowUpCard, type ProgressAdvancePayload } from '@/components/follow-up/FollowUpPipeline';
 import { FollowUpDetailPanel } from '@/components/follow-up/FollowUpDetailPanel';
 import { FollowUpNewLeadSheet } from '@/components/follow-up/FollowUpNewLeadSheet';
 import { FollowUpMembersPanel } from '@/components/follow-up/FollowUpMembersPanel';
@@ -142,13 +142,25 @@ function FollowUpPageContent() {
     }
   };
 
-  const advanceStage = async (id: string, stage: string) => {
+  const [advancing, setAdvancing] = useState(false);
+
+  const advanceStage = async (id: string, payload: ProgressAdvancePayload) => {
+    setAdvancing(true);
     try {
-      await api.patch(`/follow-up/${id}/stage`, { stage });
-      toast.success('Stage updated');
+      await api.patch(`/follow-up/${id}/stage`, {
+        stage: payload.stage,
+        whatWasDone: payload.whatWasDone,
+        whatNext: payload.whatNext,
+        dueAt: payload.dueAt ? new Date(payload.dueAt).toISOString() : undefined,
+      });
+      toast.success('Progress updated');
+      queryClient.invalidateQueries({ queryKey: ['pastoral-notes', id] });
       refresh();
     } catch {
       toast.error('Could not update stage');
+      throw new Error('advance failed');
+    } finally {
+      setAdvancing(false);
     }
   };
 
@@ -306,6 +318,7 @@ function FollowUpPageContent() {
             selectedId={selectedId}
             onSelect={setSelectedId}
             onAdvance={advanceStage}
+            advancing={advancing}
           />
         )}
 

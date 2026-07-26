@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   ArrowRight,
   Calendar,
@@ -17,12 +18,15 @@ import {
   FOLLOW_UP_STAGES,
   PIPELINE_COLUMNS,
   STAGE_LABELS,
-  STAGE_SHORT,
   formatDue,
   nextStage,
 } from '@/lib/follow-up';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  ProgressStageDialog,
+  type ProgressFormValues,
+} from '@/components/follow-up/ProgressStageDialog';
 
 export interface FollowUpCard {
   id: string;
@@ -37,11 +41,14 @@ export interface FollowUpCard {
   reminders?: Array<{ id: string; remindAt: string; sentAt?: string | null; channel: string }>;
 }
 
+export type ProgressAdvancePayload = ProgressFormValues & { stage: string };
+
 interface FollowUpPipelineProps {
   items: FollowUpCard[];
   selectedId: string | null;
   onSelect: (id: string) => void;
-  onAdvance: (id: string, stage: string) => void;
+  onAdvance: (id: string, payload: ProgressAdvancePayload) => void | Promise<void>;
+  advancing?: boolean;
 }
 
 const PHASE_ICONS: Record<string, LucideIcon> = {
@@ -55,13 +62,13 @@ function LeadCard({
   selected,
   stageAccent,
   onSelect,
-  onAdvance,
+  onRequestProgress,
 }: {
   item: FollowUpCard;
   selected: boolean;
   stageAccent: string;
   onSelect: () => void;
-  onAdvance: (stage: string) => void;
+  onRequestProgress: (stage: string) => void;
 }) {
   const due = formatDue(item.dueAt);
   const nxt = nextStage(item.stage);
@@ -150,9 +157,9 @@ function LeadCard({
             variant="ghost"
             size="sm"
             className="h-8 w-full justify-between text-xs font-semibold text-primary"
-            onClick={() => onAdvance(nxt)}
+            onClick={() => onRequestProgress(nxt)}
           >
-            Advance to {STAGE_SHORT[nxt] ?? STAGE_LABELS[nxt]}
+            Progress to the next
             <ChevronRight className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -161,11 +168,37 @@ function LeadCard({
   );
 }
 
-export function FollowUpPipeline({ items, selectedId, onSelect, onAdvance }: FollowUpPipelineProps) {
+export function FollowUpPipeline({
+  items,
+  selectedId,
+  onSelect,
+  onAdvance,
+  advancing,
+}: FollowUpPipelineProps) {
   const total = items.length;
+  const [pending, setPending] = useState<{
+    id: string;
+    contactName: string;
+    stage: string;
+  } | null>(null);
 
   return (
     <div className="space-y-6">
+      <ProgressStageDialog
+        open={!!pending}
+        contactName={pending?.contactName ?? ''}
+        nextStage={pending?.stage ?? ''}
+        submitting={advancing}
+        onClose={() => {
+          if (!advancing) setPending(null);
+        }}
+        onSubmit={async (values) => {
+          if (!pending) return;
+          await onAdvance(pending.id, { ...values, stage: pending.stage });
+          setPending(null);
+        }}
+      />
+
       {/* Journey rail */}
       <div className="rounded-2xl border border-border bg-card p-4 shadow-sm md:p-5">
         <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -259,7 +292,13 @@ export function FollowUpPipeline({ items, selectedId, onSelect, onAdvance }: Fol
                             selected={selectedId === item.id}
                             stageAccent={accent}
                             onSelect={() => onSelect(item.id)}
-                            onAdvance={(s) => onAdvance(item.id, s)}
+                            onRequestProgress={(s) =>
+                              setPending({
+                                id: item.id,
+                                contactName: item.contactName,
+                                stage: s,
+                              })
+                            }
                           />
                         ))
                       )}
