@@ -818,7 +818,7 @@ export default function PlatformConsolePage() {
                     <StaffList
                       users={detail.pastors}
                       churchId={selectedId}
-                      onPasswordReset={refresh}
+                      onStaffChange={refresh}
                     />
                   </div>
                   <div>
@@ -829,7 +829,7 @@ export default function PlatformConsolePage() {
                     <StaffList
                       users={detail.admins}
                       churchId={selectedId}
-                      onPasswordReset={refresh}
+                      onStaffChange={refresh}
                     />
                   </div>
                 </div>
@@ -845,13 +845,14 @@ export default function PlatformConsolePage() {
 function StaffList({
   users,
   churchId,
-  onPasswordReset,
+  onStaffChange,
 }: {
   users: StaffUser[];
   churchId: string;
-  onPasswordReset: () => void;
+  onStaffChange: () => void;
 }) {
   const [openUserId, setOpenUserId] = useState<string | null>(null);
+  const [emailDrafts, setEmailDrafts] = useState<Record<string, string>>({});
   const [customPassword, setCustomPassword] = useState('');
   const [mustChangePassword, setMustChangePassword] = useState(true);
   const [notifyUser, setNotifyUser] = useState(true);
@@ -861,6 +862,35 @@ function StaffList({
   if (users.length === 0) {
     return <p className="text-xs text-muted-foreground">None</p>;
   }
+
+  const saveEmail = async (user: StaffUser) => {
+    const next = (emailDrafts[user.id] ?? user.email).trim().toLowerCase();
+    if (!next || !next.includes('@')) {
+      toast.error('Enter a valid email address');
+      return;
+    }
+    if (next === user.email.toLowerCase()) {
+      toast.message('Email unchanged');
+      return;
+    }
+    setBusyUserId(user.id);
+    try {
+      await api.patch(`/platform/churches/${churchId}/users/${user.id}/email`, {
+        email: next,
+      });
+      toast.success(`Email updated to ${next}`);
+      setEmailDrafts((d) => {
+        const copy = { ...d };
+        delete copy[user.id];
+        return copy;
+      });
+      onStaffChange();
+    } catch (err) {
+      toast.error(apiErrorMessage(err, 'Could not update email'));
+    } finally {
+      setBusyUserId(null);
+    }
+  };
 
   const resetPassword = async (user: StaffUser, generate: boolean) => {
     if (!generate && customPassword.trim().length < 8) {
@@ -896,7 +926,7 @@ function StaffList({
         );
       }
       setCustomPassword('');
-      onPasswordReset();
+      onStaffChange();
     } catch (err) {
       toast.error(apiErrorMessage(err, 'Could not reset password'));
     } finally {
@@ -909,14 +939,38 @@ function StaffList({
       {users.map((u) => {
         const open = openUserId === u.id;
         const busy = busyUserId === u.id;
+        const emailValue = emailDrafts[u.id] ?? u.email;
+        const emailDirty = emailValue.trim().toLowerCase() !== u.email.toLowerCase();
         return (
           <li key={u.id} className="rounded-md border border-border px-3 py-2 text-sm">
             <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="font-medium">
                   {u.firstName} {u.lastName}
                 </p>
-                <p className="font-mono text-[11px] text-muted-foreground">{u.email}</p>
+                <div className="mt-1.5 flex flex-col gap-1.5 sm:flex-row sm:items-center">
+                  <Input
+                    type="email"
+                    className="h-8 font-mono text-[11px]"
+                    value={emailValue}
+                    disabled={busy}
+                    onChange={(e) =>
+                      setEmailDrafts((d) => ({ ...d, [u.id]: e.target.value }))
+                    }
+                    aria-label={`Email for ${u.firstName} ${u.lastName}`}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    className="shrink-0"
+                    disabled={busy || !emailDirty}
+                    onClick={() => void saveEmail(u)}
+                  >
+                    {busy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+                    Save email
+                  </Button>
+                </div>
                 <div className="mt-1 flex flex-wrap gap-1">
                   {u.roles.map((r) => (
                     <Badge key={r.name} variant="outline" className="text-[10px]">

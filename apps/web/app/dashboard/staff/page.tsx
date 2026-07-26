@@ -134,13 +134,24 @@ export default function ChurchStaffPage() {
   };
 
   const deactivate = async (id: string) => {
-    if (!confirm('Deactivate this staff account?')) return;
+    if (
+      !confirm(
+        'Permanently delete this staff account? This removes the login from the database and cannot be undone.',
+      )
+    ) {
+      return;
+    }
     try {
       await api.delete(`/church-staff/${id}`);
-      toast.success('Account deactivated');
+      toast.success('Account deleted');
       queryClient.invalidateQueries({ queryKey: ['church-staff'] });
-    } catch {
-      toast.error('Could not deactivate');
+    } catch (err: unknown) {
+      const msg =
+        err &&
+        typeof err === 'object' &&
+        'response' in err &&
+        (err as { response?: { data?: { message?: string } } }).response?.data?.message;
+      toast.error(typeof msg === 'string' ? msg : 'Could not delete account');
     }
   };
 
@@ -302,16 +313,15 @@ export default function ChurchStaffPage() {
                           <Button size="sm" variant="outline" onClick={() => startEdit(u)}>
                             Edit
                           </Button>
-                          {u.isActive && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-destructive"
-                              onClick={() => deactivate(u.id)}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          )}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive"
+                            onClick={() => deactivate(u.id)}
+                            title="Permanently delete"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
                         </div>
                       </td>
                     </tr>

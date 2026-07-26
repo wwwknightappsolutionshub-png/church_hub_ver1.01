@@ -29,6 +29,8 @@ import { MembershipConfigService } from '../membership/membership-config.service
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
 import { UploadsService } from '../uploads/uploads.service';
 import { PurgeChurchDto } from './dto/purge-church.dto';
+import { UpdateTenantUserEmailDto } from './dto/update-tenant-user-email.dto';
+import { detachUserReferences } from '../../common/detach-user-references';
 
 const STAFF_ROLE_NAMES = [
   'ADMIN',
@@ -307,60 +309,13 @@ export class PlatformService {
 
   /**
    * Clear Restrict FKs that point at tenant users so church/user cascade can complete.
-   * Prisma default onDelete is Restrict — deleting users (or cascading users via church)
-   * fails while Member.userId, Message.senderId, PastoralNote.authorId, etc. still reference them.
+   * @deprecated Prefer shared detachUserReferences helper.
    */
   private async detachUsersForChurchPurge(
     tx: Prisma.TransactionClient,
     userIds: string[],
   ) {
-    if (!userIds.length) return;
-
-    const byUser = { in: userIds };
-
-    // Optional Restrict → SetNull
-    await tx.member.updateMany({ where: { userId: byUser }, data: { userId: null } });
-    await tx.followUp.updateMany({ where: { assignedToId: byUser }, data: { assignedToId: null } });
-    await tx.notification.updateMany({ where: { userId: byUser }, data: { userId: null } });
-    await tx.serviceUnitJoinRequest.updateMany({
-      where: { reviewedById: byUser },
-      data: { reviewedById: null },
-    });
-    await tx.communitySupportRequest.updateMany({
-      where: { approvedById: byUser },
-      data: { approvedById: null },
-    });
-    await tx.mentorApplication.updateMany({
-      where: { approvedById: byUser },
-      data: { approvedById: null },
-    });
-    await tx.devotionalPlan.updateMany({
-      where: { createdById: byUser },
-      data: { createdById: null },
-    });
-    await tx.devotionalPdfImport.updateMany({
-      where: { uploadedById: byUser },
-      data: { uploadedById: null },
-    });
-    await tx.youthHelpRequest.updateMany({
-      where: { assignedToId: byUser },
-      data: { assignedToId: null },
-    });
-    await tx.youthQuestion.updateMany({
-      where: { assignedToId: byUser },
-      data: { assignedToId: null },
-    });
-
-    // Required Restrict → delete rows that would block user cascade
-    await tx.message.deleteMany({ where: { senderId: byUser } });
-    await tx.inAppMessage.deleteMany({
-      where: { OR: [{ senderId: byUser }, { recipientId: byUser }] },
-    });
-    await tx.pastoralNote.deleteMany({ where: { authorId: byUser } });
-    await tx.counselingSession.deleteMany({ where: { authorId: byUser } });
-    await tx.youthHelpResponse.deleteMany({ where: { authorId: byUser } });
-    await tx.youthAnswer.deleteMany({ where: { authorId: byUser } });
-    await tx.sermonNote.deleteMany({ where: { createdById: byUser } });
+    await detachUserReferences(tx, userIds);
   }
 
   /**
@@ -442,6 +397,85 @@ export class PlatformService {
       emailsRemoved: emailKeys,
       uploadsCleaned: storage.removed.length > 0,
     };
+  }
+
+  /**
+   * Platform admin updates a tenant staff user's login email.
+   * Login looks up users by email globally, so uniqueness is enforced across all churches.
+   */
+  async updateTenantUserEmail(
+    churchId: string,
+    userId: string,
+    dto: UpdateTenantUserEmailDto,
+    actor: { userId: string; email: string },
+  ) {
+    const church = await this.prisma.church.findUnique({
+      where: { id: churchId },
+      select: { id: true, name: true, slug: true },
+    });
+    if (!church) throw new NotFoundException('Church not found');
+
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, churchId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        roles: { include: { role: { select: { name: true } } } },
+      },
+    });
+    if (!user) throw new NotFoundException('User not found in this tenant');
+
+    const roleNames = user.roles.map((r) => r.role.name);
+    if (roleNames.includes('PLATFORM_ADMIN')) {
+      throw new BadRequestException('Cannot change a platform admin email from tenant tools');
+    }
+
+    const nextEmail = dto.email.toLowerCase().trim();
+    if (nextEmail !== user.email.toLowerCase()) {
+      const taken = await this.prisma.user.findFirst({
+        where: {
+          email: { equals: nextEmail, mode: 'insensitive' },
+          id: { not: userId },
+        },
+        select: { id: true },
+      });
+      if (taken) throw new ConflictException('Email already in use');
+
+      await this.prisma.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id: userId },
+          data: { email: nextEmail },
+        });
+        await tx.member.updateMany({
+          where: { userId },
+          data: { email: nextEmail },
+        });
+      });
+
+      this.logger.log(
+        `Platform admin ${actor.email} changed tenant user email ${user.email} → ${nextEmail} (church ${church.slug})`,
+      );
+    }
+
+    const updated = await this.prisma.user.findFirst({
+      where: { id: userId, churchId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        lastLoginAt: true,
+        createdAt: true,
+        mustChangePassword: true,
+        roles: { include: { role: { select: { name: true, description: true } } } },
+        member: { select: { id: true, status: true } },
+      },
+    });
+    if (!updated) throw new NotFoundException('User not found after email update');
+    return this.mapStaffUser(updated);
   }
 
   /**

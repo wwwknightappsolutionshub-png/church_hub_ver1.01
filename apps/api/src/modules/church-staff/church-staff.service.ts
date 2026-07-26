@@ -15,6 +15,7 @@ import {
   CreateChurchStaffDto,
   UpdateChurchStaffDto,
 } from './dto/church-staff.dto';
+import { detachUserReferences } from '../../common/detach-user-references';
 
 @Injectable()
 export class ChurchStaffService {
@@ -264,15 +265,22 @@ export class ChurchStaffService {
     if (!user) throw new NotFoundException('Staff user not found');
 
     if (id === actorUserId) {
-      throw new BadRequestException('You cannot deactivate your own account');
+      throw new BadRequestException('You cannot delete your own account');
     }
 
-    await this.prisma.user.update({
-      where: { id },
-      data: { isActive: false },
+    await this.assertCanModify(actorUserId, churchId, user);
+
+    const roleNames = user.roles.map((r) => r.role.name);
+    if (roleNames.includes('PLATFORM_ADMIN')) {
+      throw new ForbiddenException('Cannot delete a platform admin account');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await detachUserReferences(tx, [id]);
+      await tx.user.delete({ where: { id } });
     });
 
-    return { success: true };
+    return { success: true, deleted: true };
   }
 
   private async assertCanCreate(

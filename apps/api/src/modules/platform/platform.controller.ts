@@ -7,6 +7,7 @@ import { CreateChurchDto } from './dto/create-church.dto';
 import { UpdateChurchDto } from './dto/update-church.dto';
 import { ResetTenantUserPasswordDto } from './dto/reset-tenant-user-password.dto';
 import { PurgeChurchDto } from './dto/purge-church.dto';
+import { UpdateTenantUserEmailDto } from './dto/update-tenant-user-email.dto';
 
 @ApiTags('platform')
 @ApiBearerAuth()
@@ -57,6 +58,20 @@ export class PlatformController {
     @CurrentUser() actor: AuthUser,
   ) {
     return this.platform.permanentlyDeleteChurch(id, body, {
+      userId: actor.userId,
+      email: actor.email,
+    });
+  }
+
+  @Patch('churches/:churchId/users/:userId/email')
+  @ApiOperation({ summary: 'Update a tenant staff user email (platform admin)' })
+  updateTenantUserEmail(
+    @Param('churchId') churchId: string,
+    @Param('userId') userId: string,
+    @Body() body: UpdateTenantUserEmailDto,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.platform.updateTenantUserEmail(churchId, userId, body, {
       userId: actor.userId,
       email: actor.email,
     });
