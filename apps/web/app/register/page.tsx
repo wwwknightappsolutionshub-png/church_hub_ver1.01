@@ -5,9 +5,10 @@ import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import { ArrowRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
 import { api, setAuthTokens } from '@/lib/api';
 import { slugifyChurchName } from '@/lib/church-slug';
+import { apiErrorMessage } from '@/lib/api-errors';
 import {
   clearTrialRegisterPrefill,
   readTrialRegisterPrefill,
@@ -27,11 +28,18 @@ type RegisterForm = {
   password: string;
 };
 
+type Step = 'details' | 'otp';
+
 export default function RegisterPage() {
   const router = useRouter();
   const slugTouched = useRef(false);
   const [fromTrial, setFromTrial] = useState(false);
-  const { register, handleSubmit, setValue, watch } = useForm<RegisterForm>({
+  const [step, setStep] = useState<Step>('details');
+  const [busy, setBusy] = useState(false);
+  const [registrationId, setRegistrationId] = useState<string | null>(null);
+  const [otpEmail, setOtpEmail] = useState('');
+  const [otp, setOtp] = useState('');
+  const { register, handleSubmit, setValue, watch, getValues } = useForm<RegisterForm>({
     defaultValues: {
       churchName: '',
       churchSlug: '',
@@ -53,33 +61,60 @@ export default function RegisterPage() {
     setValue('lastName', prefill.lastName);
   }, [setValue]);
 
-  const onSubmit = async (data: RegisterForm) => {
+  const onStart = async (data: RegisterForm) => {
     const slug = data.churchSlug.trim() || slugifyChurchName(data.churchName);
     if (!slug) {
       toast.error('Enter a church name so we can create your URL slug');
       return;
     }
+    setBusy(true);
     try {
-      const res = await api.post('/auth/register', {
+      const { data: res } = await api.post<{
+        registrationId: string;
+        email: string;
+        message: string;
+      }>('/auth/register/start', {
         ...data,
         churchSlug: slug,
       });
-      setAuthTokens(res.data.accessToken, res.data.refreshToken);
+      setRegistrationId(res.registrationId);
+      setOtpEmail(res.email);
+      setStep('otp');
+      toast.success(res.message);
+    } catch (err) {
+      toast.error(apiErrorMessage(err, 'Registration failed — is the API running?'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onVerify = async () => {
+    if (!registrationId) return;
+    const code = otp.replace(/\D/g, '');
+    if (code.length !== 6) {
+      toast.error('Enter the 6-digit code from your email');
+      return;
+    }
+    setBusy(true);
+    try {
+      const { data } = await api.post<{ accessToken: string; refreshToken: string }>(
+        '/auth/register/verify',
+        { registrationId, otp: code },
+      );
+      setAuthTokens(data.accessToken, data.refreshToken);
       clearTrialRegisterPrefill();
       toast.success('Church workspace created!');
       router.push('/dashboard');
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { message?: string | string[] } } }).response?.data
-              ?.message
-          : undefined;
-      toast.error(
-        Array.isArray(message)
-          ? message.join(', ')
-          : message ?? 'Registration failed — is the API running?',
-      );
+    } catch (err) {
+      toast.error(apiErrorMessage(err, 'Verification failed'));
+    } finally {
+      setBusy(false);
     }
+  };
+
+  const resend = async () => {
+    const data = getValues();
+    await onStart(data);
   };
 
   return (
@@ -94,70 +129,140 @@ export default function RegisterPage() {
             </Link>
           </div>
 
-          <h1 className="text-2xl font-bold">Create your church workspace</h1>
+          <h1 className="text-2xl font-bold">
+            {step === 'details' ? 'Create your church workspace' : 'Verify your email'}
+          </h1>
           <p className="mt-2 text-muted-foreground">
-            14-day free trial · No credit card required
+            {step === 'details'
+              ? '14-day free trial · No credit card required · Email verification required'
+              : `Enter the 6-digit code we sent to ${otpEmail}`}
           </p>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-4">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium">Church name</label>
-              <Input
-                placeholder="Grace Community Church"
-                {...register('churchName', {
-                  required: true,
-                  onChange: (e) => {
-                    if (slugTouched.current) return;
-                    setValue('churchSlug', slugifyChurchName(e.target.value), {
-                      shouldDirty: true,
-                    });
-                  },
-                })}
-                required
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium">Church URL slug</label>
-              <Input
-                placeholder="grace-community-church"
-                {...register('churchSlug', {
-                  onChange: () => {
-                    slugTouched.current = true;
-                  },
-                })}
-              />
-              <p className="mt-1.5 text-xs text-muted-foreground">
-                {churchSlug
-                  ? `Your public page: /c/${churchSlug}`
-                  : 'Filled automatically from the church name — edit anytime'}
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
+          {step === 'details' ? (
+            <form onSubmit={handleSubmit(onStart)} className="mt-8 space-y-4">
               <div>
-                <label className="mb-1.5 block text-sm font-medium">First name</label>
-                <Input {...register('firstName')} required />
+                <label className="mb-1.5 block text-sm font-medium">Church name</label>
+                <Input
+                  placeholder="Grace Community Church"
+                  {...register('churchName', {
+                    required: true,
+                    onChange: (e) => {
+                      if (slugTouched.current) return;
+                      setValue('churchSlug', slugifyChurchName(e.target.value), {
+                        shouldDirty: true,
+                      });
+                    },
+                  })}
+                  required
+                />
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium">Last name</label>
-                <Input {...register('lastName')} required />
+                <label className="mb-1.5 block text-sm font-medium">Church URL slug</label>
+                <Input
+                  placeholder="grace-community-church"
+                  {...register('churchSlug', {
+                    onChange: () => {
+                      slugTouched.current = true;
+                    },
+                  })}
+                />
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  {churchSlug
+                    ? `Your public page: /c/${churchSlug}`
+                    : 'Filled automatically from the church name — edit anytime'}
+                </p>
               </div>
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium">Admin email</label>
-              <Input type="email" {...register('email')} required readOnly={fromTrial} />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium">Password</label>
-              <Input type="password" {...register('password')} required minLength={8} />
-              <p className="mt-1.5 text-xs text-muted-foreground">
-                Please enter a new password — not the temporary password from your email.
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">First name</label>
+                  <Input {...register('firstName')} required />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">Last name</label>
+                  <Input {...register('lastName')} required />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Admin email</label>
+                <Input type="email" {...register('email')} required readOnly={fromTrial} />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Password</label>
+                <Input type="password" {...register('password')} required minLength={8} />
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Please enter a new password — not the temporary password from your email.
+                </p>
+              </div>
+              <Button type="submit" className="w-full shadow-brand" disabled={busy}>
+                {busy ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sending code…
+                  </>
+                ) : (
+                  <>
+                    Continue
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            </form>
+          ) : (
+            <div className="mt-8 space-y-4">
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  setStep('details');
+                  setOtp('');
+                }}
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to details
+              </button>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Verification code</label>
+                <Input
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="6-digit code"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className="tracking-[0.3em] text-center text-lg"
+                  maxLength={6}
+                />
+              </div>
+              <Button
+                type="button"
+                className="w-full shadow-brand"
+                disabled={busy || otp.length !== 6}
+                onClick={() => void onVerify()}
+              >
+                {busy ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating workspace…
+                  </>
+                ) : (
+                  <>
+                    Verify & create workspace
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
+              <p className="text-center text-sm text-muted-foreground">
+                Didn’t get it?{' '}
+                <button
+                  type="button"
+                  className="font-medium text-primary hover:underline"
+                  disabled={busy}
+                  onClick={() => void resend()}
+                >
+                  Resend code
+                </button>
               </p>
             </div>
-            <Button type="submit" className="w-full shadow-brand">
-              Create workspace
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </form>
+          )}
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
             Already have an account?{' '}

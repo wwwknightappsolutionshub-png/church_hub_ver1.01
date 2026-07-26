@@ -1,4 +1,5 @@
 export * from './enums';
+export * from './validation';
 export * from './membership';
 export * from './membership-import';
 export * from './membership-registry';

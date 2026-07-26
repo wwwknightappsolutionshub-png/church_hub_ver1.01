@@ -8,8 +8,9 @@ import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { churchPublicPath } from '@/lib/church-slug';
 import { applyAuthSessionFromMe } from '@/lib/apply-auth-session';
-import { ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowRight, Loader2, Mail } from 'lucide-react';
 import { loginWithCredentials } from '@/lib/auth-login';
+import { requestMagicLink } from '@/lib/auth-links';
 import { api } from '@/lib/api';
 import { checkApiReachable } from '@/lib/api-health';
 import { storeTrialRegisterPrefill } from '@/lib/marketing-trial';
@@ -19,6 +20,9 @@ import { LoginTestAccountsPanel } from '@/components/auth/LoginTestAccountsPanel
 import { showLoginTestAccounts } from '@/lib/auth-test-logins';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
+
+type LoginMode = 'password' | 'magic';
 
 function useLoginSearchParams() {
   const [params, setParams] = useState({
@@ -27,6 +31,7 @@ function useLoginSearchParams() {
     portalCreated: false,
     email: null as string | null,
     trial: null as string | null,
+    mode: 'password' as LoginMode,
   });
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
@@ -36,6 +41,7 @@ function useLoginSearchParams() {
       portalCreated: sp.get('portal') === '1',
       email: sp.get('email'),
       trial: sp.get('trial'),
+      mode: sp.get('mode') === 'magic' ? 'magic' : 'password',
     });
   }, []);
   return params;
@@ -60,17 +66,27 @@ export default function LoginPage() {
     portalCreated,
     email: emailFromRegistration,
     trial: trialToken,
+    mode: modeFromUrl,
   } = useLoginSearchParams();
+  const [mode, setMode] = useState<LoginMode>('password');
   const [loading, setLoading] = useState(false);
   const [trialLoading, setTrialLoading] = useState(false);
+  const [magicSent, setMagicSent] = useState(false);
   const [apiOnline, setApiOnline] = useState<boolean | null>(null);
-  const { register, handleSubmit, setValue } = useForm<{ email: string; password: string }>({
+  const { register, handleSubmit, setValue, getValues } = useForm<{
+    email: string;
+    password: string;
+  }>({
     defaultValues: { email: '', password: '' },
   });
 
   useEffect(() => {
     checkApiReachable().then(setApiOnline);
   }, []);
+
+  useEffect(() => {
+    setMode(modeFromUrl);
+  }, [modeFromUrl]);
 
   useEffect(() => {
     if (emailFromRegistration) {
@@ -137,7 +153,7 @@ export default function LoginPage() {
 
   const showTestLogins = showLoginTestAccounts();
 
-  const onSubmit = async (data: { email: string; password: string }) => {
+  const onPasswordSubmit = async (data: { email: string; password: string }) => {
     setLoading(true);
 
     if (trialToken) {
@@ -169,7 +185,7 @@ export default function LoginPage() {
     const result = await loginWithCredentials(data.email, data.password);
     setLoading(false);
     if (result.ok) {
-      completeLogin(result.mustChangePassword);
+      void completeLogin(result.mustChangePassword);
       return;
     }
 
@@ -189,6 +205,18 @@ export default function LoginPage() {
     toast.error(result.message);
   };
 
+  const onMagicSubmit = async (data: { email: string }) => {
+    setLoading(true);
+    const result = await requestMagicLink(data.email);
+    setLoading(false);
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+    setMagicSent(true);
+    toast.success(result.message);
+  };
+
   return (
     <div className="flex min-h-[100dvh] flex-col lg:flex-row">
       <AuthMobileBrand />
@@ -201,7 +229,9 @@ export default function LoginPage() {
           <p className="mt-2 text-muted-foreground">
             {trialToken
               ? 'Enter the temporary password from your email to open registration.'
-              : 'Sign in to your church workspace'}
+              : mode === 'magic'
+                ? 'We will email you a one-time sign-in link'
+                : 'Sign in to your church workspace'}
           </p>
           {apiOnline === false ? (
             <div
@@ -250,65 +280,130 @@ export default function LoginPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium">Email</label>
-              <Input
-                type="email"
-                placeholder="you@yourchurch.org"
-                {...register('email')}
-                required
-                readOnly={Boolean(trialToken)}
-              />
-            </div>
-            <div>
-              <div className="mb-1.5 flex items-center justify-between gap-3">
-                <label className="block text-sm font-medium">
-                  {trialToken ? 'Temporary password' : 'Password'}
-                </label>
-                {!trialToken ? (
-                  <Link
-                    href="/forgot-password"
-                    className="text-sm font-medium text-primary hover:underline"
-                  >
-                    Forgot password?
-                  </Link>
-                ) : null}
-              </div>
-              <Input type="password" placeholder="••••••••" {...register('password')} required />
-            </div>
-            <Button
-              type="submit"
-              className="w-full shadow-brand"
-              disabled={loading || trialLoading}
-            >
-              {loading || trialLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {trialToken ? 'Verifying…' : 'Signing in…'}
-                </>
-              ) : (
-                <>
-                  {trialToken ? 'Continue to register' : 'Sign in'}
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </>
-              )}
-            </Button>
-          </form>
-
           {!trialToken ? (
-            <p className="mt-4 text-center text-sm text-muted-foreground">
-              Prefer no password?{' '}
-              <Link
-                href="/forgot-password?mode=magic"
-                className="font-medium text-primary hover:underline"
+            <div className="mt-6 flex gap-2 rounded-lg border bg-muted/40 p-1">
+              <button
+                type="button"
+                className={cn(
+                  'flex-1 rounded-md px-3 py-2 text-sm font-medium transition',
+                  mode === 'password' ? 'bg-background shadow-sm' : 'text-muted-foreground',
+                )}
+                onClick={() => {
+                  setMode('password');
+                  setMagicSent(false);
+                }}
               >
-                Email me a sign-in link
-              </Link>
-            </p>
+                Password
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  'flex-1 rounded-md px-3 py-2 text-sm font-medium transition',
+                  mode === 'magic' ? 'bg-background shadow-sm' : 'text-muted-foreground',
+                )}
+                onClick={() => {
+                  setMode('magic');
+                  setMagicSent(false);
+                }}
+              >
+                Magic link
+              </button>
+            </div>
           ) : null}
 
-          {showTestLogins && !trialToken ? (
+          {mode === 'magic' && !trialToken ? (
+            magicSent ? (
+              <div className="mt-6 rounded-xl border border-primary/30 bg-primary/5 p-5 text-center">
+                <Mail className="mx-auto h-8 w-8 text-primary" />
+                <p className="mt-3 font-semibold">Check your email</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  If an account exists for <strong>{getValues('email')}</strong>, we sent a
+                  one-time sign-in link.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-4"
+                  onClick={() => setMagicSent(false)}
+                >
+                  Use a different email
+                </Button>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit(onMagicSubmit)} className="mt-6 space-y-4">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">Email</label>
+                  <Input
+                    type="email"
+                    placeholder="you@yourchurch.org"
+                    {...register('email')}
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full shadow-brand" disabled={loading}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending…
+                    </>
+                  ) : (
+                    <>
+                      Email me a sign-in link
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+              </form>
+            )
+          ) : (
+            <form onSubmit={handleSubmit(onPasswordSubmit)} className="mt-6 space-y-4">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Email</label>
+                <Input
+                  type="email"
+                  placeholder="you@yourchurch.org"
+                  {...register('email')}
+                  required
+                  readOnly={Boolean(trialToken)}
+                />
+              </div>
+              <div>
+                <div className="mb-1.5 flex items-center justify-between gap-3">
+                  <label className="block text-sm font-medium">
+                    {trialToken ? 'Temporary password' : 'Password'}
+                  </label>
+                  {!trialToken ? (
+                    <Link
+                      href="/forgot-password"
+                      className="text-sm font-medium text-primary hover:underline"
+                    >
+                      Forgot password?
+                    </Link>
+                  ) : null}
+                </div>
+                <Input type="password" placeholder="••••••••" {...register('password')} required />
+              </div>
+              <Button
+                type="submit"
+                className="w-full shadow-brand"
+                disabled={loading || trialLoading}
+              >
+                {loading || trialLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {trialToken ? 'Verifying…' : 'Signing in…'}
+                  </>
+                ) : (
+                  <>
+                    {trialToken ? 'Continue to register' : 'Sign in'}
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            </form>
+          )}
+
+          {showTestLogins && !trialToken && mode === 'password' ? (
             <LoginTestAccountsPanel
               onUseAccount={(email, password) => {
                 setValue('email', email);

@@ -152,7 +152,15 @@ export class UploadsService implements OnModuleInit {
     if (!file?.buffer?.length) {
       throw new BadRequestException('File is empty');
     }
+    const maxBytes = 5 * 1024 * 1024;
+    if (file.buffer.length > maxBytes) {
+      throw new BadRequestException('File too large (max 5MB)');
+    }
     const ext = extname(file.originalname ?? '') || this.extFromMime(file.mimetype);
+    const allowed = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf', '.svg']);
+    if (ext && !allowed.has(ext.toLowerCase())) {
+      throw new BadRequestException('File type not allowed');
+    }
     const name = `${randomUUID()}${ext}`;
     const rel = join(...segments, name).replace(/\\/g, '/');
     await this.writeBuffer(rel, file.buffer);

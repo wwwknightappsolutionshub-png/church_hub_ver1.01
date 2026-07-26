@@ -14,11 +14,13 @@ import { UploadsModule } from '../uploads/uploads.module';
 import { FollowUpAccessGuard } from './follow-up-access.guard';
 import { ModuleAccessGuard } from './module-access.guard';
 import { PlatformModule } from '../platform/platform.module';
+import { CacheModule } from '../../common/cache/cache.module';
 
 @Module({
   imports: [
     MembershipModule,
     UploadsModule,
+    CacheModule,
     forwardRef(() => PlatformModule),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({

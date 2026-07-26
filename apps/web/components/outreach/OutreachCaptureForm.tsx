@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { OutreachCaptureSchema } from '@church-hub/shared-types';
@@ -38,6 +38,10 @@ export function OutreachCaptureForm({
   const [gpsLoading, setGpsLoading] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [postcodeHints, setPostcodeHints] = useState<string[]>([]);
+  const [postcodeBusy, setPostcodeBusy] = useState(false);
+  const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lookupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { register, handleSubmit, reset, setValue, watch, formState: { isSubmitting } } =
     useForm<FormData>({
@@ -48,6 +52,7 @@ export function OutreachCaptureForm({
   const photoConsent = watch('photoConsent');
   const needsBusPickup = watch('needsBusPickup');
   const voiceNotes = watch('voiceNotes') ?? '';
+  const postcode = watch('postcode') ?? '';
 
   useEffect(() => {
     getCachedForm(OUTREACH_FORM_CACHE_ID).then((cached) => {
@@ -58,6 +63,73 @@ export function OutreachCaptureForm({
       }
     });
   }, [setValue]);
+
+  useEffect(() => {
+    return () => {
+      if (suggestTimer.current) clearTimeout(suggestTimer.current);
+      if (lookupTimer.current) clearTimeout(lookupTimer.current);
+    };
+  }, []);
+
+  const applyPostcodeLookup = async (code: string) => {
+    const q = code.trim();
+    if (q.length < 5) return;
+    setPostcodeBusy(true);
+    try {
+      const { data } = await api.get<{
+        postcode: string;
+        latitude: number;
+        longitude: number;
+        adminDistrict: string | null;
+        parish: string | null;
+        region: string | null;
+      }>(`/geo/postcode/${encodeURIComponent(q)}`);
+      setValue('postcode', data.postcode);
+      setValue('latitude', data.latitude);
+      setValue('longitude', data.longitude);
+      setCoords({ lat: data.latitude, lng: data.longitude });
+      const label = [data.parish, data.adminDistrict, data.region].filter(Boolean).join(', ');
+      if (label) {
+        setValue('locationLabel', label);
+      }
+      setPostcodeHints([]);
+      toast.success(`Postcode found — location tagged (${data.latitude.toFixed(4)}, ${data.longitude.toFixed(4)})`);
+    } catch {
+      toast.error('Postcode not found');
+    } finally {
+      setPostcodeBusy(false);
+    }
+  };
+
+  const onPostcodeChange = (value: string) => {
+    setValue('postcode', value.toUpperCase());
+    if (suggestTimer.current) clearTimeout(suggestTimer.current);
+    if (lookupTimer.current) clearTimeout(lookupTimer.current);
+    const q = value.trim();
+    if (q.length < 2) {
+      setPostcodeHints([]);
+      return;
+    }
+    suggestTimer.current = setTimeout(() => {
+      void (async () => {
+        try {
+          const { data } = await api.get<string[]>('/geo/postcode-autocomplete', {
+            params: { q },
+          });
+          setPostcodeHints(Array.isArray(data) ? data : []);
+        } catch {
+          setPostcodeHints([]);
+        }
+      })();
+    }, 280);
+
+    const compact = q.replace(/\s+/g, '');
+    if (compact.length >= 5 && compact.length <= 7) {
+      lookupTimer.current = setTimeout(() => {
+        void applyPostcodeLookup(q);
+      }, 600);
+    }
+  };
 
   const captureGps = () => {
     if (!navigator.geolocation) {
@@ -86,6 +158,10 @@ export function OutreachCaptureForm({
     if (!file) return;
     if (!photoConsent) {
       toast.error('Enable photo consent before capturing');
+      return;
+    }
+    if (!/^image\//.test(file.type)) {
+      toast.error('Only image files are allowed');
       return;
     }
     if (file.size > 800_000) {
@@ -153,6 +229,48 @@ export function OutreachCaptureForm({
         <Input placeholder="Last name" {...register('lastName')} />
         <Input placeholder="Phone" {...register('phone')} />
         <Input placeholder="Email" type="email" {...register('email')} />
+        <div className="relative sm:col-span-2">
+          <div className="flex gap-2">
+            <Input
+              placeholder="UK postcode (e.g. DA1 1AA)"
+              value={postcode}
+              onChange={(e) => onPostcodeChange(e.target.value)}
+              onBlur={() => {
+                if ((postcode ?? '').trim().length >= 5) {
+                  void applyPostcodeLookup(postcode);
+                }
+              }}
+              autoComplete="postal-code"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              disabled={postcodeBusy || !(postcode ?? '').trim()}
+              onClick={() => void applyPostcodeLookup(postcode)}
+            >
+              {postcodeBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Lookup'}
+            </Button>
+          </div>
+          {postcodeHints.length > 0 ? (
+            <ul className="absolute z-20 mt-1 max-h-40 w-full overflow-auto rounded-md border bg-card shadow-md">
+              {postcodeHints.map((hint) => (
+                <li key={hint}>
+                  <button
+                    type="button"
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                    onClick={() => {
+                      setValue('postcode', hint);
+                      setPostcodeHints([]);
+                      void applyPostcodeLookup(hint);
+                    }}
+                  >
+                    {hint}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
         <Input
           placeholder="Location label (e.g. Dartford town centre)"
           className="sm:col-span-2"
@@ -177,7 +295,7 @@ export function OutreachCaptureForm({
         {needsBusPickup && (
           <>
             <Input
-              placeholder="Pickup address (or use GPS tag above)"
+              placeholder="Pickup address (or use GPS / postcode above)"
               {...register('pickupAddress')}
             />
             <Input placeholder="Bus notes (e.g. Sunday 9am)" {...register('busPickupNotes')} />
@@ -224,21 +342,18 @@ export function OutreachCaptureForm({
               capture="environment"
               className="hidden"
               onChange={onPhotoChange}
-              disabled={!photoConsent}
             />
           </label>
-          {photoPreview && (
-            <img
-              src={photoPreview}
-              alt="Contact"
-              className="h-16 w-16 rounded-lg border object-cover"
-            />
-          )}
+          {photoPreview ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={photoPreview} alt="Capture preview" className="h-16 w-16 rounded-md object-cover" />
+          ) : null}
         </div>
       </div>
 
-      <Button type="submit" disabled={isSubmitting} className="w-full shadow-brand">
-        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Capture contact'}
+      <Button type="submit" className="w-full" disabled={isSubmitting}>
+        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+        Save capture
       </Button>
     </form>
   );

@@ -9,7 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { AuthLinkPurpose } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
-import { randomBytes, createHash } from 'crypto';
+import { randomBytes, createHash, randomInt, randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.module';
 import {
   createDefaultChurchLanding,
@@ -17,6 +17,7 @@ import {
 } from '@church-hub/shared-types';
 import { PlatformMarketingDripService } from '../platform/platform-marketing-drip.service';
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
+import { RedisCacheService } from '../../common/cache/redis-cache.service';
 import { buildAuthLinkEmail } from './auth-link-email';
 
 export interface JwtPayload {
@@ -26,6 +27,8 @@ export interface JwtPayload {
 }
 
 const AUTH_LINK_TTL_MINUTES = 30;
+const REGISTER_OTP_TTL_SEC = 15 * 60;
+const REGISTER_OTP_MAX_ATTEMPTS = 5;
 const GENERIC_LINK_SENT =
   'If an account exists for that email, we sent a link. Check your inbox (and spam folder).';
 /** Failed password attempts in this window before clearing the password field. */
@@ -34,6 +37,17 @@ const LOGIN_CLEAR_PASSWORD_AT = 3;
 const LOGIN_AUTO_RESET_AT = 4;
 /** Sliding window for counting failed logins (30 minutes). */
 const LOGIN_FAILURE_WINDOW_MS = 30 * 60 * 1000;
+
+interface PendingRegistration {
+  churchName: string;
+  churchSlug: string;
+  email: string;
+  passwordHash: string;
+  firstName: string;
+  lastName: string;
+  otpHash: string;
+  attempts: number;
+}
 
 @Injectable()
 export class AuthService {
@@ -45,25 +59,31 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly drips: PlatformMarketingDripService,
     private readonly email: EmailAdapter,
+    private readonly cache: RedisCacheService,
   ) {}
 
-  async register(input: {
+  /** Step 1: validate signup, email OTP, store pending registration. */
+  async startRegistration(input: {
     churchName: string;
-    churchSlug: string;
+    churchSlug?: string;
     email: string;
     password: string;
     firstName: string;
     lastName: string;
   }) {
+    const email = input.email.trim().toLowerCase();
     const churchSlug =
       (input.churchSlug ?? '').trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '') ||
       this.slugifyChurchName(input.churchName);
     if (!churchSlug) {
       throw new BadRequestException('Church name is required to create a URL slug');
     }
+    if (input.password.length < 8) {
+      throw new BadRequestException('Password must be at least 8 characters');
+    }
 
     const existing = await this.prisma.user.findFirst({
-      where: { email: input.email },
+      where: { email: { equals: email, mode: 'insensitive' } },
     });
     if (existing) {
       throw new ConflictException('Email already registered');
@@ -76,8 +96,104 @@ export class AuthService {
       throw new ConflictException('Church slug already taken');
     }
 
+    const otp = String(randomInt(100_000, 1_000_000));
     const passwordHash = await bcrypt.hash(input.password, 12);
+    const registrationId = randomUUID();
+    const pending: PendingRegistration = {
+      churchName: input.churchName.trim(),
+      churchSlug,
+      email,
+      passwordHash,
+      firstName: input.firstName.trim(),
+      lastName: input.lastName.trim(),
+      otpHash: this.hashToken(otp),
+      attempts: 0,
+    };
 
+    await this.cache.set(`register:otp:${registrationId}`, pending, REGISTER_OTP_TTL_SEC);
+
+    try {
+      await this.email.send({
+        to: email,
+        subject: 'Your Church_Hub verification code',
+        body: `Hi ${pending.firstName},\n\nYour verification code is ${otp}.\n\nIt expires in 15 minutes.\n\n— Church_Hub`,
+        html: `<p>Hi ${pending.firstName},</p><p>Your verification code is <strong style="font-size:1.25rem;letter-spacing:0.1em">${otp}</strong>.</p><p>It expires in 15 minutes.</p><p>— Church_Hub</p>`,
+        churchId: null,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Register OTP email failed for ${email}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      throw new BadRequestException(
+        'Could not send verification email. Check email settings and try again.',
+      );
+    }
+
+    if (process.env.NODE_ENV !== 'production' && !process.env.SMTP_HOST) {
+      this.logger.log(`[register-otp] ${email} → ${otp}`);
+    }
+
+    return {
+      registrationId,
+      email,
+      message: 'We sent a 6-digit verification code to your email.',
+      expiresInSeconds: REGISTER_OTP_TTL_SEC,
+    };
+  }
+
+  /** Step 2: verify OTP and create the church workspace. */
+  async verifyRegistration(registrationId: string, otp: string) {
+    const key = `register:otp:${registrationId}`;
+    const pending = await this.cache.get<PendingRegistration>(key);
+    if (!pending) {
+      throw new BadRequestException('Registration expired or not found. Start again.');
+    }
+
+    if (pending.attempts >= REGISTER_OTP_MAX_ATTEMPTS) {
+      await this.cache.del(key);
+      throw new BadRequestException('Too many incorrect codes. Start registration again.');
+    }
+
+    const otpOk = this.hashToken(otp.trim()) === pending.otpHash;
+    if (!otpOk) {
+      pending.attempts += 1;
+      await this.cache.set(key, pending, REGISTER_OTP_TTL_SEC);
+      throw new BadRequestException('Incorrect verification code');
+    }
+
+    await this.cache.del(key);
+
+    // Re-check uniqueness in case another signup completed while OTP was pending.
+    const existing = await this.prisma.user.findFirst({
+      where: { email: { equals: pending.email, mode: 'insensitive' } },
+    });
+    if (existing) {
+      throw new ConflictException('Email already registered');
+    }
+    const slugTaken = await this.prisma.church.findUnique({
+      where: { slug: pending.churchSlug },
+    });
+    if (slugTaken) {
+      throw new ConflictException('Church slug already taken');
+    }
+
+    return this.createChurchFromPending(pending);
+  }
+
+  /** @deprecated Prefer startRegistration + verifyRegistration (kept for rare clients). */
+  async register(input: {
+    churchName: string;
+    churchSlug: string;
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+  }) {
+    // Force OTP path — do not create without email verification.
+    return this.startRegistration(input);
+  }
+
+  private async createChurchFromPending(pending: PendingRegistration) {
     const adminRole = await this.prisma.role.upsert({
       where: { name: 'ADMIN' },
       update: {},
@@ -92,18 +208,18 @@ export class AuthService {
 
     const church = await this.prisma.church.create({
       data: {
-        name: input.churchName,
-        slug: churchSlug,
+        name: pending.churchName,
+        slug: pending.churchSlug,
         settings: {
-          landing: createDefaultChurchLanding(input.churchName, 'classic'),
+          landing: createDefaultChurchLanding(pending.churchName, 'classic'),
           landingMembershipForm: DEFAULT_LANDING_MEMBERSHIP_FORM,
         },
         users: {
           create: {
-            email: input.email,
-            passwordHash,
-            firstName: input.firstName,
-            lastName: input.lastName,
+            email: pending.email,
+            passwordHash: pending.passwordHash,
+            firstName: pending.firstName,
+            lastName: pending.lastName,
             roles: { create: { roleId: adminRole.id } },
           },
         },

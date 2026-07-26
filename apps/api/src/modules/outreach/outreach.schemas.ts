@@ -1,24 +1,51 @@
 import { z } from 'zod';
+import {
+  optionalEmailSchema,
+  optionalPhoneSchema,
+  optionalUkPostcodeSchema,
+  sanitizeText,
+} from '@church-hub/shared-types';
 
 export const outreachCaptureSchema = z.object({
-  firstName: z.string().min(1).max(120),
-  lastName: z.string().max(120).optional(),
-  phone: z.string().max(40).optional(),
-  email: z
-    .union([z.string().email().max(200), z.literal('')])
-    .optional()
-    .transform((v) => (v === '' ? undefined : v)),
+  firstName: z
+    .string()
+    .transform((v) => sanitizeText(v, 120))
+    .pipe(z.string().min(1).max(120)),
+  lastName: z
+    .union([z.string(), z.literal(''), z.undefined()])
+    .transform((v) => {
+      const s = sanitizeText(v ?? '', 120);
+      return s || undefined;
+    })
+    .optional(),
+  phone: optionalPhoneSchema,
+  email: optionalEmailSchema,
   evangelistId: z.string().uuid().optional(),
   qrCodeId: z.string().uuid().optional(),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
-  locationLabel: z.string().max(300).optional(),
+  locationLabel: z
+    .union([z.string(), z.literal(''), z.undefined()])
+    .transform((v) => {
+      const s = sanitizeText(v ?? '', 300);
+      return s || undefined;
+    })
+    .optional(),
+  postcode: optionalUkPostcodeSchema,
   photoConsent: z.boolean().optional(),
-  photoUrl: z.string().url().max(2000).optional(),
+  photoUrl: z
+    .union([z.string().url().max(2000), z.string().startsWith('data:image/').max(600_000)])
+    .optional(),
   notes: z.string().max(5000).optional(),
   voiceNotes: z.string().max(5000).optional(),
   needsBusPickup: z.boolean().optional(),
-  pickupAddress: z.string().max(500).optional(),
+  pickupAddress: z
+    .union([z.string(), z.literal(''), z.undefined()])
+    .transform((v) => {
+      const s = sanitizeText(v ?? '', 500);
+      return s || undefined;
+    })
+    .optional(),
   busPickupNotes: z.string().max(1000).optional(),
   clientId: z.string().min(8).max(64).optional(),
   capturedAt: z.string().datetime().optional(),

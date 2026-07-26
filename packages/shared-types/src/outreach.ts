@@ -1,21 +1,47 @@
 import { z } from 'zod';
+import {
+  optionalEmailSchema,
+  optionalPhoneSchema,
+  optionalUkPostcodeSchema,
+  personNameSchema,
+  sanitizeText,
+} from './validation';
 
 export const OutreachCaptureSchema = z.object({
-  firstName: z.string().min(1).max(100),
-  lastName: z.string().max(100).optional(),
-  phone: z.string().min(7).max(20).optional(),
-  email: z.string().email().optional(),
+  firstName: personNameSchema,
+  lastName: z
+    .union([z.string(), z.literal(''), z.undefined()])
+    .transform((v) => {
+      const s = sanitizeText(v ?? '', 100);
+      return s || undefined;
+    })
+    .optional(),
+  phone: optionalPhoneSchema,
+  email: optionalEmailSchema,
   evangelistId: z.string().uuid().optional(),
   qrCodeId: z.string().uuid().optional(),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
-  locationLabel: z.string().max(300).optional(),
+  locationLabel: z
+    .union([z.string(), z.literal(''), z.undefined()])
+    .transform((v) => {
+      const s = sanitizeText(v ?? '', 300);
+      return s || undefined;
+    })
+    .optional(),
+  postcode: optionalUkPostcodeSchema,
   photoConsent: z.boolean().default(false),
   photoUrl: z.string().max(600_000).optional(),
   notes: z.string().max(2000).optional(),
   voiceNotes: z.string().max(5000).optional(),
   needsBusPickup: z.boolean().optional(),
-  pickupAddress: z.string().max(500).optional(),
+  pickupAddress: z
+    .union([z.string(), z.literal(''), z.undefined()])
+    .transform((v) => {
+      const s = sanitizeText(v ?? '', 500);
+      return s || undefined;
+    })
+    .optional(),
   busPickupNotes: z.string().max(1000).optional(),
   clientId: z.string().uuid().optional(),
   capturedAt: z.string().datetime().optional(),

@@ -98,6 +98,7 @@ export class OutreachService {
       latitude?: number;
       longitude?: number;
       locationLabel?: string;
+      postcode?: string;
       photoConsent?: boolean;
       photoUrl?: string;
       notes?: string;
@@ -172,7 +173,7 @@ export class OutreachService {
         email: data.email,
         latitude: data.latitude,
         longitude: data.longitude,
-        locationLabel: data.locationLabel,
+        locationLabel: [data.postcode, data.locationLabel].filter(Boolean).join(' · ') || data.locationLabel,
         photoConsent: data.photoConsent ?? false,
         photoUrl: data.photoUrl,
         notes: data.notes,

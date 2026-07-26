@@ -18,11 +18,12 @@ import { UpdateAccountDto } from './dto/update-account.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ProfileAvatarDataDto } from './dto/profile-avatar-data.dto';
 import {
-  ConsumeMagicLinkDto,
   ForgotPasswordDto,
   RequestMagicLinkDto,
   ResetPasswordDto,
+  ConsumeMagicLinkDto,
 } from './dto/auth-link.dto';
+import { LoginDto, RegisterStartDto, RegisterVerifyDto } from './dto/register.dto';
 import { Public } from './decorators';
 import { TEST_ACCOUNTS, TEST_PASSWORD } from './test-accounts';
 import { CurrentUser, AuthUser } from './current-user.decorator';
@@ -59,26 +60,37 @@ export class AuthController {
   }
 
   @Public()
-  @Post('register')
-  @ApiOperation({ summary: 'Register a new church and admin user' })
-  register(
-    @Body()
-    body: {
-      churchName: string;
-      churchSlug: string;
-      email: string;
-      password: string;
-      firstName: string;
-      lastName: string;
-    },
-  ) {
-    return this.authService.register(body);
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('register/start')
+  @ApiOperation({ summary: 'Start tenant signup — emails a 6-digit OTP' })
+  registerStart(@Body() body: RegisterStartDto) {
+    return this.authService.startRegistration(body);
   }
 
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Post('register/verify')
+  @ApiOperation({ summary: 'Verify signup OTP and create church workspace' })
+  registerVerify(@Body() body: RegisterVerifyDto) {
+    return this.authService.verifyRegistration(body.registrationId, body.otp);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('register')
+  @ApiOperation({
+    summary: 'Start registration (OTP required — same as /register/start)',
+    deprecated: true,
+  })
+  register(@Body() body: RegisterStartDto) {
+    return this.authService.startRegistration(body);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @Post('login')
   @ApiOperation({ summary: 'Login with email and password' })
-  login(@Body() body: { email: string; password: string }) {
+  login(@Body() body: LoginDto) {
     return this.authService.login(body.email, body.password);
   }
 
