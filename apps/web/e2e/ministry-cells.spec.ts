@@ -54,7 +54,8 @@ test.describe('Ministry/Cells end-to-end', () => {
     });
     await expect(page.getByRole('button', { name: 'Branches' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Analytics' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Setup' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Setup' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Add New Cell' })).toBeVisible();
   });
 
   test('create branch with leader assignment', async ({ page, request }) => {
@@ -63,7 +64,7 @@ test.describe('Ministry/Cells end-to-end', () => {
       timeout: 20_000,
     });
 
-    await page.getByRole('button', { name: 'New branch' }).click();
+    await page.getByRole('button', { name: 'Add New Cell' }).click();
     await page.locator('#name').fill(branchName);
     await page.locator('#location').fill('E2E Test Area');
 
@@ -75,7 +76,7 @@ test.describe('Ministry/Cells end-to-end', () => {
       await leaderSelect.selectOption({ index: 1 });
     }
 
-    await page.getByRole('button', { name: 'Create branch' }).click();
+    await page.getByRole('button', { name: 'Create cell' }).click();
     await expect(page.getByTestId('branch-picker-item').filter({ hasText: branchName })).toBeVisible({
       timeout: 15_000,
     });
@@ -225,7 +226,9 @@ test.describe('Ministry/Cells end-to-end', () => {
 
   test('setup: seed forms, teaching manual, reminders', async ({ page }) => {
     await page.goto('/dashboard/ministry-cells');
-    await page.getByRole('button', { name: 'Setup' }).click();
+    await expect(page.getByRole('heading', { name: 'Church-wide forms' })).toBeVisible({
+      timeout: 15_000,
+    });
 
     await page.getByRole('button', { name: 'Seed defaults' }).click();
 
@@ -265,11 +268,11 @@ test.describe('Ministry/Cells end-to-end', () => {
     await expect(page.getByText(reminderTitle)).toBeVisible({ timeout: 15_000 });
   });
 
-  test('branches tab navigation returns from setup', async ({ page }) => {
+  test('branches tab keeps Add New Cell visible', async ({ page }) => {
     await page.goto('/dashboard/ministry-cells');
-    await page.getByRole('button', { name: 'Setup' }).click();
+    await page.getByRole('button', { name: 'Analytics' }).click();
     await page.getByRole('button', { name: 'Branches' }).click();
-    await expect(page.getByRole('button', { name: 'New branch' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add New Cell' })).toBeVisible();
   });
 
   test('cancel buttons close forms without submitting', async ({ page, request }) => {
@@ -281,10 +284,10 @@ test.describe('Ministry/Cells end-to-end', () => {
 
     await page.goto('/dashboard/ministry-cells');
 
-    // New branch toggle open/close
-    await page.getByRole('button', { name: 'New branch' }).click();
+    // Add New Cell toggle open/close
+    await page.getByRole('button', { name: 'Add New Cell' }).click();
     await expect(page.locator('#name')).toBeVisible();
-    await page.getByRole('button', { name: 'New branch' }).click();
+    await page.getByRole('button', { name: 'Add New Cell' }).click();
     await expect(page.locator('#name')).not.toBeVisible();
 
     // Edit branch cancel
