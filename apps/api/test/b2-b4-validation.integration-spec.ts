@@ -51,7 +51,7 @@ describeE2e('B2–B4 validation (HTTP → 400)', () => {
 
     adminToken = await mintAccessToken(app, 'admin@demo.church');
     try {
-      platformToken = await mintAccessToken(app, 'platform@churchhub.com');
+      platformToken = await mintAccessToken(app, 'www.knightappsolutionshub@gmail.com');
     } catch {
       platformToken = null;
     }

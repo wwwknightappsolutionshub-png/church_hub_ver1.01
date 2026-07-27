@@ -5,7 +5,7 @@ export const LOGIN_TEST_ACCOUNTS = [
   {
     id: 'platform',
     title: 'Super Admin / SaaS Owner',
-    email: 'platform@churchhub.com',
+    email: 'www.knightappsolutionshub@gmail.com',
     password: TEST_LOGIN_PASSWORD,
     hint: 'Platform console — all churches, not tied to one congregation.',
   },

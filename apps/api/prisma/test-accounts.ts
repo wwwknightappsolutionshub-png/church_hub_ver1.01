@@ -20,7 +20,7 @@ export const TEST_ACCOUNTS: TestAccountDetail[] = [
   {
     key: 'platform',
     label: 'SaaS Platform Admin',
-    email: 'platform@churchhub.com',
+    email: 'www.knightappsolutionshub@gmail.com',
     userRole: 'PLATFORM_ADMIN',
     memberRoles: [],
     serviceUnits: [],
