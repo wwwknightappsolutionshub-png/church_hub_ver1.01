@@ -95,6 +95,19 @@ export class MinistryCellsController {
     return this.service.listProvinces(user, churchId);
   }
 
+  @Post('digests/weekly')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({
+    summary:
+      'Send full cell/ministry digest (all provinces, one table) to one Admin + one Pastor',
+  })
+  sendFullDigest(
+    @ChurchId() churchId: string,
+    @Body() body?: { asOf?: string },
+  ) {
+    return this.service.sendFullCellDigest(churchId, body?.asOf);
+  }
+
   @Post('provinces')
   @Roles('ADMIN', 'PASTOR')
   createProvince(

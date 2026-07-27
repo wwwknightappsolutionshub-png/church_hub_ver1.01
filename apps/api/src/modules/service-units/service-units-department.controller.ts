@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ServiceUnitsDepartmentService } from './service-units-department.service';
 import { ChurchId, CurrentUser, AuthUser } from '../auth/current-user.decorator';
-import { ModuleGate } from '../auth/decorators';
+import { ModuleGate, Roles } from '../auth/decorators';
 
 @ApiTags('service-units')
 @ApiBearerAuth()
@@ -15,6 +15,19 @@ export class ServiceUnitsDepartmentController {
   @ApiOperation({ summary: 'List Phase 8 department units (ushering, choir, youth, etc.)' })
   list(@ChurchId() churchId: string) {
     return this.departments.listDepartments(churchId);
+  }
+
+  @Post('digests/weekly')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({
+    summary:
+      'Send full department digest email (all departments, one table) to one Admin + one Pastor',
+  })
+  sendFullDigest(
+    @ChurchId() churchId: string,
+    @Body() body?: { weekStart?: string },
+  ) {
+    return this.departments.sendFullDepartmentDigest(churchId, body?.weekStart);
   }
 
   @Get(':id/dashboard')
@@ -60,7 +73,7 @@ export class ServiceUnitsDepartmentController {
   }
 
   @Post(':id/weekly-reports/generate')
-  @ApiOperation({ summary: 'Generate weekly report to admin/pastor (email + in-app)' })
+  @ApiOperation({ summary: 'Generate weekly report (stored + in-app; email via full digest)' })
   generateReport(
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,

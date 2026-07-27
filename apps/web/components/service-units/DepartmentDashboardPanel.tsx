@@ -154,7 +154,7 @@ export function DepartmentDashboardPanel({
     setBusy(true);
     try {
       await api.post(`/service-units/departments/${unitId}/weekly-reports/generate`, {});
-      toast.success('Weekly report sent to church leadership');
+      toast.success('Weekly report saved (in-app). Email digests from Admin/Pastor Reports.');
       queryClient.invalidateQueries({ queryKey: ['department-dashboard', unitId] });
     } catch {
       toast.error('Could not generate report');

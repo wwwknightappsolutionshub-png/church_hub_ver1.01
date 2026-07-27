@@ -1,23 +1,26 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ServiceUnitsDepartmentService } from './service-units-department.service';
+import { isLondonMondayDigestWindow } from '../notifications/report-digest.util';
 
-/** Phase 8 — weekly department reports (Mondays) + optional absentee sweep. */
+/** Phase 8 — Monday 10:00 Europe/London full department digests. */
 @Injectable()
 export class ServiceUnitsDepartmentScheduler implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ServiceUnitsDepartmentScheduler.name);
   private weeklyTimer?: NodeJS.Timeout;
-  private lastWeeklyKey?: string;
+  private lastDigestKey?: string;
 
   constructor(private readonly departments: ServiceUnitsDepartmentService) {}
 
   onModuleInit() {
     this.weeklyTimer = setInterval(() => {
       void this.tickWeekly().catch((err) =>
-        this.logger.warn(`Weekly report tick failed: ${err instanceof Error ? err.message : err}`),
+        this.logger.warn(`Weekly digest tick failed: ${err instanceof Error ? err.message : err}`),
       );
-    }, 60 * 60 * 1000);
+    }, 15 * 60 * 1000);
     void this.tickWeekly();
-    this.logger.log('Department scheduler started (weekly check hourly)');
+    this.logger.log(
+      'Department digest scheduler started (Mon 10:00 Europe/London, check every 15m)',
+    );
   }
 
   onModuleDestroy() {
@@ -25,12 +28,13 @@ export class ServiceUnitsDepartmentScheduler implements OnModuleInit, OnModuleDe
   }
 
   private async tickWeekly() {
-    const now = new Date();
-    if (now.getUTCDay() !== 1) return;
-    const key = now.toISOString().slice(0, 10);
-    if (this.lastWeeklyKey === key) return;
-    this.lastWeeklyKey = key;
-    const result = await this.departments.runWeeklyReportsForAllChurches();
-    this.logger.log(`Phase 8 weekly reports: ${result.reports} units across ${result.churches} churches`);
+    const { due, dateKey } = isLondonMondayDigestWindow();
+    if (!due) return;
+    if (this.lastDigestKey === dateKey) return;
+    this.lastDigestKey = dateKey;
+    const result = await this.departments.runDepartmentDigestsForAllChurches();
+    this.logger.log(
+      `Phase 8 department digests: ${result.digests} churches (week of ${dateKey} Europe/London)`,
+    );
   }
 }

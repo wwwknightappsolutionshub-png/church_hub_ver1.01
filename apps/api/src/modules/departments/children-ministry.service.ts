@@ -740,7 +740,7 @@ export class ChildrenMinistryService {
         kind: 'DEPARTMENT_WEEKLY_REPORT',
         title: `Children's Church — Sunday head count (${date.toISOString().slice(0, 10)})`,
         body,
-        channels: ['IN_APP', 'EMAIL'],
+        channels: ['IN_APP'],
         serviceUnitId,
         targetUserId: staff.id,
         metadata: { reportId: report.id, serviceDate: date.toISOString().slice(0, 10) },

@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   BarChart3,
   Loader2,
+  Mail,
   Network,
   Plus,
   RefreshCw,
@@ -17,6 +18,7 @@ import {
   UpdateCellBranchSchema,
 } from '@church-hub/shared-types';
 import { api } from '@/lib/api';
+import { apiErrorMessage } from '@/lib/api-errors';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useMediaQuery } from '@/lib/hooks/use-media-query';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
@@ -75,9 +77,27 @@ export function MinistryCellsApp() {
   const [branchSaving, setBranchSaving] = useState(false);
   const [reportFormId, setReportFormId] = useState('');
   const [messageBody, setMessageBody] = useState('');
+  const [digestBusy, setDigestBusy] = useState(false);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['ministry-cells'] });
+  };
+
+  const sendCellDigest = async () => {
+    setDigestBusy(true);
+    try {
+      const res = await api.post<{ emailed: number }>('/ministry-cells/digests/weekly', {});
+      const n = res.data?.emailed ?? 0;
+      toast.success(
+        n > 0
+          ? `Cell digest emailed to ${n} recipient(s)`
+          : 'Digest built but no Admin/Pastor email found',
+      );
+    } catch (e) {
+      toast.error(apiErrorMessage(e as AxiosError, 'Could not send cell digest'));
+    } finally {
+      setDigestBusy(false);
+    }
   };
 
   const { data: ctx, error: ctxError, isLoading: ctxLoading } = useApiQuery<MinistryCellsContext>(
@@ -389,14 +409,30 @@ export function MinistryCellsApp() {
             <div className="flex flex-row items-stretch gap-2 sm:gap-3">
               <MinistryCellsKpiStrip branches={branches} className="min-w-0 flex-1" />
               {ctx.canManage && (
-                <Button
-                  size="sm"
-                  className="h-auto min-h-[3.25rem] shrink-0 self-stretch rounded-xl px-3 text-xs sm:px-4 sm:text-sm"
-                  onClick={() => setShowCreateBranch((v) => !v)}
-                >
-                  <Plus className="mr-1.5 h-4 w-4 shrink-0 sm:mr-2" />
-                  <span className="whitespace-nowrap">Add New Cell</span>
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="h-auto min-h-[3.25rem] shrink-0 self-stretch rounded-xl px-3 text-xs sm:px-4 sm:text-sm"
+                    disabled={digestBusy}
+                    onClick={() => void sendCellDigest()}
+                  >
+                    {digestBusy ? (
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Mail className="mr-1.5 h-4 w-4 shrink-0" />
+                    )}
+                    <span className="whitespace-nowrap">Send digest</span>
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-auto min-h-[3.25rem] shrink-0 self-stretch rounded-xl px-3 text-xs sm:px-4 sm:text-sm"
+                    onClick={() => setShowCreateBranch((v) => !v)}
+                  >
+                    <Plus className="mr-1.5 h-4 w-4 shrink-0 sm:mr-2" />
+                    <span className="whitespace-nowrap">Add New Cell</span>
+                  </Button>
+                </>
               )}
             </div>
           )}
@@ -522,6 +558,7 @@ export function MinistryCellsApp() {
           analyticsTo={analyticsTo}
           filterBranchId={filterBranchId}
           filterLocation={filterLocation}
+          canSendDigest={ctx.canManage}
           onAnalyticsFrom={setAnalyticsFrom}
           onAnalyticsTo={setAnalyticsTo}
           onFilterBranchId={setFilterBranchId}

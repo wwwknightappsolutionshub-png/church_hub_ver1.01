@@ -6,7 +6,6 @@ import { ServiceUnitsDepartmentService } from './service-units-department.servic
 import { ServiceUnitsDepartmentScheduler } from './service-units-department.scheduler';
 import { ServiceUnitsAttendanceScheduler } from './service-units-attendance.scheduler';
 import { RealtimeModule } from '../realtime/realtime.module';
-import { EmailAdapter } from '../notifications/adapters/email.adapter';
 import { MembershipModule } from '../membership/membership.module';
 import { CommunicationsModule } from '../communications/communications.module';
 import { AccessModule } from '../access/access.module';
@@ -19,7 +18,6 @@ import { AccessModule } from '../access/access.module';
     ServiceUnitsDepartmentService,
     ServiceUnitsDepartmentScheduler,
     ServiceUnitsAttendanceScheduler,
-    EmailAdapter,
   ],
   exports: [ServiceUnitsService, ServiceUnitsDepartmentService],
 })

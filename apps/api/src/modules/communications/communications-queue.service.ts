@@ -78,7 +78,18 @@ export class CommunicationsQueueService {
           where: { id: item.id },
           data: { status: 'PROCESSING', attempts: { increment: 1 } },
         });
-        await this.deliver(item);
+        await this.deliver({
+          id: item.id,
+          churchId: item.churchId,
+          kind: item.kind,
+          title: item.title,
+          body: item.body,
+          channels: item.channels,
+          serviceUnitId: item.serviceUnitId,
+          targetUserId: item.targetUserId,
+          targetMemberId: item.targetMemberId,
+          metadata: item.metadata,
+        });
         await this.prisma.communicationQueueItem.update({
           where: { id: item.id },
           data: { status: 'SENT', sentAt: new Date() },
@@ -110,9 +121,19 @@ export class CommunicationsQueueService {
     serviceUnitId: string | null;
     targetUserId: string | null;
     targetMemberId: string | null;
+    metadata?: Prisma.JsonValue | null;
   }) {
     const channels = item.channels as CommChannel[];
     const recipients = await this.resolveRecipients(item);
+    const meta =
+      item.metadata && typeof item.metadata === 'object' && !Array.isArray(item.metadata)
+        ? (item.metadata as Record<string, unknown>)
+        : {};
+    const emailPurpose =
+      meta.emailPurpose === 'reports' ||
+      item.kind === 'DEPARTMENT_WEEKLY_REPORT'
+        ? 'reports'
+        : 'auth';
 
     if (channels.includes('IN_APP')) {
       for (const userId of recipients.userIds) {
@@ -138,6 +159,7 @@ export class CommunicationsQueueService {
           body: isHtml ? item.body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : item.body,
           html: isHtml ? item.body : undefined,
           churchId: item.churchId,
+          purpose: emailPurpose,
         });
       }
     }

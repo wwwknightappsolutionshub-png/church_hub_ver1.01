@@ -132,6 +132,7 @@ export class AuthService {
         body: `Hi ${pending.firstName},\n\nYour verification code is ${otp}.\n\nIt expires in 15 minutes.\n\n— Church_Hub`,
         html: `<p>Hi ${pending.firstName},</p><p>Your verification code is <strong style="font-size:1.25rem;letter-spacing:0.1em">${otp}</strong>.</p><p>It expires in 15 minutes.</p><p>— Church_Hub</p>`,
         churchId: null,
+        purpose: 'auth',
       });
     } catch (err) {
       this.logger.warn(
@@ -142,7 +143,7 @@ export class AuthService {
       );
     }
 
-    if (process.env.NODE_ENV !== 'production' && !process.env.SMTP_HOST) {
+    if (process.env.NODE_ENV !== 'production' && !this.email.isConfigured('auth')) {
       this.logger.log(`[register-otp] ${email} → ${otp}`);
     }
 
@@ -515,6 +516,7 @@ export class AuthService {
         body: rendered.text,
         html: rendered.html,
         churchId: user.churchId,
+        purpose: 'auth',
       });
     } catch (err) {
       this.logger.warn(
@@ -523,7 +525,7 @@ export class AuthService {
       // Still succeed to the client — do not leak delivery failures as "email not found".
     }
 
-    if (process.env.NODE_ENV !== 'production' && !process.env.SMTP_HOST) {
+    if (process.env.NODE_ENV !== 'production' && !this.email.isConfigured('auth')) {
       this.logger.log(`[auth-link:${purpose}] ${user.email} → ${actionUrl}`);
     }
   }
@@ -704,6 +706,7 @@ export class AuthService {
         body: `Hi ${user.firstName || 'there'},\n\nYour sign-in verification code is ${otp}.\n\nIt expires in 15 minutes.\n\nIf you did not try to sign in, ignore this email.\n\n— Church_Hub`,
         html: `<p>Hi ${user.firstName || 'there'},</p><p>Your sign-in verification code is <strong style="font-size:1.25rem;letter-spacing:0.1em">${otp}</strong>.</p><p>It expires in 15 minutes.</p><p>If you did not try to sign in, ignore this email.</p><p>— Church_Hub</p>`,
         churchId: user.churchId,
+        purpose: 'auth',
       });
     } catch (err) {
       await this.cache.del(`login:2fa:${challengeId}`);
@@ -715,7 +718,7 @@ export class AuthService {
       );
     }
 
-    if (process.env.NODE_ENV !== 'production' && !process.env.SMTP_HOST) {
+    if (process.env.NODE_ENV !== 'production' && !this.email.isConfigured('auth')) {
       this.logger.log(`[login-2fa] ${user.email} → ${otp}`);
     }
 

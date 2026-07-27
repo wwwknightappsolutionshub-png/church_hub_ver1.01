@@ -16,6 +16,11 @@ import { SERVICE_UNIT_CATALOG } from '../../../prisma/service-unit-catalog';
 import { ModuleAccessService, UserMemberContext } from '../access/module-access.service';
 import { MembershipAttendanceService } from '../membership/membership-attendance.service';
 import { CommunicationsQueueService } from '../communications/communications-queue.service';
+import { EmailAdapter } from '../notifications/adapters/email.adapter';
+import {
+  escapeHtml,
+  findOneAdminAndOnePastor,
+} from '../notifications/report-digest.util';
 import { isoWeekKey, weekStartUtc } from './service-units-department.util';
 import {
   isDepartmentModuleEnabled,
@@ -45,6 +50,7 @@ export class ServiceUnitsDepartmentService {
     private readonly moduleAccess: ModuleAccessService,
     private readonly attendance: MembershipAttendanceService,
     private readonly commQueue: CommunicationsQueueService,
+    private readonly email: EmailAdapter,
   ) {}
 
   private async upsertCatalogUnit(
@@ -393,8 +399,10 @@ export class ServiceUnitsDepartmentService {
     serviceUnitId: string,
     weekStartInput?: string,
     userId?: string,
+    options?: { notifyInApp?: boolean },
   ) {
     if (userId) await this.assertManage(userId, churchId, serviceUnitId);
+    const notifyInApp = options?.notifyInApp !== false;
     const unit = await this.requireUnit(churchId, serviceUnitId);
     const weekStart = weekStartInput
       ? weekStartUtc(new Date(weekStartInput))
@@ -481,33 +489,194 @@ export class ServiceUnitsDepartmentService {
       update: { body, stats: stats as Prisma.InputJsonValue },
     });
 
-    const staffUsers = await this.prisma.user.findMany({
+    // Store + optional in-app — email goes via Monday / on-demand full digests (reports SMTP).
+    if (notifyInApp) {
+      const staffUsers = await this.prisma.user.findMany({
+        where: {
+          churchId,
+          isActive: true,
+          roles: { some: { role: { name: { in: ['ADMIN', 'PASTOR'] } } } },
+        },
+        select: { id: true },
+      });
+
+      for (const staff of staffUsers) {
+        await this.commQueue.enqueue(churchId, {
+          kind: 'DEPARTMENT_WEEKLY_REPORT',
+          title: `${label} — weekly report`,
+          body,
+          channels: ['IN_APP'],
+          serviceUnitId,
+          targetUserId: staff.id,
+          metadata: { reportId: report.id, weekStart: weekStart.toISOString() },
+        });
+      }
+    }
+
+    return report;
+  }
+
+  /**
+   * Full department digest: one table for all Phase 8 units → one Admin + one Pastor.
+   * Sent via REPORTS SMTP (churchhub@…).
+   */
+  async sendFullDepartmentDigest(churchId: string, weekStartInput?: string) {
+    await this.syncPhase8Units(churchId);
+    const weekStart = weekStartInput
+      ? weekStartUtc(new Date(weekStartInput))
+      : weekStartUtc(new Date());
+    const weekKey = isoWeekKey(weekStart);
+
+    const units = await this.prisma.serviceUnit.findMany({
       where: {
         churchId,
         isActive: true,
-        roles: { some: { role: { name: { in: ['ADMIN', 'PASTOR'] } } } },
+        departmentCode: { in: PHASE8_DEPARTMENT_CODES },
       },
-      select: { id: true, email: true },
+      select: { id: true, departmentCode: true, name: true },
+      orderBy: { name: 'asc' },
     });
 
-    for (const staff of staffUsers) {
-      await this.commQueue.enqueue(churchId, {
-        kind: 'DEPARTMENT_WEEKLY_REPORT',
-        title: `${label} — weekly report`,
-        body,
-        channels: ['IN_APP', 'EMAIL'],
-        serviceUnitId,
-        targetUserId: staff.id,
-        metadata: { reportId: report.id, weekStart: weekStart.toISOString() },
+    const rows: Array<{
+      label: string;
+      memberCount: number;
+      sessions: number;
+      totalPresent: number;
+      totalAbsent: number;
+      consistentVolunteers: number;
+    }> = [];
+
+    for (const unit of units) {
+      const report = await this.generateWeeklyReport(
+        churchId,
+        unit.id,
+        weekStart.toISOString(),
+        undefined,
+        { notifyInApp: false },
+      );
+      const stats = (report.stats ?? {}) as Record<string, unknown>;
+      const label =
+        (unit.departmentCode && DEPARTMENT_LABEL[unit.departmentCode]) || unit.name;
+      rows.push({
+        label,
+        memberCount: Number(stats.memberCount ?? 0),
+        sessions: Number(stats.sessions ?? 0),
+        totalPresent: Number(stats.totalPresent ?? 0),
+        totalAbsent: Number(stats.totalAbsent ?? 0),
+        consistentVolunteers: Number(stats.consistentVolunteers ?? 0),
       });
     }
 
-    await this.prisma.serviceUnitWeeklyReport.update({
-      where: { id: report.id },
-      data: { emailedAt: new Date() },
+    const church = await this.prisma.church.findFirst({
+      where: { id: churchId },
+      select: { name: true },
     });
+    const churchName = church?.name ?? 'Church';
+    const subject = `${churchName} — Department weekly digest (${weekKey})`;
 
-    return report;
+    const tableRows = rows
+      .map(
+        (r) =>
+          `<tr>
+            <td style="padding:8px;border:1px solid #ddd">${escapeHtml(r.label)}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right">${r.memberCount}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right">${r.sessions}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right">${r.totalPresent}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right">${r.totalAbsent}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right">${r.consistentVolunteers}</td>
+          </tr>`,
+      )
+      .join('');
+
+    const html = `
+      <p>Department weekly summary for <strong>${escapeHtml(churchName)}</strong> (week ${escapeHtml(weekKey)}).</p>
+      <table style="border-collapse:collapse;width:100%;font-family:sans-serif;font-size:14px">
+        <thead>
+          <tr style="background:#f5f5f5">
+            <th style="padding:8px;border:1px solid #ddd;text-align:left">Department</th>
+            <th style="padding:8px;border:1px solid #ddd;text-align:right">Members</th>
+            <th style="padding:8px;border:1px solid #ddd;text-align:right">Sessions</th>
+            <th style="padding:8px;border:1px solid #ddd;text-align:right">Present</th>
+            <th style="padding:8px;border:1px solid #ddd;text-align:right">Absent</th>
+            <th style="padding:8px;border:1px solid #ddd;text-align:right">Consistent (≥80%)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows || `<tr><td colspan="6" style="padding:8px;border:1px solid #ddd">No department units</td></tr>`}
+        </tbody>
+      </table>
+      <p style="color:#666;font-size:12px;margin-top:16px">Sent automatically Mondays at 10:00 Europe/London, or on demand from Church Hub.</p>
+    `;
+
+    const text = [
+      `Department weekly summary for ${churchName} (week ${weekKey})`,
+      '',
+      'Department | Members | Sessions | Present | Absent | Consistent',
+      ...rows.map(
+        (r) =>
+          `${r.label} | ${r.memberCount} | ${r.sessions} | ${r.totalPresent} | ${r.totalAbsent} | ${r.consistentVolunteers}`,
+      ),
+    ].join('\n');
+
+    const recipients = await findOneAdminAndOnePastor(this.prisma, churchId);
+    let emailed = 0;
+    for (const recipient of recipients) {
+      await this.email.send({
+        to: recipient.email,
+        subject,
+        body: text,
+        html,
+        churchId,
+        purpose: 'reports',
+      });
+      await this.prisma.notification.create({
+        data: {
+          churchId,
+          userId: recipient.id,
+          title: subject,
+          body: text.slice(0, 2000),
+          type: 'DEPARTMENT_WEEKLY_REPORT',
+          data: {
+            digest: true,
+            weekStart: weekStart.toISOString(),
+            role: recipient.role,
+          } as Prisma.InputJsonValue,
+        },
+      });
+      emailed++;
+    }
+
+    if (rows.length > 0) {
+      await this.prisma.serviceUnitWeeklyReport.updateMany({
+        where: {
+          churchId,
+          weekStart,
+          serviceUnitId: { in: units.map((u) => u.id) },
+        },
+        data: { emailedAt: new Date() },
+      });
+    }
+
+    return {
+      weekKey,
+      departments: rows.length,
+      recipients: recipients.map((r) => ({ role: r.role, email: r.email })),
+      emailed,
+    };
+  }
+
+  /** Scheduler: generate + email full digests for every active church. */
+  async runDepartmentDigestsForAllChurches() {
+    const churches = await this.prisma.church.findMany({
+      where: { isActive: true },
+      select: { id: true },
+    });
+    let digests = 0;
+    for (const church of churches) {
+      await this.sendFullDepartmentDigest(church.id);
+      digests++;
+    }
+    return { churches: churches.length, digests };
   }
 
   async listWeeklyReports(churchId: string, serviceUnitId: string) {
@@ -519,7 +688,7 @@ export class ServiceUnitsDepartmentService {
     });
   }
 
-  /** Scheduler: all Phase 8 units for every church. */
+  /** Scheduler: generate reports for all Phase 8 units (no email fan-out). */
   async runWeeklyReportsForAllChurches() {
     const churches = await this.prisma.church.findMany({
       where: { isActive: true },

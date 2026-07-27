@@ -203,7 +203,7 @@ export function MedicalIncidentPanel({
     setBusy(true);
     try {
       await api.post(`${base}/medical/weekly-report`, {});
-      toast.success('Weekly report sent to admin/pastor');
+      toast.success('Weekly report saved (in-app). Email digests from Admin/Pastor Reports.');
     } catch {
       toast.error('Could not generate weekly report');
     } finally {

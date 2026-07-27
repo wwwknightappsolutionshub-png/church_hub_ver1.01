@@ -1152,7 +1152,7 @@ export class DepartmentModulesService {
         kind: 'DEPARTMENT_WEEKLY_REPORT',
         title: `${label} — quick report for pastors`,
         body,
-        channels: ['IN_APP', 'EMAIL'],
+        channels: ['IN_APP'],
         serviceUnitId,
         targetUserId: staff.id,
         metadata: { reportId: report.id, quickReport: true },

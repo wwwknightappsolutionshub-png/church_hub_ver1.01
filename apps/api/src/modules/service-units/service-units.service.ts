@@ -1037,7 +1037,7 @@ export class ServiceUnitsService {
         kind: 'DEPARTMENT_WEEKLY_REPORT',
         title,
         body,
-        channels: ['IN_APP', 'EMAIL'],
+        channels: ['IN_APP'],
         targetUserId: staff.id,
         serviceUnitId,
         metadata: {

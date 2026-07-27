@@ -29,6 +29,7 @@ import { EmailAdapter } from '../notifications/adapters/email.adapter';
     CommunicationsConversationsService,
     CommunicationsAutomationService,
     CelebrationEmailTemplatesService,
+    EmailAdapter,
   ],
 })
 export class CommunicationsModule {}

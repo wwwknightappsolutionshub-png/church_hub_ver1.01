@@ -1,9 +1,14 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
+import { useState } from 'react';
+import { Loader2, Mail } from 'lucide-react';
+import { toast } from 'sonner';
+import { api } from '@/lib/api';
+import { apiErrorMessage } from '@/lib/api-errors';
 import { MINISTRY_CELLS_DESKTOP_MQ } from '@/components/ministry-cells/layout';
 import type { BranchRow } from '@/components/ministry-cells/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useMediaQuery } from '@/lib/hooks/use-media-query';
@@ -35,6 +40,7 @@ export function MinistryCellsAnalyticsPanel({
   onFilterLocation,
   analytics,
   loading,
+  canSendDigest = false,
 }: {
   branches: BranchRow[];
   analyticsFrom: string;
@@ -47,14 +53,60 @@ export function MinistryCellsAnalyticsPanel({
   onFilterLocation: (v: string) => void;
   analytics: { totals: Record<string, number>; branchMetrics: BranchMetric[] } | undefined;
   loading: boolean;
+  canSendDigest?: boolean;
 }) {
   const { matches: isDesktopLayout, ready: layoutReady } = useMediaQuery(MINISTRY_CELLS_DESKTOP_MQ);
   const useDesktopComparison = layoutReady && isDesktopLayout;
+  const [digestBusy, setDigestBusy] = useState(false);
   const thClass =
     'whitespace-nowrap px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground';
 
+  const sendFullDigest = async () => {
+    setDigestBusy(true);
+    try {
+      const res = await api.post<{ emailed: number }>('/ministry-cells/digests/weekly', {});
+      const n = res.data?.emailed ?? 0;
+      toast.success(
+        n > 0
+          ? `Cell digest emailed to ${n} recipient(s)`
+          : 'Digest built but no Admin/Pastor email found',
+      );
+    } catch (e) {
+      toast.error(apiErrorMessage(e, 'Could not send cell digest'));
+    } finally {
+      setDigestBusy(false);
+    }
+  };
+
   return (
     <div className="space-y-3">
+      {canSendDigest ? (
+        <Card className="border-primary/20 bg-primary/[0.03] shadow-sm">
+          <CardHeader className="px-4 py-2.5 pb-0">
+            <CardTitle className="text-sm font-semibold">Province weekly digest</CardTitle>
+            <CardDescription className="text-xs">
+              Emails one Admin + one Pastor a single table of all provinces. Also runs Saturdays at
+              21:00 Europe/London.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-4 pb-3 pt-2">
+            <Button
+              type="button"
+              size="sm"
+              disabled={digestBusy}
+              onClick={() => void sendFullDigest()}
+            >
+              {digestBusy ? (
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+              ) : (
+                <Mail className="mr-1.5 h-4 w-4" />
+              )}
+              Send full digest
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div className="grid gap-3 xl:grid-cols-[minmax(280px,1fr)_minmax(0,1.4fr)]">
         <Card className="shadow-sm">
           <CardHeader className="px-4 py-2.5 pb-0">

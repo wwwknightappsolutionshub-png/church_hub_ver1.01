@@ -790,9 +790,49 @@ export function ReportsInboxPanel({
   const { data, isLoading } = useApiQuery<ReportsInboxData>([queryKey], inboxPath);
   const [reply, setReply] = useState({ recipientId: '', subject: '', body: '' });
   const [busy, setBusy] = useState(false);
+  const [digestBusy, setDigestBusy] = useState<'dept' | 'cell' | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | QueueStatus>('all');
   const [kindFilter, setKindFilter] = useState<TriageKind>('all');
+
+  const sendDepartmentDigest = async () => {
+    setDigestBusy('dept');
+    try {
+      const res = await api.post<{ emailed: number }>(
+        '/service-units/departments/digests/weekly',
+        {},
+      );
+      const n = res.data?.emailed ?? 0;
+      toast.success(
+        n > 0
+          ? `Department digest emailed to ${n} recipient(s)`
+          : 'Digest built but no Admin/Pastor email found',
+      );
+      qc.invalidateQueries({ queryKey: [queryKey] });
+    } catch (e) {
+      toast.error(apiErrorMessage(e, 'Could not send department digest'));
+    } finally {
+      setDigestBusy(null);
+    }
+  };
+
+  const sendCellDigest = async () => {
+    setDigestBusy('cell');
+    try {
+      const res = await api.post<{ emailed: number }>('/ministry-cells/digests/weekly', {});
+      const n = res.data?.emailed ?? 0;
+      toast.success(
+        n > 0
+          ? `Cell digest emailed to ${n} recipient(s)`
+          : 'Digest built but no Admin/Pastor email found',
+      );
+      qc.invalidateQueries({ queryKey: [queryKey] });
+    } catch (e) {
+      toast.error(apiErrorMessage(e, 'Could not send cell digest'));
+    } finally {
+      setDigestBusy(null);
+    }
+  };
 
   const selectedTarget = useMemo(
     () => data?.replyTargets.find((t) => t.userId === reply.recipientId),
@@ -1007,6 +1047,45 @@ export function ReportsInboxPanel({
           </div>
         ))}
       </div>
+
+      <Card className="border-primary/20 bg-primary/[0.03] shadow-sm" data-testid="reports-digest-actions">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Email digests</CardTitle>
+          <CardDescription className="text-xs">
+            Send one table to one Church Admin + one Pastor (reports mailbox). Also runs
+            automatically: departments Mon 10:00, cells Sat 21:00 (Europe/London).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            disabled={digestBusy !== null}
+            onClick={() => void sendDepartmentDigest()}
+          >
+            {digestBusy === 'dept' ? (
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="mr-1.5 h-4 w-4" />
+            )}
+            Send department digest
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={digestBusy !== null}
+            onClick={() => void sendCellDigest()}
+          >
+            {digestBusy === 'cell' ? (
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+            ) : (
+              <Mail className="mr-1.5 h-4 w-4" />
+            )}
+            Send cell digest
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card className="border-slate-200/80 shadow-sm">
         <CardContent className="flex flex-col gap-3 pt-6 sm:flex-row sm:flex-wrap sm:items-end">

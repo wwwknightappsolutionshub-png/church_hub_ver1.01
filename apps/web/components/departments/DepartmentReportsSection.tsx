@@ -36,8 +36,8 @@ export function DepartmentReportsSection({
       const count = data?.notified ?? 0;
       toast.success(
         count > 0
-          ? `Report sent to pastors (${count} notified via email and in-app)`
-          : 'Report saved (no pastor accounts found to notify)',
+          ? `Quick report saved and posted in-app (${count} leadership notification(s))`
+          : 'Quick report saved (no Admin/Pastor accounts found for in-app notify)',
       );
       await refetch();
       qc.invalidateQueries({ queryKey: ['dept-reports', unitId] });
@@ -53,10 +53,11 @@ export function DepartmentReportsSection({
     <div className="space-y-3">
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Quick report for pastors</CardTitle>
+          <CardTitle className="text-sm">Quick report for leadership</CardTitle>
           <CardDescription>
             Compiles attendance (4 weeks), meeting summaries, activity log, and inventory needs,
-            then notifies pastors by email and in-app.
+            then posts an in-app notification. Email digests are sent from Admin/Pastor Reports
+            (full department table), Mondays at 10:00 Europe/London, or via Send department digest.
           </CardDescription>
         </CardHeader>
         <CardContent>

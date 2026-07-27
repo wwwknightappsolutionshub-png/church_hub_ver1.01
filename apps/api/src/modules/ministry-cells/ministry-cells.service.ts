@@ -16,6 +16,11 @@ import type { AuthUser } from '../auth/current-user.decorator';
 import { MembershipService } from '../membership/membership.service';
 import { MembershipRegistryService } from '../membership/membership-registry.service';
 import { CommunicationsQueueService } from '../communications/communications-queue.service';
+import { EmailAdapter } from '../notifications/adapters/email.adapter';
+import {
+  escapeHtml,
+  findOneAdminAndOnePastor,
+} from '../notifications/report-digest.util';
 import {
   MinistryCellsAccessService,
   type MinistryCellsRole,
@@ -68,6 +73,7 @@ export class MinistryCellsService {
     private readonly membership: MembershipService,
     private readonly registry: MembershipRegistryService,
     private readonly commQueue: CommunicationsQueueService,
+    private readonly email: EmailAdapter,
   ) {}
 
   async getContext(user: AuthUser, churchId: string) {
@@ -834,7 +840,7 @@ export class MinistryCellsService {
         kind: 'DEPARTMENT_WEEKLY_REPORT',
         title,
         body,
-        channels: ['IN_APP', 'EMAIL'],
+        channels: ['IN_APP'],
         targetUserId,
         metadata: {
           tags: ['Branch/Cell Name', 'Date', 'Attendance Report', 'Timestamp'],
@@ -855,6 +861,212 @@ export class MinistryCellsService {
         },
       });
     }
+  }
+
+  /**
+   * Full cell/ministry digest: one row per province → one Admin + one Pastor.
+   * Sent via REPORTS SMTP. Window defaults to the Mon–Sun week containing `asOf`.
+   */
+  async sendFullCellDigest(churchId: string, asOfInput?: string) {
+    await this.access.assertModuleEnabled(churchId);
+    const asOf = asOfInput ? new Date(asOfInput) : new Date();
+    if (Number.isNaN(asOf.getTime())) {
+      throw new BadRequestException('Invalid date');
+    }
+    const weekStart = this.startOfWeek(asOf);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    const weekLabel = `${weekStart.toISOString().slice(0, 10)} → ${new Date(weekEnd.getTime() - 86400000).toISOString().slice(0, 10)}`;
+
+    const provinces = await this.prisma.cellProvince.findMany({
+      where: { churchId },
+      select: {
+        id: true,
+        name: true,
+        branches: { select: { id: true } },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    const allBranchIds = provinces.flatMap((p) => p.branches.map((b) => b.id));
+    const attendance = allBranchIds.length
+      ? await this.prisma.cellAttendance.findMany({
+          where: {
+            churchId,
+            branchId: { in: allBranchIds },
+            weekStart: { gte: weekStart, lt: weekEnd },
+          },
+          select: {
+            branchId: true,
+            presentCount: true,
+            maleCount: true,
+            femaleCount: true,
+            boysCount: true,
+            girlsCount: true,
+            testifiersCount: true,
+            firstTimersCount: true,
+          },
+        })
+      : [];
+
+    type Acc = {
+      present: number;
+      male: number;
+      female: number;
+      boys: number;
+      girls: number;
+      testifiers: number;
+      firstTimers: number;
+      records: number;
+    };
+    const empty = (): Acc => ({
+      present: 0,
+      male: 0,
+      female: 0,
+      boys: 0,
+      girls: 0,
+      testifiers: 0,
+      firstTimers: 0,
+      records: 0,
+    });
+
+    const rows = provinces.map((province) => {
+      const branchIds = new Set(province.branches.map((b) => b.id));
+      const totals = attendance
+        .filter((a) => branchIds.has(a.branchId))
+        .reduce((acc, r) => {
+          acc.present += r.presentCount;
+          acc.male += r.maleCount;
+          acc.female += r.femaleCount;
+          acc.boys += r.boysCount;
+          acc.girls += r.girlsCount;
+          acc.testifiers += r.testifiersCount;
+          acc.firstTimers += r.firstTimersCount;
+          acc.records += 1;
+          return acc;
+        }, empty());
+      return {
+        name: province.name,
+        branchCount: province.branches.length,
+        ...totals,
+      };
+    });
+
+    const church = await this.prisma.church.findFirst({
+      where: { id: churchId },
+      select: { name: true },
+    });
+    const churchName = church?.name ?? 'Church';
+    const subject = `${churchName} — Cell/Ministry weekly digest (${weekLabel})`;
+
+    const tableRows = rows
+      .map(
+        (r) =>
+          `<tr>
+            <td style="padding:8px;border:1px solid #ddd">${escapeHtml(r.name)}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right">${r.branchCount}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right">${r.records}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right">${r.present}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right">${r.male}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right">${r.female}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right">${r.boys}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right">${r.girls}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right">${r.testifiers}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right">${r.firstTimers}</td>
+          </tr>`,
+      )
+      .join('');
+
+    const html = `
+      <p>Cell/Ministry province summary for <strong>${escapeHtml(churchName)}</strong> (${escapeHtml(weekLabel)}).</p>
+      <table style="border-collapse:collapse;width:100%;font-family:sans-serif;font-size:14px">
+        <thead>
+          <tr style="background:#f5f5f5">
+            <th style="padding:8px;border:1px solid #ddd;text-align:left">Province</th>
+            <th style="padding:8px;border:1px solid #ddd;text-align:right">Cells</th>
+            <th style="padding:8px;border:1px solid #ddd;text-align:right">Reports</th>
+            <th style="padding:8px;border:1px solid #ddd;text-align:right">Present</th>
+            <th style="padding:8px;border:1px solid #ddd;text-align:right">Male</th>
+            <th style="padding:8px;border:1px solid #ddd;text-align:right">Female</th>
+            <th style="padding:8px;border:1px solid #ddd;text-align:right">Boys</th>
+            <th style="padding:8px;border:1px solid #ddd;text-align:right">Girls</th>
+            <th style="padding:8px;border:1px solid #ddd;text-align:right">Testifiers</th>
+            <th style="padding:8px;border:1px solid #ddd;text-align:right">First timers</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows || `<tr><td colspan="10" style="padding:8px;border:1px solid #ddd">No provinces configured</td></tr>`}
+        </tbody>
+      </table>
+      <p style="color:#666;font-size:12px;margin-top:16px">Sent automatically Saturdays at 21:00 Europe/London, or on demand from Church Hub.</p>
+    `;
+
+    const text = [
+      `Cell/Ministry province summary for ${churchName} (${weekLabel})`,
+      '',
+      'Province | Cells | Reports | Present | Male | Female | Boys | Girls | Testifiers | First timers',
+      ...rows.map(
+        (r) =>
+          `${r.name} | ${r.branchCount} | ${r.records} | ${r.present} | ${r.male} | ${r.female} | ${r.boys} | ${r.girls} | ${r.testifiers} | ${r.firstTimers}`,
+      ),
+    ].join('\n');
+
+    const recipients = await findOneAdminAndOnePastor(this.prisma, churchId);
+    let emailed = 0;
+    for (const recipient of recipients) {
+      await this.email.send({
+        to: recipient.email,
+        subject,
+        body: text,
+        html,
+        churchId,
+        purpose: 'reports',
+      });
+      await this.prisma.notification.create({
+        data: {
+          churchId,
+          userId: recipient.id,
+          title: subject,
+          body: text.slice(0, 2000),
+          type: 'DEPARTMENT_WEEKLY_REPORT',
+          data: {
+            digest: true,
+            cellDigest: true,
+            weekStart: weekStart.toISOString(),
+            role: recipient.role,
+          } as Prisma.InputJsonValue,
+        },
+      });
+      emailed++;
+    }
+
+    return {
+      weekLabel,
+      provinces: rows.length,
+      recipients: recipients.map((r) => ({ role: r.role, email: r.email })),
+      emailed,
+    };
+  }
+
+  async runCellDigestsForAllChurches() {
+    const churches = await this.prisma.church.findMany({
+      where: { isActive: true },
+      select: { id: true },
+    });
+    let digests = 0;
+    for (const church of churches) {
+      try {
+        await this.sendFullCellDigest(church.id);
+        digests++;
+      } catch (err) {
+        // Module may be disabled for some churches
+        if (err instanceof ForbiddenException || err instanceof NotFoundException) {
+          continue;
+        }
+        throw err;
+      }
+    }
+    return { churches: churches.length, digests };
   }
 
   async listAttendance(user: AuthUser, churchId: string, branchId: string) {
