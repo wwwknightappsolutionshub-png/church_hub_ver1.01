@@ -3,20 +3,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import Link from 'next/link';
 import {
   Building2,
   ChevronDown,
-  ChevronRight,
   Key,
   Loader2,
-  Mail,
-  BarChart3,
-  MessageSquare,
   Plus,
   Save,
+  Search,
   Shield,
-  Sparkles,
   Trash2,
   Users,
 } from 'lucide-react';
@@ -33,14 +28,9 @@ import { apiErrorMessage } from '@/lib/api-errors';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
-import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
-import {
-  enterpriseHeroBadgeGoldClass,
-  enterpriseHeroChipClass,
-} from '@/components/layout/EnterpriseModuleShell';
+import { PlatformConsoleShell } from '@/components/platform/PlatformConsoleShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
@@ -187,6 +177,8 @@ export default function PlatformConsolePage() {
   const [purgeOpen, setPurgeOpen] = useState(false);
   const [purgeSlug, setPurgeSlug] = useState('');
   const [purgePhrase, setPurgePhrase] = useState('');
+  const [tenantQuery, setTenantQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [createForm, setCreateForm] = useState({
     name: '',
     slug: '',
@@ -246,6 +238,31 @@ export default function PlatformConsolePage() {
     () => churches?.find((c) => c.id === selectedId),
     [churches, selectedId],
   );
+
+  const filteredChurches = useMemo(() => {
+    const q = tenantQuery.trim().toLowerCase();
+    return (churches ?? []).filter((c) => {
+      if (statusFilter === 'active' && !c.isActive) return false;
+      if (statusFilter === 'inactive' && c.isActive) return false;
+      if (!q) return true;
+      return (
+        c.name.toLowerCase().includes(q) ||
+        c.slug.toLowerCase().includes(q) ||
+        (c.city ?? '').toLowerCase().includes(q) ||
+        (c.country ?? '').toLowerCase().includes(q)
+      );
+    });
+  }, [churches, tenantQuery, statusFilter]);
+
+  const kpis = useMemo(() => {
+    const list = churches ?? [];
+    return {
+      total: list.length,
+      active: list.filter((c) => c.isActive).length,
+      members: list.reduce((n, c) => n + (c.memberCount ?? 0), 0),
+      users: list.reduce((n, c) => n + (c.userCount ?? 0), 0),
+    };
+  }, [churches]);
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['platform-churches'] });
@@ -391,189 +408,247 @@ export default function PlatformConsolePage() {
   }
 
   return (
-    <DashboardModuleShell
-      eyebrow="Platform"
-      title="SaaS owner console"
+    <PlatformConsoleShell
+      title="Platform control"
       description={MODULE_DESCRIPTIONS.platform}
-      badge={
-        <>
-          <Badge variant="gold" className={cn('gap-1.5', enterpriseHeroBadgeGoldClass)}>
-            <Building2 className="h-3.5 w-3.5" />
-            {churches?.length ?? 0} tenants
-          </Badge>
-          <Button variant="outline" size="sm" className={enterpriseHeroChipClass} asChild>
-            <Link href="/dashboard/platform/inbox">
-              <MessageSquare className="mr-1.5 h-3.5 w-3.5" />
-              Messaging
-            </Link>
+      actions={
+        canWriteTenants ? (
+          <Button
+            size="sm"
+            className="bg-white text-slate-900 hover:bg-slate-100"
+            onClick={() => setShowCreate((v) => !v)}
+          >
+            <Plus className="mr-1.5 h-4 w-4" />
+            {showCreate ? 'Close form' : 'New tenant'}
           </Button>
-          <Button variant="outline" size="sm" className={enterpriseHeroChipClass} asChild>
-            <Link href="/dashboard/platform/analytics">
-              <BarChart3 className="mr-1.5 h-3.5 w-3.5" />
-              Analytics
-            </Link>
-          </Button>
-          <Button variant="outline" size="sm" className={enterpriseHeroChipClass} asChild>
-            <Link href="/dashboard/platform/wisdom365">
-              <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-              Wisdom365+
-            </Link>
-          </Button>
-          <Button variant="outline" size="sm" className={enterpriseHeroChipClass} asChild>
-            <Link href="/dashboard/platform/marketing">
-              <Mail className="mr-1.5 h-3.5 w-3.5" />
-              Marketing
-            </Link>
-          </Button>
-        </>
+        ) : undefined
       }
     >
-      <div className="grid gap-6 xl:grid-cols-[minmax(280px,360px)_1fr]">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-base">All tenants</CardTitle>
-            {canWriteTenants ? (
-              <Button size="sm" onClick={() => setShowCreate((v) => !v)}>
-                <Plus className="mr-1 h-4 w-4" />
-                New
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          { label: 'Tenants', value: kpis.total, hint: `${kpis.active} active` },
+          { label: 'Active churches', value: kpis.active, hint: `${kpis.total - kpis.active} inactive` },
+          { label: 'Members', value: kpis.members, hint: 'Across all tenants' },
+          { label: 'Staff users', value: kpis.users, hint: 'Login accounts' },
+        ].map((kpi) => (
+          <div
+            key={kpi.label}
+            className="rounded-xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-card"
+          >
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{kpi.label}</p>
+            <p className="mt-1 font-heading text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-50">
+              {kpi.value}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{kpi.hint}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-card">
+        <div className="flex flex-col gap-3 border-b border-slate-200/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-50">Tenants</h2>
+            <p className="text-xs text-muted-foreground">
+              {filteredChurches.length} shown
+              {churches && filteredChurches.length !== churches.length
+                ? ` of ${churches.length}`
+                : ''}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="h-9 pl-8"
+                placeholder="Search name, slug, city…"
+                value={tenantQuery}
+                onChange={(e) => setTenantQuery(e.target.value)}
+              />
+            </div>
+            <select
+              className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
+            >
+              <option value="all">All statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+        </div>
+
+        {showCreate && canWriteTenants ? (
+          <form
+            onSubmit={createChurch}
+            className="grid gap-2 border-b border-dashed border-slate-200 bg-slate-50/80 px-4 py-4 sm:grid-cols-2 lg:grid-cols-3 dark:border-slate-800 dark:bg-slate-950/40"
+          >
+            <Input
+              placeholder="Church name"
+              value={createForm.name}
+              onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+              required
+            />
+            <Input
+              placeholder="slug (e.g. demo-church)"
+              value={createForm.slug}
+              onChange={(e) => setCreateForm({ ...createForm, slug: e.target.value })}
+              required
+            />
+            <Input
+              type="email"
+              placeholder="Admin email *"
+              value={createForm.adminEmail}
+              onChange={(e) => setCreateForm({ ...createForm, adminEmail: e.target.value })}
+              required
+            />
+            <Input
+              type="email"
+              placeholder="Pastor email (optional)"
+              value={createForm.pastorEmail}
+              onChange={(e) => setCreateForm({ ...createForm, pastorEmail: e.target.value })}
+            />
+            <Input
+              placeholder="City (optional)"
+              value={createForm.city}
+              onChange={(e) => setCreateForm({ ...createForm, city: e.target.value })}
+            />
+            <Input
+              placeholder="Country (optional)"
+              value={createForm.country}
+              onChange={(e) => setCreateForm({ ...createForm, country: e.target.value })}
+            />
+            <div className="flex flex-wrap items-center justify-between gap-2 sm:col-span-2 lg:col-span-3">
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                Welcome emails include a temporary password. Recipients must change it on first sign-in.
+              </p>
+              <Button type="submit" size="sm" disabled={busy}>
+                Create tenant & send welcomes
               </Button>
-            ) : null}
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {showCreate && canWriteTenants && (
-              <form onSubmit={createChurch} className="space-y-2 rounded-lg border border-dashed p-3">
-                <Input
-                  placeholder="Church name"
-                  value={createForm.name}
-                  onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
-                  required
-                />
-                <Input
-                  placeholder="slug (e.g. demo-church)"
-                  value={createForm.slug}
-                  onChange={(e) => setCreateForm({ ...createForm, slug: e.target.value })}
-                  required
-                />
-                <Input
-                  type="email"
-                  placeholder="Admin email *"
-                  value={createForm.adminEmail}
-                  onChange={(e) => setCreateForm({ ...createForm, adminEmail: e.target.value })}
-                  required
-                />
-                <Input
-                  type="email"
-                  placeholder="Pastor email (optional)"
-                  value={createForm.pastorEmail}
-                  onChange={(e) => setCreateForm({ ...createForm, pastorEmail: e.target.value })}
-                />
-                <Input
-                  placeholder="City (optional)"
-                  value={createForm.city}
-                  onChange={(e) => setCreateForm({ ...createForm, city: e.target.value })}
-                />
-                <Input
-                  placeholder="Country (optional)"
-                  value={createForm.country}
-                  onChange={(e) => setCreateForm({ ...createForm, country: e.target.value })}
-                />
-                <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  Welcome emails include a temporary password and a guide to every enabled module.
-                  Recipients must change their password on first sign-in.
-                </p>
-                <Button type="submit" size="sm" className="w-full" disabled={busy}>
-                  Create tenant & send welcomes
-                </Button>
-              </form>
-            )}
-            {isLoading && (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            )}
-            {churches?.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => {
-                  setSelectedId(c.id);
-                  setWorkspaceTab('tenant');
-                  setOpenModuleGroup(null);
-                  setOpenDept(null);
-                }}
-                className={cn(
-                  'flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors',
-                  selectedId === c.id
-                    ? 'border-primary/50 bg-primary/5'
-                    : 'border-border hover:bg-muted/50',
-                  !c.isActive && 'opacity-60',
-                )}
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{c.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {c.slug}
-                    {!c.isActive ? ' · inactive' : ''}
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    <Badge variant="secondary" className="text-[10px]">
-                      {c.pastorCount} pastors
-                    </Badge>
-                    <Badge variant="outline" className="text-[10px]">
-                      {c.adminCount} admins
-                    </Badge>
-                  </div>
-                </div>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-              </button>
-            ))}
-            {!isLoading && churches?.length === 0 && (
-              <p className="text-sm text-muted-foreground">No churches registered yet.</p>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          </form>
+        ) : null}
 
-        <div className="space-y-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">
-                {detail?.church.name ?? selectedRow?.name ?? 'Select a tenant'}
-              </CardTitle>
-              {selectedId && detail && !detailLoading ? (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {(
-                    [
-                      { id: 'tenant' as const, label: 'Overview' },
-                      { id: 'modules' as const, label: 'Modules' },
-                      { id: 'departments' as const, label: 'Departments' },
-                      { id: 'staff' as const, label: 'Staff' },
-                    ] as const
-                  ).map((t) => (
-                    <Button
-                      key={t.id}
-                      size="sm"
-                      variant={workspaceTab === t.id ? 'default' : 'outline'}
-                      className="h-8"
-                      onClick={() => setWorkspaceTab(t.id)}
-                    >
-                      {t.label}
-                    </Button>
-                  ))}
-                </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 dark:bg-slate-900/60">
+              <tr>
+                <th className="px-4 py-2.5 font-semibold">Church</th>
+                <th className="px-4 py-2.5 font-semibold">Location</th>
+                <th className="px-4 py-2.5 font-semibold">Status</th>
+                <th className="px-4 py-2.5 font-semibold text-right">Pastors</th>
+                <th className="px-4 py-2.5 font-semibold text-right">Admins</th>
+                <th className="px-4 py-2.5 font-semibold text-right">Members</th>
+                <th className="px-4 py-2.5 font-semibold text-right">Users</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center">
+                    <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" />
+                  </td>
+                </tr>
               ) : null}
-            </CardHeader>
-            <CardContent>
-              {!selectedId && (
-                <p className="text-sm text-muted-foreground">
-                  Choose a church to configure tenants, modules, departments, and staff.
-                </p>
-              )}
-              {selectedId && detailLoading && (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                </div>
-              )}
+              {!isLoading && filteredChurches.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
+                    No tenants match this filter.
+                  </td>
+                </tr>
+              ) : null}
+              {filteredChurches.map((c) => {
+                const selected = selectedId === c.id;
+                return (
+                  <tr
+                    key={c.id}
+                    className={cn(
+                      'cursor-pointer border-t border-slate-100 transition-colors dark:border-slate-800',
+                      selected
+                        ? 'bg-slate-900/[0.04] dark:bg-slate-100/10'
+                        : 'hover:bg-slate-50 dark:hover:bg-slate-900/40',
+                      !c.isActive && 'opacity-70',
+                    )}
+                    onClick={() => {
+                      setSelectedId(c.id);
+                      setWorkspaceTab('tenant');
+                      setOpenModuleGroup(null);
+                      setOpenDept(null);
+                    }}
+                  >
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-slate-900 dark:text-slate-50">{c.name}</p>
+                      <p className="font-mono text-[11px] text-muted-foreground">{c.slug}</p>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {[c.city, c.country].filter(Boolean).join(', ') || '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge variant={c.isActive ? 'default' : 'outline'} className="text-[10px]">
+                        {c.isActive ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums">{c.pastorCount}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{c.adminCount}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{c.memberCount}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{c.userCount}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
+      <div className="rounded-xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-card">
+        <div className="flex flex-col gap-3 border-b border-slate-200/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
+          <div className="min-w-0">
+            <h2 className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
+              {detail?.church.name ?? selectedRow?.name ?? 'Tenant workspace'}
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              {selectedId
+                ? 'Configure overview, modules, departments, and staff'
+                : 'Select a row in the table to open the workspace'}
+            </p>
+          </div>
+          {selectedId && detail && !detailLoading ? (
+            <div className="flex flex-wrap gap-1">
+              {(
+                [
+                  { id: 'tenant' as const, label: 'Overview' },
+                  { id: 'modules' as const, label: 'Modules' },
+                  { id: 'departments' as const, label: 'Departments' },
+                  { id: 'staff' as const, label: 'Staff' },
+                ] as const
+              ).map((t) => (
+                <Button
+                  key={t.id}
+                  size="sm"
+                  variant={workspaceTab === t.id ? 'default' : 'outline'}
+                  className="h-8"
+                  onClick={() => setWorkspaceTab(t.id)}
+                >
+                  {t.label}
+                </Button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <div className="p-4 sm:p-5">
+          {!selectedId && (
+            <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+              <Building2 className="h-8 w-8 text-slate-300" />
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">No tenant selected</p>
+              <p className="max-w-sm text-xs text-muted-foreground">
+                Choose a church from the table above to edit settings, modules, departments, and staff.
+              </p>
+            </div>
+          )}
+          {selectedId && detailLoading && (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          )}
               {selectedId && detail && !detailLoading && workspaceTab === 'tenant' && (
                 <div className="space-y-3">
                   <div className="grid gap-2 sm:grid-cols-2">
@@ -737,7 +812,12 @@ export default function PlatformConsolePage() {
                       </div>
                     );
                   })}
-                  <Button size="sm" className="mt-2" onClick={saveChurch} disabled={busy}>
+                  <Button
+                    size="sm"
+                    className="mt-2"
+                    onClick={saveChurch}
+                    disabled={busy || !canWriteTenants}
+                  >
                     Save module access
                   </Button>
                 </div>
@@ -815,7 +895,12 @@ export default function PlatformConsolePage() {
                       </div>
                     );
                   })}
-                  <Button size="sm" className="mt-2" onClick={saveChurch} disabled={busy}>
+                  <Button
+                    size="sm"
+                    className="mt-2"
+                    onClick={saveChurch}
+                    disabled={busy || !canWriteTenants}
+                  >
                     Save department controls
                   </Button>
                 </div>
@@ -849,11 +934,9 @@ export default function PlatformConsolePage() {
                   </div>
                 </div>
               )}
-            </CardContent>
-          </Card>
         </div>
       </div>
-    </DashboardModuleShell>
+    </PlatformConsoleShell>
   );
 }
 

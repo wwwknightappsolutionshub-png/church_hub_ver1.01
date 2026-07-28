@@ -1,9 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Building2, ChevronLeft, Loader2, Save, Sparkles } from 'lucide-react';
+import { Building2, Loader2, Save, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -11,8 +10,7 @@ import { apiErrorMessage } from '@/lib/api-errors';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
-import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
-import { enterpriseHeroChipClass } from '@/components/layout/EnterpriseModuleShell';
+import { PlatformConsoleShell } from '@/components/platform/PlatformConsoleShell';
 import { Wisdom365VariantEditor, type VariantRow } from '@/components/platform/wisdom365/Wisdom365VariantEditor';
 import { Wisdom365ContentManager } from '@/components/platform/wisdom365/Wisdom365ContentManager';
 import { Wisdom365SubscriptionsTab } from '@/components/platform/wisdom365/Wisdom365SubscriptionsTab';
@@ -128,16 +126,9 @@ export default function PlatformWisdom365Page() {
   }
 
   return (
-    <DashboardModuleShell
+    <PlatformConsoleShell
       title="Wisdom365+ Management"
       description={MODULE_DESCRIPTIONS.platformWisdom365}
-      actions={
-        <Button variant="outline" size="sm" className={enterpriseHeroChipClass} asChild>
-          <Link href="/dashboard/platform">
-            <ChevronLeft className="mr-1 h-4 w-4" /> Platform
-          </Link>
-        </Button>
-      }
     >
       <div className="space-y-6">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -349,6 +340,6 @@ export default function PlatformWisdom365Page() {
           </TabsContent>
         </Tabs>
       </div>
-    </DashboardModuleShell>
+    </PlatformConsoleShell>
   );
 }

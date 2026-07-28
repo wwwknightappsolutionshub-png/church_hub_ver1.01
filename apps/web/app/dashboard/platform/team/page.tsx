@@ -9,7 +9,7 @@ import { api } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-errors';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
-import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
+import { PlatformConsoleShell } from '@/components/platform/PlatformConsoleShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -236,7 +236,7 @@ export default function PlatformTeamPage() {
   const loading = catalogLoading || rolesLoading || staffLoading;
 
   return (
-    <DashboardModuleShell
+    <PlatformConsoleShell
       title="Platform team"
       description="Invite support operators and define custom roles with a permission matrix."
     >
@@ -500,6 +500,6 @@ export default function PlatformTeamPage() {
           </Card>
         </div>
       </div>
-    </DashboardModuleShell>
+    </PlatformConsoleShell>
   );
 }

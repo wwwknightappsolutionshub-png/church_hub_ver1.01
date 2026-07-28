@@ -4,7 +4,6 @@ import Link from 'next/link';
 import {
   BarChart3,
   Building2,
-  ChevronLeft,
   Loader2,
   RefreshCw,
   Sparkles,
@@ -17,8 +16,7 @@ import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { apiErrorMessage } from '@/lib/api-errors';
 import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
-import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
-import { enterpriseHeroChipClass } from '@/components/layout/EnterpriseModuleShell';
+import { PlatformConsoleShell } from '@/components/platform/PlatformConsoleShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -124,16 +122,9 @@ export default function PlatformAnalyticsPage() {
   const maxRevenue = Math.max(...(data?.revenueByMonth.map((m) => m.revenuePence) ?? [1]), 1);
 
   return (
-    <DashboardModuleShell
+    <PlatformConsoleShell
       title="Business analytics"
       description={MODULE_DESCRIPTIONS.platformAnalytics}
-      actions={
-        <Button variant="outline" size="sm" className={enterpriseHeroChipClass} asChild>
-          <Link href="/dashboard/platform">
-            <ChevronLeft className="mr-1 h-4 w-4" /> Platform
-          </Link>
-        </Button>
-      }
     >
       {isLoading && !data ? (
         <div className="flex min-h-[30vh] items-center justify-center">
@@ -333,6 +324,6 @@ export default function PlatformAnalyticsPage() {
           </p>
         </div>
       )}
-    </DashboardModuleShell>
+    </PlatformConsoleShell>
   );
 }

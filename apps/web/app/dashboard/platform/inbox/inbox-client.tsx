@@ -1,18 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Loader2, Megaphone, MessageSquare, Plus, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-errors';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
-import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
-import {
-  enterpriseHeroBadgeGoldClass,
-  enterpriseHeroChipClass,
-} from '@/components/layout/EnterpriseModuleShell';
+import { PlatformConsoleShell } from '@/components/platform/PlatformConsoleShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -203,28 +198,29 @@ export default function PlatformInboxInner() {
   };
 
   return (
-    <DashboardModuleShell
-      eyebrow="Platform"
+    <PlatformConsoleShell
       title="Messaging"
       description="Support chat with tenants and SaaS broadcasts — no AI. Human replies only."
-      badge={<span className={enterpriseHeroBadgeGoldClass}>SaaS Owner</span>}
       actions={
-        <div className="flex flex-wrap gap-2">
-          <Link href="/dashboard/platform" className={enterpriseHeroChipClass}>
-            Tenant console
-          </Link>
-          {tab === 'support' ? (
-            <Button size="sm" onClick={() => setShowCompose((v) => !v)}>
-              <Plus className="mr-1.5 h-3.5 w-3.5" />
-              Message tenant
-            </Button>
-          ) : (
-            <Button size="sm" onClick={() => setShowBroadcast((v) => !v)}>
-              <Megaphone className="mr-1.5 h-3.5 w-3.5" />
-              New broadcast
-            </Button>
-          )}
-        </div>
+        tab === 'support' ? (
+          <Button
+            size="sm"
+            className="bg-white text-slate-900 hover:bg-slate-100"
+            onClick={() => setShowCompose((v) => !v)}
+          >
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
+            Message tenant
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            className="bg-white text-slate-900 hover:bg-slate-100"
+            onClick={() => setShowBroadcast((v) => !v)}
+          >
+            <Megaphone className="mr-1.5 h-3.5 w-3.5" />
+            New broadcast
+          </Button>
+        )
       }
     >
       <div className="mb-4 flex flex-wrap gap-2">
@@ -476,6 +472,6 @@ export default function PlatformInboxInner() {
           </Card>
         </>
       )}
-    </DashboardModuleShell>
+    </PlatformConsoleShell>
   );
 }

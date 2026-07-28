@@ -10,7 +10,7 @@ import { apiErrorMessage } from '@/lib/api-errors';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
-import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
+import { PlatformConsoleShell } from '@/components/platform/PlatformConsoleShell';
 import { HtmlRichEditor } from '@/components/ui/HtmlRichEditor';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -129,7 +129,7 @@ export default function PlatformMarketingPage() {
   }
 
   return (
-    <DashboardModuleShell
+    <PlatformConsoleShell
       title="Marketing"
       description={MODULE_DESCRIPTIONS.platformMarketing}
     >
@@ -258,6 +258,6 @@ export default function PlatformMarketingPage() {
           </CardContent>
         </Card>
       </div>
-    </DashboardModuleShell>
+    </PlatformConsoleShell>
   );
 }
