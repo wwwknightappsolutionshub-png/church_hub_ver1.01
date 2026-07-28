@@ -228,24 +228,24 @@ export class AuthController {
           }
         : baseUser;
 
-    const isPlatformAdmin = access.isPlatformAdmin;
+    const isPlatformOperator = access.isPlatformOperator || access.isPlatformAdmin;
 
-    const enabledModules = isPlatformAdmin
+    const enabledModules = isPlatformOperator
       ? defaultTenantModules()
       : church
         ? parseTenantModulesFromSettings(church.settings)
         : defaultTenantModules();
     const departmentModuleSettings =
-      isPlatformAdmin || !church ? parseDepartmentModuleSettings({}) : parseDepartmentModuleSettings(church.settings);
+      isPlatformOperator || !church ? parseDepartmentModuleSettings({}) : parseDepartmentModuleSettings(church.settings);
 
     return {
       ...membership,
       ...access,
-      user: isPlatformAdmin ? membership.user : mergedUser,
-      member: isPlatformAdmin ? null : member,
-      churchId: isPlatformAdmin ? null : user.churchId,
-      churchName: isPlatformAdmin ? null : (church?.name ?? null),
-      churchSlug: isPlatformAdmin ? null : (church?.slug ?? null),
+      user: isPlatformOperator ? membership.user : mergedUser,
+      member: isPlatformOperator ? null : member,
+      churchId: isPlatformOperator ? null : user.churchId,
+      churchName: isPlatformOperator ? null : (church?.name ?? null),
+      churchSlug: isPlatformOperator ? null : (church?.slug ?? null),
       enabledModules,
       departmentModuleSettings,
       mustChangePassword: accountUser?.mustChangePassword ?? false,

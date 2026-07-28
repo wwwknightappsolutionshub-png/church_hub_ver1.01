@@ -27,6 +27,8 @@ import {
   ChevronDown,
   Mail,
   MessageSquare,
+  Sparkles,
+  Users,
 } from 'lucide-react';
 import { BrandMark } from '@/components/brand/BrandMark';
 import { SkipToMain } from '@/components/accessibility/SkipToMain';
@@ -35,11 +37,13 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ModuleChromeProvider, useModuleChrome } from '@/components/layout/ModuleChromeContext';
 
-const platformNav: DashboardNavItem[] = [
-  { href: '/dashboard/platform', label: 'Platform console', icon: Building2, exact: true },
-  { href: '/dashboard/platform/inbox', label: 'Messaging', icon: MessageSquare, exact: false },
-  { href: '/dashboard/platform/analytics', label: 'Analytics', icon: BarChart3, exact: false },
-  { href: '/dashboard/platform/marketing', label: 'Marketing', icon: Mail, exact: false },
+const platformNavAll: (DashboardNavItem & { permission?: string })[] = [
+  { href: '/dashboard/platform', label: 'Tenants', icon: Building2, exact: true, permission: 'platform.tenants:read' },
+  { href: '/dashboard/platform/team', label: 'Team', icon: Users, exact: false, permission: 'platform.team:read' },
+  { href: '/dashboard/platform/inbox', label: 'Messaging', icon: MessageSquare, exact: false, permission: 'platform.messaging:read' },
+  { href: '/dashboard/platform/analytics', label: 'Analytics', icon: BarChart3, exact: false, permission: 'platform.analytics:read' },
+  { href: '/dashboard/platform/marketing', label: 'Marketing', icon: Mail, exact: false, permission: 'platform.marketing:read' },
+  { href: '/dashboard/platform/wisdom365', label: 'Wisdom365+', icon: Sparkles, exact: false, permission: 'platform.wisdom365:read' },
 ];
 
 function NavLink({
@@ -85,7 +89,8 @@ function DesktopSidebar({ onNavigate }: { onNavigate?: () => void }) {
     canAccessMinistryCells,
     canManageStaff,
     userRoles,
-    isPlatformAdmin,
+    isPlatformOperator,
+    hasPlatformPermission,
     isChurchStaff,
     churchName,
     user,
@@ -93,6 +98,14 @@ function DesktopSidebar({ onNavigate }: { onNavigate?: () => void }) {
     enabledModules,
     isLoading: accessLoading,
   } = useModuleAccess();
+
+  const platformNav = useMemo(
+    () =>
+      platformNavAll.filter(
+        (item) => !item.permission || hasPlatformPermission(item.permission),
+      ),
+    [hasPlatformPermission],
+  );
 
   const memberNav = useMemo(
     () =>
@@ -167,7 +180,7 @@ function DesktopSidebar({ onNavigate }: { onNavigate?: () => void }) {
       enabledModules,
     ],
   );
-  const homeHref = isPlatformAdmin
+  const homeHref = isPlatformOperator
     ? '/dashboard/platform'
     : isChurchStaff
       ? '/dashboard'
@@ -181,7 +194,7 @@ function DesktopSidebar({ onNavigate }: { onNavigate?: () => void }) {
         </Link>
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {isPlatformAdmin ? (
+        {isPlatformOperator ? (
           platformNav.map((item) => (
             <NavLink key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} />
           ))
@@ -238,7 +251,7 @@ function DesktopSidebar({ onNavigate }: { onNavigate?: () => void }) {
           </>
         )}
       </nav>
-      {!isPlatformAdmin && (user || member) && (
+      {!isPlatformOperator && (user || member) && (
         <div className="space-y-2 border-t border-sidebar-muted px-3 py-3">
           <div className="px-1">
             <p className="truncate text-xs font-medium text-sidebar-foreground">
@@ -251,7 +264,7 @@ function DesktopSidebar({ onNavigate }: { onNavigate?: () => void }) {
           <LogoutButton variant="sidebar" />
         </div>
       )}
-      {isPlatformAdmin && (
+      {isPlatformOperator && (
         <div className="border-t border-sidebar-muted p-3">
           <LogoutButton variant="sidebar" />
         </div>
@@ -281,7 +294,7 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
     canAccessMinistryCells,
     canManageStaff,
     userRoles,
-    isPlatformAdmin,
+    isPlatformOperator,
     isChurchStaff,
     churchName,
     user,
@@ -370,9 +383,9 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
         }
       : null;
   const pageTitle = getAppRouteTitle(pathname);
-  const showMobileApp = !isPlatformAdmin;
+  const showMobileApp = !isPlatformOperator;
   const showMobilePageTitle = showMobileApp && pageTitle && !hasModulePageChrome(pathname);
-  const homeHref = isPlatformAdmin
+  const homeHref = isPlatformOperator
     ? '/dashboard/platform'
     : isChurchStaff
       ? '/dashboard'

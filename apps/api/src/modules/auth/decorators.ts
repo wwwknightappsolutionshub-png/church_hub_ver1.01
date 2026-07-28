@@ -6,6 +6,12 @@ export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
 export const ROLES_KEY = 'roles';
 export const Roles = (...roles: string[]) => SetMetadata(ROLES_KEY, roles);
 
+/** Platform operator permission (resource:action). PLATFORM_ADMIN bypasses. */
+export const PLATFORM_PERMISSION_KEY = 'platformPermission';
+export const RequirePlatformPermission = (
+  ...permissions: import('../platform/platform-permissions.catalog').PlatformPermissionKey[]
+) => SetMetadata(PLATFORM_PERMISSION_KEY, permissions.length === 1 ? permissions[0] : permissions);
+
 /** Requires church staff (ADMIN/PASTOR UserRole) or Member profile with ADMIN role. */
 export const MEMBER_ADMIN_KEY = 'memberAdmin';
 export const MemberAdmin = () => SetMetadata(MEMBER_ADMIN_KEY, true);

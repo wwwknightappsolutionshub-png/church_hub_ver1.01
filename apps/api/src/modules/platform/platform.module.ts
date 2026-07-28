@@ -16,6 +16,10 @@ import {
   TenantSupportController,
   UserNotificationsController,
 } from './platform-messaging.controller';
+import { PlatformAccessService } from './platform-access.service';
+import { PlatformPermissionGuard } from './platform-permission.guard';
+import { PlatformTeamService } from './platform-team.service';
+import { PlatformTeamController } from './platform-team.controller';
 
 @Module({
   imports: [MembershipModule, UploadsModule],
@@ -26,6 +30,7 @@ import {
     PlatformMessagingController,
     TenantSupportController,
     UserNotificationsController,
+    PlatformTeamController,
   ],
   providers: [
     PlatformService,
@@ -35,6 +40,9 @@ import {
     PlatformMarketingDripSchedulerService,
     PlatformAnalyticsService,
     PlatformMessagingService,
+    PlatformAccessService,
+    PlatformPermissionGuard,
+    PlatformTeamService,
   ],
   exports: [
     PlatformService,
@@ -42,6 +50,8 @@ import {
     PlatformMarketingDripService,
     PlatformAnalyticsService,
     PlatformMessagingService,
+    PlatformAccessService,
+    PlatformPermissionGuard,
   ],
 })
 export class PlatformModule {}

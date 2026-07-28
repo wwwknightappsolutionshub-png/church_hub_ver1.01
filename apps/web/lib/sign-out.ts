@@ -14,6 +14,7 @@ const ME_TIMEOUT_MS = 2500;
 
 type SignOutMe = {
   isPlatformAdmin?: boolean;
+  isPlatformOperator?: boolean;
   isChurchStaff?: boolean;
   userRoles?: string[];
   churchSlug?: string | null;
@@ -24,6 +25,7 @@ function resolveBucket(me: SignOutMe | null): SessionRoleBucket {
     return resolveSessionRoleBucket({
       userRoles: me.userRoles,
       isPlatformAdmin: me.isPlatformAdmin,
+      isPlatformOperator: me.isPlatformOperator,
       isChurchStaff: me.isChurchStaff,
     });
   }
@@ -73,8 +75,8 @@ export async function signOutAndRedirect(): Promise<void> {
   try {
     const { data } = await api.get<SignOutMe>('/auth/me', { timeout: ME_TIMEOUT_MS });
     me = data;
-    if (isPlatformRole(data.userRoles, data.isPlatformAdmin)) {
-      me = { ...data, isPlatformAdmin: true, churchSlug: null };
+    if (isPlatformRole(data.userRoles, data)) {
+      me = { ...data, isPlatformOperator: true, churchSlug: null };
     }
   } catch {
     /* fall back to cached role bucket */

@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsArray, IsBoolean, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
-import { Roles } from '../auth/decorators';
+import { Roles, RequirePlatformPermission } from '../auth/decorators';
 import { AuthUser, CurrentUser } from '../auth/current-user.decorator';
 import { PlatformMessagingService } from './platform-messaging.service';
 
@@ -69,6 +69,7 @@ export class PlatformMessagingController {
 
   @Get('broadcasts')
   @Roles('PLATFORM_ADMIN')
+  @RequirePlatformPermission('platform.messaging:read')
   @ApiOperation({ summary: 'List SaaS → tenant broadcasts' })
   listBroadcasts() {
     return this.messaging.listBroadcasts();
@@ -76,6 +77,7 @@ export class PlatformMessagingController {
 
   @Post('broadcasts')
   @Roles('PLATFORM_ADMIN')
+  @RequirePlatformPermission('platform.messaging:write')
   @ApiOperation({ summary: 'Broadcast notification to tenant staff' })
   createBroadcast(@CurrentUser() user: AuthUser, @Body() body: CreateBroadcastDto) {
     return this.messaging.createBroadcast(user.userId, body);
@@ -83,18 +85,21 @@ export class PlatformMessagingController {
 
   @Get('support/threads')
   @Roles('PLATFORM_ADMIN')
+  @RequirePlatformPermission('platform.messaging:read')
   listSupportThreads(@Query('status') status?: string) {
     return this.messaging.listSupportThreads({ status });
   }
 
   @Get('support/threads/:id')
   @Roles('PLATFORM_ADMIN')
+  @RequirePlatformPermission('platform.messaging:read')
   getSupportThread(@Param('id') id: string) {
     return this.messaging.getSupportThread(id, { isPlatform: true });
   }
 
   @Post('support/threads')
   @Roles('PLATFORM_ADMIN')
+  @RequirePlatformPermission('platform.messaging:write')
   createSupportThreadAsPlatform(@CurrentUser() user: AuthUser, @Body() body: CreateSupportThreadDto) {
     return this.messaging.createSupportThread(
       { userId: user.userId, churchId: null },
@@ -104,6 +109,7 @@ export class PlatformMessagingController {
 
   @Post('support/threads/:id/messages')
   @Roles('PLATFORM_ADMIN')
+  @RequirePlatformPermission('platform.messaging:write')
   replyAsPlatform(
     @Param('id') id: string,
     @CurrentUser() user: AuthUser,
@@ -114,12 +120,14 @@ export class PlatformMessagingController {
 
   @Post('support/threads/:id/close')
   @Roles('PLATFORM_ADMIN')
+  @RequirePlatformPermission('platform.messaging:write')
   closeAsPlatform(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.messaging.closeSupportThread(id, { userId: user.userId, churchId: null });
   }
 
   @Get('inbox')
   @Roles('PLATFORM_ADMIN')
+  @RequirePlatformPermission('platform.messaging:read')
   platformInbox(@CurrentUser() user: AuthUser) {
     return this.messaging.myNotifications(user.userId, null);
   }

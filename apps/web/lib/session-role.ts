@@ -4,9 +4,28 @@ export type SessionRoleBucket = 'platform' | 'church_admin' | 'pastor' | 'member
 const ROLE_KEY = 'churchHub.sessionRole';
 const SAAS_LANDING_KEY = 'churchHub.saasLanding';
 
-export function isPlatformRole(roles: string[] | undefined, isPlatformAdmin?: boolean): boolean {
+/** True SaaS owner (PLATFORM_ADMIN only). */
+export function isPlatformAdminRole(
+  roles: string[] | undefined,
+  isPlatformAdmin?: boolean,
+): boolean {
   if (isPlatformAdmin) return true;
   return (roles ?? []).includes('PLATFORM_ADMIN');
+}
+
+/** Any platform-scoped operator (owner or custom support role). */
+export function isPlatformRole(
+  roles: string[] | undefined,
+  flags?: boolean | { isPlatformAdmin?: boolean; isPlatformOperator?: boolean },
+): boolean {
+  if (typeof flags === 'boolean') {
+    if (flags) return true;
+  } else if (flags?.isPlatformOperator || flags?.isPlatformAdmin) {
+    return true;
+  }
+  if ((roles ?? []).includes('PLATFORM_ADMIN')) return true;
+  // Custom platform roles use names other than PLATFORM_ADMIN; operator flag from /auth/me is authoritative.
+  return false;
 }
 
 export function isChurchAdminRole(roles: string[] | undefined): boolean {
@@ -25,10 +44,11 @@ export function isChurchLeadershipRole(roles: string[] | undefined): boolean {
 export function resolveSessionRoleBucket(input: {
   userRoles?: string[];
   isPlatformAdmin?: boolean;
+  isPlatformOperator?: boolean;
   isChurchStaff?: boolean;
 }): SessionRoleBucket {
   const roles = input.userRoles ?? [];
-  if (isPlatformRole(roles, input.isPlatformAdmin)) return 'platform';
+  if (isPlatformRole(roles, input)) return 'platform';
   if (isChurchAdminRole(roles)) return 'church_admin';
   if (isPastorRole(roles)) return 'pastor';
   if (input.isChurchStaff) return 'pastor';

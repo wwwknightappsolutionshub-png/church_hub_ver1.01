@@ -10,9 +10,9 @@ import { isPlatformRole } from '@/lib/session-role';
 export function ChangePasswordGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isLoading, mustChangePassword, isPlatformAdmin, userRoles } = useModuleAccess();
+  const { isLoading, mustChangePassword, isPlatformOperator, userRoles } = useModuleAccess();
 
-  const isPlatform = isPlatformRole(userRoles, isPlatformAdmin);
+  const isPlatform = isPlatformRole(userRoles, { isPlatformOperator });
   const required = mustChangePassword && !isPlatform;
 
   useEffect(() => {

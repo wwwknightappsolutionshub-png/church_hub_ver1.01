@@ -402,9 +402,14 @@ model Role {
   id          String   @id @default(uuid())
   name        String   @unique
   description String?
+  /// TENANT = church staff roles; PLATFORM = SaaS operator / support roles
+  scope       String   @default("TENANT")
+  /// System roles (e.g. PLATFORM_ADMIN) cannot be deleted or have permissions cleared
+  isSystem    Boolean  @default(false)
   permissions Permission[]
   users       UserRole[]
 
+  @@index([scope])
   @@map("roles")
 }
 

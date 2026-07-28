@@ -14,6 +14,7 @@ import { UploadsModule } from '../uploads/uploads.module';
 import { FollowUpAccessGuard } from './follow-up-access.guard';
 import { ModuleAccessGuard } from './module-access.guard';
 import { PlatformModule } from '../platform/platform.module';
+import { PlatformPermissionGuard } from '../platform/platform-permission.guard';
 import { CacheModule } from '../../common/cache/cache.module';
 
 @Module({
@@ -39,6 +40,7 @@ import { CacheModule } from '../../common/cache/cache.module';
     JwtStrategy,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: PlatformPermissionGuard },
     { provide: APP_GUARD, useClass: MemberAdminGuard },
     { provide: APP_GUARD, useClass: FollowUpAccessGuard },
     { provide: APP_GUARD, useClass: ModuleAccessGuard },

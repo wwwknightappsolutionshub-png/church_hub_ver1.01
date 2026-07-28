@@ -36,10 +36,11 @@ export class RolesGuard implements CanActivate {
     request.user.roles = roleNames;
 
     if (requiredRoles.includes('PLATFORM_ADMIN')) {
-      if (!roleNames.includes('PLATFORM_ADMIN')) {
-        throw new ForbiddenException('Platform administrator access required');
-      }
-      return true;
+      if (roleNames.includes('PLATFORM_ADMIN')) return true;
+      // Custom platform support roles: allowed past RolesGate; PlatformPermissionGuard enforces finer access.
+      const hasPlatformScope = userRoles.some((ur) => ur.role.scope === 'PLATFORM');
+      if (hasPlatformScope) return true;
+      throw new ForbiddenException('Platform administrator access required');
     }
 
     const allowed =

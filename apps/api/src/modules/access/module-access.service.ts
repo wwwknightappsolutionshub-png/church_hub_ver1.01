@@ -12,6 +12,11 @@ import {
   YOUTH_MEMBER_ROLES,
   COMMUNITY_MEMBER_STATUSES,
 } from './access.constants';
+import {
+  ALL_PLATFORM_PERMISSION_KEYS,
+  toPermissionKey,
+  type PlatformPermissionKey,
+} from '../platform/platform-permissions.catalog';
 
 export interface UserMemberContext {
   userId: string;
@@ -187,9 +192,52 @@ export class ModuleAccessService {
     return user?.roles.map((r) => r.role.name) ?? [];
   }
 
-  private platformAccessFlags(userRoles: string[]) {
+  private async resolvePlatformFlags(userId: string, roleNames: string[]) {
+    const isPlatformAdmin = roleNames.includes('PLATFORM_ADMIN');
+    if (isPlatformAdmin) {
+      return {
+        isPlatformAdmin: true,
+        isPlatformOperator: true,
+        platformPermissions: [...ALL_PLATFORM_PERMISSION_KEYS] as string[],
+      };
+    }
+
+    const platformRoles = await this.prisma.userRole.findMany({
+      where: { userId, role: { scope: 'PLATFORM' } },
+      include: { role: { include: { permissions: true } } },
+    });
+    if (!platformRoles.length) {
+      return {
+        isPlatformAdmin: false,
+        isPlatformOperator: false,
+        platformPermissions: [] as string[],
+      };
+    }
+
+    const keys = new Set<string>();
+    for (const ur of platformRoles) {
+      for (const p of ur.role.permissions) {
+        keys.add(toPermissionKey(p.resource, p.action));
+      }
+    }
     return {
-      isPlatformAdmin: true,
+      isPlatformAdmin: false,
+      isPlatformOperator: true,
+      platformPermissions: [...keys].filter((k): k is PlatformPermissionKey =>
+        ALL_PLATFORM_PERMISSION_KEYS.includes(k as PlatformPermissionKey),
+      ),
+    };
+  }
+
+  private platformAccessFlags(
+    userRoles: string[],
+    platformPermissions: string[],
+    isPlatformAdmin: boolean,
+  ) {
+    return {
+      isPlatformAdmin,
+      isPlatformOperator: true,
+      platformPermissions,
       canManageStaff: false,
       canAccessFollowUp: false,
       canAccessServiceUnitHub: false,
@@ -211,13 +259,20 @@ export class ModuleAccessService {
 
   async getAccessFlags(userId: string, churchId: string | null) {
     const roleNames = await this.userRoleNames(userId);
-    if (roleNames.includes('PLATFORM_ADMIN')) {
-      return this.platformAccessFlags(roleNames);
+    const platform = await this.resolvePlatformFlags(userId, roleNames);
+    if (platform.isPlatformOperator) {
+      return this.platformAccessFlags(
+        roleNames,
+        platform.platformPermissions,
+        platform.isPlatformAdmin,
+      );
     }
 
     if (!churchId) {
       return {
         isPlatformAdmin: false,
+        isPlatformOperator: false,
+        platformPermissions: [] as string[],
         canManageStaff: false,
         canAccessFollowUp: false,
         canAccessServiceUnitHub: false,
@@ -241,6 +296,8 @@ export class ModuleAccessService {
     if (!ctx) {
       return {
         isPlatformAdmin: false,
+        isPlatformOperator: false,
+        platformPermissions: [] as string[],
         canManageStaff: false,
         canAccessFollowUp: false,
         canAccessServiceUnitHub: false,
@@ -262,6 +319,8 @@ export class ModuleAccessService {
 
     return {
       isPlatformAdmin: false,
+      isPlatformOperator: false,
+      platformPermissions: [] as string[],
       canManageStaff: this.canManageStaff(ctx),
       memberId: ctx.memberId,
       memberStatus: ctx.memberStatus,

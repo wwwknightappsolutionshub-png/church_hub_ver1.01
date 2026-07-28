@@ -3,7 +3,12 @@
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import type { ChurchTenantModulesMap } from '@church-hub/shared-types';
 import type { AuthMeResponse } from '@/lib/hooks/use-membership-access';
-import { isChurchAdminRole, isPastorRole, isPlatformRole } from '@/lib/session-role';
+import {
+  isChurchAdminRole,
+  isPastorRole,
+  isPlatformAdminRole,
+  isPlatformRole,
+} from '@/lib/session-role';
 
 export interface ModuleAccess extends AuthMeResponse {
   churchId?: string | null;
@@ -16,6 +21,8 @@ export interface ModuleAccess extends AuthMeResponse {
   memberStatus?: string | null;
   isChurchStaff?: boolean;
   isPlatformAdmin?: boolean;
+  isPlatformOperator?: boolean;
+  platformPermissions?: string[];
   canManageStaff?: boolean;
   /** Communication Hub CRUD (admin & pastor only). */
   canManageCommunications?: boolean;
@@ -37,6 +44,15 @@ export function useModuleAccess() {
   const userRoles = data?.userRoles ?? data?.user?.userRoles ?? [];
   const pastorOrAdmin =
     isPastorRole(userRoles) || isChurchAdminRole(userRoles) || (data?.isChurchStaff ?? false);
+  const platformPermissions = data?.platformPermissions ?? [];
+  const isPlatformOperator = isPlatformRole(userRoles, {
+    isPlatformAdmin: data?.isPlatformAdmin,
+    isPlatformOperator: data?.isPlatformOperator,
+  });
+  const isPlatformAdmin = isPlatformAdminRole(userRoles, data?.isPlatformAdmin);
+
+  const hasPlatformPermission = (key: string) =>
+    isPlatformAdmin || platformPermissions.includes(key);
 
   return {
     isLoading,
@@ -52,7 +68,12 @@ export function useModuleAccess() {
     canManageCommunications: data?.canManageCommunications ?? data?.isChurchStaff ?? false,
     canAccessSermonNote: data?.canAccessSermonNote === true,
     canAccessMinistryCells: data?.canAccessMinistryCells === true || pastorOrAdmin,
-    isPlatformAdmin: isPlatformRole(data?.userRoles, data?.isPlatformAdmin),
+    /** Owner only */
+    isPlatformAdmin,
+    /** Owner or custom platform role */
+    isPlatformOperator,
+    platformPermissions,
+    hasPlatformPermission,
     churchId: data?.churchId ?? null,
     churchName: data?.churchName ?? null,
     churchSlug: data?.churchSlug ?? null,

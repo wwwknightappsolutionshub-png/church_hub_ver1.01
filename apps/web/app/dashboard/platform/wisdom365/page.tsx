@@ -51,38 +51,40 @@ interface ChurchAvail {
 export default function PlatformWisdom365Page() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { isPlatformAdmin, isLoading: authLoading } = useModuleAccess();
+  const { isPlatformOperator, hasPlatformPermission, isLoading: authLoading } = useModuleAccess();
+  const canAccess = isPlatformOperator && hasPlatformPermission('platform.wisdom365:read');
+  const canWrite = hasPlatformPermission('platform.wisdom365:write');
 
   const { data: dashboard } = useApiQuery<DashboardStats>(
     ['platform-w365-dashboard'],
     '/platform/wisdom365/dashboard',
-    { enabled: isPlatformAdmin },
+    { enabled: canAccess },
   );
 
   const { data: product, refetch: refetchProduct } = useApiQuery<ProductConfig>(
     ['platform-w365-product'],
     '/platform/wisdom365/product-config',
-    { enabled: isPlatformAdmin },
+    { enabled: canAccess },
   );
 
   const { data: variants, refetch: refetchVariants } = useApiQuery<VariantRow[]>(
     ['platform-w365-variants'],
     '/platform/wisdom365/variants',
-    { enabled: isPlatformAdmin },
+    { enabled: canAccess },
   );
 
   const { data: churches, refetch: refetchChurches } = useApiQuery<ChurchAvail[]>(
     ['platform-w365-churches'],
     '/platform/wisdom365/churches',
-    { enabled: isPlatformAdmin },
+    { enabled: canAccess },
   );
 
   const [productForm, setProductForm] = useState<ProductConfig | null>(null);
   const [savingProduct, setSavingProduct] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && !isPlatformAdmin) router.replace('/dashboard');
-  }, [authLoading, isPlatformAdmin, router]);
+    if (!authLoading && !canAccess) router.replace('/dashboard');
+  }, [authLoading, canAccess, router]);
 
   useEffect(() => {
     if (product) setProductForm(product);

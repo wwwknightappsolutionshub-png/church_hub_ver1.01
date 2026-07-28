@@ -167,8 +167,13 @@ const MODULE_GROUPS: { title: string; ids: (typeof CHURCH_TENANT_MODULE_IDS)[num
 export default function PlatformConsolePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { isPlatformAdmin, userRoles, isLoading: accessLoading } = useModuleAccess();
-  const canAccess = isPlatformAdmin || userRoles.includes('PLATFORM_ADMIN');
+  const { isPlatformOperator, hasPlatformPermission, isLoading: accessLoading } = useModuleAccess();
+  const canAccess =
+    isPlatformOperator && hasPlatformPermission('platform.tenants:read');
+  const canWriteTenants = hasPlatformPermission('platform.tenants:write');
+  const canDeleteTenants = hasPlatformPermission('platform.tenants:delete');
+  const canPurgeTenants = hasPlatformPermission('platform.tenants:purge');
+  const canManageTenantStaff = hasPlatformPermission('platform.tenants.staff:write');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [workspaceTab, setWorkspaceTab] = useState<'tenant' | 'modules' | 'departments' | 'staff'>(
     'tenant',
@@ -427,13 +432,15 @@ export default function PlatformConsolePage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-base">All tenants</CardTitle>
-            <Button size="sm" onClick={() => setShowCreate((v) => !v)}>
-              <Plus className="mr-1 h-4 w-4" />
-              New
-            </Button>
+            {canWriteTenants ? (
+              <Button size="sm" onClick={() => setShowCreate((v) => !v)}>
+                <Plus className="mr-1 h-4 w-4" />
+                New
+              </Button>
+            ) : null}
           </CardHeader>
           <CardContent className="space-y-3">
-            {showCreate && (
+            {showCreate && canWriteTenants && (
               <form onSubmit={createChurch} className="space-y-2 rounded-lg border border-dashed p-3">
                 <Input
                   placeholder="Church name"
@@ -600,28 +607,34 @@ export default function PlatformConsolePage() {
                     Tenant active (members can sign in)
                   </label>
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" onClick={saveChurch} disabled={busy}>
-                      <Save className="mr-1.5 h-4 w-4" />
-                      Save tenant
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={removeChurch} disabled={busy}>
-                      Deactivate
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      disabled={busy}
-                      onClick={() => {
-                        setPurgeOpen(true);
-                        setPurgeSlug('');
-                        setPurgePhrase('');
-                      }}
-                    >
-                      <Trash2 className="mr-1.5 h-4 w-4" />
-                      Permanently delete
-                    </Button>
+                    {canWriteTenants ? (
+                      <Button size="sm" onClick={saveChurch} disabled={busy}>
+                        <Save className="mr-1.5 h-4 w-4" />
+                        Save tenant
+                      </Button>
+                    ) : null}
+                    {canDeleteTenants ? (
+                      <Button size="sm" variant="outline" onClick={removeChurch} disabled={busy}>
+                        Deactivate
+                      </Button>
+                    ) : null}
+                    {canPurgeTenants ? (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        disabled={busy}
+                        onClick={() => {
+                          setPurgeOpen(true);
+                          setPurgeSlug('');
+                          setPurgePhrase('');
+                        }}
+                      >
+                        <Trash2 className="mr-1.5 h-4 w-4" />
+                        Permanently delete
+                      </Button>
+                    ) : null}
                   </div>
-                  {purgeOpen ? (
+                  {purgeOpen && canPurgeTenants ? (
                     <div className="mt-4 space-y-3 rounded-lg border border-destructive/40 bg-destructive/5 p-4">
                       <p className="text-sm font-semibold text-destructive">
                         Permanent delete — irreversible
@@ -819,6 +832,7 @@ export default function PlatformConsolePage() {
                       users={detail.pastors}
                       churchId={selectedId}
                       onStaffChange={refresh}
+                      canManage={canManageTenantStaff}
                     />
                   </div>
                   <div>
@@ -830,6 +844,7 @@ export default function PlatformConsolePage() {
                       users={detail.admins}
                       churchId={selectedId}
                       onStaffChange={refresh}
+                      canManage={canManageTenantStaff}
                     />
                   </div>
                 </div>
@@ -846,10 +861,12 @@ function StaffList({
   users,
   churchId,
   onStaffChange,
+  canManage = true,
 }: {
   users: StaffUser[];
   churchId: string;
   onStaffChange: () => void;
+  canManage?: boolean;
 }) {
   const [openUserId, setOpenUserId] = useState<string | null>(null);
   const [emailDrafts, setEmailDrafts] = useState<Record<string, string>>({});
@@ -953,12 +970,13 @@ function StaffList({
                     type="email"
                     className="h-8 font-mono text-[11px]"
                     value={emailValue}
-                    disabled={busy}
+                    disabled={busy || !canManage}
                     onChange={(e) =>
                       setEmailDrafts((d) => ({ ...d, [u.id]: e.target.value }))
                     }
                     aria-label={`Email for ${u.firstName} ${u.lastName}`}
                   />
+                  {canManage ? (
                   <Button
                     type="button"
                     size="sm"
@@ -970,6 +988,7 @@ function StaffList({
                     {busy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
                     Save email
                   </Button>
+                  ) : null}
                 </div>
                 <div className="mt-1 flex flex-wrap gap-1">
                   {u.roles.map((r) => (
@@ -984,6 +1003,7 @@ function StaffList({
                   ) : null}
                 </div>
               </div>
+              {canManage ? (
               <Button
                 type="button"
                 variant="outline"
@@ -1000,6 +1020,7 @@ function StaffList({
                 <Key className="h-3.5 w-3.5" />
                 {open ? 'Close' : 'Password'}
               </Button>
+              ) : null}
             </div>
 
             {open ? (

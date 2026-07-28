@@ -9,6 +9,7 @@ import {
 export type AuthMeRouting = {
   userRoles?: string[];
   isPlatformAdmin?: boolean;
+  isPlatformOperator?: boolean;
   isChurchStaff?: boolean;
   churchSlug?: string | null;
 };

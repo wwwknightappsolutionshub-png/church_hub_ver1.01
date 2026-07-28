@@ -39,7 +39,7 @@ const chartTickSm = { fontSize: 11, fontFamily: 'Montserrat' };
 export default function DashboardPage() {
   const router = useRouter();
   const {
-    isPlatformAdmin,
+    isPlatformOperator,
     isChurchStaff,
     isLoading: accessLoading,
     user,
@@ -56,17 +56,17 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (accessLoading) return;
-    if (isPlatformAdmin) {
+    if (isPlatformOperator) {
       router.replace('/dashboard/platform');
       return;
     }
     if (!isChurchStaff) {
       router.replace('/dashboard/lounge');
     }
-  }, [accessLoading, isPlatformAdmin, isChurchStaff, router]);
+  }, [accessLoading, isPlatformOperator, isChurchStaff, router]);
 
   useEffect(() => {
-    if (isPlatformAdmin) return;
+    if (isPlatformOperator) return;
     let cancelled = false;
     api
       .get('/admin/dashboard')
@@ -85,7 +85,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [isPlatformAdmin]);
+  }, [isPlatformOperator]);
 
   const chartData = metrics.membership.byStatus.map((s) => ({
     name: s.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),

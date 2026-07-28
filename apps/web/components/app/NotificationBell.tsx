@@ -22,7 +22,7 @@ interface AppNotification {
 export function NotificationBell() {
   const router = useRouter();
   const pathname = usePathname();
-  const { isPlatformAdmin, isChurchStaff, churchId } = useModuleAccess();
+  const { isPlatformOperator, isChurchStaff, churchId } = useModuleAccess();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -51,7 +51,7 @@ export function NotificationBell() {
     void load();
     const t = setInterval(() => void load(), 60_000);
     return () => clearInterval(t);
-  }, [churchId, isPlatformAdmin, pathname]);
+  }, [churchId, isPlatformOperator, pathname]);
 
   useEffect(() => {
     if (!open) return;
@@ -62,7 +62,7 @@ export function NotificationBell() {
     return () => document.removeEventListener('mousedown', onDoc);
   }, [open]);
 
-  const unread = isPlatformAdmin
+  const unread = isPlatformOperator
     ? supportPending
     : notifications.filter((n) => !n.readAt).length;
 
@@ -112,7 +112,7 @@ export function NotificationBell() {
         <div className="absolute right-0 top-12 z-50 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border border-border bg-card shadow-elevated">
           <div className="flex items-center justify-between border-b border-border px-3 py-2">
             <p className="text-sm font-semibold">Notifications</p>
-            {!isPlatformAdmin && unread > 0 ? (
+            {!isPlatformOperator && unread > 0 ? (
               <button
                 type="button"
                 className="inline-flex items-center gap-1 text-[11px] font-medium text-primary"
@@ -129,7 +129,7 @@ export function NotificationBell() {
               <div className="flex justify-center py-8">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
-            ) : isPlatformAdmin ? (
+            ) : isPlatformOperator ? (
               <div className="space-y-1 p-2">
                 <Link
                   href="/dashboard/platform/inbox"
@@ -192,7 +192,7 @@ export function NotificationBell() {
             )}
           </div>
 
-          {isChurchStaff && !isPlatformAdmin ? (
+          {isChurchStaff && !isPlatformOperator ? (
             <div className="border-t border-border p-2">
               <Button variant="outline" size="sm" className="w-full" asChild>
                 <Link href="/dashboard/support" onClick={() => setOpen(false)}>

@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 export default function LoungePage() {
   const router = useRouter();
   const {
-    isPlatformAdmin,
+    isPlatformOperator,
     isChurchStaff,
     isLoading: accessLoading,
     memberId,
@@ -25,15 +25,15 @@ export default function LoungePage() {
   } = useModuleAccess();
 
   useEffect(() => {
-    if (!accessLoading && isPlatformAdmin) {
+    if (!accessLoading && isPlatformOperator) {
       router.replace('/dashboard/platform');
     }
-  }, [accessLoading, isPlatformAdmin, router]);
+  }, [accessLoading, isPlatformOperator, router]);
 
   const { data: members, isLoading, refetch } = useApiQuery<LoungeMember[]>(
     ['lounge-members'],
     '/lounge/members',
-    { enabled: !isPlatformAdmin && !!churchId },
+    { enabled: !isPlatformOperator && !!churchId },
   );
 
   const { onlineMemberIds } = useLoungePresence(churchId ?? undefined, memberId ?? undefined);
@@ -56,7 +56,7 @@ export default function LoungePage() {
     ? `${churchName} member lounge — see who is online, send connection requests, and browse announcements and jobs.`
     : MODULE_DESCRIPTIONS.lounge;
 
-  if (accessLoading || isPlatformAdmin) {
+  if (accessLoading || isPlatformOperator) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

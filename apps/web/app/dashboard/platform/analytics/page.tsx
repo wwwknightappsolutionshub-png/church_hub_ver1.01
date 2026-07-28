@@ -98,17 +98,18 @@ function StatCard({
 
 export default function PlatformAnalyticsPage() {
   const router = useRouter();
-  const { isPlatformAdmin, isLoading: accessLoading } = useModuleAccess();
+  const { isPlatformOperator, hasPlatformPermission, isLoading: accessLoading } = useModuleAccess();
+  const canAccess = isPlatformOperator && hasPlatformPermission('platform.analytics:read');
 
   const { data, isLoading, isError, error, refetch, isFetching } = useApiQuery<AnalyticsDashboard>(
     ['platform-analytics-dashboard'],
     '/platform/analytics/dashboard',
-    { enabled: isPlatformAdmin, staleTime: 60_000, retry: 1 },
+    { enabled: canAccess, staleTime: 60_000, retry: 1 },
   );
 
   useEffect(() => {
-    if (!accessLoading && !isPlatformAdmin) router.replace('/dashboard/platform');
-  }, [accessLoading, isPlatformAdmin, router]);
+    if (!accessLoading && !canAccess) router.replace('/dashboard/platform');
+  }, [accessLoading, canAccess, router]);
 
   if (accessLoading) {
     return (
@@ -118,7 +119,7 @@ export default function PlatformAnalyticsPage() {
     );
   }
 
-  if (!isPlatformAdmin) return null;
+  if (!canAccess) return null;
 
   const maxRevenue = Math.max(...(data?.revenueByMonth.map((m) => m.revenuePence) ?? [1]), 1);
 

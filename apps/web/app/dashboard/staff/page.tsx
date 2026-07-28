@@ -42,7 +42,7 @@ interface StaffUser {
 export default function ChurchStaffPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { canManageStaff, isPlatformAdmin, isLoading: accessLoading, userRoles } =
+  const { canManageStaff, isPlatformOperator, isLoading: accessLoading, userRoles } =
     useModuleAccess();
   const [showForm, setShowForm] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -56,15 +56,15 @@ export default function ChurchStaffPage() {
   });
 
   useEffect(() => {
-    if (!accessLoading && (isPlatformAdmin || !canManageStaff)) {
+    if (!accessLoading && (isPlatformOperator || !canManageStaff)) {
       router.replace('/dashboard');
     }
-  }, [accessLoading, isPlatformAdmin, canManageStaff, router]);
+  }, [accessLoading, isPlatformOperator, canManageStaff, router]);
 
   const { data: staff, isLoading } = useApiQuery<StaffUser[]>(
     ['church-staff'],
     '/church-staff',
-    { enabled: canManageStaff && !isPlatformAdmin },
+    { enabled: canManageStaff && !isPlatformOperator },
   );
 
   const resetForm = () => {

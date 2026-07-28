@@ -10,9 +10,11 @@ import { isPlatformRole } from '@/lib/session-role';
 export function PlatformRouteGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isPlatformAdmin, userRoles, isLoading } = useModuleAccess();
+  const { isPlatformOperator, userRoles, isLoading } = useModuleAccess();
 
-  const isPlatform = isPlatformRole(userRoles, isPlatformAdmin);
+  const isPlatform = isPlatformRole(userRoles, {
+    isPlatformOperator,
+  });
 
   useEffect(() => {
     if (isLoading || !isPlatform) return;

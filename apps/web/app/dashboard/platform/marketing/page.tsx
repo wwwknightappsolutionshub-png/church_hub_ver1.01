@@ -45,12 +45,14 @@ const CATEGORY_LABEL: Record<string, string> = {
 export default function PlatformMarketingPage() {
   const router = useRouter();
   const qc = useQueryClient();
-  const { isPlatformAdmin, isLoading: accessLoading } = useModuleAccess();
+  const { isPlatformOperator, hasPlatformPermission, isLoading: accessLoading } = useModuleAccess();
+  const canAccess = isPlatformOperator && hasPlatformPermission('platform.marketing:read');
+  const canWrite = hasPlatformPermission('platform.marketing:write');
 
   const { data: templates = [], isLoading } = useApiQuery<EmailTemplate[]>(
     ['platform-marketing-templates'],
     '/platform/marketing/templates',
-    { enabled: isPlatformAdmin },
+    { enabled: canAccess },
   );
 
   const [slug, setSlug] = useState<string>('');
@@ -79,8 +81,8 @@ export default function PlatformMarketingPage() {
   const missingCount = Math.max(0, EXPECTED_TEMPLATE_COUNT - templates.length);
 
   useEffect(() => {
-    if (!accessLoading && !isPlatformAdmin) router.replace('/dashboard/platform');
-  }, [accessLoading, isPlatformAdmin, router]);
+    if (!accessLoading && !canAccess) router.replace('/dashboard/platform');
+  }, [accessLoading, canAccess, router]);
 
   useEffect(() => {
     if (active && slug !== active.slug) {
@@ -118,7 +120,7 @@ export default function PlatformMarketingPage() {
     onError: (e) => toast.error(apiErrorMessage(e, 'Could not save template')),
   });
 
-  if (accessLoading || !isPlatformAdmin) {
+  if (accessLoading || !canAccess) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
         Loading…
@@ -245,7 +247,7 @@ export default function PlatformMarketingPage() {
                 dangerouslySetInnerHTML={{ __html: htmlBody }}
               />
             </div>
-            <Button disabled={!slug || saveMutation.isPending} onClick={() => saveMutation.mutate()}>
+            <Button disabled={!canWrite || !slug || saveMutation.isPending} onClick={() => saveMutation.mutate()}>
               {saveMutation.isPending ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
