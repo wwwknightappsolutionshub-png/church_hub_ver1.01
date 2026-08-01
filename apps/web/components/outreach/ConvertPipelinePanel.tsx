@@ -120,7 +120,7 @@ export function ConvertPipelinePanel({ onRefresh }: { onRefresh: () => void }) {
                     href={`/dashboard/follow-up`}
                     className="mt-1 block text-xs text-primary hover:underline"
                   >
-                    Follow-up · {c.followUp.stage.replace(/_/g, ' ')}
+                    Outreach · {c.followUp.stage.replace(/_/g, ' ')}
                   </Link>
                 )}
                 <div className="mt-2 flex flex-wrap gap-2">

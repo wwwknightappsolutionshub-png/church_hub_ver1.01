@@ -154,6 +154,8 @@ model Church {
   wisdom365Subscriptions   Wisdom365Subscription[]
   wisdom365ChurchAvailability Wisdom365ChurchAvailability?
   platformMarketingDrips PlatformMarketingDrip[]
+  consentRecords            UserConsentRecord[]
+  dsarRequests              PlatformDsarRequest[]
   cellBranches              CellBranch[]
   cellBranchMembers         CellBranchMember[]
   cellProvinces             CellProvince[]
@@ -333,6 +335,7 @@ model User {
   isActive             Boolean   @default(true)
   mustChangePassword   Boolean   @default(false)
   lastLoginAt          DateTime?
+  anonymizedAt         DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -375,6 +378,10 @@ model User {
   wisdom365MemberProgress   Wisdom365MemberProgress[]
   wisdom365MemberPrefs      Wisdom365MemberPrefs[]
   platformMarketingDrips    PlatformMarketingDrip[]
+  consentRecords            UserConsentRecord[]
+  dsarRequests              PlatformDsarRequest[]
+  dsarRequestsHandled       PlatformDsarRequest[] @relation("DsarHandler")
+  cmsPagesUpdated           PlatformCmsPage[]     @relation("PlatformCmsPageUpdater")
   cellBranchesLed           CellBranch[]       @relation("CellBranchLeader")
   cellProvincesLed          CellProvince[]     @relation("CellProvinceLeader")
   cellReportsSubmitted      CellReport[]       @relation("CellReportSubmitter")
@@ -1088,6 +1095,7 @@ model FollowUp {
   dueAt        DateTime?
   completedAt  DateTime?
   notes        String?
+  referredBy   String?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
@@ -1289,18 +1297,20 @@ model CarePrayerRequest {
 // ─── Evangelism & Outreach ───────────────────────────────────
 
 model EvangelistQrCode {
-  id         String   @id @default(uuid())
-  churchId   String
-  memberId   String
-  code       String   @unique
-  nfcUrl     String?
-  scanCount  Int      @default(0)
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
+  id           String   @id @default(uuid())
+  churchId     String
+  memberId     String?
+  isChurchWide Boolean  @default(false)
+  code         String   @unique
+  nfcUrl       String?
+  scanCount    Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
 
   church   Church            @relation(fields: [churchId], references: [id], onDelete: Cascade)
   contacts OutreachContact[]
 
+  @@index([churchId, isChurchWide])
   @@map("evangelist_qr_codes")
 }
 
@@ -1330,6 +1340,7 @@ model OutreachContact {
   photoUrl      String?
   notes         String?
   voiceNotes    String?
+  referredBy    String?
   convertStage  OutreachConvertStage @default(CAPTURED)
   needsBusPickup Boolean @default(false)
   pickupAddress String?
@@ -5309,6 +5320,108 @@ model PlatformMarketingDrip {
   @@unique([userId, dripStep])
   @@index([scheduledAt, sentAt, skippedAt])
   @@map("platform_marketing_drips")
+}
+
+// ─── Platform CMS + privacy / GDPR controls ───────────────────
+
+enum PlatformCmsPageStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum PlatformCmsPageKind {
+  PRIVACY
+  TERMS
+  COOKIE
+  DPA
+  CUSTOM
+}
+
+model PlatformCmsPage {
+  id          String               @id @default(uuid())
+  slug        String               @unique
+  title       String
+  summary     String?
+  htmlBody    String               @db.Text
+  status      PlatformCmsPageStatus @default(DRAFT)
+  kind        PlatformCmsPageKind  @default(CUSTOM)
+  isSystem    Boolean              @default(false)
+  version     Int                  @default(1)
+  publishedAt DateTime?
+  updatedById String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  updatedBy User? @relation("PlatformCmsPageUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([status, kind])
+  @@map("platform_cms_pages")
+}
+
+enum ConsentType {
+  PRIVACY
+  TERMS
+  COOKIES
+  MARKETING
+}
+
+model UserConsentRecord {
+  id              String      @id @default(uuid())
+  userId          String?
+  churchId        String?
+  email           String?
+  consentType     ConsentType
+  documentSlug    String
+  documentVersion Int         @default(1)
+  accepted        Boolean     @default(true)
+  ipAddress       String?
+  userAgent       String?
+  acceptedAt      DateTime    @default(now())
+  createdAt       DateTime    @default(now())
+
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  church Church? @relation(fields: [churchId], references: [id], onDelete: SetNull)
+
+  @@index([userId, consentType])
+  @@index([email])
+  @@index([churchId])
+  @@map("user_consent_records")
+}
+
+enum DsarRequestType {
+  ACCESS
+  ERASURE
+  RECTIFICATION
+}
+
+enum DsarRequestStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  REJECTED
+}
+
+model PlatformDsarRequest {
+  id             String            @id @default(uuid())
+  churchId       String?
+  userId         String?
+  requesterEmail String
+  requesterName  String?
+  type           DsarRequestType
+  status         DsarRequestStatus @default(OPEN)
+  notes          String?           @db.Text
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  completedAt    DateTime?
+  handledById    String?
+
+  church    Church? @relation(fields: [churchId], references: [id], onDelete: SetNull)
+  user      User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  handledBy User?   @relation("DsarHandler", fields: [handledById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([userId])
+  @@map("platform_dsar_requests")
 }
 
 // ─── Wisdom365+ (licensed daily wisdom journeys) ───────────────

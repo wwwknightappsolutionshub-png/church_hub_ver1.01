@@ -6,8 +6,10 @@ import { usePathname } from 'next/navigation';
 import {
   BarChart3,
   Building2,
+  FileText,
   Mail,
   MessageSquare,
+  Shield,
   Sparkles,
   Users,
 } from 'lucide-react';
@@ -57,6 +59,18 @@ const PLATFORM_NAV: PlatformNavItem[] = [
     label: 'Marketing',
     icon: Mail,
     permission: 'platform.marketing:read',
+  },
+  {
+    href: '/dashboard/platform/content',
+    label: 'Legal & CMS',
+    icon: FileText,
+    permission: 'platform.content:read',
+  },
+  {
+    href: '/dashboard/platform/privacy',
+    label: 'Privacy',
+    icon: Shield,
+    permission: 'platform.privacy:read',
   },
   {
     href: '/dashboard/platform/wisdom365',

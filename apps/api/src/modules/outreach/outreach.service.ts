@@ -107,6 +107,7 @@ export class OutreachService {
       photoUrl?: string;
       notes?: string;
       voiceNotes?: string;
+      referredBy?: string;
       needsBusPickup?: boolean;
       pickupAddress?: string;
       busPickupNotes?: string;
@@ -182,6 +183,7 @@ export class OutreachService {
         photoUrl: data.photoUrl,
         notes: data.notes,
         voiceNotes: data.voiceNotes,
+        referredBy: data.referredBy?.trim() || null,
         needsBusPickup: data.needsBusPickup ?? false,
         pickupAddress: data.pickupAddress,
         busPickupNotes: data.busPickupNotes,
@@ -203,6 +205,7 @@ export class OutreachService {
       outreachContactId: contact.id,
       evangelistMemberId: data.evangelistId,
       capturedByUserId: data.capturedByUserId,
+      referredBy: data.referredBy,
     });
 
     if (data.sendWelcome !== false) {
@@ -378,6 +381,7 @@ export class OutreachService {
       data: {
         churchId,
         memberId,
+        isChurchWide: false,
         code,
         nfcUrl: captureUrl,
       },
@@ -397,30 +401,68 @@ export class OutreachService {
     };
   }
 
-  async getOrCreateMyQr(churchId: string, userId: string, baseUrl: string) {
-    const member = await this.prisma.member.findFirst({
-      where: { churchId, userId },
+  /** Stable church-level Team QR — refresh only regenerates the image, not the code. */
+  async getOrCreateChurchQr(churchId: string, baseUrl: string) {
+    const church = await this.prisma.church.findUnique({
+      where: { id: churchId },
+      select: { id: true, name: true, slug: true },
     });
-    if (!member) throw new NotFoundException('Link your account to a member profile first');
+    if (!church) throw new NotFoundException('Church not found');
 
-    const existing = await this.prisma.evangelistQrCode.findFirst({
-      where: { churchId, memberId: member.id, isActive: true },
-      orderBy: { createdAt: 'desc' },
+    // Prefer a single active church-wide QR; deactivate personal evangelist QRs.
+    await this.prisma.evangelistQrCode.updateMany({
+      where: { churchId, isChurchWide: false, isActive: true },
+      data: { isActive: false },
     });
 
-    if (existing) {
-      const captureUrl = existing.nfcUrl ?? `${baseUrl}/outreach/capture?code=${existing.code}`;
-      const qrDataUrl = await QRCode.toDataURL(captureUrl, { width: 400, margin: 2 });
-      return {
-        ...existing,
-        evangelistName: `${member.firstName} ${member.lastName}`,
-        captureUrl,
-        qrDataUrl,
-        nfcInstructions: 'Program this URL to an NFC tag for tap-to-register outreach.',
-      };
+    const churchWide = await this.prisma.evangelistQrCode.findMany({
+      where: { churchId, isChurchWide: true, isActive: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    let qr = churchWide[0] ?? null;
+    if (churchWide.length > 1) {
+      await this.prisma.evangelistQrCode.updateMany({
+        where: { id: { in: churchWide.slice(1).map((c) => c.id) } },
+        data: { isActive: false },
+      });
     }
 
-    return this.generateEvangelistQr(churchId, member.id, baseUrl);
+    if (!qr) {
+      const code = randomBytes(8).toString('hex');
+      const captureUrl = `${baseUrl}/outreach/capture?code=${code}`;
+      qr = await this.prisma.evangelistQrCode.create({
+        data: {
+          churchId,
+          memberId: null,
+          isChurchWide: true,
+          code,
+          nfcUrl: captureUrl,
+        },
+      });
+    }
+
+    const captureUrl = qr.nfcUrl ?? `${baseUrl}/outreach/capture?code=${qr.code}`;
+    const qrDataUrl = await QRCode.toDataURL(captureUrl, {
+      width: 400,
+      margin: 2,
+      color: { dark: '#1e3a8a' },
+    });
+
+    return {
+      ...qr,
+      evangelistName: church.name,
+      captureUrl,
+      qrDataUrl,
+      isChurchWide: true,
+      nfcInstructions: 'Program this URL to an NFC tag for tap-to-register outreach.',
+    };
+  }
+
+  async getOrCreateMyQr(churchId: string, userId: string, baseUrl: string) {
+    // Team QR is church-wide; personal member attribution is collected as "Who referred you?"
+    void userId;
+    return this.getOrCreateChurchQr(churchId, baseUrl);
   }
 
   async resolveQrCode(code: string) {
@@ -432,14 +474,18 @@ export class OutreachService {
     });
     if (!qr || !qr.isActive) throw new NotFoundException('QR / NFC link not found');
 
-    const member = await this.prisma.member.findUnique({
-      where: { id: qr.memberId },
-      select: { firstName: true, lastName: true },
-    });
+    let evangelistName = qr.church.name;
+    if (qr.memberId && !qr.isChurchWide) {
+      const member = await this.prisma.member.findUnique({
+        where: { id: qr.memberId },
+        select: { firstName: true, lastName: true },
+      });
+      if (member) evangelistName = `${member.firstName} ${member.lastName}`;
+    }
 
     return {
       ...qr,
-      evangelistName: member ? `${member.firstName} ${member.lastName}` : 'Outreach team',
+      evangelistName,
     };
   }
 
@@ -451,13 +497,17 @@ export class OutreachService {
       phone?: string;
       email?: string;
       notes?: string;
+      referredBy?: string;
     },
   ) {
     const qr = await this.resolveQrCode(code);
+    const evangelistId =
+      qr.isChurchWide || !qr.memberId ? undefined : qr.memberId;
     return this.captureContact(qr.churchId, {
       ...data,
       qrCodeId: qr.id,
-      evangelistId: qr.memberId,
+      evangelistId,
+      referredBy: data.referredBy,
       sendWelcome: true,
     });
   }
@@ -482,21 +532,28 @@ export class OutreachService {
   async listTeamQrCodes(churchId: string) {
     const codes = await this.prisma.evangelistQrCode.findMany({
       where: { churchId, isActive: true },
-      orderBy: { scanCount: 'desc' },
+      orderBy: [{ isChurchWide: 'desc' }, { scanCount: 'desc' }],
     });
 
+    const memberIds = codes.map((c) => c.memberId).filter((id): id is string => !!id);
     const members = await this.prisma.member.findMany({
-      where: { id: { in: codes.map((c) => c.memberId) } },
+      where: { id: { in: memberIds } },
       select: { id: true, firstName: true, lastName: true },
     });
 
     const memberMap = Object.fromEntries(members.map((m) => [m.id, m]));
+    const church = await this.prisma.church.findUnique({
+      where: { id: churchId },
+      select: { name: true },
+    });
 
     return codes.map((c) => ({
       ...c,
-      evangelistName: memberMap[c.memberId]
-        ? `${memberMap[c.memberId].firstName} ${memberMap[c.memberId].lastName}`
-        : 'Unknown',
+      evangelistName: c.isChurchWide
+        ? church?.name ?? 'Church Team QR'
+        : c.memberId && memberMap[c.memberId]
+          ? `${memberMap[c.memberId].firstName} ${memberMap[c.memberId].lastName}`
+          : 'Unknown',
     }));
   }
 }

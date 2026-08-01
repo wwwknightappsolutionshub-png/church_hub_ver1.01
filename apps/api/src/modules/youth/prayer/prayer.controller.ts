@@ -13,10 +13,12 @@ import { YouthPrayerCategory } from '@prisma/client';
 import { YouthPrayerService } from './prayer.service';
 import { ChurchId, CurrentUser, AuthUser } from '../../auth/current-user.decorator';
 import { Roles, ModuleGate } from '../../auth/decorators';
+import { AllowMemberOwnedDelete } from '../../auth/destructive.decorators';
 
 @ApiTags('youth')
 @ApiBearerAuth()
 @ModuleGate('youth')
+@AllowMemberOwnedDelete()
 @Controller('youth/prayer')
 export class YouthPrayerController {
   constructor(private readonly prayer: YouthPrayerService) {}

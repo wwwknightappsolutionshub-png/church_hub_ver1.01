@@ -38,7 +38,7 @@ test.describe('Membership primary flows (Phase 10)', () => {
 
   test('follow-up board loads', async ({ page }) => {
     await page.goto('/dashboard/follow-up');
-    await expect(page.getByText(/Follow-Up|Follow up/i).first()).toBeVisible({
+    await expect(page.getByText(/Outreach|Pipeline/i).first()).toBeVisible({
       timeout: 20_000,
     });
   });

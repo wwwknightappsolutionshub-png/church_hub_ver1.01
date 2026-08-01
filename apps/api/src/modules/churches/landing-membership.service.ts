@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { ConsentType, Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import {
@@ -17,6 +17,7 @@ import { PrismaService } from '../../prisma/prisma.module';
 import { MembershipService } from '../membership/membership.service';
 import { ServiceUnitsService } from '../service-units/service-units.service';
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
+import { PlatformPrivacyService } from '../platform/platform-privacy.service';
 import { PublicMembershipRegisterDto } from './dto/public-membership-register.dto';
 
 const SETTINGS_MEMBERSHIP_FORM_KEY = 'landingMembershipForm';
@@ -41,6 +42,7 @@ export class LandingMembershipService {
     private readonly membershipService: MembershipService,
     private readonly serviceUnits: ServiceUnitsService,
     private readonly email: EmailAdapter,
+    private readonly privacy: PlatformPrivacyService,
   ) {}
 
   readFormConfig(settings: unknown): LandingMembershipFormConfig {
@@ -178,11 +180,19 @@ export class LandingMembershipService {
     }
   }
 
-  async registerFromLanding(slug: string, dto: PublicMembershipRegisterDto) {
+  async registerFromLanding(
+    slug: string,
+    dto: PublicMembershipRegisterDto,
+    meta?: { ipAddress?: string | null; userAgent?: string | null },
+  ) {
     const church = await this.prisma.church.findUnique({
       where: { slug, isActive: true },
     });
     if (!church) throw new NotFoundException('Church not found');
+
+    if (dto.acceptedTerms !== true || dto.acceptedPrivacy !== true) {
+      throw new BadRequestException('You must accept the Terms of Service and Privacy Policy');
+    }
 
     const form = this.readFormConfig(church.settings);
     const email = dto.email?.trim().toLowerCase();
@@ -258,6 +268,25 @@ export class LandingMembershipService {
       bornAgain: dto.bornAgain,
       baptizedInHolySpirit: dto.baptizedInHolySpirit,
       userId,
+    });
+
+    const consentRows: Array<{ consentType: ConsentType; documentSlug: string }> = [
+      { consentType: ConsentType.TERMS, documentSlug: 'terms-of-service' },
+      { consentType: ConsentType.PRIVACY, documentSlug: 'privacy-policy' },
+    ];
+    if (dto.acceptedMarketing === true) {
+      consentRows.push({
+        consentType: ConsentType.MARKETING,
+        documentSlug: 'privacy-policy',
+      });
+    }
+    await this.privacy.recordConsents({
+      userId: userId ?? null,
+      churchId: church.id,
+      email: email ?? null,
+      consents: consentRows,
+      ipAddress: meta?.ipAddress,
+      userAgent: meta?.userAgent,
     });
 
     const unitNames: string[] = [];

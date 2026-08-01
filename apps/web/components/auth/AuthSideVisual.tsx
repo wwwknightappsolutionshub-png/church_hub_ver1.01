@@ -87,7 +87,7 @@ function EnterpriseDashboardMock() {
           <div className="grid grid-cols-3 gap-1.5">
             {[
               { label: 'Members', value: '2.8k' },
-              { label: 'Follow-up', value: '78%' },
+              { label: 'Outreach', value: '78%' },
               { label: 'Outreach', value: '+24%' },
             ].map((s) => (
               <div key={s.label} className="rounded-lg bg-white/5 px-2 py-1.5 ring-1 ring-white/10">

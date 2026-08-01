@@ -239,7 +239,7 @@ export function MembershipImportWizard({
                   }
                 >
                   <option value="MEMBERS">Members (profiles)</option>
-                  <option value="LEADS">Follow-up leads only</option>
+                  <option value="LEADS">Outreach leads only</option>
                 </select>
               </div>
               <label className="flex items-center gap-2 text-sm">
@@ -380,7 +380,7 @@ export function MembershipImportWizard({
               <p>Class enrollments: {commitSummary.classesEnrolled}</p>
             )}
             {(commitSummary.followUpsCreated ?? 0) > 0 && (
-              <p>Follow-up leads: {commitSummary.followUpsCreated}</p>
+              <p>Outreach leads: {commitSummary.followUpsCreated}</p>
             )}
             <Button
               type="button"

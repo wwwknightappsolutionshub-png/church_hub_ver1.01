@@ -15,7 +15,11 @@ export type PlatformPermissionKey =
   | 'platform.wisdom365:read'
   | 'platform.wisdom365:write'
   | 'platform.team:read'
-  | 'platform.team:write';
+  | 'platform.team:write'
+  | 'platform.content:read'
+  | 'platform.content:write'
+  | 'platform.privacy:read'
+  | 'platform.privacy:write';
 
 export type PlatformPermissionDef = {
   key: PlatformPermissionKey;
@@ -146,6 +150,38 @@ export const PLATFORM_PERMISSION_CATALOG: PlatformPermissionDef[] = [
     label: 'Manage platform team',
     group: 'Team',
     description: 'Invite staff and create custom roles with permissions.',
+  },
+  {
+    key: 'platform.content:read',
+    resource: 'platform.content',
+    action: 'read',
+    label: 'View legal & CMS pages',
+    group: 'Content',
+    description: 'Browse Privacy, Terms, Cookie, and custom CMS pages.',
+  },
+  {
+    key: 'platform.content:write',
+    resource: 'platform.content',
+    action: 'write',
+    label: 'Edit legal & CMS pages',
+    group: 'Content',
+    description: 'Create, edit, and publish platform CMS pages.',
+  },
+  {
+    key: 'platform.privacy:read',
+    resource: 'platform.privacy',
+    action: 'read',
+    label: 'View privacy requests',
+    group: 'Privacy',
+    description: 'See data subject access and erasure requests.',
+  },
+  {
+    key: 'platform.privacy:write',
+    resource: 'platform.privacy',
+    action: 'write',
+    label: 'Handle privacy requests',
+    group: 'Privacy',
+    description: 'Update DSAR status and complete erasure actions.',
   },
 ];
 

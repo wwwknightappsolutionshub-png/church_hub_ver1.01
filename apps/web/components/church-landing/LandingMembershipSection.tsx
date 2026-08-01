@@ -36,6 +36,9 @@ type FormState = {
   bornAgain: '' | 'yes' | 'no';
   baptizedInHolySpirit: '' | 'yes' | 'no';
   serviceUnitIds: string[];
+  acceptedTerms: boolean;
+  acceptedPrivacy: boolean;
+  acceptedMarketing: boolean;
 };
 
 const emptyForm: FormState = {
@@ -49,6 +52,9 @@ const emptyForm: FormState = {
   bornAgain: '',
   baptizedInHolySpirit: '',
   serviceUnitIds: [],
+  acceptedTerms: false,
+  acceptedPrivacy: false,
+  acceptedMarketing: false,
 };
 
 function boolFromChoice(v: '' | 'yes' | 'no'): boolean | undefined {
@@ -156,6 +162,10 @@ export function LandingMembershipSection({
       toast.error('Please answer whether you are baptized in the Holy Spirit');
       return;
     }
+    if (!form.acceptedTerms || !form.acceptedPrivacy) {
+      toast.error('Please accept the Terms of Service and Privacy Policy');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -175,6 +185,9 @@ export function LandingMembershipSection({
           effectiveConfig.showServiceUnits && form.serviceUnitIds.length > 0
             ? form.serviceUnitIds
             : undefined,
+        acceptedTerms: true as const,
+        acceptedPrivacy: true as const,
+        acceptedMarketing: form.acceptedMarketing,
       };
 
       const res = await registerPublicMembership(churchSlug, payload);
@@ -469,6 +482,57 @@ export function LandingMembershipSection({
                 onChange={(e) => update({ notes: e.target.value })}
               />
             </div>
+
+            <div className="space-y-2 rounded-lg border border-border/80 bg-muted/20 p-3 text-left">
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4"
+                  checked={form.acceptedTerms}
+                  onChange={(e) => update({ acceptedTerms: e.target.checked })}
+                />
+                <span>
+                  I agree to the{' '}
+                  <a
+                    href="/legal/terms-of-service"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-primary underline-offset-2 hover:underline"
+                  >
+                    Terms of Service
+                  </a>
+                </span>
+              </label>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4"
+                  checked={form.acceptedPrivacy}
+                  onChange={(e) => update({ acceptedPrivacy: e.target.checked })}
+                />
+                <span>
+                  I have read the{' '}
+                  <a
+                    href="/legal/privacy-policy"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-primary underline-offset-2 hover:underline"
+                  >
+                    Privacy Policy
+                  </a>
+                </span>
+              </label>
+              <label className="flex items-start gap-2 text-sm text-muted-foreground">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4"
+                  checked={form.acceptedMarketing}
+                  onChange={(e) => update({ acceptedMarketing: e.target.checked })}
+                />
+                <span>Send me church updates by email (optional)</span>
+              </label>
+            </div>
+
             <div className="flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end">
               <Button
                 type="button"

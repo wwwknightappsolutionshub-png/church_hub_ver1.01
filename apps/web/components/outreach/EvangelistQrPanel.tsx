@@ -15,6 +15,7 @@ interface QrData {
   nfcInstructions?: string;
   evangelistName?: string;
   scanCount?: number;
+  isChurchWide?: boolean;
 }
 
 export function EvangelistQrPanel() {
@@ -24,10 +25,10 @@ export function EvangelistQrPanel() {
   const load = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get<QrData>('/outreach/qr/me');
+      const { data } = await api.get<QrData>('/outreach/qr/church');
       setQr(data);
     } catch {
-      toast.error('Could not generate QR — ensure your user has a member profile');
+      toast.error('Could not load church Team QR');
     } finally {
       setLoading(false);
     }
@@ -47,28 +48,28 @@ export function EvangelistQrPanel() {
           Team QR & NFC
         </CardTitle>
         <CardDescription>
-          Self-registration link for your outreach team. Tap NFC tag or scan QR in the field —
-          opens a simple web form (no app install).
+          One stable church QR for the whole team. Refresh redraws the image — the link stays the
+          same. Opens a simple web form (no app install). Visitors can say who referred them.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {qr?.qrDataUrl ? (
           <>
             <div className="flex justify-center rounded-xl border bg-white p-4">
-              <img src={qr.qrDataUrl} alt="Evangelist QR code" className="h-48 w-48" />
+              <img src={qr.qrDataUrl} alt="Church team QR code" className="h-48 w-48" />
             </div>
             {qr.evangelistName && (
               <p className="text-center text-sm font-medium">{qr.evangelistName}</p>
             )}
             <p className="text-center text-xs text-muted-foreground">
-              {qr.scanCount ?? 0} scans · code {qr.code.slice(0, 8)}…
+              {qr.scanCount ?? 0} scans · code {qr.code.slice(0, 8)}… · church-wide
             </p>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" className="flex-1" onClick={copyLink}>
                 <Copy className="mr-1.5 h-3.5 w-3.5" />
                 Copy link
               </Button>
-              <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+              <Button variant="outline" size="sm" onClick={load} disabled={loading} title="Redraw QR">
                 <RefreshCw className="h-3.5 w-3.5" />
               </Button>
             </div>
@@ -85,7 +86,7 @@ export function EvangelistQrPanel() {
           <div className="flex aspect-square flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted/20 p-6 text-center">
             <QrCode className="h-14 w-14 text-muted-foreground/40" />
             <p className="mt-3 text-sm text-muted-foreground">
-              Generate your personal outreach QR code
+              Generate your church Team QR code
             </p>
             <Button className="mt-4" size="sm" onClick={load} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Generate QR code'}

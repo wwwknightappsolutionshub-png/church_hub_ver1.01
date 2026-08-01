@@ -12,7 +12,7 @@ const leadName = `E2E Lead ${runId}`;
 
 test.describe.configure({ mode: 'serial' });
 
-test.describe('Follow-Up end-to-end', () => {
+test.describe('Outreach end-to-end', () => {
   test.skip(skipBrowser, 'Set SKIP_PLAYWRIGHT=true to skip browser E2E');
 
   test.beforeAll(async ({ request }) => {
@@ -25,7 +25,7 @@ test.describe('Follow-Up end-to-end', () => {
 
   test('page loads with pipeline stats and search', async ({ page }) => {
     await page.goto('/dashboard/follow-up');
-    await expect(page.getByRole('heading', { name: /^Follow-Up$/i })).toBeVisible({
+    await expect(page.getByRole('heading', { name: /^Outreach$/i })).toBeVisible({
       timeout: 20_000,
     });
     await expect(page.getByPlaceholder('Search name, phone, email, assignee…')).toBeVisible();

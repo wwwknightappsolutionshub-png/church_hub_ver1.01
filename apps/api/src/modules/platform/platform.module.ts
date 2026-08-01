@@ -20,6 +20,13 @@ import { PlatformAccessService } from './platform-access.service';
 import { PlatformPermissionGuard } from './platform-permission.guard';
 import { PlatformTeamService } from './platform-team.service';
 import { PlatformTeamController } from './platform-team.controller';
+import { PlatformCmsService } from './platform-cms.service';
+import { PlatformCmsController } from './platform-cms.controller';
+import { PlatformPrivacyService } from './platform-privacy.service';
+import {
+  PlatformPrivacyController,
+  PrivacySelfServiceController,
+} from './platform-privacy.controller';
 
 @Module({
   imports: [MembershipModule, UploadsModule],
@@ -31,6 +38,9 @@ import { PlatformTeamController } from './platform-team.controller';
     TenantSupportController,
     UserNotificationsController,
     PlatformTeamController,
+    PlatformCmsController,
+    PlatformPrivacyController,
+    PrivacySelfServiceController,
   ],
   providers: [
     PlatformService,
@@ -43,6 +53,8 @@ import { PlatformTeamController } from './platform-team.controller';
     PlatformAccessService,
     PlatformPermissionGuard,
     PlatformTeamService,
+    PlatformCmsService,
+    PlatformPrivacyService,
   ],
   exports: [
     PlatformService,
@@ -52,6 +64,8 @@ import { PlatformTeamController } from './platform-team.controller';
     PlatformMessagingService,
     PlatformAccessService,
     PlatformPermissionGuard,
+    PlatformCmsService,
+    PlatformPrivacyService,
   ],
 })
 export class PlatformModule {}

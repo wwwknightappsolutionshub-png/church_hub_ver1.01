@@ -180,6 +180,13 @@ export const RegisterStartSchema = z.object({
   lastName: personNameSchema,
   email: emailSchema,
   password: passwordSchema,
+  acceptedTerms: z.literal(true, {
+    errorMap: () => ({ message: 'You must accept the Terms of Service' }),
+  }),
+  acceptedPrivacy: z.literal(true, {
+    errorMap: () => ({ message: 'You must accept the Privacy Policy' }),
+  }),
+  acceptedMarketing: z.boolean().optional().default(false),
 });
 export type RegisterStartInput = z.infer<typeof RegisterStartSchema>;
 

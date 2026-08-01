@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import { useModuleAccess } from '@/lib/hooks/use-module-access';
+import { isChurchLeadershipRole } from '@/lib/session-role';
 import {
   MEMBER_STATUSES,
   ROLE_LABELS,
@@ -72,6 +74,8 @@ export function MemberDetailPanel({
   onDeleted,
 }: MemberDetailPanelProps) {
   const queryClient = useQueryClient();
+  const { userRoles } = useModuleAccess();
+  const canDeleteMember = isChurchLeadershipRole(userRoles);
   const [mounted, setMounted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -139,6 +143,7 @@ export function MemberDetailPanel({
   };
 
   const deleteMember = async () => {
+    if (!canDeleteMember) return;
     if (!window.confirm(`Remove ${formatMemberName(member)} from membership?`)) return;
     setBusy(true);
     try {
@@ -147,7 +152,7 @@ export function MemberDetailPanel({
       onDeleted?.();
       onClose();
     } catch {
-      toast.error('Could not delete — Member Admin permission required');
+      toast.error('Could not delete — Pastor or Admin permission required');
     } finally {
       setBusy(false);
     }
@@ -565,7 +570,7 @@ export function MemberDetailPanel({
           </section>
         )}
 
-        {canManageMembers && (
+        {canDeleteMember && (
           <section className="border-t border-border pt-4">
             <Button
               variant="destructive"

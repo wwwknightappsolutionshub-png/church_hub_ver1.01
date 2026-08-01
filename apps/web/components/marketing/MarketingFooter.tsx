@@ -1,5 +1,8 @@
+'use client';
+
 import Link from 'next/link';
 import { BrandMark } from '@/components/brand/BrandMark';
+import { COOKIE_CONSENT_STORAGE_KEY } from '@/components/privacy/CookieConsentBanner';
 
 const footerLinks = {
   Product: [
@@ -11,10 +14,20 @@ const footerLinks = {
   Company: [
     { label: 'About', href: '#' },
     { label: 'Contact', href: '#' },
-    { label: 'Privacy', href: '#' },
-    { label: 'Terms', href: '#' },
+    { label: 'Privacy', href: '/legal/privacy-policy' },
+    { label: 'Terms', href: '/legal/terms-of-service' },
+    { label: 'Cookies', href: '/legal/cookie-policy' },
   ],
 };
+
+function reopenCookiePreferences() {
+  try {
+    localStorage.removeItem(COOKIE_CONSENT_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+  window.dispatchEvent(new Event('churchhub:reopen-cookie-consent'));
+}
 
 export function MarketingFooter() {
   return (
@@ -39,6 +52,17 @@ export function MarketingFooter() {
                     </Link>
                   </li>
                 ))}
+                {group === 'Company' ? (
+                  <li>
+                    <button
+                      type="button"
+                      className="text-sm text-muted-foreground hover:text-foreground"
+                      onClick={reopenCookiePreferences}
+                    >
+                      Cookie preferences
+                    </button>
+                  </li>
+                ) : null}
               </ul>
             </div>
           ))}

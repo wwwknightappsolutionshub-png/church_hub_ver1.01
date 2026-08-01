@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 const sidebarItems = [
   { icon: LayoutDashboard, label: 'Dashboard', active: true },
   { icon: Users, label: 'Membership' },
-  { icon: HeartHandshake, label: 'Follow-Up' },
+  { icon: HeartHandshake, label: 'Outreach' },
   { icon: Megaphone, label: 'Outreach' },
   { icon: Sparkles, label: 'Youth' },
   { icon: Bus, label: 'Bus Ministry' },

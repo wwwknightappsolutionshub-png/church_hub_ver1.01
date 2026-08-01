@@ -115,6 +115,7 @@ export class FollowUpService {
       assignedToId?: string;
       dueAt?: string;
       notes?: string;
+      referredBy?: string;
       scheduleReminder?: boolean;
       reminderChannel?: string;
     },
@@ -130,6 +131,7 @@ export class FollowUpService {
         assignedToId: data.assignedToId,
         dueAt: data.dueAt ? new Date(data.dueAt) : undefined,
         notes: data.notes,
+        referredBy: data.referredBy?.trim() || null,
       },
       include: followUpInclude,
     });
@@ -350,6 +352,7 @@ export class FollowUpService {
       outreachContactId?: string;
       evangelistMemberId?: string | null;
       capturedByUserId?: string | null;
+      referredBy?: string;
     },
   ) {
     const contactName = [data.firstName, data.lastName].filter(Boolean).join(' ').trim();
@@ -361,7 +364,39 @@ export class FollowUpService {
       const existing = await this.prisma.followUp.findFirst({
         where: { churchId, OR: orConditions },
       });
-      if (existing) return existing;
+      if (existing) {
+        const referredBy = data.referredBy?.trim() || null;
+        const noteExtra = [
+          referredBy && !existing.referredBy ? `Referred by: ${referredBy}.` : null,
+          data.notes?.trim() || null,
+        ]
+          .filter(Boolean)
+          .join(' ');
+
+        const updated = await this.prisma.followUp.update({
+          where: { id: existing.id },
+          data: {
+            ...(referredBy && !existing.referredBy ? { referredBy } : {}),
+            ...(noteExtra
+              ? {
+                  notes: existing.notes
+                    ? `${existing.notes} ${noteExtra}`.trim()
+                    : noteExtra,
+                }
+              : {}),
+          },
+          include: followUpInclude,
+        });
+
+        if (data.outreachContactId) {
+          await this.prisma.outreachContact.update({
+            where: { id: data.outreachContactId },
+            data: { followUpId: updated.id },
+          });
+        }
+
+        return updated;
+      }
     }
 
     const assignedToId = await this.teamNotify.resolveAssigneeForCapture(churchId, {
@@ -377,6 +412,7 @@ export class FollowUpService {
     const noteParts = ['Created from Outreach capture.'];
     if (data.outreachContactId) noteParts.push(`Outreach ID: ${data.outreachContactId}.`);
     if (evangelistName) noteParts.push(`Evangelist: ${evangelistName}.`);
+    if (data.referredBy?.trim()) noteParts.push(`Referred by: ${data.referredBy.trim()}.`);
     if (data.notes?.trim()) noteParts.push(data.notes.trim());
 
     const followUp = await this.create(churchId, {
@@ -386,6 +422,7 @@ export class FollowUpService {
       stage: 'NEW_LEAD',
       assignedToId,
       notes: noteParts.join(' '),
+      referredBy: data.referredBy,
       scheduleReminder: false,
     });
 

@@ -56,7 +56,7 @@ export default function OutreachPage() {
   return (
     <DashboardModuleShell
       eyebrow="Evangelism"
-      title="Outreach"
+      title="Field Outreach"
       description={MODULE_DESCRIPTIONS.outreach}
       badge={<Badge variant="success">Offline-ready</Badge>}
       actions={
@@ -107,10 +107,10 @@ export default function OutreachPage() {
               <CardHeader>
                 <CardTitle>Fast capture form</CardTitle>
                 <CardDescription>
-                  Offline-first capture. Creates a New Lead in Follow-Up, auto-assigns when possible,
-                  and alerts the follow-up team (in-app + email). View and progress leads on{' '}
+                  Offline-first capture. Creates a New Lead in Outreach, auto-assigns when possible,
+                  and alerts the outreach team (in-app + email). View and progress leads on{' '}
                   <Link href="/dashboard/follow-up" className="font-medium text-primary underline-offset-2 hover:underline">
-                    Follow-Up
+                    Outreach
                   </Link>
                   .
                 </CardDescription>

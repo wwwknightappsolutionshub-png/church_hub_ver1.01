@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
+  Equals,
   IsArray,
   IsBoolean,
   IsEmail,
@@ -74,4 +75,19 @@ export class PublicMembershipRegisterDto {
   @IsArray()
   @IsUUID('4', { each: true })
   serviceUnitIds?: string[];
+
+  @ApiProperty({ description: 'Must accept Terms of Service' })
+  @IsBoolean()
+  @Equals(true, { message: 'You must accept the Terms of Service' })
+  acceptedTerms!: boolean;
+
+  @ApiProperty({ description: 'Must accept Privacy Policy' })
+  @IsBoolean()
+  @Equals(true, { message: 'You must accept the Privacy Policy' })
+  acceptedPrivacy!: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  acceptedMarketing?: boolean;
 }

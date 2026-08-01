@@ -164,13 +164,27 @@ export class OutreachController {
   @Get('qr/me')
   @ApiBearerAuth()
   @ModuleGate('followUp')
+  @ApiOperation({ summary: 'Get or create the stable church-wide Team QR' })
   myQr(@ChurchId() churchId: string, @CurrentUser() user: AuthUser) {
     return this.outreachService.getOrCreateMyQr(churchId, user.userId, this.appBaseUrl());
+  }
+
+  @Get('qr/church')
+  @ApiBearerAuth()
+  @ModuleGate('followUp')
+  @ApiOperation({ summary: 'Stable church-level Team QR (same as /qr/me)' })
+  churchQr(@ChurchId() churchId: string) {
+    return this.outreachService.getOrCreateChurchQr(churchId, this.appBaseUrl());
   }
 
   @Post('qr/:memberId')
   @ApiBearerAuth()
   @ModuleGate('followUp')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({
+    summary: 'Deprecated — personal evangelist QR. Prefer GET /outreach/qr/church',
+    deprecated: true,
+  })
   generateQr(@ChurchId() churchId: string, @Param('memberId') memberId: string) {
     return this.outreachService.generateEvangelistQr(churchId, memberId, this.appBaseUrl());
   }

@@ -38,6 +38,7 @@ function useLoginSearchParams() {
     email: null as string | null,
     trial: null as string | null,
     mode: 'password' as LoginMode,
+    idle: false,
   });
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
@@ -48,6 +49,7 @@ function useLoginSearchParams() {
       email: sp.get('email'),
       trial: sp.get('trial'),
       mode: sp.get('mode') === 'magic' ? 'magic' : 'password',
+      idle: sp.get('reason') === 'idle',
     });
   }, []);
   return params;
@@ -73,6 +75,7 @@ export default function LoginPage() {
     email: emailFromRegistration,
     trial: trialToken,
     mode: modeFromUrl,
+    idle: signedOutIdle,
   } = useLoginSearchParams();
   const [mode, setMode] = useState<LoginMode>('password');
   const [loading, setLoading] = useState(false);
@@ -101,6 +104,13 @@ export default function LoginPage() {
       setValue('email', emailFromRegistration);
     }
   }, [emailFromRegistration, setValue]);
+
+  useEffect(() => {
+    if (!signedOutIdle) return;
+    toast.message('Signed out due to inactivity', {
+      description: 'Please sign in again to continue.',
+    });
+  }, [signedOutIdle]);
 
   useEffect(() => {
     if (!trialToken) return;

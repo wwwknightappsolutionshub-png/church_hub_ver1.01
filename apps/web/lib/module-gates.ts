@@ -1,7 +1,7 @@
 export type ModuleGateType = 'followUp' | 'serviceUnitHub' | 'departmentTools' | 'profile' | 'sermonNote' | 'ministryCells';
 
 export const MODULE_GATE_LABELS: Record<ModuleGateType, string> = {
-  followUp: 'Follow-Up',
+  followUp: 'Outreach',
   serviceUnitHub: 'Service Unit Hub',
   departmentTools: 'Departments',
   profile: 'My Profile',
@@ -47,7 +47,7 @@ export function gateRequirementHint(
 
   switch (gate) {
     case 'followUp':
-      return `Available to church staff, Follow-up / Harvesters / Prayer / Winning Foundation units, or Evangelist role. Your status: ${status}. Roles: ${roles}.`;
+      return `Available to church staff, Outreach / Harvesters / Prayer / Winning Foundation units, or Evangelist role. Your status: ${status}. Roles: ${roles}.`;
     case 'serviceUnitHub':
       return `Available when you are New Member, Active Member, or Discipled—or already assigned to a service unit. Your status: ${status}.`;
     case 'departmentTools':

@@ -5,10 +5,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import type { AxiosError } from 'axios';
 import {
-  AlertCircle,
-  Bell,
+  Download,
   Filter,
-  HeartHandshake,
   Loader2,
   Megaphone,
   Plus,
@@ -19,14 +17,25 @@ import {
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
-import { FollowUpPipeline, type FollowUpCard, type ProgressAdvancePayload } from '@/components/follow-up/FollowUpPipeline';
+import {
+  FollowUpPipeline,
+  type FollowUpCard,
+  type ProgressAdvancePayload,
+} from '@/components/follow-up/FollowUpPipeline';
+import { FollowUpTable } from '@/components/follow-up/FollowUpTable';
 import { FollowUpDetailPanel } from '@/components/follow-up/FollowUpDetailPanel';
 import { FollowUpNewLeadSheet } from '@/components/follow-up/FollowUpNewLeadSheet';
 import { FollowUpMembersPanel } from '@/components/follow-up/FollowUpMembersPanel';
 import { FollowUpAutomationPanel } from '@/components/follow-up/FollowUpAutomationPanel';
 import { useMembershipAccess } from '@/lib/hooks/use-membership-access';
+import { useModuleAccess } from '@/lib/hooks/use-module-access';
+import { isChurchLeadershipRole } from '@/lib/session-role';
 import { ModuleGate } from '@/components/app/ModuleGate';
 import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
+import {
+  FOLLOW_UP_EXPORT_OPTIONS,
+  exportFollowUpPdf,
+} from '@/lib/follow-up-pdf';
 import {
   EnterpriseContent,
   EnterpriseHero,
@@ -36,7 +45,6 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
 
 interface FollowUpStats {
   pending: number;
@@ -70,7 +78,7 @@ interface PastoralNote {
 function followUpErrorMessage(err: AxiosError | null) {
   const status = err?.response?.status;
   if (status === 401) return 'Session expired — please sign in again.';
-  if (status === 403) return 'You do not have permission to view follow-ups.';
+  if (status === 403) return 'You do not have permission to view outreach.';
   if (status && status >= 500) return 'Server error — check API logs.';
   return 'Could not reach the API — ensure it is running on port 4000 with Postgres.';
 }
@@ -78,7 +86,9 @@ function followUpErrorMessage(err: AxiosError | null) {
 function FollowUpPageContent() {
   const queryClient = useQueryClient();
   const { canManageMembers } = useMembershipAccess();
-  const [view, setView] = useState<'pipeline' | 'members'>('pipeline');
+  const { userRoles } = useModuleAccess();
+  const canExport = isChurchLeadershipRole(userRoles);
+  const [view, setView] = useState<'pipeline' | 'table' | 'members'>('pipeline');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [assigneeFilter, setAssigneeFilter] = useState('');
@@ -91,6 +101,7 @@ function FollowUpPageContent() {
     dueAt: '',
   });
   const [creating, setCreating] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const listUrl = assigneeFilter
     ? `/follow-up?assignedToId=${encodeURIComponent(assigneeFilter)}`
@@ -129,7 +140,8 @@ function FollowUpPageContent() {
         f.contactPhone?.includes(q) ||
         f.contactEmail?.toLowerCase().includes(q) ||
         f.assignedTo?.firstName.toLowerCase().includes(q) ||
-        f.assignedTo?.lastName.toLowerCase().includes(q),
+        f.assignedTo?.lastName.toLowerCase().includes(q) ||
+        f.referredBy?.toLowerCase().includes(q),
     );
   }, [data, search]);
 
@@ -183,9 +195,21 @@ function FollowUpPageContent() {
       setShowNew(false);
       refresh();
     } catch {
-      toast.error('Could not create follow-up');
+      toast.error('Could not create lead');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const runExport = async (scope: (typeof FOLLOW_UP_EXPORT_OPTIONS)[number]['scope']) => {
+    try {
+      await api.post('/follow-up/export-check');
+      exportFollowUpPdf(filteredItems, scope);
+      toast.success('PDF downloaded');
+    } catch {
+      toast.error('Export requires Pastor or Admin permission');
+    } finally {
+      setExportOpen(false);
     }
   };
 
@@ -193,10 +217,38 @@ function FollowUpPageContent() {
     <EnterpriseShell>
       <EnterpriseHero
         eyebrow="Discipleship"
-        title="Follow-Up"
+        title="Outreach"
         description={MODULE_DESCRIPTIONS.followUp}
         actions={
           <>
+            {canExport ? (
+              <div className="relative">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  type="button"
+                  onClick={() => setExportOpen((o) => !o)}
+                  disabled={filteredItems.length === 0}
+                >
+                  <Download className="mr-1.5 h-4 w-4" />
+                  Export PDF
+                </Button>
+                {exportOpen ? (
+                  <div className="absolute right-0 z-20 mt-1 w-64 rounded-lg border border-border bg-card p-1 shadow-lg">
+                    {FOLLOW_UP_EXPORT_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.label}
+                        type="button"
+                        className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
+                        onClick={() => runExport(opt.scope)}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             <Button size="sm" onClick={() => setShowNew(true)}>
               <Plus className="mr-1.5 h-4 w-4" />
               New lead
@@ -204,7 +256,7 @@ function FollowUpPageContent() {
             <Button size="sm" variant="secondary" asChild>
               <Link href="/dashboard/outreach">
                 <Megaphone className="mr-1.5 h-4 w-4" />
-                Fast capture
+                Field capture
               </Link>
             </Button>
           </>
@@ -231,13 +283,14 @@ function FollowUpPageContent() {
       />
 
       <EnterpriseTabNav
-        ariaLabel="Follow-up views"
+        ariaLabel="Outreach views"
         tabs={[
           { id: 'pipeline', label: 'Pipeline' },
+          { id: 'table', label: 'Table' },
           { id: 'members', label: 'Members' },
         ]}
         active={view}
-        onChange={(id) => setView(id as 'pipeline' | 'members')}
+        onChange={(id) => setView(id as 'pipeline' | 'table' | 'members')}
       />
 
       <EnterpriseContent className="max-w-[1600px]">
@@ -297,23 +350,35 @@ function FollowUpPageContent() {
             <UserPlus className="mx-auto h-12 w-12 text-muted-foreground/50" />
             <p className="mt-4 font-heading text-lg font-semibold text-foreground">Pipeline is empty</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Add a lead manually or capture someone from Outreach — they appear here as New Lead.
+              Add a lead manually or capture someone from Field Outreach — they appear here as New
+              Lead.
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-2">
               <Button onClick={() => setShowNew(true)}>Add first lead</Button>
               <Button variant="outline" asChild>
-                <Link href="/dashboard/outreach">Go to Outreach</Link>
+                <Link href="/dashboard/outreach">Go to Field Outreach</Link>
               </Button>
             </div>
           </div>
         )}
 
-        {view === 'members' && (
-          <FollowUpMembersPanel canManageMembers={canManageMembers} />
-        )}
+        {view === 'members' && <FollowUpMembersPanel canManageMembers={canManageMembers} />}
 
-        {view === 'pipeline' && !isLoading && !isError && (filteredItems.length > 0 || (data?.length ?? 0) === 0) && (
-          <FollowUpPipeline
+        {view === 'pipeline' &&
+          !isLoading &&
+          !isError &&
+          (filteredItems.length > 0 || (data?.length ?? 0) === 0) && (
+            <FollowUpPipeline
+              items={filteredItems}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onAdvance={advanceStage}
+              advancing={advancing}
+            />
+          )}
+
+        {view === 'table' && !isLoading && !isError && (
+          <FollowUpTable
             items={filteredItems}
             selectedId={selectedId}
             onSelect={setSelectedId}

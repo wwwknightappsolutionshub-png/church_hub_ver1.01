@@ -87,7 +87,7 @@ export function FollowUpAutomationPanel() {
           <div className="min-w-0">
             <CardTitle className="flex items-center gap-2 text-base">
               <Zap className="h-4 w-4 shrink-0 text-primary" />
-              Follow-up automation
+              Outreach automation
             </CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
               Delayed WhatsApp/email reminders and assignee alerts. Processed every minute via

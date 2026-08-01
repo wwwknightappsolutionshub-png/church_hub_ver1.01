@@ -4,10 +4,12 @@ import { MemberProfileService } from './member-profile.service';
 import { UpdateMemberProfileDto } from './dto/update-member-profile.dto';
 import { ChurchId, CurrentUser, AuthUser } from '../auth/current-user.decorator';
 import { ModuleGate } from '../auth/decorators';
+import { AllowMemberOwnedDelete } from '../auth/destructive.decorators';
 
 @ApiTags('member-profile')
 @ApiBearerAuth()
 @ModuleGate('profile')
+@AllowMemberOwnedDelete()
 @Controller('member-profile')
 export class MemberProfileController {
   constructor(private readonly profiles: MemberProfileService) {}

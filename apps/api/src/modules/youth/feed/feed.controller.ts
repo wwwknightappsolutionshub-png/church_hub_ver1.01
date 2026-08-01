@@ -13,10 +13,12 @@ import { ContentReportStatus, YouthPostStatus, YouthReactionType } from '@prisma
 import { YouthFeedService } from './feed.service';
 import { ChurchId, CurrentUser, AuthUser } from '../../auth/current-user.decorator';
 import { Roles, ModuleGate } from '../../auth/decorators';
+import { AllowMemberOwnedDelete } from '../../auth/destructive.decorators';
 
 @ApiTags('youth')
 @ApiBearerAuth()
 @ModuleGate('youth')
+@AllowMemberOwnedDelete()
 @Controller('youth/feed')
 export class YouthFeedController {
   constructor(private readonly feed: YouthFeedService) {}

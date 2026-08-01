@@ -64,7 +64,7 @@ export function UnifiedAdminHub({ hub }: UnifiedAdminHubProps) {
           icon={Megaphone}
         />
         <StatCard
-          label="Follow-up Rate"
+          label="Outreach Rate"
           value={`${Math.round(metrics.followUp.completionRate * 100)}%`}
           changeLabel={
             metrics.followUp.pending === 1

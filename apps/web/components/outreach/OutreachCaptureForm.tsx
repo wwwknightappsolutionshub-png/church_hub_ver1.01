@@ -31,6 +31,7 @@ const EMPTY_FORM: Partial<FormData> = {
   locationLabel: '',
   notes: '',
   voiceNotes: '',
+  referredBy: '',
   needsBusPickup: false,
   pickupAddress: '',
   busPickupNotes: '',
@@ -322,6 +323,19 @@ function OutreachCaptureFormInner({
           inputMode="email"
           {...register('email')}
           autoComplete="off"
+          readOnly
+          onFocus={unlockAutofill}
+          data-lpignore="true"
+          data-1p-ignore
+          data-form-type="other"
+        />
+        <Input
+          placeholder="Who referred you? (name)"
+          className="sm:col-span-2"
+          {...register('referredBy')}
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
           readOnly
           onFocus={unlockAutofill}
           data-lpignore="true"

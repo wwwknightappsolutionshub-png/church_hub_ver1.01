@@ -13,6 +13,7 @@ import { MembershipModule } from '../membership/membership.module';
 import { UploadsModule } from '../uploads/uploads.module';
 import { FollowUpAccessGuard } from './follow-up-access.guard';
 import { ModuleAccessGuard } from './module-access.guard';
+import { DestructiveOpsGuard } from './destructive-ops.guard';
 import { PlatformModule } from '../platform/platform.module';
 import { PlatformPermissionGuard } from '../platform/platform-permission.guard';
 import { CacheModule } from '../../common/cache/cache.module';
@@ -44,6 +45,7 @@ import { CacheModule } from '../../common/cache/cache.module';
     { provide: APP_GUARD, useClass: MemberAdminGuard },
     { provide: APP_GUARD, useClass: FollowUpAccessGuard },
     { provide: APP_GUARD, useClass: ModuleAccessGuard },
+    { provide: APP_GUARD, useClass: DestructiveOpsGuard },
   ],
   exports: [AuthService],
 })

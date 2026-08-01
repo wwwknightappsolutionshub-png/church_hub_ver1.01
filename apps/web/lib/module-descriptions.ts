@@ -31,9 +31,9 @@ export const MODULE_DESCRIPTIONS = {
   business:
     'Verified member businesses, marketplace listings, job openings, networking events, mentorship, and idea submissions.',
   followUp:
-    'Move visitors from outreach capture through convert status, assignments, and cell group placement.',
+    'Move visitors through New Lead → Contacted → Visited → Attended → Joined Group, with assignments and reminders.',
   outreach:
-    'Log field contacts, manage the convert pipeline, link follow-up tasks, and capture data when offline.',
+    'Field capture, Team QR/NFC, offline sync, and convert pipeline — feeds new leads into Outreach.',
   serviceUnits:
     'Create ministry teams, approve membership requests, post schedules, and view unit attendance dashboards.',
   departments:
@@ -68,6 +68,8 @@ export const MODULE_DESCRIPTIONS = {
     'Manage Wisdom365+ variants, content library, subscription pricing, and church availability.',
   platformMarketing:
     'ChurchHub onboarding email templates — edit copy and layout with the WYSIWYG editor.',
+  platformContent:
+    'Edit Privacy, Terms, Cookie Policy, DPA, and custom legal pages with the WYSIWYG editor.',
   lounge:
     'See who is online in your church, send connection requests, and browse announcements and job openings.',
   communicationsSermons:

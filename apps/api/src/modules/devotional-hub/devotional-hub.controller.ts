@@ -103,12 +103,15 @@ import { DevotionalMeetupsService } from './services/devotional-meetups.service'
 
 import { DevotionalDiscussionsService } from './services/devotional-discussions.service';
 import { DevotionalAiThrottleGuard } from './guards/devotional-ai-throttle.guard';
+import { AllowMemberOwnedDelete } from '../auth/destructive.decorators';
 
 
 
 @ApiTags('devotional-hub')
 
 @ApiBearerAuth()
+
+@AllowMemberOwnedDelete()
 
 @Controller('devotional-hub')
 

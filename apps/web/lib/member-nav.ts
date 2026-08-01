@@ -58,7 +58,7 @@ export const OPEN_MEMBER_NAV: DashboardNavItem[] = [
   { href: '/dashboard/suggestions', label: 'Suggestions', icon: Lightbulb },
   { href: '/dashboard/devotional-hub', label: 'Devotional Hub', icon: BookOpen },
   { href: '/dashboard/wisdom365', label: 'Wisdom365+', icon: Sunrise },
-  { href: '/dashboard/outreach', label: 'Outreach', icon: Megaphone },
+  { href: '/dashboard/outreach', label: 'Field Outreach', icon: Megaphone },
   { href: '/dashboard/youth', label: 'Youth Hub', icon: Sparkles },
   { href: '/dashboard/business', label: 'Kingdom Konnect', icon: Briefcase },
   { href: '/dashboard/spirify', label: 'Spirify', icon: Disc3 },
@@ -67,7 +67,7 @@ export const OPEN_MEMBER_NAV: DashboardNavItem[] = [
 /** Membership determines access */
 export const GATED_MEMBER_NAV: DashboardNavItem[] = [
   { href: '/dashboard/sermon-notes', label: 'Sermon Note', icon: ScrollText, gate: 'sermonNote' },
-  { href: '/dashboard/follow-up', label: 'Follow-Up', icon: HeartHandshake, gate: 'followUp' },
+  { href: '/dashboard/follow-up', label: 'Outreach', icon: HeartHandshake, gate: 'followUp' },
   { href: '/dashboard/ministry-cells', label: 'Ministry/Cells', icon: Network, gate: 'ministryCells' },
   { href: '/dashboard/service-units', label: 'Service Unit Hub', icon: Layers, gate: 'serviceUnitHub' },
   // Departments hub stays at /dashboard/departments (and via Service Unit tools) but is hidden from menus.
@@ -86,7 +86,7 @@ export const STAFF_LEADERSHIP_NAV: DashboardNavItem[] = [
     icon: Shield,
     requiresChurchLeadership: true,
   },
-  { href: '/dashboard/follow-up', label: 'Follow-Up', icon: HeartHandshake },
+  { href: '/dashboard/follow-up', label: 'Outreach', icon: HeartHandshake },
   {
     href: '/dashboard/ministry-cells',
     label: 'Ministry/Cells',
@@ -169,8 +169,8 @@ export const STAFF_COMMUNITY_NAV: DashboardNavItem[] = [
   { href: '/dashboard/devotional-hub', label: 'Devotional Hub', icon: BookOpen },
   { href: '/dashboard/service-units', label: 'Service Unit Hub', icon: Layers },
   // Departments remains functional via /dashboard/departments and Service Unit workspaces; not listed in nav.
-  { href: '/dashboard/outreach', label: 'Outreach Hub', icon: Megaphone },
-  { href: '/dashboard/follow-up', label: 'Follow Up', icon: HeartHandshake },
+  { href: '/dashboard/outreach', label: 'Field Outreach', icon: Megaphone },
+  { href: '/dashboard/follow-up', label: 'Outreach', icon: HeartHandshake },
   { href: '/dashboard/business', label: 'Kingdom Konnect', icon: Briefcase },
   { href: '/dashboard/youth', label: 'Youth Hub', icon: Sparkles },
   { href: '/dashboard/spirify', label: 'Spirify', icon: Disc3 },

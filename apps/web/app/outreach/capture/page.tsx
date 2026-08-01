@@ -34,6 +34,7 @@ function CaptureForm() {
     lastName: '',
     phone: '',
     email: '',
+    referredBy: '',
     notes: '',
   });
 
@@ -59,6 +60,7 @@ function CaptureForm() {
         lastName: form.lastName.trim() || undefined,
         phone: form.phone || undefined,
         email: form.email || undefined,
+        referredBy: form.referredBy.trim() || undefined,
         notes: form.notes || undefined,
       });
       setDone(true);
@@ -108,7 +110,7 @@ function CaptureForm() {
             </div>
             <CardTitle className="font-heading">Connect with {info.church.name}</CardTitle>
             <CardDescription>
-              Self-registration via outreach team
+              Self-registration via church outreach
               {info.evangelistName ? ` · ${info.evangelistName}` : ''}
             </CardDescription>
           </CardHeader>
@@ -135,6 +137,12 @@ function CaptureForm() {
                 placeholder="Email"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
+              />
+              <Input
+                placeholder="Who referred you? (name)"
+                value={form.referredBy}
+                onChange={(e) => setForm({ ...form, referredBy: e.target.value })}
+                autoComplete="off"
               />
               <textarea
                 className="flex min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"

@@ -73,7 +73,7 @@ export default function MembershipAnalyticsPage() {
                 icon={BarChart3}
               />
               <StatCard
-                label="Follow-up completion"
+                label="Outreach completion"
                 value={pct(dash.summary.followUpCompletionRate)}
                 changeLabel={`Attendance avg ${pct(dash.summary.averageAttendanceRate)}`}
                 icon={BarChart3}

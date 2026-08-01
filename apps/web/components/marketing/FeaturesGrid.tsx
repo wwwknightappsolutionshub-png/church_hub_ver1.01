@@ -19,7 +19,7 @@ const modules = [
   },
   {
     icon: HeartHandshake,
-    title: 'Follow-Up & Discipleship',
+    title: 'Outreach & Discipleship',
     description: 'Automated pipeline stages, team assignments, SMS reminders, and confidential pastoral notes.',
     tags: ['Pipeline', 'Reminders', 'Notes'],
   },

@@ -40,6 +40,8 @@ describe('B2 auth/staff/platform DTO validation', () => {
       lastName: 'B',
       email: 'a@b.co',
       password: 'short',
+      acceptedTerms: true,
+      acceptedPrivacy: true,
     });
     expect(errors.some((e) => e.property === 'password')).toBe(true);
   });
@@ -117,6 +119,8 @@ describe('B2–B4 shared Zod schemas (API contract)', () => {
       lastName: 'Admin',
       email: 'ann@example.com',
       password: 'short',
+      acceptedTerms: true,
+      acceptedPrivacy: true,
     });
     expect(parsed.success).toBe(false);
   });

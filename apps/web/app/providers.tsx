@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { AppErrorBoundary } from '@/components/app/AppErrorBoundary';
 import { ChurchPwaRegister } from '@/components/church-landing/ChurchPwaRegister';
 import { PwaInstallGate } from '@/components/pwa/PwaInstallGate';
+import { CookieConsentBanner } from '@/components/privacy/CookieConsentBanner';
 import { attachAuthRefreshInterceptor } from '@/lib/auth-refresh';
 
 let refreshAttached = false;
@@ -39,6 +40,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <AppErrorBoundary>
           <ChurchPwaRegister />
           <PwaInstallGate />
+          <CookieConsentBanner />
           {children}
         </AppErrorBoundary>
         <Toaster

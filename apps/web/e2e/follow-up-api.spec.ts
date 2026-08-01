@@ -1,5 +1,5 @@
 /**
- * API smoke test — verifies Follow-Up endpoints respond for church admin.
+ * API smoke test — verifies Outreach (follow-up) endpoints respond for church admin.
  * Run: npx playwright test e2e/follow-up-api.spec.ts
  */
 import { test, expect } from '@playwright/test';
@@ -7,7 +7,7 @@ import { API_URL, assertLogin } from './helpers/auth';
 
 test.describe.configure({ mode: 'serial' });
 
-test.describe('Follow-Up API smoke', () => {
+test.describe('Outreach API smoke', () => {
   let headers: Record<string, string>;
   let leadId: string;
 
@@ -15,7 +15,7 @@ test.describe('Follow-Up API smoke', () => {
     headers = await assertLogin(request);
     const statsRes = await request.get(`${API_URL}/follow-up/stats`, { headers });
     if (!statsRes.ok()) {
-      test.skip(true, `Follow-Up API unavailable (${statsRes.status()})`);
+      test.skip(true, `Outreach API unavailable (${statsRes.status()})`);
     }
   });
 

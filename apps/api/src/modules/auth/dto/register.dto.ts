@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsEmail,
   IsOptional,
   IsString,
@@ -7,6 +8,7 @@ import {
   Matches,
   MaxLength,
   MinLength,
+  Equals,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 
@@ -63,6 +65,18 @@ export class RegisterStartDto {
   @MinLength(8)
   @MaxLength(128)
   password!: string;
+
+  @IsBoolean()
+  @Equals(true, { message: 'You must accept the Terms of Service' })
+  acceptedTerms!: boolean;
+
+  @IsBoolean()
+  @Equals(true, { message: 'You must accept the Privacy Policy' })
+  acceptedPrivacy!: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  acceptedMarketing?: boolean;
 }
 
 export class RegisterVerifyDto {

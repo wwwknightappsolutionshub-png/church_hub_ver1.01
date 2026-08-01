@@ -140,7 +140,7 @@ export default function DashboardPage() {
             icon={Megaphone}
           />
           <StatCard
-            label="Follow-up Rate"
+            label="Outreach Rate"
             value={
               metricsLoaded ? `${Math.round(metrics.followUp.completionRate * 100)}%` : '—'
             }

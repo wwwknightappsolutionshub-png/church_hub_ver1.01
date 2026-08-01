@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { AuthLinkPurpose } from '@prisma/client';
+import { AuthLinkPurpose, ConsentType } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { randomBytes, createHash, randomInt, randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.module';
@@ -50,6 +50,9 @@ interface PendingRegistration {
   lastName: string;
   otpHash: string;
   attempts: number;
+  acceptedTerms: boolean;
+  acceptedPrivacy: boolean;
+  acceptedMarketing: boolean;
 }
 
 interface PendingLogin2fa {
@@ -83,7 +86,13 @@ export class AuthService {
     password: string;
     firstName: string;
     lastName: string;
+    acceptedTerms: boolean;
+    acceptedPrivacy: boolean;
+    acceptedMarketing?: boolean;
   }) {
+    if (input.acceptedTerms !== true || input.acceptedPrivacy !== true) {
+      throw new BadRequestException('You must accept the Terms of Service and Privacy Policy');
+    }
     const email = input.email.trim().toLowerCase();
     const churchSlug =
       (input.churchSlug ?? '').trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '') ||
@@ -121,6 +130,9 @@ export class AuthService {
       lastName: input.lastName.trim(),
       otpHash: this.hashToken(otp),
       attempts: 0,
+      acceptedTerms: true,
+      acceptedPrivacy: true,
+      acceptedMarketing: input.acceptedMarketing === true,
     };
 
     await this.cache.set(`register:otp:${registrationId}`, pending, REGISTER_OTP_TTL_SEC);
@@ -202,6 +214,9 @@ export class AuthService {
     password: string;
     firstName: string;
     lastName: string;
+    acceptedTerms: boolean;
+    acceptedPrivacy: boolean;
+    acceptedMarketing?: boolean;
   }) {
     // Force OTP path — do not create without email verification.
     return this.startRegistration(input);
@@ -242,6 +257,38 @@ export class AuthService {
     });
 
     const user = church.users[0];
+
+    const consentRows: Array<{
+      consentType: ConsentType;
+      documentSlug: string;
+    }> = [
+      { consentType: ConsentType.TERMS, documentSlug: 'terms-of-service' },
+      { consentType: ConsentType.PRIVACY, documentSlug: 'privacy-policy' },
+    ];
+    if (pending.acceptedMarketing) {
+      consentRows.push({
+        consentType: ConsentType.MARKETING,
+        documentSlug: 'privacy-policy',
+      });
+    }
+
+    const pageVersions = await this.prisma.platformCmsPage.findMany({
+      where: { slug: { in: ['terms-of-service', 'privacy-policy'] } },
+      select: { slug: true, version: true },
+    });
+    const versionBySlug = new Map(pageVersions.map((p) => [p.slug, p.version]));
+
+    await this.prisma.userConsentRecord.createMany({
+      data: consentRows.map((c) => ({
+        userId: user.id,
+        churchId: church.id,
+        email: user.email,
+        consentType: c.consentType,
+        documentSlug: c.documentSlug,
+        documentVersion: versionBySlug.get(c.documentSlug) ?? 1,
+        accepted: true,
+      })),
+    });
 
     void this.drips
       .scheduleUpsellSequence({

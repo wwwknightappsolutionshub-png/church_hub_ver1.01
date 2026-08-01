@@ -243,7 +243,7 @@ export function AnalyticsChartsSection({ dash }: { dash: MembershipAnalyticsDash
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Follow-up completeness</CardTitle>
+              <CardTitle className="text-base">Outreach completeness</CardTitle>
               <CardDescription>Leads created vs completed (joined group)</CardDescription>
             </CardHeader>
             <CardContent className="h-52 sm:h-60">
@@ -263,7 +263,7 @@ export function AnalyticsChartsSection({ dash }: { dash: MembershipAnalyticsDash
 
           <Card className="lg:col-span-2">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Follow-up pipeline</CardTitle>
+              <CardTitle className="text-base">Outreach pipeline</CardTitle>
               <CardDescription>Current leads by stage</CardDescription>
             </CardHeader>
             <CardContent className="h-48 sm:h-56">

@@ -78,6 +78,8 @@ describeE2e('B2–B4 validation (HTTP → 400)', () => {
           lastName: 'Admin',
           email: 'ann@example.com',
           password: 'short',
+          acceptedTerms: true,
+          acceptedPrivacy: true,
         });
       expect(res.status).toBe(400);
     });

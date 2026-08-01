@@ -99,8 +99,8 @@ export class MembershipController {
   }
 
   @Delete('members/:id')
-  @MemberAdmin()
-  @ApiOperation({ summary: 'Remove a member record (Member Admin only)' })
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({ summary: 'Remove a member record (Admin or Pastor only)' })
   deleteMember(
     @ChurchId() churchId: string,
     @Param('id') id: string,
@@ -232,7 +232,7 @@ export class MembershipController {
   }
 
   @Delete('members/:parentId/guardian/:childId')
-  @MemberAdmin()
+  @Roles('ADMIN', 'PASTOR')
   removeGuardian(
     @ChurchId() churchId: string,
     @Param('parentId') parentId: string,
@@ -432,7 +432,7 @@ export class MembershipController {
   }
 
   @Delete('church-services/:id')
-  @MemberAdmin()
+  @Roles('ADMIN', 'PASTOR')
   deleteChurchService(@ChurchId() churchId: string, @Param('id') id: string) {
     return this.membershipConfig.deleteChurchService(churchId, id);
   }
@@ -468,7 +468,7 @@ export class MembershipController {
   }
 
   @Delete('class-definitions/:id')
-  @MemberAdmin()
+  @Roles('ADMIN', 'PASTOR')
   deleteClassDefinition(@ChurchId() churchId: string, @Param('id') id: string) {
     return this.membershipConfig.deleteClassDefinition(churchId, id);
   }

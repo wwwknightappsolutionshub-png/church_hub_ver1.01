@@ -36,6 +36,7 @@ export interface FollowUpCard {
   stage: string;
   dueAt?: string | null;
   notes?: string | null;
+  referredBy?: string | null;
   member?: { id: string; firstName: string; lastName: string } | null;
   assignedTo?: { id: string; firstName: string; lastName: string } | null;
   reminders?: Array<{ id: string; remindAt: string; sentAt?: string | null; channel: string }>;
@@ -116,6 +117,12 @@ function LeadCard({
                 <p className="flex items-center gap-1.5 truncate">
                   <Mail className="h-3 w-3 shrink-0" />
                   {item.contactEmail}
+                </p>
+              )}
+              {item.referredBy?.trim() && (
+                <p className="flex items-center gap-1.5 truncate">
+                  <User className="h-3 w-3 shrink-0" />
+                  Referred by {item.referredBy.trim()}
                 </p>
               )}
               {item.assignedTo && (
@@ -274,7 +281,7 @@ export function FollowUpPipeline({
                           {stageItems.length}
                         </span>
                       </div>
-                      <div className="flex min-h-[120px] flex-col gap-2.5 rounded-xl bg-muted/30 p-2">
+                      <div className="flex max-h-[28rem] min-h-[120px] flex-col gap-2.5 overflow-y-auto rounded-xl bg-muted/30 p-2">
                         {stageItems.length === 0 ? (
                           <p className="flex flex-1 items-center justify-center px-2 py-8 text-center text-xs text-muted-foreground">
                             No one here yet

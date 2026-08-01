@@ -57,8 +57,15 @@ export class FollowUpController {
     return this.followUpService.listTemplates(churchId);
   }
 
+  @Post('export-check')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({ summary: 'Authorize church outreach PDF export (Admin/Pastor only)' })
+  exportCheck() {
+    return { ok: true };
+  }
+
   @Post('templates')
-  @Roles('ADMIN', 'PASTOR', 'LEADER')
+  @Roles('ADMIN', 'PASTOR')
   createTemplate(
     @ChurchId() churchId: string,
     @Body() body: { name: string; channel: string; body: string; subject?: string },

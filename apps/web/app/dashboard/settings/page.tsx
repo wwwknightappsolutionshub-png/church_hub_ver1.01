@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import { Loader2, User } from 'lucide-react';
 import { toast } from 'sonner';
-import { api } from '@/lib/api';
+import { api, clearAuthTokens } from '@/lib/api';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import type { ModuleAccess } from '@/lib/hooks/use-module-access';
 import { accountAvatarUrl, userDisplayName } from '@/lib/user-display';
@@ -317,6 +317,84 @@ export default function SettingsPage() {
 
           <Button type="button" onClick={save} disabled={busy}>
             {busy ? 'Saving…' : 'Save profile'}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Privacy & data</CardTitle>
+          <CardDescription>
+            Download a copy of your account data or request erasure. Legal documents are at{' '}
+            <Link href="/legal/privacy-policy" className="font-medium text-primary hover:underline">
+              Privacy Policy
+            </Link>
+            .
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                const { data } = await api.get('/privacy/export');
+                const blob = new Blob([JSON.stringify(data, null, 2)], {
+                  type: 'application/json',
+                });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `churchhub-data-export-${new Date().toISOString().slice(0, 10)}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                toast.success('Data export downloaded');
+              } catch (err) {
+                toast.error(apiErrorMessage(err));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Download my data
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={busy}
+            onClick={async () => {
+              if (
+                !window.confirm(
+                  'Request permanent erasure of your account? You can choose to erase immediately or queue for review.',
+                )
+              ) {
+                return;
+              }
+              const executeNow = window.confirm(
+                'Erase immediately? Click OK to anonymize now (you will be signed out), or Cancel to submit a request for review.',
+              );
+              setBusy(true);
+              try {
+                await api.post('/privacy/erasure', { executeNow });
+                toast.success(
+                  executeNow
+                    ? 'Account anonymized. Signing you out…'
+                    : 'Erasure request submitted. Our team will process it.',
+                );
+                if (executeNow) {
+                  clearAuthTokens();
+                  window.location.href = '/login';
+                }
+              } catch (err) {
+                toast.error(apiErrorMessage(err));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Request erasure
           </Button>
         </CardContent>
       </Card>

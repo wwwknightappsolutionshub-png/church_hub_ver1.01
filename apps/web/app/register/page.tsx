@@ -50,6 +50,9 @@ export default function RegisterPage() {
       lastName: '',
       email: '',
       password: '',
+      acceptedTerms: undefined as unknown as true,
+      acceptedPrivacy: undefined as unknown as true,
+      acceptedMarketing: false,
     },
   });
 
@@ -213,6 +216,48 @@ export default function RegisterPage() {
                     Please enter a new password — not the temporary password from your email.
                   </p>
                 )}
+              </div>
+              <div className="space-y-2 rounded-md border border-border/80 bg-muted/30 p-3">
+                <label className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    {...register('acceptedTerms')}
+                  />
+                  <span>
+                    I agree to the{' '}
+                    <Link href="/legal/terms-of-service" target="_blank" className="font-medium text-primary hover:underline">
+                      Terms of Service
+                    </Link>
+                  </span>
+                </label>
+                {errors.acceptedTerms ? (
+                  <p className="text-xs text-destructive">{errors.acceptedTerms.message}</p>
+                ) : null}
+                <label className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    {...register('acceptedPrivacy')}
+                  />
+                  <span>
+                    I have read the{' '}
+                    <Link href="/legal/privacy-policy" target="_blank" className="font-medium text-primary hover:underline">
+                      Privacy Policy
+                    </Link>
+                  </span>
+                </label>
+                {errors.acceptedPrivacy ? (
+                  <p className="text-xs text-destructive">{errors.acceptedPrivacy.message}</p>
+                ) : null}
+                <label className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    {...register('acceptedMarketing')}
+                  />
+                  <span>Send me product tips and onboarding emails (optional)</span>
+                </label>
               </div>
               <Button type="submit" className="w-full shadow-brand" disabled={busy}>
                 {busy ? (

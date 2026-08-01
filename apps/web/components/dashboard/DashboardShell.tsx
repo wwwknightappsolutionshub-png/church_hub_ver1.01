@@ -25,8 +25,10 @@ import {
   Building2,
   BarChart3,
   ChevronDown,
+  FileText,
   Mail,
   MessageSquare,
+  Shield,
   Sparkles,
   Users,
 } from 'lucide-react';
@@ -43,6 +45,8 @@ const platformNavAll: (DashboardNavItem & { permission?: string })[] = [
   { href: '/dashboard/platform/inbox', label: 'Messaging', icon: MessageSquare, exact: false, permission: 'platform.messaging:read' },
   { href: '/dashboard/platform/analytics', label: 'Analytics', icon: BarChart3, exact: false, permission: 'platform.analytics:read' },
   { href: '/dashboard/platform/marketing', label: 'Marketing', icon: Mail, exact: false, permission: 'platform.marketing:read' },
+  { href: '/dashboard/platform/content', label: 'Legal & CMS', icon: FileText, exact: false, permission: 'platform.content:read' },
+  { href: '/dashboard/platform/privacy', label: 'Privacy', icon: Shield, exact: false, permission: 'platform.privacy:read' },
   { href: '/dashboard/platform/wisdom365', label: 'Wisdom365+', icon: Sparkles, exact: false, permission: 'platform.wisdom365:read' },
 ];
 

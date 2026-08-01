@@ -52,6 +52,7 @@ interface FollowUpDetail {
   contactEmail?: string | null;
   stage: string;
   notes?: string | null;
+  referredBy?: string | null;
   dueAt?: string | null;
   member?: { id: string; firstName: string; lastName: string; email?: string | null } | null;
   assignedTo?: { id: string; firstName: string; lastName: string } | null;
@@ -106,7 +107,7 @@ export function FollowUpDetailPanel({
   );
   const [remindAt, setRemindAt] = useState('');
   const [remindChannel, setRemindChannel] = useState('EMAIL');
-  const [remindMessage, setRemindMessage] = useState(`Follow-up: ${followUp.contactName}`);
+  const [remindMessage, setRemindMessage] = useState(`Outreach: ${followUp.contactName}`);
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [noteBody, setNoteBody] = useState('');
   const [confidential, setConfidential] = useState(true);
@@ -237,6 +238,12 @@ export function FollowUpDetailPanel({
               <Badge variant="outline" className="mt-2">
                 {STAGE_LABELS[followUp.stage]}
               </Badge>
+              {followUp.referredBy?.trim() ? (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Referred by{' '}
+                  <span className="font-medium text-foreground">{followUp.referredBy.trim()}</span>
+                </p>
+              ) : null}
               {followUp.assignedTo && (
                 <p className="mt-2 text-sm text-muted-foreground">
                   Assigned to{' '}

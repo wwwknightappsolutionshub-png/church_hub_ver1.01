@@ -34,6 +34,13 @@ export const OutreachCaptureSchema = z.object({
   photoUrl: z.string().max(600_000).optional(),
   notes: z.string().max(2000).optional(),
   voiceNotes: z.string().max(5000).optional(),
+  referredBy: z
+    .union([z.string(), z.literal(''), z.undefined()])
+    .transform((v) => {
+      const s = sanitizeText(v ?? '', 200);
+      return s || undefined;
+    })
+    .optional(),
   needsBusPickup: z.boolean().optional(),
   pickupAddress: z
     .union([z.string(), z.literal(''), z.undefined()])

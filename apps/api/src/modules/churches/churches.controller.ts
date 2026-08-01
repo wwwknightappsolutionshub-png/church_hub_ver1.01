@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Header, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Header, Param, Patch, Post, Req } from '@nestjs/common';
+import { Request } from 'express';
 import { PublicMembershipRegisterDto } from './dto/public-membership-register.dto';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { ChurchesService } from './churches.service';
@@ -101,8 +102,19 @@ export class ChurchesController {
   registerMembership(
     @Param('slug') slug: string,
     @Body() body: PublicMembershipRegisterDto,
+    @Req() req: Request,
   ) {
-    return this.landingMembershipService.registerFromLanding(slug, body);
+    const forwarded = req.headers['x-forwarded-for'];
+    const ip =
+      typeof forwarded === 'string'
+        ? forwarded.split(',')[0]?.trim()
+        : Array.isArray(forwarded)
+          ? forwarded[0]
+          : req.ip;
+    return this.landingMembershipService.registerFromLanding(slug, body, {
+      ipAddress: ip || null,
+      userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : null,
+    });
   }
 
   @Public()
