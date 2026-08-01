@@ -89,8 +89,25 @@ export function writePwaGateState(state: PwaGateState): void {
   localStorage.setItem(PWA_GATE_STORAGE_KEY, JSON.stringify(state));
 }
 
+/**
+ * Public field forms (QR/NFC) must load as plain browser pages —
+ * never block them behind "Install app".
+ */
+export function isPublicWebFormPath(pathname?: string): boolean {
+  const path =
+    pathname ??
+    (typeof window !== 'undefined' ? window.location.pathname : '');
+  if (!path) return false;
+  return (
+    path === '/outreach/capture' ||
+    path.startsWith('/outreach/capture/') ||
+    path.startsWith('/outreach/register')
+  );
+}
+
 export function shouldShowPwaInstallGate(): boolean {
   if (!isPwaInstallGateEnabled()) return false;
+  if (isPublicWebFormPath()) return false;
   if (!isMobilePhoneViewport()) return false;
 
   const state = readPwaGateState();

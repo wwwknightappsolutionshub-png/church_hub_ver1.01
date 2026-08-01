@@ -47,7 +47,8 @@ export function EvangelistQrPanel() {
           Team QR & NFC
         </CardTitle>
         <CardDescription>
-          Self-registration link for your outreach team. Tap NFC tag or scan QR in the field.
+          Self-registration link for your outreach team. Tap NFC tag or scan QR in the field —
+          opens a simple web form (no app install).
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">

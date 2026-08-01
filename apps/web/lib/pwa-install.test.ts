@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { auditManifest } from '@/lib/pwa-checklist';
+import { isPublicWebFormPath } from '@/lib/pwa-install';
 
 describe('pwa manifest icons', () => {
   it('includes required PNG sizes for install', () => {
@@ -13,5 +14,14 @@ describe('pwa manifest icons', () => {
       ],
     };
     expect(auditManifest(manifest).ok).toBe(true);
+  });
+});
+
+describe('public web form paths', () => {
+  it('treats outreach capture as browser-only', () => {
+    expect(isPublicWebFormPath('/outreach/capture')).toBe(true);
+    expect(isPublicWebFormPath('/outreach/capture/')).toBe(true);
+    expect(isPublicWebFormPath('/dashboard/outreach')).toBe(false);
+    expect(isPublicWebFormPath('/')).toBe(false);
   });
 });
