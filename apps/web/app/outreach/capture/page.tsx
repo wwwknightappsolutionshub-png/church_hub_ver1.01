@@ -81,13 +81,12 @@ function CaptureForm() {
         return;
       }
 
+      const apiMessage = axios.isAxiosError(err) ? err.response?.data?.message : undefined;
       const msg =
-        axios.isAxiosError(err) && typeof err.response?.data?.message === 'string'
-          ? err.response.data.message
-          : Array.isArray(
-                axios.isAxiosError(err) ? err.response?.data?.message : undefined,
-              )
-            ? (err.response?.data?.message as string[]).join(', ')
+        typeof apiMessage === 'string'
+          ? apiMessage
+          : Array.isArray(apiMessage)
+            ? apiMessage.join(', ')
             : 'Registration failed — please try again';
       toast.error(msg);
     } finally {
