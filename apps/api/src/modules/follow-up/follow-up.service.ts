@@ -1,6 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { FollowUpStage } from '@prisma/client';
-import { CreateFollowUpSchema } from '@church-hub/shared-types';
+import {
+  CreateFollowUpSchema,
+  optionalEmailSchema,
+  optionalPhoneSchema,
+} from '@church-hub/shared-types';
 import { PrismaService } from '../../prisma/prisma.module';
 import { NotificationsQueueService } from '../notifications/notifications-queue.service';
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
@@ -371,9 +375,14 @@ export class FollowUpService {
     },
   ) {
     const contactName = [data.firstName, data.lastName].filter(Boolean).join(' ').trim();
+    const phoneParsed = optionalPhoneSchema.safeParse(data.phone);
+    const emailParsed = optionalEmailSchema.safeParse(data.email);
+    const phone = phoneParsed.success ? phoneParsed.data : undefined;
+    const email = emailParsed.success ? emailParsed.data : undefined;
+
     const orConditions: Array<{ contactPhone?: string; contactEmail?: string }> = [];
-    if (data.phone) orConditions.push({ contactPhone: data.phone });
-    if (data.email) orConditions.push({ contactEmail: data.email });
+    if (phone) orConditions.push({ contactPhone: phone });
+    if (email) orConditions.push({ contactEmail: email });
 
     if (orConditions.length > 0) {
       const existing = await this.prisma.followUp.findFirst({
@@ -432,8 +441,8 @@ export class FollowUpService {
 
     const followUp = await this.create(churchId, {
       contactName,
-      contactPhone: data.phone,
-      contactEmail: data.email,
+      contactPhone: phone,
+      contactEmail: email,
       stage: 'NEW_LEAD',
       assignedToId,
       notes: noteParts.join(' '),
@@ -441,16 +450,24 @@ export class FollowUpService {
       scheduleReminder: false,
     });
 
-    await this.teamNotify.notifyTeamOnNewLead({
-      churchId,
-      followUpId: followUp.id,
-      contactName,
-      contactPhone: data.phone,
-      contactEmail: data.email,
-      assignedToId: followUp.assignedToId,
-      evangelistName,
-    });
-
+    try {
+      await this.teamNotify.notifyTeamOnNewLead({
+        churchId,
+        followUpId: followUp.id,
+        contactName,
+        contactPhone: phone,
+        contactEmail: email,
+        assignedToId: followUp.assignedToId,
+        evangelistName,
+      });
+    } catch (err) {
+      // Non-fatal — lead is already in the pipeline
+      console.warn(
+        `Team notify failed for follow-up ${followUp.id}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
     if (data.outreachContactId) {
       await this.prisma.outreachContact.update({
         where: { id: data.outreachContactId },

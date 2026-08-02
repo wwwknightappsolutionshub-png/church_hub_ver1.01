@@ -17,11 +17,36 @@ import {
 } from '@/lib/contact-validation';
 import { cn } from '@/lib/utils';
 
+function publicApiBaseUrl() {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    // Always hit the same host Nginx proxies to the API (works for church-hub + custom aliases).
+    return `${window.location.origin}/api/v1`;
+  }
+  return `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}/api/v1`;
+}
+
 const publicApi = axios.create({
-  baseURL: `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}/api/v1`,
   headers: { 'Content-Type': 'application/json' },
   timeout: 45_000,
 });
+
+function apiErrorToastMessage(err: unknown): string {
+  if (!axios.isAxiosError(err)) return 'Registration failed — please try again';
+  const data = err.response?.data as { message?: string | string[] } | undefined;
+  const raw = data?.message;
+  if (typeof raw === 'string' && raw.trim()) {
+    // Never surface opaque Nest 500 text for validation-style failures.
+    if (/^internal server error$/i.test(raw.trim())) {
+      return 'Could not save your details. Check phone/email and try again.';
+    }
+    return raw.replace(/^phone:\s*/i, '').replace(/^email:\s*/i, '');
+  }
+  if (Array.isArray(raw) && raw.length) return raw.join(', ');
+  if (err.response?.status === 400) {
+    return 'Please enter a valid UK phone number and email address.';
+  }
+  return 'Registration failed — please try again';
+}
 
 interface RegisterInfo {
   code: string;
@@ -53,7 +78,7 @@ function CaptureForm() {
       return;
     }
     publicApi
-      .get<RegisterInfo>(`/outreach/register/${code}`)
+      .get<RegisterInfo>(`${publicApiBaseUrl()}/outreach/register/${code}`)
       .then(({ data }) => setInfo(data))
       .catch(() => toast.error('Invalid or expired outreach link'))
       .finally(() => setLoading(false));
@@ -66,6 +91,13 @@ function CaptureForm() {
       phone: phoneErr ?? undefined,
       email: emailErr ?? undefined,
     });
+    if (!form.phone.trim() && !form.email.trim()) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        phone: prev.phone ?? 'Enter a UK phone number or an email',
+      }));
+      return false;
+    }
     return !phoneErr && !emailErr;
   };
 
@@ -96,7 +128,7 @@ function CaptureForm() {
 
     setSubmitting(true);
     try {
-      await publicApi.post(`/outreach/register/${code}`, parsed.data);
+      await publicApi.post(`${publicApiBaseUrl()}/outreach/register/${code}`, parsed.data);
       setDone(true);
     } catch (err) {
       const status = axios.isAxiosError(err) ? err.response?.status : undefined;
@@ -112,14 +144,7 @@ function CaptureForm() {
         return;
       }
 
-      const apiMessage = axios.isAxiosError(err) ? err.response?.data?.message : undefined;
-      const msg =
-        typeof apiMessage === 'string'
-          ? apiMessage
-          : Array.isArray(apiMessage)
-            ? apiMessage.join(', ')
-            : 'Registration failed — please try again';
-      toast.error(msg);
+      toast.error(apiErrorToastMessage(err));
     } finally {
       setSubmitting(false);
     }

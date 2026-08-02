@@ -206,6 +206,12 @@ export class OutreachService {
       evangelistMemberId: data.evangelistId,
       capturedByUserId: data.capturedByUserId,
       referredBy: data.referredBy,
+    }).catch((err) => {
+      this.logger.warn(
+        `Follow-up pipeline sync failed after outreach capture ${contact.id} (registration still saved): ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
     });
 
     if (data.sendWelcome !== false) {

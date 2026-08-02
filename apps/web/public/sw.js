@@ -1,6 +1,6 @@
 /* Church Hub PWA — Phase 11 hardened offline shell */
-const STATIC_CACHE = 'church-hub-static-v6';
-const RUNTIME_CACHE = 'church-hub-runtime-v6';
+const STATIC_CACHE = 'church-hub-static-v7';
+const RUNTIME_CACHE = 'church-hub-runtime-v7';
 const PRECACHE_URLS = [
   '/',
   '/offline',
