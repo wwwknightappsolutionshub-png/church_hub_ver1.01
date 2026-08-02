@@ -209,7 +209,15 @@ export class OutreachService {
     });
 
     if (data.sendWelcome !== false) {
-      await this.sendWelcomeMessage(churchId, contact.id);
+      try {
+        await this.sendWelcomeMessage(churchId, contact.id);
+      } catch (err) {
+        this.logger.warn(
+          `Welcome message failed after outreach capture ${contact.id} (registration still saved): ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
     }
 
     return this.prisma.outreachContact.findUnique({
@@ -229,6 +237,9 @@ export class OutreachService {
     const name = contact.firstName;
     const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ').trim() || name;
 
+    let emailed = false;
+    let texted = false;
+
     if (contact.email) {
       try {
         const rendered = await this.emailTemplates.render(churchId, 'OUTREACH_WELCOME', {
@@ -246,26 +257,49 @@ export class OutreachService {
           html: rendered.bodyHtml,
           churchId,
         });
+        emailed = true;
       } catch (err) {
         this.logger.warn(
           `Branded outreach welcome failed for ${contact.email}; falling back to plain text: ${
             err instanceof Error ? err.message : String(err)
           }`,
         );
-        await this.email.send({
-          to: contact.email,
-          subject: this.applyTemplate(DEFAULT_WELCOME_EMAIL_SUBJECT, name, churchName),
-          body: this.applyTemplate(DEFAULT_WELCOME_EMAIL_BODY, name, churchName),
-          churchId,
-        });
+        try {
+          await this.email.send({
+            to: contact.email,
+            subject: this.applyTemplate(DEFAULT_WELCOME_EMAIL_SUBJECT, name, churchName),
+            body: this.applyTemplate(DEFAULT_WELCOME_EMAIL_BODY, name, churchName),
+            churchId,
+          });
+          emailed = true;
+        } catch (fallbackErr) {
+          this.logger.warn(
+            `Plain outreach welcome email also failed for ${contact.email}: ${
+              fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)
+            }`,
+          );
+        }
       }
     }
     if (contact.phone) {
-      await this.sms.sendWhatsApp({
-        to: contact.phone,
-        body: this.applyTemplate(DEFAULT_WELCOME_SMS, name, churchName),
-        churchId,
-      });
+      try {
+        await this.sms.sendWhatsApp({
+          to: contact.phone,
+          body: this.applyTemplate(DEFAULT_WELCOME_SMS, name, churchName),
+          churchId,
+        });
+        texted = true;
+      } catch (err) {
+        this.logger.warn(
+          `Outreach welcome WhatsApp/SMS failed for ${contact.phone}: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+
+    if (!emailed && !texted) {
+      return contact;
     }
 
     return this.prisma.outreachContact.update({

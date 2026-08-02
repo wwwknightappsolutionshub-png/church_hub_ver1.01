@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 const publicApi = axios.create({
   baseURL: `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}/api/v1`,
   headers: { 'Content-Type': 'application/json' },
+  timeout: 45_000,
 });
 
 interface RegisterInfo {
@@ -58,15 +59,37 @@ function CaptureForm() {
       await publicApi.post(`/outreach/register/${code}`, {
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim() || undefined,
-        phone: form.phone || undefined,
-        email: form.email || undefined,
+        phone: form.phone.trim() || undefined,
+        email: form.email.trim() || undefined,
         referredBy: form.referredBy.trim() || undefined,
-        notes: form.notes || undefined,
+        notes: form.notes.trim() || undefined,
       });
       setDone(true);
-      toast.success('You are registered — welcome message on its way!');
-    } catch {
-      toast.error('Registration failed — please try again');
+    } catch (err) {
+      // Registration may have already been saved server-side (welcome SMS/email can fail after).
+      // Prefer thank-you when the API returned a contact payload or a conflict-style success.
+      const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+      const data = axios.isAxiosError(err) ? err.response?.data : undefined;
+      const looksSaved =
+        status === 409 ||
+        (data &&
+          typeof data === 'object' &&
+          ('id' in data || 'firstName' in data || 'outreachContactId' in data));
+
+      if (looksSaved) {
+        setDone(true);
+        return;
+      }
+
+      const msg =
+        axios.isAxiosError(err) && typeof err.response?.data?.message === 'string'
+          ? err.response.data.message
+          : Array.isArray(
+                axios.isAxiosError(err) ? err.response?.data?.message : undefined,
+              )
+            ? (err.response?.data?.message as string[]).join(', ')
+            : 'Registration failed — please try again';
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -155,7 +178,7 @@ function CaptureForm() {
                 will be sent automatically.
               </p>
               <Button type="submit" className="w-full shadow-brand" disabled={submitting}>
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Register with us'}
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Submit'}
               </Button>
             </form>
           </CardContent>
@@ -166,6 +189,24 @@ function CaptureForm() {
 }
 
 const AUTO_CLOSE_SECONDS = 5;
+
+function tryClosePage() {
+  try {
+    window.close();
+  } catch {
+    // ignored
+  }
+  // Browsers usually block window.close() for QR/NFC tabs not opened by script.
+  setTimeout(() => {
+    if (!document.hidden) {
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        window.location.replace('about:blank');
+      }
+    }
+  }, 150);
+}
 
 function ThankYouSuccess({
   firstName,
@@ -182,21 +223,7 @@ function ThankYouSuccess({
     }, 1000);
 
     const closeTimer = setTimeout(() => {
-      try {
-        window.close();
-      } catch {
-        // ignored — browsers block close unless opened by script
-      }
-      // Fallback when the tab cannot be closed programmatically (typical for QR/NFC opens).
-      setTimeout(() => {
-        if (!document.hidden) {
-          if (window.history.length > 1) {
-            window.history.back();
-          } else {
-            window.location.replace('about:blank');
-          }
-        }
-      }, 150);
+      tryClosePage();
     }, AUTO_CLOSE_SECONDS * 1000);
 
     return () => {
@@ -218,6 +245,9 @@ function ThankYouSuccess({
           ? `This page will close in ${secondsLeft} second${secondsLeft === 1 ? '' : 's'}…`
           : 'Closing…'}
       </p>
+      <Button type="button" variant="outline" onClick={tryClosePage}>
+        Done
+      </Button>
     </div>
   );
 }
