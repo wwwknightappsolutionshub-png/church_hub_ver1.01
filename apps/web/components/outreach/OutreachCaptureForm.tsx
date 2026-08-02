@@ -17,6 +17,7 @@ import {
 import { VoiceNotesField } from '@/components/outreach/VoiceNotesField';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { filterPhoneTyping } from '@/lib/contact-validation';
 import { cn } from '@/lib/utils';
 
 const formSchema = OutreachCaptureSchema;
@@ -78,7 +79,7 @@ function OutreachCaptureFormInner({
   const lookupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const allowDraftRestore = useRef(true);
 
-  const { register, handleSubmit, reset, setValue, watch, formState: { isSubmitting } } =
+  const { register, handleSubmit, reset, setValue, watch, formState: { isSubmitting, errors } } =
     useForm<FormData>({
       resolver: zodResolver(formSchema),
       defaultValues: EMPTY_FORM,
@@ -307,28 +308,43 @@ function OutreachCaptureFormInner({
           data-form-type="other"
         />
         <Input
-          placeholder="Phone"
-          {...register('phone')}
+          placeholder="UK phone (e.g. 07123 456789)"
+          {...register('phone', {
+            onChange: (e) => {
+              e.target.value = filterPhoneTyping(e.target.value);
+            },
+          })}
           autoComplete="off"
           inputMode="tel"
+          type="tel"
           readOnly
           onFocus={unlockAutofill}
+          aria-invalid={!!errors.phone}
+          className={cn(errors.phone && 'border-destructive')}
           data-lpignore="true"
           data-1p-ignore
           data-form-type="other"
         />
+        {errors.phone?.message ? (
+          <p className="sm:col-span-2 -mt-2 text-xs text-destructive">{String(errors.phone.message)}</p>
+        ) : null}
         <Input
           placeholder="Email"
-          type="text"
+          type="email"
           inputMode="email"
           {...register('email')}
           autoComplete="off"
           readOnly
           onFocus={unlockAutofill}
+          aria-invalid={!!errors.email}
+          className={cn(errors.email && 'border-destructive')}
           data-lpignore="true"
           data-1p-ignore
           data-form-type="other"
         />
+        {errors.email?.message ? (
+          <p className="sm:col-span-2 -mt-2 text-xs text-destructive">{String(errors.email.message)}</p>
+        ) : null}
         <Input
           placeholder="Who referred you? (name)"
           className="sm:col-span-2"

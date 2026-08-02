@@ -1,11 +1,12 @@
 import { z } from 'zod';
 import { MemberRoleSchema, MemberStatusSchema } from './enums';
+import { optionalEmailSchema, optionalPhoneSchema } from './validation';
 
 export const CreateMemberSchema = z.object({
   firstName: z.string().min(1).max(100),
   lastName: z.string().min(1).max(100),
-  email: z.string().email().optional(),
-  phone: z.string().min(7).max(20).optional(),
+  email: optionalEmailSchema,
+  phone: optionalPhoneSchema,
   dateOfBirth: z.string().datetime().optional(),
   roles: z.array(MemberRoleSchema).default(['ADULT']),
   status: MemberStatusSchema.default('VISITOR'),

@@ -22,6 +22,11 @@ import { LandingModal } from './LandingModal';
 import { churchSectionClass, landingContainer } from './church-landing-classes';
 import { LandingSectionHeader } from './LandingSectionHeader';
 import { cn } from '@/lib/utils';
+import {
+  emailFormatError,
+  filterPhoneTyping,
+  phoneFormatError,
+} from '@/lib/contact-validation';
 
 type ServiceUnitOption = { id: string; name: string; description?: string | null };
 
@@ -152,6 +157,16 @@ export function LandingMembershipSection({
     }
     if (effectiveConfig.requireEmail && !form.email.trim()) {
       toast.error('Email is required');
+      return;
+    }
+    const emailErr = emailFormatError(form.email);
+    if (emailErr) {
+      toast.error(emailErr);
+      return;
+    }
+    const phoneErr = phoneFormatError(form.phone);
+    if (phoneErr) {
+      toast.error(phoneErr);
       return;
     }
     if (effectiveConfig.showBornAgain && !form.bornAgain) {
@@ -337,6 +352,7 @@ export function LandingMembershipSection({
                 <Input
                   id="mem-email"
                   type="email"
+                  inputMode="email"
                   value={form.email}
                   onChange={(e) => update({ email: e.target.value })}
                   required={effectiveConfig.requireEmail}
@@ -344,13 +360,15 @@ export function LandingMembershipSection({
                 />
               </div>
               <div>
-                <Label htmlFor="mem-phone">Phone</Label>
+                <Label htmlFor="mem-phone">UK phone</Label>
                 <Input
                   id="mem-phone"
                   type="tel"
+                  inputMode="tel"
                   value={form.phone}
-                  onChange={(e) => update({ phone: e.target.value })}
+                  onChange={(e) => update({ phone: filterPhoneTyping(e.target.value) })}
                   autoComplete="tel"
+                  placeholder="07123 456789"
                 />
               </div>
             </div>

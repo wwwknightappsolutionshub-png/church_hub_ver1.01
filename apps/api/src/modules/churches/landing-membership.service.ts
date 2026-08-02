@@ -11,7 +11,10 @@ import {
   DEFAULT_LANDING_MEMBERSHIP_FORM,
   applyTemplateVars,
   landingMembershipFormSchema,
+  optionalEmailSchema,
+  optionalPhoneSchema,
   type LandingMembershipFormConfig,
+  UK_PHONE_HINT,
 } from '@church-hub/shared-types';
 import { PrismaService } from '../../prisma/prisma.module';
 import { MembershipService } from '../membership/membership.service';
@@ -195,7 +198,17 @@ export class LandingMembershipService {
     }
 
     const form = this.readFormConfig(church.settings);
-    const email = dto.email?.trim().toLowerCase();
+    const emailParsed = optionalEmailSchema.safeParse(dto.email);
+    if (!emailParsed.success) {
+      throw new BadRequestException(emailParsed.error.issues[0]?.message ?? 'Enter a valid email');
+    }
+    const email = emailParsed.data;
+
+    const phoneParsed = optionalPhoneSchema.safeParse(dto.phone);
+    if (!phoneParsed.success) {
+      throw new BadRequestException(phoneParsed.error.issues[0]?.message ?? UK_PHONE_HINT);
+    }
+    const phone = phoneParsed.data ?? undefined;
 
     if (form.requireEmail && !email) {
       throw new BadRequestException('Email is required to complete registration');
@@ -238,7 +251,7 @@ export class LandingMembershipService {
           passwordHash,
           firstName: dto.firstName.trim(),
           lastName: dto.lastName.trim(),
-          phone: dto.phone?.trim(),
+          phone: phone,
           roles: memberRole ? { create: { roleId: memberRole.id } } : undefined,
         },
       });
@@ -258,7 +271,7 @@ export class LandingMembershipService {
       firstName: dto.firstName.trim(),
       lastName: dto.lastName.trim(),
       email: email || undefined,
-      phone: dto.phone?.trim() || undefined,
+      phone: phone || undefined,
       address: dto.address?.trim() || undefined,
       city: dto.city?.trim() || undefined,
       notes: noteParts.join(' '),

@@ -3,6 +3,7 @@ import {
   optionalEmailSchema,
   optionalPhoneSchema,
   optionalUkPostcodeSchema,
+  PublicOutreachRegisterSchema,
   sanitizeText,
 } from '@church-hub/shared-types';
 
@@ -88,11 +89,4 @@ export const pipelineAdvanceSchema = z.object({
   ]),
 });
 
-export const publicRegisterSchema = z.object({
-  firstName: z.string().min(1).max(120),
-  lastName: z.string().max(120).optional(),
-  phone: z.string().max(40).optional(),
-  email: z.string().email().max(200).optional(),
-  notes: z.string().max(2000).optional(),
-  referredBy: z.string().max(200).optional(),
-});
+export const publicRegisterSchema = PublicOutreachRegisterSchema;

@@ -54,6 +54,35 @@ export const OutreachCaptureSchema = z.object({
   capturedAt: z.string().datetime().optional(),
 });
 
+/** Public QR/NFC self-registration (no GPS/postcode required). */
+export const PublicOutreachRegisterSchema = z.object({
+  firstName: personNameSchema,
+  lastName: z
+    .union([z.string(), z.literal(''), z.undefined()])
+    .transform((v) => {
+      const s = sanitizeText(v ?? '', 100);
+      return s || undefined;
+    })
+    .optional(),
+  phone: optionalPhoneSchema,
+  email: optionalEmailSchema,
+  notes: z
+    .union([z.string(), z.literal(''), z.undefined()])
+    .transform((v) => {
+      const s = sanitizeText(v ?? '', 2000);
+      return s || undefined;
+    })
+    .optional(),
+  referredBy: z
+    .union([z.string(), z.literal(''), z.undefined()])
+    .transform((v) => {
+      const s = sanitizeText(v ?? '', 200);
+      return s || undefined;
+    })
+    .optional(),
+});
+export type PublicOutreachRegisterInput = z.infer<typeof PublicOutreachRegisterSchema>;
+
 export const OutreachConvertStageSchema = z.enum([
   'CAPTURED',
   'CONTACTED',

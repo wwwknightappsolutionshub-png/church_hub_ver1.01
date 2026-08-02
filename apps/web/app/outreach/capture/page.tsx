@@ -9,6 +9,13 @@ import { BrandMark } from '@/components/brand/BrandMark';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  emailFormatError,
+  filterPhoneTyping,
+  phoneFormatError,
+  PublicOutreachRegisterSchema,
+} from '@/lib/contact-validation';
+import { cn } from '@/lib/utils';
 
 const publicApi = axios.create({
   baseURL: `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}/api/v1`,
@@ -30,6 +37,7 @@ function CaptureForm() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{ phone?: string; email?: string }>({});
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -51,23 +59,46 @@ function CaptureForm() {
       .finally(() => setLoading(false));
   }, [code]);
 
+  const validateFields = () => {
+    const phoneErr = phoneFormatError(form.phone);
+    const emailErr = emailFormatError(form.email);
+    setFieldErrors({
+      phone: phoneErr ?? undefined,
+      email: emailErr ?? undefined,
+    });
+    return !phoneErr && !emailErr;
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!code || !form.firstName.trim()) return;
+    if (!validateFields()) {
+      toast.error('Please fix the highlighted fields');
+      return;
+    }
+
+    const parsed = PublicOutreachRegisterSchema.safeParse({
+      firstName: form.firstName.trim(),
+      lastName: form.lastName.trim() || undefined,
+      phone: form.phone.trim() || undefined,
+      email: form.email.trim() || undefined,
+      referredBy: form.referredBy.trim() || undefined,
+      notes: form.notes.trim() || undefined,
+    });
+    if (!parsed.success) {
+      const first = parsed.error.issues[0];
+      const msg = first?.message ?? 'Please check your details';
+      if (first?.path[0] === 'phone') setFieldErrors((prev) => ({ ...prev, phone: msg }));
+      if (first?.path[0] === 'email') setFieldErrors((prev) => ({ ...prev, email: msg }));
+      toast.error(msg);
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await publicApi.post(`/outreach/register/${code}`, {
-        firstName: form.firstName.trim(),
-        lastName: form.lastName.trim() || undefined,
-        phone: form.phone.trim() || undefined,
-        email: form.email.trim() || undefined,
-        referredBy: form.referredBy.trim() || undefined,
-        notes: form.notes.trim() || undefined,
-      });
+      await publicApi.post(`/outreach/register/${code}`, parsed.data);
       setDone(true);
     } catch (err) {
-      // Registration may have already been saved server-side (welcome SMS/email can fail after).
-      // Prefer thank-you when the API returned a contact payload or a conflict-style success.
       const status = axios.isAxiosError(err) ? err.response?.status : undefined;
       const data = axios.isAxiosError(err) ? err.response?.data : undefined;
       const looksSaved =
@@ -137,29 +168,80 @@ function CaptureForm() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={submit} className="space-y-3">
+            <form onSubmit={submit} className="space-y-3" noValidate>
               <Input
                 placeholder="First name *"
                 value={form.firstName}
                 onChange={(e) => setForm({ ...form, firstName: e.target.value })}
                 required
+                autoComplete="given-name"
               />
               <Input
                 placeholder="Last name"
                 value={form.lastName}
                 onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+                autoComplete="family-name"
               />
-              <Input
-                placeholder="Phone"
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              />
-              <Input
-                type="email"
-                placeholder="Email"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-              />
+              <div>
+                <Input
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  placeholder="UK phone (e.g. 07123 456789)"
+                  value={form.phone}
+                  aria-invalid={!!fieldErrors.phone}
+                  className={cn(fieldErrors.phone && 'border-destructive')}
+                  onChange={(e) => {
+                    const phone = filterPhoneTyping(e.target.value);
+                    setForm({ ...form, phone });
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      phone: phoneFormatError(phone) ?? undefined,
+                    }));
+                  }}
+                  onBlur={() =>
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      phone: phoneFormatError(form.phone) ?? undefined,
+                    }))
+                  }
+                />
+                {fieldErrors.phone ? (
+                  <p className="mt-1 text-xs text-destructive">{fieldErrors.phone}</p>
+                ) : (
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    UK numbers only — digits, no letters
+                  </p>
+                )}
+              </div>
+              <div>
+                <Input
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  placeholder="Email"
+                  value={form.email}
+                  aria-invalid={!!fieldErrors.email}
+                  className={cn(fieldErrors.email && 'border-destructive')}
+                  onChange={(e) => {
+                    const email = e.target.value;
+                    setForm({ ...form, email });
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      email: emailFormatError(email) ?? undefined,
+                    }));
+                  }}
+                  onBlur={() =>
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      email: emailFormatError(form.email) ?? undefined,
+                    }))
+                  }
+                />
+                {fieldErrors.email ? (
+                  <p className="mt-1 text-xs text-destructive">{fieldErrors.email}</p>
+                ) : null}
+              </div>
               <Input
                 placeholder="Who referred you? (name)"
                 value={form.referredBy}
@@ -195,7 +277,6 @@ function tryClosePage() {
   } catch {
     // ignored
   }
-  // Browsers usually block window.close() for QR/NFC tabs not opened by script.
   setTimeout(() => {
     if (!document.hidden) {
       if (window.history.length > 1) {

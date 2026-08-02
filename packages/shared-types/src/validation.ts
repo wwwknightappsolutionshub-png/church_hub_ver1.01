@@ -14,13 +14,55 @@ export function sanitizeEmail(value: unknown): string {
   return sanitizeText(value, 255).toLowerCase();
 }
 
-/** Keep leading +, digits only otherwise. */
+/**
+ * Strip to a dialable string while typing (digits, +, spaces, dashes, parentheses only).
+ * Letters and other symbols are removed immediately.
+ */
+export function filterPhoneTyping(value: unknown): string {
+  return String(value ?? '')
+    .replace(/[^\d+\s()-]/g, '')
+    .slice(0, 24);
+}
+
+/** Keep leading +, digits only otherwise (legacy helper — prefer normalizeUkPhoneToE164). */
 export function sanitizePhone(value: unknown): string {
   const raw = sanitizeText(value, 40);
   if (!raw) return '';
+  if (/[a-zA-Z]/.test(raw)) return '';
   const plus = raw.startsWith('+') ? '+' : '';
   return `${plus}${raw.replace(/[^\d]/g, '')}`.slice(0, 20);
 }
+
+const UK_E164_REGEX = /^\+44[1-9]\d{8,9}$/;
+
+/**
+ * Normalize a UK phone to E.164 (`+44…`).
+ * Accepts `07…`, `447…`, `+44…`, with spaces/dashes. Rejects letters and non-UK shapes.
+ */
+export function normalizeUkPhoneToE164(value: unknown): string | null {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  if (/[a-zA-Z]/.test(raw)) return null;
+
+  let digits = raw.replace(/[^\d]/g, '');
+  if (!digits) return null;
+  if (digits.startsWith('00')) digits = digits.slice(2);
+  if (digits.startsWith('44')) digits = digits.slice(2);
+  else if (digits.startsWith('0')) digits = digits.slice(1);
+
+  // National significant number: 9–10 digits, not starting with 0.
+  if (!/^[1-9]\d{8,9}$/.test(digits)) return null;
+  // UK mobiles are 10 digits starting with 7 (07xxx xxx xxx).
+  if (digits.startsWith('7') && digits.length !== 10) return null;
+
+  return `+44${digits}`;
+}
+
+export function isValidUkPhone(value: unknown): boolean {
+  return normalizeUkPhoneToE164(value) != null;
+}
+
+export const UK_PHONE_HINT = 'Enter a valid UK phone (e.g. 07123 456789 or +44 7123 456789)';
 
 export function sanitizeSlug(value: unknown): string {
   return sanitizeText(value, 64)
@@ -111,22 +153,38 @@ export const optionalEmailSchema = z
 
 export const phoneSchema = z
   .string()
-  .transform(sanitizePhone)
-  .pipe(
-    z
-      .string()
-      .min(7, 'Enter a valid phone number')
-      .max(20)
-      .regex(/^\+?\d{7,15}$/, 'Enter a valid phone number'),
-  );
+  .trim()
+  .min(1, 'Enter a phone number')
+  .refine((v) => !/[a-zA-Z]/.test(v), {
+    message: 'Phone number cannot contain letters',
+  })
+  .transform((v) => normalizeUkPhoneToE164(v) ?? '')
+  .refine((v) => UK_E164_REGEX.test(v), { message: UK_PHONE_HINT });
 
 export const optionalPhoneSchema = z
   .union([z.string(), z.literal(''), z.undefined(), z.null()])
-  .transform((v) => {
-    const s = sanitizePhone(v ?? '');
-    return s || undefined;
+  .superRefine((v, ctx) => {
+    const raw = String(v ?? '').trim();
+    if (!raw) return;
+    if (/[a-zA-Z]/.test(raw)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Phone number cannot contain letters',
+      });
+      return;
+    }
+    if (!normalizeUkPhoneToE164(raw)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: UK_PHONE_HINT,
+      });
+    }
   })
-  .pipe(z.union([phoneSchema, z.undefined()]));
+  .transform((v) => {
+    const raw = String(v ?? '').trim();
+    if (!raw) return undefined;
+    return normalizeUkPhoneToE164(raw) ?? undefined;
+  });
 
 export const passwordSchema = z
   .string()

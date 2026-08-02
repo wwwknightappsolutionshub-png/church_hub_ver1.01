@@ -1,11 +1,12 @@
 import { z } from 'zod';
 import { FollowUpStageSchema } from './enums';
+import { optionalEmailSchema, optionalPhoneSchema } from './validation';
 
 export const CreateFollowUpSchema = z.object({
   memberId: z.string().uuid().optional(),
   contactName: z.string().min(1).max(200),
-  contactPhone: z.string().optional(),
-  contactEmail: z.string().email().optional(),
+  contactPhone: optionalPhoneSchema,
+  contactEmail: optionalEmailSchema,
   stage: FollowUpStageSchema.default('NEW_LEAD'),
   assignedToId: z.string().uuid().optional(),
   dueAt: z.string().datetime().optional(),

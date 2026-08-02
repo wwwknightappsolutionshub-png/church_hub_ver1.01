@@ -1,8 +1,15 @@
 'use client';
 
 import { Loader2, UserPlus, X } from 'lucide-react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  emailFormatError,
+  filterPhoneTyping,
+  phoneFormatError,
+} from '@/lib/contact-validation';
+import { cn } from '@/lib/utils';
 
 interface Assignee {
   id: string;
@@ -35,7 +42,21 @@ export function FollowUpNewLeadSheet({
   onClose,
   onSubmit,
 }: FollowUpNewLeadSheetProps) {
+  const [errors, setErrors] = useState<{ phone?: string; email?: string }>({});
+
   if (!open) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const phoneErr = phoneFormatError(form.contactPhone);
+    const emailErr = emailFormatError(form.contactEmail);
+    setErrors({
+      phone: phoneErr ?? undefined,
+      email: emailErr ?? undefined,
+    });
+    if (phoneErr || emailErr) return;
+    onSubmit(e);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
@@ -60,7 +81,7 @@ export function FollowUpNewLeadSheet({
             <X className="h-5 w-5" />
           </Button>
         </div>
-        <form onSubmit={onSubmit} className="space-y-4 p-5">
+        <form onSubmit={handleSubmit} className="space-y-4 p-5" noValidate>
           <Input
             placeholder="Full name *"
             value={form.contactName}
@@ -68,17 +89,48 @@ export function FollowUpNewLeadSheet({
             required
           />
           <div className="grid gap-3 sm:grid-cols-2">
-            <Input
-              placeholder="Phone"
-              value={form.contactPhone}
-              onChange={(e) => onChange({ ...form, contactPhone: e.target.value })}
-            />
-            <Input
-              type="email"
-              placeholder="Email"
-              value={form.contactEmail}
-              onChange={(e) => onChange({ ...form, contactEmail: e.target.value })}
-            />
+            <div>
+              <Input
+                type="tel"
+                inputMode="tel"
+                placeholder="UK phone"
+                value={form.contactPhone}
+                aria-invalid={!!errors.phone}
+                className={cn(errors.phone && 'border-destructive')}
+                onChange={(e) => {
+                  const contactPhone = filterPhoneTyping(e.target.value);
+                  onChange({ ...form, contactPhone });
+                  setErrors((prev) => ({
+                    ...prev,
+                    phone: phoneFormatError(contactPhone) ?? undefined,
+                  }));
+                }}
+              />
+              {errors.phone ? (
+                <p className="mt-1 text-xs text-destructive">{errors.phone}</p>
+              ) : null}
+            </div>
+            <div>
+              <Input
+                type="email"
+                inputMode="email"
+                placeholder="Email"
+                value={form.contactEmail}
+                aria-invalid={!!errors.email}
+                className={cn(errors.email && 'border-destructive')}
+                onChange={(e) => {
+                  const contactEmail = e.target.value;
+                  onChange({ ...form, contactEmail });
+                  setErrors((prev) => ({
+                    ...prev,
+                    email: emailFormatError(contactEmail) ?? undefined,
+                  }));
+                }}
+              />
+              {errors.email ? (
+                <p className="mt-1 text-xs text-destructive">{errors.email}</p>
+              ) : null}
+            </div>
           </div>
           <select
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"

@@ -16,6 +16,7 @@ import { CustomFieldsFormSection } from '@/components/membership/CustomFieldsFor
 import { MultiStepFormDialog } from '@/components/membership/MultiStepFormDialog';
 import { FieldLabel, WizardSection } from '@/components/membership/WizardFormSection';
 import { addressFieldLabel } from '@/lib/membership/address-labels';
+import { filterPhoneTyping } from '@/lib/contact-validation';
 import { cn } from '@/lib/utils';
 
 const CONGREGANT_STEPS = [
@@ -618,25 +619,28 @@ export function CongregantEditorForm({
                   <FieldLabel required>Mobile Phone</FieldLabel>
                   <Input
                     type="tel"
+                    inputMode="tel"
                     value={form.cellPhone ?? ''}
-                    onChange={(e) => setField('cellPhone', e.target.value)}
-                    placeholder="Primary contact number"
+                    onChange={(e) => setField('cellPhone', filterPhoneTyping(e.target.value))}
+                    placeholder="UK mobile e.g. 07123 456789"
                   />
                 </label>
                 <label>
                   <FieldLabel>Home Phone</FieldLabel>
                   <Input
                     type="tel"
+                    inputMode="tel"
                     value={form.homePhone ?? ''}
-                    onChange={(e) => setField('homePhone', e.target.value)}
+                    onChange={(e) => setField('homePhone', filterPhoneTyping(e.target.value))}
                   />
                 </label>
                 <label className="sm:col-span-2">
                   <FieldLabel>Work Phone</FieldLabel>
                   <Input
                     type="tel"
+                    inputMode="tel"
                     value={form.workPhone ?? ''}
-                    onChange={(e) => setField('workPhone', e.target.value)}
+                    onChange={(e) => setField('workPhone', filterPhoneTyping(e.target.value))}
                   />
                 </label>
               </div>

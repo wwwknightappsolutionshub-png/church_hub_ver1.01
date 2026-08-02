@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { FollowUpStage } from '@prisma/client';
+import { CreateFollowUpSchema } from '@church-hub/shared-types';
 import { PrismaService } from '../../prisma/prisma.module';
 import { NotificationsQueueService } from '../notifications/notifications-queue.service';
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
@@ -120,17 +121,31 @@ export class FollowUpService {
       reminderChannel?: string;
     },
   ) {
+    const contact = CreateFollowUpSchema.safeParse({
+      memberId: data.memberId,
+      contactName: data.contactName,
+      contactPhone: data.contactPhone || undefined,
+      contactEmail: data.contactEmail || undefined,
+      stage: data.stage,
+      assignedToId: data.assignedToId || undefined,
+      dueAt: data.dueAt || undefined,
+      notes: data.notes,
+    });
+    if (!contact.success) {
+      throw new BadRequestException(contact.error.issues[0]?.message ?? 'Invalid follow-up details');
+    }
+
     const followUp = await this.prisma.followUp.create({
       data: {
         churchId,
-        memberId: data.memberId,
-        contactName: data.contactName,
-        contactPhone: data.contactPhone,
-        contactEmail: data.contactEmail,
-        stage: data.stage ?? 'NEW_LEAD',
-        assignedToId: data.assignedToId,
+        memberId: contact.data.memberId,
+        contactName: contact.data.contactName,
+        contactPhone: contact.data.contactPhone,
+        contactEmail: contact.data.contactEmail,
+        stage: contact.data.stage ?? 'NEW_LEAD',
+        assignedToId: contact.data.assignedToId ?? data.assignedToId,
         dueAt: data.dueAt ? new Date(data.dueAt) : undefined,
-        notes: data.notes,
+        notes: contact.data.notes,
         referredBy: data.referredBy?.trim() || null,
       },
       include: followUpInclude,
