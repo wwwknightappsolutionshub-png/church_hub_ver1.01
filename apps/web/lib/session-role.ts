@@ -41,6 +41,15 @@ export function isChurchLeadershipRole(roles: string[] | undefined): boolean {
   return isChurchAdminRole(roles) || isPastorRole(roles);
 }
 
+export function isLeaderRole(roles: string[] | undefined): boolean {
+  return (roles ?? []).includes('LEADER');
+}
+
+/** Admin, Pastor, or Follow-up / unit Leader — may export outreach directory PDFs. */
+export function canExportOutreachDirectory(roles: string[] | undefined): boolean {
+  return isChurchLeadershipRole(roles) || isLeaderRole(roles);
+}
+
 export function resolveSessionRoleBucket(input: {
   userRoles?: string[];
   isPlatformAdmin?: boolean;

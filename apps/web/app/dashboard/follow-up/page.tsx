@@ -29,13 +29,14 @@ import { FollowUpMembersPanel } from '@/components/follow-up/FollowUpMembersPane
 import { FollowUpAutomationPanel } from '@/components/follow-up/FollowUpAutomationPanel';
 import { useMembershipAccess } from '@/lib/hooks/use-membership-access';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
-import { isChurchLeadershipRole } from '@/lib/session-role';
+import { canExportOutreachDirectory } from '@/lib/session-role';
 import { ModuleGate } from '@/components/app/ModuleGate';
 import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import {
   FOLLOW_UP_EXPORT_OPTIONS,
   exportFollowUpPdf,
 } from '@/lib/follow-up-pdf';
+import { FOLLOW_UP_STAGES, STAGE_LABELS } from '@/lib/follow-up';
 import {
   EnterpriseContent,
   EnterpriseHero,
@@ -87,11 +88,14 @@ function FollowUpPageContent() {
   const queryClient = useQueryClient();
   const { canManageMembers } = useMembershipAccess();
   const { userRoles } = useModuleAccess();
-  const canExport = isChurchLeadershipRole(userRoles);
+  const canExport = canExportOutreachDirectory(userRoles);
   const [view, setView] = useState<'pipeline' | 'table' | 'members'>('pipeline');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [assigneeFilter, setAssigneeFilter] = useState('');
+  const [stageFilter, setStageFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [search, setSearch] = useState('');
   const [newForm, setNewForm] = useState({
     contactName: '',
@@ -133,17 +137,32 @@ function FollowUpPageContent() {
   const filteredItems = useMemo(() => {
     const list = data ?? [];
     const q = search.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter(
-      (f) =>
+    const fromMs = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
+    const toMs = dateTo ? new Date(`${dateTo}T23:59:59.999`).getTime() : null;
+
+    return list.filter((f) => {
+      if (stageFilter && f.stage !== stageFilter) return false;
+
+      if (fromMs != null || toMs != null) {
+        const raw = f.createdAt || f.dueAt;
+        if (!raw) return false;
+        const t = new Date(raw).getTime();
+        if (Number.isNaN(t)) return false;
+        if (fromMs != null && t < fromMs) return false;
+        if (toMs != null && t > toMs) return false;
+      }
+
+      if (!q) return true;
+      return (
         f.contactName.toLowerCase().includes(q) ||
         f.contactPhone?.includes(q) ||
         f.contactEmail?.toLowerCase().includes(q) ||
         f.assignedTo?.firstName.toLowerCase().includes(q) ||
         f.assignedTo?.lastName.toLowerCase().includes(q) ||
-        f.referredBy?.toLowerCase().includes(q),
-    );
-  }, [data, search]);
+        f.referredBy?.toLowerCase().includes(q)
+      );
+    });
+  }, [data, search, stageFilter, dateFrom, dateTo]);
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['follow-up'] });
@@ -207,7 +226,7 @@ function FollowUpPageContent() {
       exportFollowUpPdf(filteredItems, scope);
       toast.success('PDF downloaded');
     } catch {
-      toast.error('Export requires Pastor or Admin permission');
+      toast.error('Export requires Admin, Pastor, or Follow-up Leader permission');
     } finally {
       setExportOpen(false);
     }
@@ -221,34 +240,6 @@ function FollowUpPageContent() {
         description={MODULE_DESCRIPTIONS.followUp}
         actions={
           <>
-            {canExport ? (
-              <div className="relative">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  type="button"
-                  onClick={() => setExportOpen((o) => !o)}
-                  disabled={filteredItems.length === 0}
-                >
-                  <Download className="mr-1.5 h-4 w-4" />
-                  Export PDF
-                </Button>
-                {exportOpen ? (
-                  <div className="absolute right-0 z-20 mt-1 w-64 rounded-lg border border-border bg-card p-1 shadow-lg">
-                    {FOLLOW_UP_EXPORT_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.label}
-                        type="button"
-                        className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
-                        onClick={() => runExport(opt.scope)}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
             <Button size="sm" onClick={() => setShowNew(true)}>
               <Plus className="mr-1.5 h-4 w-4" />
               New lead
@@ -286,7 +277,7 @@ function FollowUpPageContent() {
         ariaLabel="Outreach views"
         tabs={[
           { id: 'pipeline', label: 'Pipeline' },
-          { id: 'table', label: 'Table' },
+          { id: 'table', label: 'Outreach Directory' },
           { id: 'members', label: 'Members' },
         ]}
         active={view}
@@ -304,12 +295,26 @@ function FollowUpPageContent() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
+            <select
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground"
+              value={stageFilter}
+              onChange={(e) => setStageFilter(e.target.value)}
+              aria-label="Filter by stage"
+            >
+              <option value="">All stages</option>
+              {FOLLOW_UP_STAGES.map((stage) => (
+                <option key={stage} value={stage}>
+                  {STAGE_LABELS[stage]}
+                </option>
+              ))}
+            </select>
             <select
               className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground"
               value={assigneeFilter}
               onChange={(e) => setAssigneeFilter(e.target.value)}
+              aria-label="Filter by assignee"
             >
               <option value="">All assignees</option>
               {(assignees ?? []).map((a) => (
@@ -318,7 +323,52 @@ function FollowUpPageContent() {
                 </option>
               ))}
             </select>
+            <Input
+              type="date"
+              className="h-10 w-auto min-w-[9.5rem]"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              aria-label="Captured from date"
+              title="Captured from"
+            />
+            <span className="text-xs text-muted-foreground">to</span>
+            <Input
+              type="date"
+              className="h-10 w-auto min-w-[9.5rem]"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              aria-label="Captured to date"
+              title="Captured to"
+            />
           </div>
+          {view === 'table' && canExport ? (
+            <div className="relative">
+              <Button
+                size="sm"
+                variant="outline"
+                type="button"
+                onClick={() => setExportOpen((o) => !o)}
+                disabled={filteredItems.length === 0}
+              >
+                <Download className="mr-1.5 h-4 w-4" />
+                Export PDF
+              </Button>
+              {exportOpen ? (
+                <div className="absolute right-0 z-20 mt-1 w-64 rounded-lg border border-border bg-card p-1 shadow-lg">
+                  {FOLLOW_UP_EXPORT_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.label}
+                      type="button"
+                      className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
+                      onClick={() => runExport(opt.scope)}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {stats && (
             <Badge variant="outline" className="hidden sm:inline-flex">
               <Sparkles className="mr-1 h-3 w-3" />
@@ -341,7 +391,8 @@ function FollowUpPageContent() {
 
         {!isLoading && !isError && filteredItems.length === 0 && (data?.length ?? 0) > 0 && (
           <p className="mb-4 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
-            No matches for &quot;{search}&quot;. Clear search to see all leads.
+            No matches for the current search or filters. Clear search, stage, or date to see more
+            people.
           </p>
         )}
 

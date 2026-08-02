@@ -58,8 +58,10 @@ export class FollowUpController {
   }
 
   @Post('export-check')
-  @Roles('ADMIN', 'PASTOR')
-  @ApiOperation({ summary: 'Authorize church outreach PDF export (Admin/Pastor only)' })
+  @Roles('ADMIN', 'PASTOR', 'LEADER')
+  @ApiOperation({
+    summary: 'Authorize church outreach PDF export (Admin, Pastor, or Leader)',
+  })
   exportCheck() {
     return { ok: true };
   }

@@ -35,6 +35,7 @@ export interface FollowUpCard {
   contactEmail?: string | null;
   stage: string;
   dueAt?: string | null;
+  createdAt?: string | null;
   notes?: string | null;
   referredBy?: string | null;
   member?: { id: string; firstName: string; lastName: string } | null;

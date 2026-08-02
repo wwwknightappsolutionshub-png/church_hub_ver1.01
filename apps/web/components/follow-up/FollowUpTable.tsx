@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Calendar, ChevronRight, Mail, Phone, User } from 'lucide-react';
-import { STAGE_LABELS, formatDue, nextStage } from '@/lib/follow-up';
+import { STAGE_LABELS, STAGE_ROW_CLASS, formatDue, nextStage } from '@/lib/follow-up';
 import type { FollowUpCard, ProgressAdvancePayload } from '@/components/follow-up/FollowUpPipeline';
 import {
   ProgressStageDialog,
@@ -11,6 +11,9 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+
+/** ~50 body rows at ~2.75rem each + header; scroll when directory is large. */
+const TABLE_SCROLL_MAX = 'max-h-[min(70vh,calc(2.75rem*50+2.75rem))]';
 
 interface FollowUpTableProps {
   items: FollowUpCard[];
@@ -36,7 +39,7 @@ export function FollowUpTable({
   if (items.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
-        No people to show in the table.
+        No people to show in the directory.
       </p>
     );
   }
@@ -58,10 +61,15 @@ export function FollowUpTable({
         }}
       />
 
-      <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
+      <div
+        className={cn(
+          'overflow-auto rounded-xl border border-border bg-card shadow-sm',
+          TABLE_SCROLL_MAX,
+        )}
+      >
         <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-          <thead>
-            <tr className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+          <thead className="sticky top-0 z-10">
+            <tr className="border-b border-border bg-muted/95 text-xs uppercase tracking-wide text-muted-foreground backdrop-blur-sm">
               <th className="px-3 py-2.5 font-semibold">Name</th>
               <th className="px-3 py-2.5 font-semibold">Stage</th>
               <th className="px-3 py-2.5 font-semibold">Phone</th>
@@ -81,8 +89,9 @@ export function FollowUpTable({
                 <tr
                   key={item.id}
                   className={cn(
-                    'border-b border-border/70 transition-colors hover:bg-muted/30',
-                    selectedId === item.id && 'bg-primary/5',
+                    'border-b border-border/70 transition-colors hover:brightness-[0.98] dark:hover:brightness-110',
+                    STAGE_ROW_CLASS[item.stage] ?? 'bg-card',
+                    selectedId === item.id && 'ring-2 ring-inset ring-primary/40',
                   )}
                 >
                   <td className="px-3 py-2.5">
@@ -99,7 +108,7 @@ export function FollowUpTable({
                       </Badge>
                     ) : null}
                   </td>
-                  <td className="px-3 py-2.5 text-foreground">
+                  <td className="px-3 py-2.5 font-medium text-foreground">
                     {STAGE_LABELS[item.stage] ?? item.stage}
                   </td>
                   <td className="px-3 py-2.5 text-muted-foreground">
@@ -183,6 +192,11 @@ export function FollowUpTable({
           </tbody>
         </table>
       </div>
+      {items.length >= 20 ? (
+        <p className="text-xs text-muted-foreground">
+          Showing {items.length} people — scroll the directory to see more.
+        </p>
+      ) : null}
     </div>
   );
 }

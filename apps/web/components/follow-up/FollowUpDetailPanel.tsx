@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import {
@@ -112,6 +113,19 @@ export function FollowUpDetailPanel({
   const [noteBody, setNoteBody] = useState('');
   const [confidential, setConfidential] = useState(true);
   const [linkMemberId, setLinkMemberId] = useState(followUp.member?.id ?? '');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, []);
 
   const saveAssignment = async () => {
     setBusy(true);
@@ -219,16 +233,23 @@ export function FollowUpDetailPanel({
 
   const initial = followUp.contactName.charAt(0).toUpperCase();
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <>
       <button
         type="button"
-        className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm"
+        className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm"
         aria-label="Close panel"
         onClick={onClose}
       />
-      <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col border-l border-border bg-card shadow-2xl">
-        <div className="border-b border-border bg-gradient-to-br from-primary/10 via-card to-card px-5 py-5">
+      <div
+        role="dialog"
+        aria-modal
+        aria-label={`${followUp.contactName} details`}
+        className="fixed inset-y-0 right-0 z-[110] flex h-[100dvh] w-full max-w-lg flex-col border-l border-border bg-card shadow-2xl"
+      >
+        <div className="shrink-0 border-b border-border bg-gradient-to-br from-primary/10 via-card to-card px-5 py-5">
           <div className="flex items-start gap-4">
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary text-xl font-bold text-primary-foreground shadow-md">
               {initial}
@@ -259,7 +280,7 @@ export function FollowUpDetailPanel({
           </div>
         </div>
 
-        <div className="flex gap-1 overflow-x-auto border-b border-border bg-muted/30 px-3 py-2">
+        <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-border bg-muted/30 px-3 py-2">
           {tabs.map((t) => (
             <button
               key={t.id}
@@ -277,7 +298,7 @@ export function FollowUpDetailPanel({
           ))}
         </div>
 
-      <div className="flex-1 overflow-y-auto p-5">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         {tab === 'details' && (
           <div className="space-y-4">
             <div className="space-y-2 text-sm">
@@ -529,6 +550,7 @@ export function FollowUpDetailPanel({
         )}
       </div>
       </div>
-    </>
+    </>,
+    document.body,
   );
 }
