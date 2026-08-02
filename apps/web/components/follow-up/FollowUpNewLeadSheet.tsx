@@ -73,8 +73,8 @@ export function FollowUpNewLeadSheet({
               <UserPlus className="h-5 w-5" />
             </div>
             <div>
-              <p className="font-heading text-lg font-bold text-foreground">Add new lead</p>
-              <p className="text-xs text-muted-foreground">Starts at New Lead in the pipeline</p>
+              <p className="font-heading text-lg font-bold text-foreground">Add Fresh Contact</p>
+              <p className="text-xs text-muted-foreground">Starts at Fresh Contact in the pipeline</p>
             </div>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose}>

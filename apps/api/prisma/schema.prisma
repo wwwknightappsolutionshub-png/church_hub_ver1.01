@@ -345,6 +345,8 @@ model User {
   refreshTokens RefreshToken[]
   authLinkTokens AuthLinkToken[]
   assignedFollowUps FollowUp[] @relation("AssignedFollowUps")
+  followUpsArchived FollowUp[] @relation("FollowUpArchivedBy")
+  followUpsArchiveRequested FollowUp[] @relation("FollowUpArchiveRequestedBy")
   pastoralNotes PastoralNote[] @relation("PastoralNoteAuthor")
   counselingAssigned CounselingCase[] @relation("CounselingAssignee")
   counselingSessionsAuthored CounselingSession[] @relation("CounselingSessionAuthor")
@@ -1093,15 +1095,26 @@ model FollowUp {
   stage        FollowUpStage @default(NEW_LEAD)
   assignedToId String?
   dueAt        DateTime?
+  /// Short description of the next action (shown on calendar / cards).
+  nextAction   String?
   completedAt  DateTime?
   notes        String?
   referredBy   String?
+  /// Soft-archive: lead left the membership journey (no restore; email re-contact only).
+  archivedAt              DateTime?
+  archivedById            String?
+  archiveReason           String?
+  archiveRequestedAt      DateTime?
+  archiveRequestedById    String?
+  archiveRequestReason    String?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
   church     Church  @relation(fields: [churchId], references: [id], onDelete: Cascade)
   member     Member? @relation(fields: [memberId], references: [id])
   assignedTo User?   @relation("AssignedFollowUps", fields: [assignedToId], references: [id])
+  archivedBy User?   @relation("FollowUpArchivedBy", fields: [archivedById], references: [id], onDelete: SetNull)
+  archiveRequestedBy User? @relation("FollowUpArchiveRequestedBy", fields: [archiveRequestedById], references: [id], onDelete: SetNull)
   outreachContact OutreachContact?
   reminders  FollowUpReminder[]
   pastoralNotes PastoralNote[]
@@ -1110,6 +1123,7 @@ model FollowUp {
   automationRuns FollowUpAutomationRun[]
 
   @@index([churchId, stage])
+  @@index([churchId, archivedAt])
   @@index([assignedToId, dueAt])
   @@map("follow_ups")
 }
@@ -1152,6 +1166,10 @@ model PastoralNote {
   authorId       String
   content        String
   isConfidential Boolean  @default(true)
+  /// Pipeline stage when the note was written (for journey timeline).
+  stageAtTime    FollowUpStage?
+  /// NOTE | STAGE_PROGRESS | ARCHIVE_REQUEST | ARCHIVE | ARCHIVE_DECLINED | RECONTACT
+  kind           String   @default("NOTE")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

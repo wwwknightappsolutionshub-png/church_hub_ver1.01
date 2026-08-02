@@ -104,7 +104,7 @@ export function FollowUpTable({
                     </button>
                     {item.stage === 'NEW_LEAD' ? (
                       <Badge variant="gold" className="ml-1.5 text-[10px]">
-                        New
+                        Fresh
                       </Badge>
                     ) : null}
                   </td>

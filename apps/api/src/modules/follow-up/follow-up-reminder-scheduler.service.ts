@@ -32,7 +32,11 @@ export class FollowUpReminderSchedulerService implements OnModuleInit, OnModuleD
 
   async tick() {
     const due = await this.prisma.followUpReminder.findMany({
-      where: { sentAt: null, remindAt: { lte: new Date() } },
+      where: {
+        sentAt: null,
+        remindAt: { lte: new Date() },
+        followUp: { archivedAt: null },
+      },
       include: {
         followUp: {
           select: {
@@ -42,6 +46,7 @@ export class FollowUpReminderSchedulerService implements OnModuleInit, OnModuleD
             contactEmail: true,
             contactPhone: true,
             assignedToId: true,
+            archivedAt: true,
           },
         },
       },
@@ -50,6 +55,13 @@ export class FollowUpReminderSchedulerService implements OnModuleInit, OnModuleD
 
     for (const row of due) {
       const fu = row.followUp;
+      if (fu.archivedAt) {
+        await this.prisma.followUpReminder.update({
+          where: { id: row.id },
+          data: { sentAt: new Date() },
+        });
+        continue;
+      }
       try {
         await this.delivery.deliverFollowUpReminder({
           churchId: fu.churchId,
@@ -57,9 +69,10 @@ export class FollowUpReminderSchedulerService implements OnModuleInit, OnModuleD
           reminderId: row.id,
           subject: `Follow-up: ${fu.contactName}`,
           body: row.message ?? `Follow-up reminder for ${fu.contactName}`,
-          contactEmail: fu.contactEmail,
-          contactPhone: fu.contactPhone,
+          contactEmail: row.channel === 'IN_APP' ? null : fu.contactEmail,
+          contactPhone: row.channel === 'IN_APP' ? null : fu.contactPhone,
           assignedToId: fu.assignedToId,
+          notifyLeaders: true,
         });
       } catch (err) {
         this.logger.warn(`Reminder ${row.id} delivery failed: ${err}`);

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.module';
 import { EmailAdapter } from './adapters/email.adapter';
 import { SmsAdapter } from './adapters/sms.adapter';
@@ -12,9 +13,12 @@ export interface FollowUpReminderDelivery {
   contactEmail?: string | null;
   contactPhone?: string | null;
   assignedToId?: string | null;
+  notifyLeaders?: boolean;
 }
 
-/** Follow-up reminders: in-app + email + WhatsApp (phone channel is WhatsApp-only). */
+const TEAM_ROLES = ['ADMIN', 'PASTOR', 'LEADER'] as const;
+
+/** Follow-up reminders: in-app (+ push flag) for staff; optional contact email/WhatsApp. */
 @Injectable()
 export class NotificationDeliveryService {
   private readonly logger = new Logger(NotificationDeliveryService.name);
@@ -26,21 +30,51 @@ export class NotificationDeliveryService {
   ) {}
 
   async deliverFollowUpReminder(params: FollowUpReminderDelivery): Promise<void> {
-    if (params.assignedToId) {
+    const followUp = await this.prisma.followUp.findFirst({
+      where: { id: params.followUpId, churchId: params.churchId },
+      select: { archivedAt: true, contactName: true },
+    });
+    if (!followUp || followUp.archivedAt) {
+      await this.prisma.followUpReminder.updateMany({
+        where: { id: params.reminderId, sentAt: null },
+        data: { sentAt: new Date() },
+      });
+      return;
+    }
+
+    const staffIds = new Set<string>();
+    if (params.assignedToId) staffIds.add(params.assignedToId);
+
+    if (params.notifyLeaders) {
+      const leaders = await this.prisma.user.findMany({
+        where: {
+          churchId: params.churchId,
+          isActive: true,
+          roles: { some: { role: { name: { in: [...TEAM_ROLES] } } } },
+        },
+        select: { id: true },
+      });
+      for (const u of leaders) staffIds.add(u.id);
+    }
+
+    for (const userId of staffIds) {
       await this.prisma.notification.create({
         data: {
           churchId: params.churchId,
-          userId: params.assignedToId,
+          userId,
           title: params.subject,
           body: params.body,
           type: 'FOLLOW_UP_REMINDER',
           data: {
             followUpId: params.followUpId,
             reminderId: params.reminderId,
-          },
+            channel: 'push',
+          } as Prisma.InputJsonValue,
         },
       });
-      this.logger.debug(`In-app reminder for user ${params.assignedToId}`);
+    }
+    if (staffIds.size) {
+      this.logger.debug(`In-app/push reminder for ${staffIds.size} staff on ${params.followUpId}`);
     }
 
     if (params.contactEmail) {

@@ -19,6 +19,8 @@ import { FollowUpAutomationService } from './follow-up-automation.service';
 const followUpInclude = {
   member: { select: { id: true, firstName: true, lastName: true, email: true } },
   assignedTo: { select: { id: true, firstName: true, lastName: true, email: true } },
+  archivedBy: { select: { id: true, firstName: true, lastName: true } },
+  archiveRequestedBy: { select: { id: true, firstName: true, lastName: true } },
   reminders: { orderBy: { remindAt: 'asc' as const } },
 };
 
@@ -33,16 +35,55 @@ export class FollowUpService {
     private readonly automation: FollowUpAutomationService,
   ) {}
 
-  async list(churchId: string, stage?: FollowUpStage, assignedToId?: string) {
+  async list(
+    churchId: string,
+    stage?: FollowUpStage,
+    assignedToId?: string,
+    opts?: { archived?: boolean },
+  ) {
+    const archived = opts?.archived === true;
     return this.prisma.followUp.findMany({
       where: {
         churchId,
         ...(stage ? { stage } : {}),
         ...(assignedToId ? { assignedToId } : {}),
+        ...(archived ? { archivedAt: { not: null } } : { archivedAt: null }),
       },
       include: followUpInclude,
-      orderBy: [{ dueAt: 'asc' }, { createdAt: 'desc' }],
+      orderBy: archived
+        ? [{ archivedAt: 'desc' }, { createdAt: 'desc' }]
+        : [{ dueAt: 'asc' }, { createdAt: 'desc' }],
     });
+  }
+
+  async listCalendar(
+    churchId: string,
+    from: Date,
+    to: Date,
+  ) {
+    const items = await this.prisma.followUp.findMany({
+      where: {
+        churchId,
+        archivedAt: null,
+        dueAt: { gte: from, lte: to },
+      },
+      include: {
+        assignedTo: { select: { id: true, firstName: true, lastName: true } },
+      },
+      orderBy: { dueAt: 'asc' },
+    });
+
+    return items.map((f) => ({
+      id: f.id,
+      contactName: f.contactName,
+      stage: f.stage,
+      dueAt: f.dueAt,
+      nextAction: f.nextAction,
+      contactPhone: f.contactPhone,
+      contactEmail: f.contactEmail,
+      assignedTo: f.assignedTo,
+      archiveRequestedAt: f.archiveRequestedAt,
+    }));
   }
 
   async getOne(churchId: string, id: string) {
@@ -63,20 +104,21 @@ export class FollowUpService {
   async getStats(churchId: string) {
     const grouped = await this.prisma.followUp.groupBy({
       by: ['stage'],
-      where: { churchId },
+      where: { churchId, archivedAt: null },
       _count: { id: true },
     });
     const byStage = Object.fromEntries(
       FOLLOW_UP_STAGE_ORDER.map((s) => [s, grouped.find((g) => g.stage === s)?._count.id ?? 0]),
     ) as Record<FollowUpStage, number>;
 
-    const [pending, overdue, remindersDue] = await Promise.all([
+    const [pending, overdue, remindersDue, archived, archiveRequested] = await Promise.all([
       this.prisma.followUp.count({
-        where: { churchId, stage: { not: 'JOINED_GROUP' } },
+        where: { churchId, archivedAt: null, stage: { not: 'JOINED_GROUP' } },
       }),
       this.prisma.followUp.count({
         where: {
           churchId,
+          archivedAt: null,
           stage: { not: 'JOINED_GROUP' },
           dueAt: { lt: new Date() },
         },
@@ -85,12 +127,22 @@ export class FollowUpService {
         where: {
           sentAt: null,
           remindAt: { lte: new Date(Date.now() + 24 * 60 * 60 * 1000) },
-          followUp: { churchId },
+          followUp: { churchId, archivedAt: null },
+        },
+      }),
+      this.prisma.followUp.count({
+        where: { churchId, archivedAt: { not: null } },
+      }),
+      this.prisma.followUp.count({
+        where: {
+          churchId,
+          archivedAt: null,
+          archiveRequestedAt: { not: null },
         },
       }),
     ]);
 
-    return { byStage, pending, overdue, remindersDue };
+    return { byStage, pending, overdue, remindersDue, archived, archiveRequested };
   }
 
   async listAssignees(churchId: string) {
@@ -259,6 +311,9 @@ export class FollowUpService {
   ) {
     const existing = await this.prisma.followUp.findFirst({ where: { id, churchId } });
     if (!existing) throw new NotFoundException('Follow-up not found');
+    if (existing.archivedAt) {
+      throw new BadRequestException('Archived leads cannot progress in the pipeline');
+    }
 
     const whatWasDone = data.whatWasDone?.trim() ?? '';
     const whatNext = data.whatNext?.trim() ?? '';
@@ -291,6 +346,7 @@ export class FollowUpService {
           stage: data.stage,
           notes: data.notes ?? (progressNote || existing.notes),
           ...(dueAt !== undefined ? { dueAt } : {}),
+          ...(whatNext ? { nextAction: whatNext } : {}),
           completedAt: data.stage === 'JOINED_GROUP' ? new Date() : null,
         },
         include: followUpInclude,
@@ -305,6 +361,8 @@ export class FollowUpService {
             memberId: existing.memberId,
             content: progressNote,
             isConfidential: false,
+            stageAtTime: data.stage,
+            kind: 'STAGE_PROGRESS',
           },
         });
       }
@@ -312,9 +370,54 @@ export class FollowUpService {
       return row;
     });
 
+    if (dueAt) {
+      await this.scheduleStaffDueReminder(churchId, id, dueAt, whatNext || undefined);
+    }
+
     await this.automation.onFollowUpEvent(churchId, id, { stage: data.stage });
 
     return updated;
+  }
+
+  /** In-app (+ queue) reminder for assignee and unit leaders when next action is due. */
+  private async scheduleStaffDueReminder(
+    churchId: string,
+    followUpId: string,
+    dueAt: Date,
+    nextAction?: string,
+  ) {
+    const followUp = await this.getOne(churchId, followUpId);
+    if (followUp.archivedAt) return;
+
+    const message = [
+      `Next action due for ${followUp.contactName}.`,
+      nextAction ? `Action: ${nextAction}` : null,
+      `Open Outreach pipeline to follow up.`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const reminder = await this.prisma.followUpReminder.create({
+      data: {
+        followUpId,
+        remindAt: dueAt,
+        channel: 'IN_APP',
+        message,
+      },
+    });
+
+    await this.notifications.scheduleFollowUpReminder({
+      churchId,
+      followUpId,
+      reminderId: reminder.id,
+      body: message,
+      subject: `Action due: ${followUp.contactName}`,
+      remindAt: dueAt,
+      contactEmail: null,
+      contactPhone: null,
+      assignedToId: followUp.assignedToId,
+      notifyLeaders: true,
+    });
   }
 
   async scheduleReminder(
@@ -354,6 +457,7 @@ export class FollowUpService {
         contactEmail: followUp.contactEmail,
         contactPhone: followUp.contactPhone,
         assignedToId: followUp.assignedToId,
+        notifyLeaders: true,
       });
     }
 
@@ -386,7 +490,7 @@ export class FollowUpService {
 
     if (orConditions.length > 0) {
       const existing = await this.prisma.followUp.findFirst({
-        where: { churchId, OR: orConditions },
+        where: { churchId, archivedAt: null, OR: orConditions },
       });
       if (existing) {
         const referredBy = data.referredBy?.trim() || null;
@@ -561,14 +665,18 @@ export class FollowUpService {
       isConfidential?: boolean;
       memberId?: string;
       followUpId?: string;
+      stageAtTime?: FollowUpStage;
+      kind?: string;
     },
   ) {
     if (!data.memberId && !data.followUpId) {
       throw new BadRequestException('memberId or followUpId required');
     }
+    let stageAtTime = data.stageAtTime;
     if (data.followUpId) {
       const fu = await this.getOne(churchId, data.followUpId);
       if (!data.memberId && fu.memberId) data.memberId = fu.memberId;
+      if (!stageAtTime) stageAtTime = fu.stage;
     }
 
     return this.prisma.pastoralNote.create({
@@ -579,9 +687,215 @@ export class FollowUpService {
         followUpId: data.followUpId,
         content: data.content,
         isConfidential: data.isConfidential ?? true,
+        stageAtTime: stageAtTime ?? null,
+        kind: data.kind ?? 'NOTE',
       },
       include: { author: { select: { id: true, firstName: true, lastName: true } } },
     });
+  }
+
+  async archive(
+    churchId: string,
+    id: string,
+    actorId: string,
+    reason: string,
+  ) {
+    const existing = await this.prisma.followUp.findFirst({ where: { id, churchId } });
+    if (!existing) throw new NotFoundException('Follow-up not found');
+    if (existing.archivedAt) throw new BadRequestException('This lead is already archived');
+
+    const trimmed = reason.trim();
+    if (trimmed.length < 3) throw new BadRequestException('Enter a reason for archiving');
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.followUp.update({
+        where: { id },
+        data: {
+          archivedAt: new Date(),
+          archivedById: actorId,
+          archiveReason: trimmed,
+          archiveRequestedAt: null,
+          archiveRequestedById: null,
+          archiveRequestReason: null,
+          dueAt: null,
+          completedAt: new Date(),
+        },
+        include: followUpInclude,
+      });
+
+      await tx.pastoralNote.create({
+        data: {
+          churchId,
+          authorId: actorId,
+          followUpId: id,
+          memberId: existing.memberId,
+          content: `Archived from membership journey.\nReason: ${trimmed}`,
+          isConfidential: false,
+          stageAtTime: existing.stage,
+          kind: 'ARCHIVE',
+        },
+      });
+
+      await tx.followUpReminder.updateMany({
+        where: { followUpId: id, sentAt: null },
+        data: { sentAt: new Date() },
+      });
+
+      return row;
+    });
+
+    return updated;
+  }
+
+  async requestArchive(
+    churchId: string,
+    id: string,
+    actorId: string,
+    reason: string,
+  ) {
+    const existing = await this.prisma.followUp.findFirst({ where: { id, churchId } });
+    if (!existing) throw new NotFoundException('Follow-up not found');
+    if (existing.archivedAt) throw new BadRequestException('This lead is already archived');
+
+    const trimmed = reason.trim();
+    if (trimmed.length < 3) {
+      throw new BadRequestException('Explain why this lead should be archived');
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.followUp.update({
+        where: { id },
+        data: {
+          archiveRequestedAt: new Date(),
+          archiveRequestedById: actorId,
+          archiveRequestReason: trimmed,
+        },
+        include: followUpInclude,
+      });
+
+      await tx.pastoralNote.create({
+        data: {
+          churchId,
+          authorId: actorId,
+          followUpId: id,
+          memberId: existing.memberId,
+          content: `Archive requested (DND).\nReason: ${trimmed}`,
+          isConfidential: false,
+          stageAtTime: existing.stage,
+          kind: 'ARCHIVE_REQUEST',
+        },
+      });
+
+      return row;
+    });
+
+    const requester = await this.prisma.user.findFirst({
+      where: { id: actorId },
+      select: { firstName: true, lastName: true },
+    });
+    const requesterName = requester
+      ? `${requester.firstName} ${requester.lastName}`.trim()
+      : 'A team member';
+
+    await this.teamNotify.notifyTeamOnArchiveRequest({
+      churchId,
+      followUpId: id,
+      contactName: existing.contactName,
+      reason: trimmed,
+      requesterName,
+    });
+
+    return updated;
+  }
+
+  async declineArchiveRequest(
+    churchId: string,
+    id: string,
+    actorId: string,
+    note?: string,
+  ) {
+    const existing = await this.prisma.followUp.findFirst({ where: { id, churchId } });
+    if (!existing) throw new NotFoundException('Follow-up not found');
+    if (existing.archivedAt) throw new BadRequestException('This lead is already archived');
+    if (!existing.archiveRequestedAt) {
+      throw new BadRequestException('No pending archive request');
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.followUp.update({
+        where: { id },
+        data: {
+          archiveRequestedAt: null,
+          archiveRequestedById: null,
+          archiveRequestReason: null,
+        },
+        include: followUpInclude,
+      });
+
+      await tx.pastoralNote.create({
+        data: {
+          churchId,
+          authorId: actorId,
+          followUpId: id,
+          memberId: existing.memberId,
+          content: [
+            'Archive request declined — lead stays in the pipeline.',
+            note?.trim() ? `Note: ${note.trim()}` : null,
+          ]
+            .filter(Boolean)
+            .join('\n'),
+          isConfidential: false,
+          stageAtTime: existing.stage,
+          kind: 'ARCHIVE_DECLINED',
+        },
+      });
+
+      return row;
+    });
+
+    return updated;
+  }
+
+  async recontactArchived(
+    churchId: string,
+    id: string,
+    actorId: string,
+    data: { subject: string; body: string },
+  ) {
+    const followUp = await this.prisma.followUp.findFirst({ where: { id, churchId } });
+    if (!followUp) throw new NotFoundException('Follow-up not found');
+    if (!followUp.archivedAt) {
+      throw new BadRequestException('Only archived leads can be re-contacted this way');
+    }
+    if (!followUp.contactEmail) {
+      throw new BadRequestException('No email on this archived lead');
+    }
+
+    const subject = data.subject.trim();
+    const body = data.body.trim();
+    if (!subject || !body) throw new BadRequestException('Subject and message are required');
+
+    await this.email.send({
+      to: followUp.contactEmail,
+      subject,
+      body,
+      churchId,
+    });
+
+    await this.prisma.pastoralNote.create({
+      data: {
+        churchId,
+        authorId: actorId,
+        followUpId: id,
+        memberId: followUp.memberId,
+        content: `Re-contacted by email.\nSubject: ${subject}\n\n${body}`,
+        isConfidential: false,
+        stageAtTime: followUp.stage,
+        kind: 'RECONTACT',
+      },
+    });
+
+    return { success: true, to: followUp.contactEmail };
   }
 
   async getPastoralNotes(

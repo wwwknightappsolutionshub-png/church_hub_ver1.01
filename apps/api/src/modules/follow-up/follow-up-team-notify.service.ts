@@ -111,7 +111,7 @@ export class FollowUpTeamNotifyService {
       .join('\n');
 
     const title = `New outreach lead: ${params.contactName}`;
-    const body = `A fast capture was added to Follow-Up as New Lead.\n\n${contactLines}\n\nOpen the pipeline: ${appUrl}/dashboard/follow-up`;
+    const body = `A fast capture was added to Follow-Up as Fresh Contact.\n\n${contactLines}\n\nOpen the pipeline: ${appUrl}/dashboard/follow-up`;
 
     await Promise.all(
       team.map(async (user) => {
@@ -142,6 +142,70 @@ export class FollowUpTeamNotifyService {
 
     this.logger.log(
       `Notified ${team.length} follow-up team member(s) for lead ${params.followUpId}`,
+    );
+  }
+
+  /** In-app (+ email) alert when an outreach member requests archive (DND). */
+  async notifyTeamOnArchiveRequest(params: {
+    churchId: string;
+    followUpId: string;
+    contactName: string;
+    reason: string;
+    requesterName: string;
+  }): Promise<void> {
+    const team = await this.prisma.user.findMany({
+      where: {
+        churchId: params.churchId,
+        isActive: true,
+        roles: { some: { role: { name: { in: [...TEAM_ROLES] } } } },
+      },
+      select: { id: true, firstName: true, lastName: true, email: true },
+    });
+
+    if (team.length === 0) {
+      this.logger.warn(`No follow-up leaders for archive request church ${params.churchId}`);
+      return;
+    }
+
+    const church = await this.prisma.church.findUnique({
+      where: { id: params.churchId },
+      select: { name: true },
+    });
+    const churchName = church?.name ?? 'Your church';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3001';
+
+    const title = `Archive requested: ${params.contactName}`;
+    const body = `${params.requesterName} requested this lead be archived (DND).\n\nReason: ${params.reason}\n\nReview in Outreach: ${appUrl}/dashboard/follow-up`;
+
+    await Promise.all(
+      team.map(async (user) => {
+        await this.prisma.notification.create({
+          data: {
+            churchId: params.churchId,
+            userId: user.id,
+            title,
+            body,
+            type: 'FOLLOW_UP_ARCHIVE_REQUEST',
+            data: {
+              followUpId: params.followUpId,
+              channel: 'push',
+            },
+          },
+        });
+
+        if (user.email) {
+          await this.email.send({
+            to: user.email,
+            subject: `[${churchName}] ${title}`,
+            body: `Hi ${user.firstName},\n\n${body}`,
+            churchId: params.churchId,
+          });
+        }
+      }),
+    );
+
+    this.logger.log(
+      `Notified ${team.length} leader(s) of archive request for ${params.followUpId}`,
     );
   }
 }

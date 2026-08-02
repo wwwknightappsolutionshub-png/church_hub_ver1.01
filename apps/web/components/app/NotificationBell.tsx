@@ -16,7 +16,7 @@ interface AppNotification {
   type: string;
   sentAt: string;
   readAt: string | null;
-  data?: { threadId?: string };
+  data?: { threadId?: string; followUpId?: string };
 }
 
 export function NotificationBell() {
@@ -177,6 +177,12 @@ export function NotificationBell() {
                           router.push(`/dashboard/support?thread=${n.data.threadId}`);
                         } else if (n.type === 'PLATFORM_BROADCAST') {
                           router.push('/dashboard/support');
+                        } else if (
+                          n.type === 'FOLLOW_UP_ARCHIVE_REQUEST' ||
+                          n.type === 'FOLLOW_UP_REMINDER' ||
+                          n.type === 'FOLLOW_UP_NEW_LEAD'
+                        ) {
+                          router.push('/dashboard/follow-up');
                         }
                       }}
                     >

@@ -107,7 +107,7 @@ export default function OutreachPage() {
               <CardHeader>
                 <CardTitle>Fast capture form</CardTitle>
                 <CardDescription>
-                  Offline-first capture. Creates a New Lead in Outreach, auto-assigns when possible,
+                  Offline-first capture. Creates a Fresh Contact in Outreach, auto-assigns when possible,
                   and alerts the outreach team (in-app + email). View and progress leads on{' '}
                   <Link href="/dashboard/follow-up" className="font-medium text-primary underline-offset-2 hover:underline">
                     Outreach

@@ -34,6 +34,7 @@ export class NotificationsProcessor extends WorkerHost {
             contactEmail: data.contactEmail,
             contactPhone: data.contactPhone,
             assignedToId: data.assignedToId,
+            notifyLeaders: data.notifyLeaders === true,
           });
         }
         break;

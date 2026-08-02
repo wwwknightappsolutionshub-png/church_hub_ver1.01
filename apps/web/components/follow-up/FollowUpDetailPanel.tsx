@@ -43,6 +43,8 @@ interface PastoralNote {
   content: string;
   isConfidential: boolean;
   createdAt: string;
+  stageAtTime?: string | null;
+  kind?: string | null;
   author: { firstName: string; lastName: string };
 }
 
@@ -183,13 +185,15 @@ export function FollowUpDetailPanel({
         followUpId: followUp.id,
         content: noteBody.trim(),
         isConfidential: confidential,
+        stageAtTime: followUp.stage,
+        kind: 'NOTE',
       });
       setNoteBody('');
-      toast.success('Pastoral note saved');
+      toast.success('Comment saved');
       queryClient.invalidateQueries({ queryKey: ['pastoral-notes', followUp.id] });
       onUpdated();
     } catch {
-      toast.error('Could not save note — pastoral access required');
+      toast.error('Could not save comment — pastoral access required');
     } finally {
       setBusy(false);
     }
@@ -512,24 +516,27 @@ export function FollowUpDetailPanel({
                   className={cn(
                     'rounded-lg border p-3 text-sm',
                     n.isConfidential ? 'border-primary/20 bg-primary/5' : 'border-border',
+                    n.kind === 'ARCHIVE_REQUEST' && 'border-destructive/30 bg-destructive/5',
                   )}
                 >
                   <p className="text-xs text-muted-foreground">
                     {n.author.firstName} {n.author.lastName}
+                    {n.stageAtTime ? ` · ${STAGE_LABELS[n.stageAtTime] ?? n.stageAtTime}` : ''}
+                    {n.kind && n.kind !== 'NOTE' ? ` · ${n.kind.replace(/_/g, ' ').toLowerCase()}` : ''}
                     {n.isConfidential ? ' · Confidential' : ''} ·{' '}
                     {new Date(n.createdAt).toLocaleDateString()}
                   </p>
-                  <p className="mt-1">{n.content}</p>
+                  <p className="mt-1 whitespace-pre-wrap">{n.content}</p>
                 </li>
               ))}
               {pastoralNotes.length === 0 && (
-                <p className="text-sm text-muted-foreground">No pastoral notes yet</p>
+                <p className="text-sm text-muted-foreground">No journey comments yet</p>
               )}
             </ul>
             <div className="space-y-2 rounded-lg border border-border p-4">
               <textarea
                 className="flex min-h-[88px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                placeholder="Pastoral observation, prayer points, discipleship notes…"
+                placeholder="Stage comment, prayer points, discipleship notes…"
                 value={noteBody}
                 onChange={(e) => setNoteBody(e.target.value)}
               />
@@ -543,7 +550,7 @@ export function FollowUpDetailPanel({
                 Confidential (restricted)
               </label>
               <Button size="sm" disabled={busy} onClick={addNote}>
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Add pastoral note'}
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Add comment'}
               </Button>
             </div>
           </div>

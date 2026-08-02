@@ -31,7 +31,7 @@ export const MODULE_DESCRIPTIONS = {
   business:
     'Verified member businesses, marketplace listings, job openings, networking events, mentorship, and idea submissions.',
   followUp:
-    'Move visitors through New Lead → Contacted → Visited → Attended → Joined Group, with assignments and reminders.',
+    'Move visitors through Fresh Contact → Contacted → Visited → Attended → Joined Group, with assignments and reminders.',
   outreach:
     'Field capture, Team QR/NFC, offline sync, and convert pipeline — feeds new leads into Outreach.',
   serviceUnits:

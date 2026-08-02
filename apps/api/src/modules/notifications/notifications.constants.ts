@@ -14,4 +14,5 @@ export interface NotificationJob {
   contactEmail?: string;
   contactPhone?: string;
   assignedToId?: string;
+  notifyLeaders?: boolean;
 }

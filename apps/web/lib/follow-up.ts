@@ -7,7 +7,7 @@ export const FOLLOW_UP_STAGES = [
 ] as const;
 
 export const STAGE_LABELS: Record<string, string> = {
-  NEW_LEAD: 'New Lead',
+  NEW_LEAD: 'Fresh Contact',
   CONTACTED: 'Contacted',
   VISITED: 'Visited',
   ATTENDED: 'Attended',
@@ -15,7 +15,7 @@ export const STAGE_LABELS: Record<string, string> = {
 };
 
 export const STAGE_SHORT: Record<string, string> = {
-  NEW_LEAD: 'Lead',
+  NEW_LEAD: 'Fresh',
   CONTACTED: 'Contacted',
   VISITED: 'Visited',
   ATTENDED: 'Attended',

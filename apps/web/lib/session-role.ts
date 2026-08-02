@@ -50,6 +50,11 @@ export function canExportOutreachDirectory(roles: string[] | undefined): boolean
   return isChurchLeadershipRole(roles) || isLeaderRole(roles);
 }
 
+/** Admin / Pastor / Unit Leader may archive immediately. */
+export function canArchiveFollowUp(roles: string[] | undefined): boolean {
+  return isChurchLeadershipRole(roles) || isLeaderRole(roles);
+}
+
 export function resolveSessionRoleBucket(input: {
   userRoles?: string[];
   isPlatformAdmin?: boolean;

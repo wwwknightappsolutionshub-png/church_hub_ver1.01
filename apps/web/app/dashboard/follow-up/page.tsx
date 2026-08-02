@@ -29,7 +29,9 @@ import { FollowUpMembersPanel } from '@/components/follow-up/FollowUpMembersPane
 import { FollowUpAutomationPanel } from '@/components/follow-up/FollowUpAutomationPanel';
 import { useMembershipAccess } from '@/lib/hooks/use-membership-access';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
-import { canExportOutreachDirectory } from '@/lib/session-role';
+import { canArchiveFollowUp, canExportOutreachDirectory } from '@/lib/session-role';
+import { FollowUpCalendar } from '@/components/follow-up/FollowUpCalendar';
+import { FollowUpArchivedTable } from '@/components/follow-up/FollowUpArchivedTable';
 import { ModuleGate } from '@/components/app/ModuleGate';
 import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import {
@@ -51,6 +53,8 @@ interface FollowUpStats {
   pending: number;
   overdue: number;
   remindersDue: number;
+  archived?: number;
+  archiveRequested?: number;
   byStage: Record<string, number>;
 }
 
@@ -73,6 +77,8 @@ interface PastoralNote {
   content: string;
   isConfidential: boolean;
   createdAt: string;
+  stageAtTime?: string | null;
+  kind?: string | null;
   author: { firstName: string; lastName: string };
 }
 
@@ -89,7 +95,11 @@ function FollowUpPageContent() {
   const { canManageMembers } = useMembershipAccess();
   const { userRoles } = useModuleAccess();
   const canExport = canExportOutreachDirectory(userRoles);
-  const [view, setView] = useState<'pipeline' | 'table' | 'members'>('pipeline');
+  const canArchive = canArchiveFollowUp(userRoles);
+  const canRequestArchive = !canArchive;
+  const [view, setView] = useState<'pipeline' | 'table' | 'calendar' | 'archived' | 'members'>(
+    'pipeline',
+  );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [assigneeFilter, setAssigneeFilter] = useState('');
@@ -106,6 +116,7 @@ function FollowUpPageContent() {
   });
   const [creating, setCreating] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [archiveBusy, setArchiveBusy] = useState(false);
 
   const listUrl = assigneeFilter
     ? `/follow-up?assignedToId=${encodeURIComponent(assigneeFilter)}`
@@ -114,6 +125,11 @@ function FollowUpPageContent() {
   const { data, isLoading, isError, error } = useApiQuery<FollowUpCard[]>(
     ['follow-up', assigneeFilter],
     listUrl,
+  );
+  const { data: archivedData } = useApiQuery<FollowUpCard[]>(
+    ['follow-up-archived'],
+    '/follow-up?archived=1',
+    { enabled: view === 'archived' },
   );
   const { data: stats } = useApiQuery<FollowUpStats>(['follow-up-stats'], '/follow-up/stats');
   const { data: assignees } = useApiQuery<Assignee[]>(['follow-up-assignees'], '/follow-up/assignees');
@@ -166,7 +182,9 @@ function FollowUpPageContent() {
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['follow-up'] });
+    queryClient.invalidateQueries({ queryKey: ['follow-up-archived'] });
     queryClient.invalidateQueries({ queryKey: ['follow-up-stats'] });
+    queryClient.invalidateQueries({ queryKey: ['follow-up-calendar'] });
     if (selectedId) {
       queryClient.invalidateQueries({ queryKey: ['follow-up-detail', selectedId] });
       queryClient.invalidateQueries({ queryKey: ['pastoral-notes', selectedId] });
@@ -174,6 +192,23 @@ function FollowUpPageContent() {
   };
 
   const [advancing, setAdvancing] = useState(false);
+
+  const runArchiveAction = async (
+    fn: () => Promise<unknown>,
+    successMsg: string,
+  ) => {
+    setArchiveBusy(true);
+    try {
+      await fn();
+      toast.success(successMsg);
+      refresh();
+    } catch {
+      toast.error('Could not update archive status');
+      throw new Error('archive failed');
+    } finally {
+      setArchiveBusy(false);
+    }
+  };
 
   const advanceStage = async (id: string, payload: ProgressAdvancePayload) => {
     setAdvancing(true);
@@ -209,7 +244,7 @@ function FollowUpPageContent() {
         scheduleReminder: !!newForm.dueAt,
         reminderChannel: 'WHATSAPP',
       });
-      toast.success('New lead added to pipeline');
+      toast.success('Fresh Contact added to pipeline');
       setNewForm({ contactName: '', contactPhone: '', contactEmail: '', assignedToId: '', dueAt: '' });
       setShowNew(false);
       refresh();
@@ -232,6 +267,9 @@ function FollowUpPageContent() {
     }
   };
 
+  const showPipelineEmpty =
+    view === 'pipeline' && !isLoading && !isError && (data?.length ?? 0) === 0;
+
   return (
     <EnterpriseShell>
       <EnterpriseHero
@@ -242,7 +280,7 @@ function FollowUpPageContent() {
           <>
             <Button size="sm" onClick={() => setShowNew(true)}>
               <Plus className="mr-1.5 h-4 w-4" />
-              New lead
+              Fresh Contact
             </Button>
             <Button size="sm" variant="secondary" asChild>
               <Link href="/dashboard/outreach">
@@ -254,11 +292,12 @@ function FollowUpPageContent() {
         }
         badge={
           stats ? (
-            <div className="grid grid-cols-3 gap-2 text-slate-900">
+            <div className="grid grid-cols-3 gap-2 text-slate-900 sm:grid-cols-4">
               {[
                 { label: 'Active', value: stats.pending },
                 { label: 'Overdue', value: stats.overdue },
                 { label: 'Reminders', value: stats.remindersDue },
+                { label: 'Archive req.', value: stats.archiveRequested ?? 0 },
               ].map((s) => (
                 <div
                   key={s.label}
@@ -278,13 +317,24 @@ function FollowUpPageContent() {
         tabs={[
           { id: 'pipeline', label: 'Pipeline' },
           { id: 'table', label: 'Outreach Directory' },
+          { id: 'calendar', label: 'Calendar' },
+          {
+            id: 'archived',
+            label:
+              stats?.archived != null && stats.archived > 0
+                ? `Archived (${stats.archived})`
+                : 'Archived Leads',
+          },
           { id: 'members', label: 'Members' },
         ]}
         active={view}
-        onChange={(id) => setView(id as 'pipeline' | 'table' | 'members')}
+        onChange={(id) =>
+          setView(id as 'pipeline' | 'table' | 'calendar' | 'archived' | 'members')
+        }
       />
 
       <EnterpriseContent className="max-w-[1600px]">
+        {view !== 'calendar' && view !== 'archived' && view !== 'members' && (
         <div className="mb-6 flex flex-wrap items-center gap-3">
           <div className="relative min-w-[200px] flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -373,39 +423,44 @@ function FollowUpPageContent() {
             <Badge variant="outline" className="hidden sm:inline-flex">
               <Sparkles className="mr-1 h-3 w-3" />
               {stats.pending} in pipeline
+              {(stats.archiveRequested ?? 0) > 0
+                ? ` · ${stats.archiveRequested} archive requests`
+                : ''}
             </Badge>
           )}
         </div>
-        {isLoading && (
+        )}
+
+        {view !== 'calendar' && view !== 'archived' && view !== 'members' && isLoading && (
           <div className="flex flex-col items-center justify-center gap-3 py-24">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
             <p className="text-sm text-muted-foreground">Loading pipeline…</p>
           </div>
         )}
 
-        {isError && !isLoading && (
+        {view !== 'calendar' && view !== 'archived' && view !== 'members' && isError && !isLoading && (
           <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
             {followUpErrorMessage(error)}
           </div>
         )}
 
-        {!isLoading && !isError && filteredItems.length === 0 && (data?.length ?? 0) > 0 && (
+        {!isLoading && !isError && filteredItems.length === 0 && (data?.length ?? 0) > 0 && view !== 'calendar' && view !== 'archived' && view !== 'members' && (
           <p className="mb-4 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
             No matches for the current search or filters. Clear search, stage, or date to see more
             people.
           </p>
         )}
 
-        {!isLoading && !isError && (data?.length ?? 0) === 0 && (
+        {showPipelineEmpty && (
           <div className="mb-8 rounded-2xl border border-dashed border-border bg-card p-10 text-center">
             <UserPlus className="mx-auto h-12 w-12 text-muted-foreground/50" />
             <p className="mt-4 font-heading text-lg font-semibold text-foreground">Pipeline is empty</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Add a lead manually or capture someone from Field Outreach — they appear here as New
-              Lead.
+              Add a Fresh Contact manually or capture someone from Field Outreach — they appear here
+              first.
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-2">
-              <Button onClick={() => setShowNew(true)}>Add first lead</Button>
+              <Button onClick={() => setShowNew(true)}>Add first Fresh Contact</Button>
               <Button variant="outline" asChild>
                 <Link href="/dashboard/outreach">Go to Field Outreach</Link>
               </Button>
@@ -414,6 +469,30 @@ function FollowUpPageContent() {
         )}
 
         {view === 'members' && <FollowUpMembersPanel canManageMembers={canManageMembers} />}
+
+        {view === 'calendar' && (
+          <FollowUpCalendar selectedId={selectedId} onSelect={setSelectedId} />
+        )}
+
+        {view === 'archived' && (
+          <FollowUpArchivedTable
+            items={(archivedData ?? []).map((f) => ({
+              id: f.id,
+              contactName: f.contactName,
+              contactPhone: f.contactPhone,
+              contactEmail: f.contactEmail,
+              stage: f.stage,
+              archiveReason: (f as { archiveReason?: string | null }).archiveReason,
+              archivedAt: (f as { archivedAt?: string | null }).archivedAt,
+              archivedBy: (f as { archivedBy?: { firstName: string; lastName: string } | null })
+                .archivedBy,
+            }))}
+            canRecontact={canArchive}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onRecontacted={refresh}
+          />
+        )}
 
         {view === 'pipeline' &&
           !isLoading &&
@@ -425,6 +504,33 @@ function FollowUpPageContent() {
               onSelect={setSelectedId}
               onAdvance={advanceStage}
               advancing={advancing}
+              canArchive={canArchive}
+              canRequestArchive={canRequestArchive}
+              archiveBusy={archiveBusy}
+              onArchive={(id, reason) =>
+                runArchiveAction(
+                  () => api.post(`/follow-up/${id}/archive`, { reason }),
+                  'Lead archived',
+                )
+              }
+              onRequestArchive={(id, reason) =>
+                runArchiveAction(
+                  () => api.post(`/follow-up/${id}/archive-request`, { reason }),
+                  'Archive request sent to leaders',
+                )
+              }
+              onApproveArchive={(id, reason) =>
+                runArchiveAction(
+                  () => api.post(`/follow-up/${id}/archive-request/approve`, { reason }),
+                  'Archive approved',
+                )
+              }
+              onDeclineArchive={(id, note) =>
+                runArchiveAction(
+                  () => api.post(`/follow-up/${id}/archive-request/decline`, { note }),
+                  'Archive request declined',
+                )
+              }
             />
           )}
 
@@ -438,9 +544,11 @@ function FollowUpPageContent() {
           />
         )}
 
-        <div className="mt-8 border-t border-border/60 pt-4">
-          <FollowUpAutomationPanel />
-        </div>
+        {view !== 'archived' && (
+          <div className="mt-8 border-t border-border/60 pt-4">
+            <FollowUpAutomationPanel />
+          </div>
+        )}
       </EnterpriseContent>
 
       <FollowUpNewLeadSheet

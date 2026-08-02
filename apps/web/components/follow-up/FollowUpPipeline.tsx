@@ -27,6 +27,11 @@ import {
   ProgressStageDialog,
   type ProgressFormValues,
 } from '@/components/follow-up/ProgressStageDialog';
+import {
+  ArchiveIconButton,
+  DndIconButton,
+  FollowUpArchiveDialog,
+} from '@/components/follow-up/FollowUpArchiveDialog';
 
 export interface FollowUpCard {
   id: string;
@@ -35,9 +40,12 @@ export interface FollowUpCard {
   contactEmail?: string | null;
   stage: string;
   dueAt?: string | null;
+  nextAction?: string | null;
   createdAt?: string | null;
   notes?: string | null;
   referredBy?: string | null;
+  archiveRequestedAt?: string | null;
+  archiveRequestReason?: string | null;
   member?: { id: string; firstName: string; lastName: string } | null;
   assignedTo?: { id: string; firstName: string; lastName: string } | null;
   reminders?: Array<{ id: string; remindAt: string; sentAt?: string | null; channel: string }>;
@@ -51,6 +59,13 @@ interface FollowUpPipelineProps {
   onSelect: (id: string) => void;
   onAdvance: (id: string, payload: ProgressAdvancePayload) => void | Promise<void>;
   advancing?: boolean;
+  canArchive?: boolean;
+  canRequestArchive?: boolean;
+  onArchive?: (id: string, reason: string) => void | Promise<void>;
+  onRequestArchive?: (id: string, reason: string) => void | Promise<void>;
+  onApproveArchive?: (id: string, reason: string) => void | Promise<void>;
+  onDeclineArchive?: (id: string, note: string) => void | Promise<void>;
+  archiveBusy?: boolean;
 }
 
 const PHASE_ICONS: Record<string, LucideIcon> = {
@@ -65,17 +80,30 @@ function LeadCard({
   stageAccent,
   onSelect,
   onRequestProgress,
+  canArchive,
+  canRequestArchive,
+  onArchiveClick,
+  onDndClick,
+  onApproveClick,
+  onDeclineClick,
 }: {
   item: FollowUpCard;
   selected: boolean;
   stageAccent: string;
   onSelect: () => void;
   onRequestProgress: (stage: string) => void;
+  canArchive?: boolean;
+  canRequestArchive?: boolean;
+  onArchiveClick?: () => void;
+  onDndClick?: () => void;
+  onApproveClick?: () => void;
+  onDeclineClick?: () => void;
 }) {
   const due = formatDue(item.dueAt);
   const nxt = nextStage(item.stage);
   const pendingReminder = item.reminders?.find((r) => !r.sentAt);
-  const isNew = item.stage === 'NEW_LEAD';
+  const isFresh = item.stage === 'NEW_LEAD';
+  const archiveRequested = !!item.archiveRequestedAt;
 
   return (
     <article
@@ -84,6 +112,7 @@ function LeadCard({
         selected
           ? 'border-primary ring-2 ring-primary/25 shadow-md'
           : 'border-border shadow-sm hover:border-primary/30 hover:shadow-md',
+        archiveRequested && 'border-destructive/50 ring-1 ring-destructive/30',
         stageAccent,
         'border-t-[3px]',
       )}
@@ -96,9 +125,14 @@ function LeadCard({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
               <h4 className="font-semibold leading-tight text-foreground">{item.contactName}</h4>
-              {isNew && (
+              {isFresh && (
                 <Badge variant="gold" className="text-[10px]">
-                  New
+                  Fresh
+                </Badge>
+              )}
+              {archiveRequested && (
+                <Badge variant="destructive" className="text-[10px]">
+                  Archive requested
                 </Badge>
               )}
               {item.member && (
@@ -132,6 +166,9 @@ function LeadCard({
                   {item.assignedTo.firstName} {item.assignedTo.lastName}
                 </p>
               )}
+              {item.nextAction && (
+                <p className="line-clamp-2 text-[11px] text-foreground/70">Next: {item.nextAction}</p>
+              )}
             </div>
           </div>
         </div>
@@ -158,20 +195,52 @@ function LeadCard({
           </div>
         )}
       </button>
-      {nxt && (
-        <div className="border-t border-border/80 px-3 py-2">
+      <div className="flex flex-wrap items-center gap-1 border-t border-border/80 px-2 py-1.5">
+        {canArchive && onArchiveClick && (
+          <ArchiveIconButton title="Archive" onClick={onArchiveClick} />
+        )}
+        {canRequestArchive && !canArchive && onDndClick && <DndIconButton onClick={onDndClick} />}
+        {canArchive && archiveRequested && onApproveClick && (
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            className="h-8 w-full justify-between text-xs font-semibold text-primary"
+            className="h-8 px-2 text-[10px] font-semibold text-destructive"
+            onClick={(e) => {
+              e.stopPropagation();
+              onApproveClick();
+            }}
+          >
+            Approve archive
+          </Button>
+        )}
+        {canArchive && archiveRequested && onDeclineClick && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2 text-[10px]"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDeclineClick();
+            }}
+          >
+            Decline
+          </Button>
+        )}
+        {nxt && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="ml-auto h-8 justify-between text-xs font-semibold text-primary"
             onClick={() => onRequestProgress(nxt)}
           >
             Progress to the next
-            <ChevronRight className="h-3.5 w-3.5" />
+            <ChevronRight className="ml-1 h-3.5 w-3.5" />
           </Button>
-        </div>
-      )}
+        )}
+      </div>
     </article>
   );
 }
@@ -182,12 +251,24 @@ export function FollowUpPipeline({
   onSelect,
   onAdvance,
   advancing,
+  canArchive,
+  canRequestArchive,
+  onArchive,
+  onRequestArchive,
+  onApproveArchive,
+  onDeclineArchive,
+  archiveBusy,
 }: FollowUpPipelineProps) {
   const total = items.length;
   const [pending, setPending] = useState<{
     id: string;
     contactName: string;
     stage: string;
+  } | null>(null);
+  const [archiveDlg, setArchiveDlg] = useState<{
+    id: string;
+    contactName: string;
+    mode: 'archive' | 'dnd' | 'decline';
   } | null>(null);
 
   return (
@@ -207,7 +288,23 @@ export function FollowUpPipeline({
         }}
       />
 
-      {/* Journey + phases share one 3-col grid so columns line up */}
+      <FollowUpArchiveDialog
+        open={!!archiveDlg}
+        mode={archiveDlg?.mode ?? 'archive'}
+        contactName={archiveDlg?.contactName ?? ''}
+        submitting={archiveBusy}
+        onClose={() => {
+          if (!archiveBusy) setArchiveDlg(null);
+        }}
+        onSubmit={async (reason) => {
+          if (!archiveDlg) return;
+          if (archiveDlg.mode === 'archive') await onArchive?.(archiveDlg.id, reason);
+          else if (archiveDlg.mode === 'dnd') await onRequestArchive?.(archiveDlg.id, reason);
+          else await onDeclineArchive?.(archiveDlg.id, reason);
+          setArchiveDlg(null);
+        }}
+      />
+
       <div className="space-y-4">
         <div className="rounded-2xl border border-border bg-card px-4 py-3 shadow-sm md:px-5">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -302,6 +399,47 @@ export function FollowUpPipeline({
                                   stage: s,
                                 })
                               }
+                              canArchive={canArchive}
+                              canRequestArchive={canRequestArchive}
+                              onArchiveClick={
+                                onArchive
+                                  ? () =>
+                                      setArchiveDlg({
+                                        id: item.id,
+                                        contactName: item.contactName,
+                                        mode: 'archive',
+                                      })
+                                  : undefined
+                              }
+                              onDndClick={
+                                onRequestArchive
+                                  ? () =>
+                                      setArchiveDlg({
+                                        id: item.id,
+                                        contactName: item.contactName,
+                                        mode: 'dnd',
+                                      })
+                                  : undefined
+                              }
+                              onApproveClick={
+                                onApproveArchive
+                                  ? () =>
+                                      void onApproveArchive(
+                                        item.id,
+                                        item.archiveRequestReason || 'Approved archive request',
+                                      )
+                                  : undefined
+                              }
+                              onDeclineClick={
+                                onDeclineArchive
+                                  ? () =>
+                                      setArchiveDlg({
+                                        id: item.id,
+                                        contactName: item.contactName,
+                                        mode: 'decline',
+                                      })
+                                  : undefined
+                              }
                             />
                           ))
                         )}
@@ -315,7 +453,6 @@ export function FollowUpPipeline({
         </div>
       </div>
 
-      {/* Mini legend: all 5 stages */}
       <div className="flex flex-wrap gap-2 rounded-xl border border-dashed border-border bg-muted/20 p-3">
         {FOLLOW_UP_STAGES.map((stage) => {
           const n = items.filter((f) => f.stage === stage).length;

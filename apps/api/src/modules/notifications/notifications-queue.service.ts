@@ -31,6 +31,7 @@ export class NotificationsQueueService {
             contactEmail: job.contactEmail,
             contactPhone: job.contactPhone,
             assignedToId: job.assignedToId,
+            notifyLeaders: job.notifyLeaders === true,
           });
         }, delayMs);
         this.timers.set(key, timer);
@@ -56,6 +57,7 @@ export class NotificationsQueueService {
     contactEmail?: string | null;
     contactPhone?: string | null;
     assignedToId?: string | null;
+    notifyLeaders?: boolean;
   }) {
     const delayMs = Math.max(0, params.remindAt.getTime() - Date.now());
     await this.enqueue(
@@ -69,6 +71,7 @@ export class NotificationsQueueService {
         contactEmail: params.contactEmail ?? undefined,
         contactPhone: params.contactPhone ?? undefined,
         assignedToId: params.assignedToId ?? undefined,
+        notifyLeaders: params.notifyLeaders === true,
       },
       delayMs,
     );

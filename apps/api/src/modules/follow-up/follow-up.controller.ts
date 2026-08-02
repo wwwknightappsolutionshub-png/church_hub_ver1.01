@@ -85,6 +85,8 @@ export class FollowUpController {
       isConfidential?: boolean;
       memberId?: string;
       followUpId?: string;
+      stageAtTime?: FollowUpStage;
+      kind?: string;
     },
   ) {
     return this.followUpService.addPastoralNote(churchId, user.userId, body);
@@ -101,13 +103,38 @@ export class FollowUpController {
     return this.followUpService.getPastoralNotes(churchId, user.userId, { memberId, followUpId });
   }
 
+  @Get('calendar')
+  @ApiOperation({ summary: 'Active leads with next-action dates for calendar view' })
+  calendar(
+    @ChurchId() churchId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    const now = new Date();
+    const fromDate = from ? new Date(from) : new Date(now.getFullYear(), now.getMonth(), 1);
+    const toDate = to
+      ? new Date(to)
+      : new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+      return this.followUpService.listCalendar(
+        churchId,
+        new Date(now.getFullYear(), now.getMonth(), 1),
+        new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59),
+      );
+    }
+    return this.followUpService.listCalendar(churchId, fromDate, toDate);
+  }
+
   @Get()
   list(
     @ChurchId() churchId: string,
     @Query('stage') stage?: FollowUpStage,
     @Query('assignedToId') assignedToId?: string,
+    @Query('archived') archived?: string,
   ) {
-    return this.followUpService.list(churchId, stage, assignedToId);
+    return this.followUpService.list(churchId, stage, assignedToId, {
+      archived: archived === '1' || archived === 'true',
+    });
   }
 
   @Post()
@@ -118,6 +145,72 @@ export class FollowUpController {
   @Get(':id')
   getOne(@ChurchId() churchId: string, @Param('id') id: string) {
     return this.followUpService.getOne(churchId, id);
+  }
+
+  @Post(':id/archive')
+  @Roles('ADMIN', 'PASTOR', 'LEADER')
+  @ApiOperation({ summary: 'Archive lead (no restore; email re-contact only)' })
+  archive(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { reason?: string },
+  ) {
+    return this.followUpService.archive(churchId, id, user.userId, body.reason ?? '');
+  }
+
+  @Post(':id/archive-request')
+  @ApiOperation({ summary: 'Outreach member DND — request archive with required comment' })
+  requestArchive(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { reason?: string },
+  ) {
+    return this.followUpService.requestArchive(churchId, id, user.userId, body.reason ?? '');
+  }
+
+  @Post(':id/archive-request/approve')
+  @Roles('ADMIN', 'PASTOR', 'LEADER')
+  @ApiOperation({ summary: 'Approve pending archive request' })
+  approveArchiveRequest(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { reason?: string },
+  ) {
+    return this.followUpService.archive(
+      churchId,
+      id,
+      user.userId,
+      body.reason?.trim() || 'Approved archive request',
+    );
+  }
+
+  @Post(':id/archive-request/decline')
+  @Roles('ADMIN', 'PASTOR', 'LEADER')
+  declineArchiveRequest(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { note?: string },
+  ) {
+    return this.followUpService.declineArchiveRequest(churchId, id, user.userId, body.note);
+  }
+
+  @Post(':id/recontact')
+  @Roles('ADMIN', 'PASTOR', 'LEADER')
+  @ApiOperation({ summary: 'Email an archived lead (no pipeline restore)' })
+  recontact(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { subject?: string; body?: string },
+  ) {
+    return this.followUpService.recontactArchived(churchId, id, user.userId, {
+      subject: body.subject ?? '',
+      body: body.body ?? '',
+    });
   }
 
   @Patch(':id')
