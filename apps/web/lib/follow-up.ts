@@ -8,7 +8,7 @@ export const FOLLOW_UP_STAGES = [
 ] as const;
 
 export const STAGE_LABELS: Record<string, string> = {
-  NEW_LEAD: 'Fresh Contact',
+  NEW_LEAD: 'Fresh Contacts',
   CONTACTED: 'Contacted',
   VISITED: 'Attended Service',
   ATTENDED: 'Engrafted In WSF',
@@ -29,7 +29,7 @@ export const STAGE_SHORT: Record<string, string> = {
  * Journey status pill colors — shared by pipeline cards and Outreach Directory.
  */
 export const STAGE_BADGE_CLASS: Record<string, string> = {
-  NEW_LEAD: 'border-transparent bg-[#7d3d19]/25 text-[#7d3d19] dark:text-amber-100',
+  NEW_LEAD: 'border-transparent bg-[#2f3ba7]/15 text-[#2f3ba7]',
   CONTACTED: 'border-transparent bg-[#e0f2fe] text-sky-900 dark:bg-sky-950/80 dark:text-sky-200',
   VISITED: 'border-transparent bg-[#fef3c7] text-amber-950 dark:bg-amber-950/70 dark:text-amber-100',
   ATTENDED: 'border-transparent bg-[#b58b62]/30 text-[#5c4030] dark:text-amber-100',
@@ -97,7 +97,7 @@ export const PIPELINE_COLUMNS = [
 
 /** Full-row backgrounds for pipeline cards and Outreach Directory (stage tint). */
 export const STAGE_ROW_CLASS: Record<string, string> = {
-  NEW_LEAD: 'bg-[#7d3d19] text-amber-50 border-[#7d3d19]',
+  NEW_LEAD: 'bg-[#7d3d19]/15 text-[#2f3ba7] border-[#2f3ba7]/30',
   CONTACTED: 'bg-[#e0f2fe] text-sky-950 border-sky-200 dark:bg-sky-950/50 dark:text-sky-50',
   VISITED: 'bg-[#fef3c7] text-amber-950 border-amber-200 dark:bg-amber-950/40 dark:text-amber-50',
   ATTENDED: 'bg-[#b58b62] text-amber-50 border-[#b58b62]',
@@ -107,9 +107,9 @@ export const STAGE_ROW_CLASS: Record<string, string> = {
     'bg-violet-100 text-violet-950 border-violet-200 dark:bg-violet-950/45 dark:text-violet-50',
 };
 
-/** Muted text on dark stage rows. */
+/** Muted text on stage rows. */
 export const STAGE_ROW_MUTED_CLASS: Record<string, string> = {
-  NEW_LEAD: 'text-amber-100/85',
+  NEW_LEAD: 'text-[#2f3ba7]/80',
   CONTACTED: 'text-sky-800/80 dark:text-sky-200/80',
   VISITED: 'text-amber-900/75 dark:text-amber-100/75',
   ATTENDED: 'text-amber-50/85',

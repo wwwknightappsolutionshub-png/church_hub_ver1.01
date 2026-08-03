@@ -6,7 +6,6 @@ import Link from 'next/link';
 import type { AxiosError } from 'axios';
 import {
   Download,
-  Filter,
   Loader2,
   Megaphone,
   Plus,
@@ -412,20 +411,6 @@ function FollowUpPageContent() {
             })}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <select
-              className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground"
-              value={stageFilter}
-              onChange={(e) => setStageFilter(e.target.value)}
-              aria-label="Filter by stage"
-            >
-              <option value="">All stages</option>
-              {FOLLOW_UP_STAGES.map((stage) => (
-                <option key={stage} value={stage}>
-                  {STAGE_LABELS[stage]}
-                </option>
-              ))}
-            </select>
             <select
               className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground"
               value={assigneeFilter}

@@ -99,6 +99,91 @@ const channelIcon: Record<string, typeof Smartphone> = {
   EMAIL: Mail,
 };
 
+function parseOutreachNotes(notes: string): {
+  isOutreach: boolean;
+  outreachId?: string;
+  referredBy?: string;
+  body: string;
+} {
+  const text = notes.trim();
+  const outreachMatch = text.match(/Outreach ID:\s*([0-9a-f-]{36})/i);
+  const referredMatch = text.match(/Referred by:\s*([^.\n]+)/i);
+  const isOutreach = /Created from Outreach capture/i.test(text) || !!outreachMatch;
+
+  let body = text
+    .replace(/Created from Outreach capture\.?/gi, '')
+    .replace(/Outreach ID:\s*[0-9a-f-]{36}\.?/gi, '')
+    .replace(/Referred by:\s*[^.\n]+\.?/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return {
+    isOutreach,
+    outreachId: outreachMatch?.[1],
+    referredBy: referredMatch?.[1]?.trim(),
+    body,
+  };
+}
+
+function OutreachNotesBlock({ notes }: { notes: string }) {
+  const parsed = parseOutreachNotes(notes);
+
+  if (!parsed.isOutreach) {
+    return (
+      <div className="rounded-xl border border-amber-200/80 bg-amber-50 p-4 dark:border-amber-900/50 dark:bg-amber-950/40">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200">
+          Notes
+        </p>
+        <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-amber-950 dark:text-amber-50">
+          {notes}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-sky-50 shadow-sm dark:border-indigo-900/60 dark:from-indigo-950/50 dark:via-card dark:to-sky-950/30">
+      <div className="border-b border-indigo-100 bg-indigo-600/90 px-4 py-2.5 dark:border-indigo-900/50 dark:bg-indigo-800">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-50">
+          Outreach capture notes
+        </p>
+      </div>
+      <div className="space-y-3 p-4">
+        {parsed.outreachId ? (
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-indigo-700/80 dark:text-indigo-300">
+              Outreach ID
+            </p>
+            <p className="mt-0.5 break-all font-mono text-xs text-slate-800 dark:text-slate-100">
+              {parsed.outreachId}
+            </p>
+          </div>
+        ) : null}
+        {parsed.referredBy ? (
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-indigo-700/80 dark:text-indigo-300">
+              Referred by
+            </p>
+            <p className="mt-0.5 text-sm font-medium text-slate-900 dark:text-slate-50">
+              {parsed.referredBy}
+            </p>
+          </div>
+        ) : null}
+        {parsed.body ? (
+          <div className="rounded-lg border border-indigo-100/80 bg-white/90 px-3 py-2.5 dark:border-indigo-900/40 dark:bg-slate-950/40">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-indigo-700/80 dark:text-indigo-300">
+              Prayer / conversation notes
+            </p>
+            <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-slate-900 dark:text-slate-50">
+              {parsed.body}
+            </p>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function FollowUpDetailPanel({
   followUp,
   assignees,
@@ -354,9 +439,7 @@ export function FollowUpDetailPanel({
             <div className="space-y-2 text-sm">
               {followUp.contactPhone && <p>Phone: {followUp.contactPhone}</p>}
               {followUp.contactEmail && <p>Email: {followUp.contactEmail}</p>}
-              {followUp.notes && (
-                <p className="rounded-lg bg-muted/40 p-3 text-muted-foreground">{followUp.notes}</p>
-              )}
+              {followUp.notes ? <OutreachNotesBlock notes={followUp.notes} /> : null}
             </div>
 
             <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-4">
@@ -410,7 +493,7 @@ export function FollowUpDetailPanel({
             </div>
 
             <div className="space-y-3 rounded-lg border border-border p-4">
-              <p className="text-sm font-medium">Team assignment</p>
+              <p className="text-sm font-medium">Assigned Manager</p>
               <select
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 value={assigneeId}

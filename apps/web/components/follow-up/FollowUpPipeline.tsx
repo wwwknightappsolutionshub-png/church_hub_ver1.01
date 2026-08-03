@@ -115,9 +115,11 @@ function LeadCard({
             <div
               className={cn(
                 'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold',
-                item.stage === 'NEW_LEAD' || item.stage === 'ATTENDED'
+                item.stage === 'ATTENDED'
                   ? 'bg-white/20 text-inherit'
-                  : 'bg-black/5 text-inherit dark:bg-white/10',
+                  : item.stage === 'NEW_LEAD'
+                    ? 'bg-[#2f3ba7]/15 text-[#2f3ba7]'
+                    : 'bg-black/5 text-inherit dark:bg-white/10',
               )}
             >
               {item.contactName.charAt(0).toUpperCase()}
