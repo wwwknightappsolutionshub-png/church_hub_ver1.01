@@ -12,9 +12,11 @@ import { cn } from '@/lib/utils';
 interface LogoutButtonProps {
   variant?: 'sidebar' | 'header' | 'menu';
   className?: string;
+  /** Icon-only control (collapsed desktop sidebar). */
+  iconOnly?: boolean;
 }
 
-export function LogoutButton({ variant = 'sidebar', className }: LogoutButtonProps) {
+export function LogoutButton({ variant = 'sidebar', className, iconOnly }: LogoutButtonProps) {
   const [busy, setBusy] = useState(false);
 
   const handleClick = async () => {
@@ -38,13 +40,16 @@ export function LogoutButton({ variant = 'sidebar', className }: LogoutButtonPro
         type="button"
         onClick={handleClick}
         disabled={busy}
+        title="Log out"
+        aria-label="Log out"
         className={cn(
-          'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 transition-all hover:bg-sidebar-muted hover:text-sidebar-foreground',
+          'flex w-full items-center rounded-lg text-sm font-medium text-sidebar-foreground/70 transition-all hover:bg-sidebar-muted hover:text-sidebar-foreground',
+          iconOnly ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5',
           className,
         )}
       >
         <LogOut className="h-4 w-4 shrink-0" />
-        <span>{busy ? 'Signing out…' : 'Log out'}</span>
+        {!iconOnly ? <span>{busy ? 'Signing out…' : 'Log out'}</span> : null}
       </button>
     );
   }

@@ -3,6 +3,7 @@ import {
   normalizeUkPostcodeKey,
   sanitizeProvincePostcodeEntry,
   sanitizeUkPostcode,
+  ukPostcodeOutward,
   UK_POSTCODE_REGEX,
 } from '@church-hub/shared-types';
 import { BadRequestException } from '@nestjs/common';
@@ -60,6 +61,15 @@ export function assertCoverageIncludesCell(cellPostcode: string, coverage: strin
       'This province coverage does not include the cell postcode. Update coverage or choose another province.',
     );
   }
+}
+
+/** Outward code to add when manually mapping a cell outside current coverage. */
+export function coverageKeyForCell(cellPostcode: string): string {
+  const outward = ukPostcodeOutward(cellPostcode);
+  if (!outward) {
+    throw new BadRequestException('Cell postcode is invalid');
+  }
+  return outward;
 }
 
 export { normalizeUkPostcodeKey, cellPostcodeMatchesCoverage };

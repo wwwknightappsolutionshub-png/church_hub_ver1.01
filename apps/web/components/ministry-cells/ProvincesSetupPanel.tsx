@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 export function ProvincesSetupPanel({ onChanged }: { onChanged: () => void }) {
   const { data: provinces = [], isLoading } = useApiQuery<CellProvinceRow[]>(
@@ -26,6 +27,7 @@ export function ProvincesSetupPanel({ onChanged }: { onChanged: () => void }) {
   const [postcodes, setPostcodes] = useState('');
   const [leaderUserId, setLeaderUserId] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,6 +51,7 @@ export function ProvincesSetupPanel({ onChanged }: { onChanged: () => void }) {
       setName('');
       setPostcodes('');
       setLeaderUserId('');
+      setShowCreate(false);
       onChanged();
     } catch (err: unknown) {
       const msg =
@@ -72,7 +75,24 @@ export function ProvincesSetupPanel({ onChanged }: { onChanged: () => void }) {
   };
 
   return (
-    <div className="grid gap-3 lg:grid-cols-2">
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">
+          {provinces.length} province{provinces.length === 1 ? '' : 's'}
+        </p>
+        <Button
+          type="button"
+          size="sm"
+          variant={showCreate ? 'secondary' : 'default'}
+          onClick={() => setShowCreate((v) => !v)}
+        >
+          <Plus className="mr-1 h-4 w-4" />
+          {showCreate ? 'Hide form' : 'Create province'}
+        </Button>
+      </div>
+
+      <div className={cn('grid gap-3', showCreate ? 'lg:grid-cols-2' : '')}>
+      {showCreate && (
       <Card className="shadow-sm">
         <CardHeader className="px-4 py-2.5">
           <CardTitle className="text-sm font-semibold">Create province</CardTitle>
@@ -131,6 +151,7 @@ export function ProvincesSetupPanel({ onChanged }: { onChanged: () => void }) {
           </form>
         </CardContent>
       </Card>
+      )}
 
       <Card className="shadow-sm">
         <CardHeader className="px-4 py-2.5">
@@ -168,6 +189,7 @@ export function ProvincesSetupPanel({ onChanged }: { onChanged: () => void }) {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

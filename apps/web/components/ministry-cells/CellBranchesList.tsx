@@ -3,17 +3,8 @@
 import { useMemo } from 'react';
 import { MapPin, Search, User } from 'lucide-react';
 import type { BranchRow } from '@/components/ministry-cells/types';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-
-function branchInitials(name: string) {
-  return name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('');
-}
 
 function BranchGridCard({
   branch,
@@ -25,6 +16,7 @@ function BranchGridCard({
   onSelect: () => void;
 }) {
   const hue = branch.name.split('').reduce((n, c) => n + c.charCodeAt(0), 0) % 360;
+  const leader = branch.leader?.name ?? 'Leader unassigned';
 
   return (
     <button
@@ -32,60 +24,35 @@ function BranchGridCard({
       data-testid="branch-picker-item"
       onClick={onSelect}
       className={cn(
-        'group relative flex flex-col overflow-hidden rounded-2xl border bg-card text-left shadow-sm transition',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-        'hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99]',
-        selected
-          ? 'border-primary ring-2 ring-primary/30'
-          : 'border-border hover:border-primary/30',
+        'group flex flex-col overflow-hidden rounded-xl border bg-card text-left shadow-sm transition',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1',
+        'hover:border-primary/40 hover:shadow-md active:scale-[0.99]',
+        selected ? 'border-primary ring-2 ring-primary/25' : 'border-border',
       )}
     >
       <div
-        className="h-1.5 w-full shrink-0"
-        style={{ background: `linear-gradient(90deg, hsl(${hue} 55% 45%), hsl(${(hue + 40) % 360} 60% 55%))` }}
+        className="h-1 w-full shrink-0"
+        style={{
+          background: `linear-gradient(90deg, hsl(${hue} 55% 45%), hsl(${(hue + 40) % 360} 60% 55%))`,
+        }}
         aria-hidden
       />
-      <div className="flex flex-1 flex-col gap-3 p-4">
-        <div className="flex items-start gap-3">
-          <div
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white shadow-inner"
-            style={{ background: `hsl(${hue} 50% 42%)` }}
-          >
-            {branchInitials(branch.name)}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="font-heading text-base font-semibold leading-tight group-hover:text-primary">
-              {branch.name}
-            </p>
-            {branch.location && (
-              <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                <MapPin className="h-3 w-3 shrink-0" aria-hidden />
-                <span className="truncate">{branch.location}</span>
-              </p>
-            )}
-            {(branch.postcode || branch.province) && (
-              <p className="mt-1 truncate text-xs text-muted-foreground">
-                {[branch.postcode, branch.province?.name].filter(Boolean).join(' · ')}
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-1.5">
-          <Badge variant="secondary" className="tabular-nums">
-            {branch.memberCount} members
-          </Badge>
-          {branch.incidentCount > 0 && (
-            <Badge variant="destructive" className="tabular-nums">
-              {branch.incidentCount} incidents
-            </Badge>
-          )}
-        </div>
-
-        <div className="mt-auto flex items-center gap-2 border-t border-border/60 pt-3 text-xs text-muted-foreground">
-          <User className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          <span className="truncate">{branch.leader?.name ?? 'Leader unassigned'}</span>
-        </div>
+      <div className="space-y-1 px-2.5 py-2">
+        <p className="truncate font-heading text-sm font-semibold leading-tight text-primary group-hover:underline">
+          {branch.name}
+        </p>
+        <p className="flex items-center gap-1 truncate text-[11px] text-muted-foreground">
+          <MapPin className="h-3 w-3 shrink-0" aria-hidden />
+          <span className="truncate">{branch.location?.trim() || 'No location'}</span>
+        </p>
+        <p className="truncate text-[11px] tabular-nums text-muted-foreground">
+          {branch.postcode?.trim() || 'No postcode'}
+          {branch.province?.name ? ` · ${branch.province.name}` : ''}
+        </p>
+        <p className="flex items-center gap-1 truncate text-[11px] text-muted-foreground">
+          <User className="h-3 w-3 shrink-0" aria-hidden />
+          <span className="truncate">{leader}</span>
+        </p>
       </div>
     </button>
   );
@@ -107,55 +74,67 @@ export function CellBranchesList({
   onSearchChange: (value: string) => void;
 }) {
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = search.trim().toLowerCase().replace(/\s+/g, '');
     if (!q) return branches;
-    return branches.filter(
-      (b) =>
-        b.name.toLowerCase().includes(q) ||
-        b.location?.toLowerCase().includes(q) ||
-        b.leader?.name.toLowerCase().includes(q) ||
-        (b.members ?? []).some((m) => m.name.toLowerCase().includes(q)),
-    );
+    return branches.filter((b) => {
+      const name = b.name.toLowerCase();
+      const location = (b.location ?? '').toLowerCase();
+      const leader = (b.leader?.name ?? '').toLowerCase();
+      const postcode = (b.postcode ?? '').toLowerCase().replace(/\s+/g, '');
+      const province = (b.province?.name ?? '').toLowerCase();
+      const members = (b.members ?? []).some((m) => m.name.toLowerCase().includes(q));
+      return (
+        name.includes(q) ||
+        location.includes(q) ||
+        leader.includes(q) ||
+        postcode.includes(q) ||
+        province.includes(q) ||
+        members ||
+        // allow spaced search against original fields
+        name.includes(search.trim().toLowerCase()) ||
+        location.includes(search.trim().toLowerCase())
+      );
+    });
   }, [branches, search]);
 
   const emptyMessage =
     branches.length === 0
       ? `No cell branches yet.${canManage ? ' Create your first branch above.' : ''}`
-      : 'No branches match your search.';
+      : 'No cells match that name or postcode.';
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Search branches, leaders, members…"
+          placeholder="Search cell name or postcode…"
           className="h-10 rounded-xl border-border/80 bg-background pl-9 shadow-sm"
-          aria-label="Search cell branches"
+          aria-label="Search cell branches by name or postcode"
         />
       </div>
 
       <div
-        className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
+        className="max-h-[min(70vh,36rem)] overflow-y-auto overscroll-contain rounded-xl border border-border/60 bg-muted/10 p-2"
         role="listbox"
         aria-label="Cell branches"
       >
-        {filtered.map((b) => (
-          <BranchGridCard
-            key={b.id}
-            branch={b}
-            selected={selectedBranchId === b.id}
-            onSelect={() => onSelectBranch(b.id)}
-          />
-        ))}
-      </div>
-
-      {filtered.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-border px-4 py-12 text-center text-sm text-muted-foreground">
-          {emptyMessage}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+          {filtered.map((b) => (
+            <BranchGridCard
+              key={b.id}
+              branch={b}
+              selected={selectedBranchId === b.id}
+              onSelect={() => onSelectBranch(b.id)}
+            />
+          ))}
         </div>
-      )}
+
+        {filtered.length === 0 && (
+          <div className="px-4 py-10 text-center text-sm text-muted-foreground">{emptyMessage}</div>
+        )}
+      </div>
     </div>
   );
 }

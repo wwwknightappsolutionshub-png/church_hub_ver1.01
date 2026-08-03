@@ -1,62 +1,21 @@
 'use client';
 
-import { Loader2, UserPlus, X } from 'lucide-react';
-import { useState } from 'react';
+import { UserPlus, X } from 'lucide-react';
+import { useOfflineSync } from '@/lib/hooks/use-offline-sync';
+import { OutreachCaptureForm } from '@/components/outreach/OutreachCaptureForm';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  emailFormatError,
-  filterPhoneTyping,
-  phoneFormatError,
-} from '@/lib/contact-validation';
-import { cn } from '@/lib/utils';
-
-interface Assignee {
-  id: string;
-  firstName: string;
-  lastName: string;
-}
 
 interface FollowUpNewLeadSheetProps {
   open: boolean;
-  form: {
-    contactName: string;
-    contactPhone: string;
-    contactEmail: string;
-    assignedToId: string;
-    dueAt: string;
-  };
-  assignees: Assignee[];
-  creating: boolean;
-  onChange: (form: FollowUpNewLeadSheetProps['form']) => void;
   onClose: () => void;
-  onSubmit: (e: React.FormEvent) => void;
+  onSuccess: () => void;
 }
 
-export function FollowUpNewLeadSheet({
-  open,
-  form,
-  assignees,
-  creating,
-  onChange,
-  onClose,
-  onSubmit,
-}: FollowUpNewLeadSheetProps) {
-  const [errors, setErrors] = useState<{ phone?: string; email?: string }>({});
+/** Fresh Contact uses the same Field Capture form and Outreach DB path. */
+export function FollowUpNewLeadSheet({ open, onClose, onSuccess }: FollowUpNewLeadSheetProps) {
+  const { online } = useOfflineSync();
 
   if (!open) return null;
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const phoneErr = phoneFormatError(form.contactPhone);
-    const emailErr = emailFormatError(form.contactEmail);
-    setErrors({
-      phone: phoneErr ?? undefined,
-      email: emailErr ?? undefined,
-    });
-    if (phoneErr || emailErr) return;
-    onSubmit(e);
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
@@ -66,103 +25,32 @@ export function FollowUpNewLeadSheet({
         aria-label="Close"
         onClick={onClose}
       />
-      <div className="relative z-10 w-full max-w-lg rounded-t-2xl border border-border bg-card shadow-2xl sm:rounded-2xl">
-        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+      <div className="relative z-10 flex max-h-[min(92dvh,44rem)] w-full max-w-lg flex-col rounded-t-2xl border border-border bg-card shadow-2xl sm:rounded-2xl">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 text-primary">
               <UserPlus className="h-5 w-5" />
             </div>
             <div>
               <p className="font-heading text-lg font-bold text-foreground">Add Fresh Contact</p>
-              <p className="text-xs text-muted-foreground">Starts at Fresh Contact in the pipeline</p>
+              <p className="text-xs text-muted-foreground">
+                Same form as Field Capture — saved to Outreach and the follow-up pipeline
+              </p>
             </div>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="h-5 w-5" />
           </Button>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4 p-5" noValidate>
-          <Input
-            placeholder="Full name *"
-            value={form.contactName}
-            onChange={(e) => onChange({ ...form, contactName: e.target.value })}
-            required
+        <div className="min-h-0 flex-1 overflow-y-auto p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+          <OutreachCaptureForm
+            online={online}
+            onSuccess={() => {
+              onSuccess();
+              onClose();
+            }}
           />
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <Input
-                type="tel"
-                inputMode="tel"
-                placeholder="UK phone"
-                value={form.contactPhone}
-                aria-invalid={!!errors.phone}
-                className={cn(errors.phone && 'border-destructive')}
-                onChange={(e) => {
-                  const contactPhone = filterPhoneTyping(e.target.value);
-                  onChange({ ...form, contactPhone });
-                  setErrors((prev) => ({
-                    ...prev,
-                    phone: phoneFormatError(contactPhone) ?? undefined,
-                  }));
-                }}
-              />
-              {errors.phone ? (
-                <p className="mt-1 text-xs text-destructive">{errors.phone}</p>
-              ) : null}
-            </div>
-            <div>
-              <Input
-                type="email"
-                inputMode="email"
-                placeholder="Email"
-                value={form.contactEmail}
-                aria-invalid={!!errors.email}
-                className={cn(errors.email && 'border-destructive')}
-                onChange={(e) => {
-                  const contactEmail = e.target.value;
-                  onChange({ ...form, contactEmail });
-                  setErrors((prev) => ({
-                    ...prev,
-                    email: emailFormatError(contactEmail) ?? undefined,
-                  }));
-                }}
-              />
-              {errors.email ? (
-                <p className="mt-1 text-xs text-destructive">{errors.email}</p>
-              ) : null}
-            </div>
-          </div>
-          <select
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
-            value={form.assignedToId}
-            onChange={(e) => onChange({ ...form, assignedToId: e.target.value })}
-          >
-            <option value="">Assign to team member…</option>
-            {assignees.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.firstName} {a.lastName}
-              </option>
-            ))}
-          </select>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">
-              Follow-up due (optional)
-            </label>
-            <Input
-              type="datetime-local"
-              value={form.dueAt}
-              onChange={(e) => onChange({ ...form, dueAt: e.target.value })}
-            />
-          </div>
-          <div className="flex gap-2 pt-1">
-            <Button type="submit" disabled={creating} className="flex-1 shadow-brand">
-              {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Add to pipeline'}
-            </Button>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-          </div>
-        </form>
+        </div>
       </div>
     </div>
   );

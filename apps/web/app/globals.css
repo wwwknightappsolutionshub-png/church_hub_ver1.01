@@ -69,6 +69,51 @@
     @apply bg-background text-foreground font-sans antialiased;
   }
 
+  /* Themed scrollbars — blend with light app chrome and dark sidebar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border) / 0.85);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.45);
+  }
+
+  .sidebar-scroll,
+  .sidebar-scroll * {
+    scrollbar-color: hsl(var(--sidebar-muted)) hsl(var(--sidebar));
+  }
+
+  .sidebar-scroll::-webkit-scrollbar-track {
+    background: hsl(var(--sidebar));
+  }
+
+  .sidebar-scroll::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--sidebar-muted));
+    border: 2px solid hsl(var(--sidebar));
+    background-clip: padding-box;
+  }
+
+  .sidebar-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--sidebar-foreground) / 0.35);
+  }
+
   p,
   span,
   li,

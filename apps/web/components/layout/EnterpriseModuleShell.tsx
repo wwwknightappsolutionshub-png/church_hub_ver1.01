@@ -109,33 +109,41 @@ export function EnterpriseTabNav({
   active,
   onChange,
   ariaLabel,
+  actions,
 }: {
   tabs: Array<{ id: string; label: string }>;
   active: string;
   onChange: (id: string) => void;
   ariaLabel?: string;
+  /** Right-side controls on the same row as the tabs (e.g. Export). */
+  actions?: ReactNode;
 }) {
   return (
     <nav
       className="sticky top-[calc(3rem+env(safe-area-inset-top))] z-20 border-b border-slate-200/80 bg-white/95 backdrop-blur xl:top-16 dark:border-slate-800 dark:bg-slate-950/95"
       aria-label={ariaLabel ?? 'Module sections'}
     >
-      <div className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 py-2 sm:px-6 md:px-8 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => onChange(t.id)}
-            className={cn(
-              'shrink-0 rounded-md px-4 py-2.5 text-sm font-semibold transition',
-              active === t.id
-                ? 'bg-slate-900 text-white shadow-sm dark:bg-slate-100 dark:text-slate-900'
-                : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800',
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-2 sm:px-6 md:px-8">
+        <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => onChange(t.id)}
+              className={cn(
+                'shrink-0 rounded-md px-4 py-2.5 text-sm font-semibold transition',
+                active === t.id
+                  ? 'bg-slate-900 text-white shadow-sm dark:bg-slate-100 dark:text-slate-900'
+                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800',
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        {actions ? (
+          <div className="flex shrink-0 items-center gap-2">{actions}</div>
+        ) : null}
       </div>
     </nav>
   );

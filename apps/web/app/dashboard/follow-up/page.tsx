@@ -107,14 +107,6 @@ function FollowUpPageContent() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [search, setSearch] = useState('');
-  const [newForm, setNewForm] = useState({
-    contactName: '',
-    contactPhone: '',
-    contactEmail: '',
-    assignedToId: '',
-    dueAt: '',
-  });
-  const [creating, setCreating] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [archiveBusy, setArchiveBusy] = useState(false);
 
@@ -230,31 +222,6 @@ function FollowUpPageContent() {
     }
   };
 
-  const createLead = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newForm.contactName.trim()) return;
-    setCreating(true);
-    try {
-      await api.post('/follow-up', {
-        contactName: newForm.contactName.trim(),
-        contactPhone: newForm.contactPhone || undefined,
-        contactEmail: newForm.contactEmail || undefined,
-        assignedToId: newForm.assignedToId || undefined,
-        dueAt: newForm.dueAt ? new Date(newForm.dueAt).toISOString() : undefined,
-        scheduleReminder: !!newForm.dueAt,
-        reminderChannel: 'WHATSAPP',
-      });
-      toast.success('Fresh Contact added to pipeline');
-      setNewForm({ contactName: '', contactPhone: '', contactEmail: '', assignedToId: '', dueAt: '' });
-      setShowNew(false);
-      refresh();
-    } catch {
-      toast.error('Could not create lead');
-    } finally {
-      setCreating(false);
-    }
-  };
-
   const runExport = async (scope: (typeof FOLLOW_UP_EXPORT_OPTIONS)[number]['scope']) => {
     try {
       await api.post('/follow-up/export-check');
@@ -328,8 +295,51 @@ function FollowUpPageContent() {
           { id: 'members', label: 'Members' },
         ]}
         active={view}
-        onChange={(id) =>
-          setView(id as 'pipeline' | 'table' | 'calendar' | 'archived' | 'members')
+        onChange={(id) => {
+          setExportOpen(false);
+          setView(id as 'pipeline' | 'table' | 'calendar' | 'archived' | 'members');
+        }}
+        actions={
+          <>
+            {view === 'table' && canExport ? (
+              <div className="relative">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  type="button"
+                  className="h-9 whitespace-nowrap"
+                  onClick={() => setExportOpen((o) => !o)}
+                  disabled={filteredItems.length === 0}
+                >
+                  <Download className="mr-1.5 h-4 w-4 shrink-0" />
+                  Export PDF
+                </Button>
+                {exportOpen ? (
+                  <div className="absolute right-0 z-30 mt-1 w-64 rounded-lg border border-border bg-card p-1 shadow-lg">
+                    {FOLLOW_UP_EXPORT_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.label}
+                        type="button"
+                        className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
+                        onClick={() => runExport(opt.scope)}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            {stats ? (
+              <Badge variant="outline" className="hidden h-9 items-center whitespace-nowrap sm:inline-flex">
+                <Sparkles className="mr-1 h-3 w-3" />
+                {stats.pending} in pipeline
+                {(stats.archiveRequested ?? 0) > 0
+                  ? ` · ${stats.archiveRequested} archive requests`
+                  : ''}
+              </Badge>
+            ) : null}
+          </>
         }
       />
 
@@ -391,43 +401,6 @@ function FollowUpPageContent() {
               title="Captured to"
             />
           </div>
-          {view === 'table' && canExport ? (
-            <div className="relative">
-              <Button
-                size="sm"
-                variant="outline"
-                type="button"
-                onClick={() => setExportOpen((o) => !o)}
-                disabled={filteredItems.length === 0}
-              >
-                <Download className="mr-1.5 h-4 w-4" />
-                Export PDF
-              </Button>
-              {exportOpen ? (
-                <div className="absolute right-0 z-20 mt-1 w-64 rounded-lg border border-border bg-card p-1 shadow-lg">
-                  {FOLLOW_UP_EXPORT_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.label}
-                      type="button"
-                      className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
-                      onClick={() => runExport(opt.scope)}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-          {stats && (
-            <Badge variant="outline" className="hidden sm:inline-flex">
-              <Sparkles className="mr-1 h-3 w-3" />
-              {stats.pending} in pipeline
-              {(stats.archiveRequested ?? 0) > 0
-                ? ` · ${stats.archiveRequested} archive requests`
-                : ''}
-            </Badge>
-          )}
         </div>
         )}
 
@@ -551,12 +524,8 @@ function FollowUpPageContent() {
 
       <FollowUpNewLeadSheet
         open={showNew}
-        form={newForm}
-        assignees={assignees ?? []}
-        creating={creating}
-        onChange={setNewForm}
         onClose={() => setShowNew(false)}
-        onSubmit={createLead}
+        onSuccess={refresh}
       />
 
       {selectedId && selectedDetail && (

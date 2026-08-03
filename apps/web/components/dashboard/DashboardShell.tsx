@@ -28,12 +28,14 @@ import {
   FileText,
   Mail,
   MessageSquare,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plug,
   Shield,
   Sparkles,
   Users,
 } from 'lucide-react';
-import { BrandMark } from '@/components/brand/BrandMark';
+import { BrandIcon, BrandMark } from '@/components/brand/BrandMark';
 import { SkipToMain } from '@/components/accessibility/SkipToMain';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -52,14 +54,18 @@ const platformNavAll: (DashboardNavItem & { permission?: string })[] = [
   { href: '/dashboard/platform/wisdom365', label: 'Wisdom365+', icon: Sparkles, exact: false, permission: 'platform.wisdom365:read' },
 ];
 
+const SIDEBAR_EXPANDED_KEY = 'churchhub.desktopSidebarExpanded';
+
 function NavLink({
   item,
   pathname,
   onNavigate,
+  collapsed,
 }: {
   item: DashboardNavItem;
   pathname: string;
   onNavigate?: () => void;
+  collapsed?: boolean;
 }) {
   const { href, label, icon: Icon, exact } = item;
   const active = exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
@@ -68,8 +74,11 @@ function NavLink({
     <Link
       href={href}
       onClick={onNavigate}
+      title={collapsed ? label : undefined}
+      aria-label={label}
       className={cn(
-        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+        'flex items-center rounded-lg text-sm font-medium transition-colors',
+        collapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5',
         active
           ? 'bg-sidebar-muted text-sidebar-foreground ring-1 ring-white/15'
           : 'text-sidebar-foreground/90 hover:bg-sidebar-muted/70 hover:text-sidebar-foreground',
@@ -79,12 +88,20 @@ function NavLink({
         className={cn('h-4 w-4 shrink-0', active ? 'text-secondary' : 'text-sidebar-foreground/80')}
         aria-hidden
       />
-      <span className="flex-1">{label}</span>
+      {!collapsed ? <span className="flex-1 truncate">{label}</span> : null}
     </Link>
   );
 }
 
-function DesktopSidebar({ onNavigate }: { onNavigate?: () => void }) {
+function DesktopSidebar({
+  onNavigate,
+  expanded,
+  onToggleExpanded,
+}: {
+  onNavigate?: () => void;
+  expanded: boolean;
+  onToggleExpanded: () => void;
+}) {
   const pathname = usePathname();
   const {
     canAccessFollowUp,
@@ -192,54 +209,100 @@ function DesktopSidebar({ onNavigate }: { onNavigate?: () => void }) {
       ? '/dashboard'
       : '/dashboard/lounge';
 
+  const collapsed = !expanded;
+
   return (
     <>
-      <div className="flex h-16 items-center border-b border-sidebar-muted px-5">
-        <Link href={homeHref} onClick={onNavigate}>
-          <BrandMark variant="light" />
+      <div
+        className={cn(
+          'flex flex-col border-b border-sidebar-muted',
+          collapsed ? 'items-center gap-1 px-1 py-2' : 'h-16 flex-row items-center justify-between gap-2 px-3',
+        )}
+      >
+        <Link
+          href={homeHref}
+          onClick={onNavigate}
+          className={cn('min-w-0', collapsed && 'flex justify-center')}
+          title="Church Hub home"
+        >
+          {collapsed ? (
+            <span className="flex h-9 w-9 items-center justify-center">
+              <BrandIcon variant="light" className="h-8 w-8" />
+            </span>
+          ) : (
+            <BrandMark variant="light" />
+          )}
         </Link>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 shrink-0 text-sidebar-foreground/80 hover:bg-sidebar-muted hover:text-sidebar-foreground"
+          onClick={onToggleExpanded}
+          aria-label={expanded ? 'Collapse sidebar' : 'Expand sidebar'}
+          title={expanded ? 'Collapse sidebar' : 'Expand sidebar'}
+        >
+          {expanded ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+        </Button>
       </div>
-      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+      <nav className="sidebar-scroll flex-1 space-y-1 overflow-y-auto p-2">
         {isPlatformOperator ? (
           platformNav.map((item) => (
-            <NavLink key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} />
+            <NavLink
+              key={item.href}
+              item={item}
+              pathname={pathname}
+              onNavigate={onNavigate}
+              collapsed={collapsed}
+            />
           ))
         ) : isChurchStaff ? (
           <>
             {staffNav.length > 0 && (
               <>
-                <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
-                  Leadership
-                </p>
+                {!collapsed ? (
+                  <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
+                    Leadership
+                  </p>
+                ) : null}
                 {staffNav.map((item) => (
-                  <NavLink key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} />
+                  <NavLink
+                    key={item.href}
+                    item={item}
+                    pathname={pathname}
+                    onNavigate={onNavigate}
+                    collapsed={collapsed}
+                  />
                 ))}
               </>
             )}
             {staffCommunityNav.length > 0 && (
-              <div className="mt-4">
-                <button
-                  type="button"
-                  onClick={() => setCommunityOpen((o) => !o)}
-                  className="mb-2 flex w-full items-center justify-between px-3 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40 hover:text-sidebar-foreground/70"
-                  aria-expanded={communityOpen}
-                >
-                  <span>Community</span>
-                  <ChevronDown
-                    className={cn(
-                      'h-3.5 w-3.5 shrink-0 transition-transform',
-                      communityOpen ? 'rotate-0' : '-rotate-90',
-                    )}
-                    aria-hidden
-                  />
-                </button>
-                {communityOpen
+              <div className={cn(!collapsed && 'mt-4')}>
+                {!collapsed ? (
+                  <button
+                    type="button"
+                    onClick={() => setCommunityOpen((o) => !o)}
+                    className="mb-2 flex w-full items-center justify-between px-3 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40 hover:text-sidebar-foreground/70"
+                    aria-expanded={communityOpen}
+                  >
+                    <span>Community</span>
+                    <ChevronDown
+                      className={cn(
+                        'h-3.5 w-3.5 shrink-0 transition-transform',
+                        communityOpen ? 'rotate-0' : '-rotate-90',
+                      )}
+                      aria-hidden
+                    />
+                  </button>
+                ) : null}
+                {(collapsed || communityOpen)
                   ? staffCommunityNav.map((item) => (
                       <NavLink
                         key={item.href}
                         item={item}
                         pathname={pathname}
                         onNavigate={onNavigate}
+                        collapsed={collapsed}
                       />
                     ))
                   : null}
@@ -248,31 +311,46 @@ function DesktopSidebar({ onNavigate }: { onNavigate?: () => void }) {
           </>
         ) : (
           <>
-            <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
-              Community
-            </p>
+            {!collapsed ? (
+              <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
+                Community
+              </p>
+            ) : null}
             {memberNav.map((item) => (
-              <NavLink key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} />
+              <NavLink
+                key={item.href}
+                item={item}
+                pathname={pathname}
+                onNavigate={onNavigate}
+                collapsed={collapsed}
+              />
             ))}
           </>
         )}
       </nav>
       {!isPlatformOperator && (user || member) && (
-        <div className="space-y-2 border-t border-sidebar-muted px-3 py-3">
-          <div className="px-1">
-            <p className="truncate text-xs font-medium text-sidebar-foreground">
-              {userDisplayName(user, member)}
-            </p>
-            {churchName && (
-              <p className="truncate text-[10px] text-sidebar-foreground/50">{churchName}</p>
-            )}
-          </div>
-          <LogoutButton variant="sidebar" />
+        <div
+          className={cn(
+            'space-y-2 border-t border-sidebar-muted py-3',
+            collapsed ? 'px-1' : 'px-3',
+          )}
+        >
+          {!collapsed ? (
+            <div className="px-1">
+              <p className="truncate text-xs font-medium text-sidebar-foreground">
+                {userDisplayName(user, member)}
+              </p>
+              {churchName && (
+                <p className="truncate text-[10px] text-sidebar-foreground/50">{churchName}</p>
+              )}
+            </div>
+          ) : null}
+          <LogoutButton variant="sidebar" iconOnly={collapsed} />
         </div>
       )}
       {isPlatformOperator && (
-        <div className="border-t border-sidebar-muted p-3">
-          <LogoutButton variant="sidebar" />
+        <div className={cn('border-t border-sidebar-muted', collapsed ? 'p-1' : 'p-3')}>
+          <LogoutButton variant="sidebar" iconOnly={collapsed} />
         </div>
       )}
     </>
@@ -290,6 +368,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 function DashboardShellInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
+  /** Desktop nav starts collapsed; user can expand via the panel icon. */
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const { stickyModuleTitle } = useModuleChrome();
   const {
     canAccessFollowUp,
@@ -397,15 +477,50 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
       ? '/dashboard'
       : '/dashboard/lounge';
 
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(SIDEBAR_EXPANDED_KEY) === '1') {
+        setSidebarExpanded(true);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const toggleSidebarExpanded = () => {
+    setSidebarExpanded((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SIDEBAR_EXPANDED_KEY, next ? '1' : '0');
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
   return (
     <div className="app-root min-h-[100dvh] bg-[hsl(var(--muted))]">
       <div className="app-frame relative mx-auto flex min-h-[100dvh] w-full max-w-[100%] flex-col bg-background xl:max-w-none">
-        {/* Desktop sidebar */}
-        <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col bg-sidebar xl:flex">
-          <DesktopSidebar />
+        {/* Desktop sidebar — collapsed by default (icon rail) */}
+        <aside
+          className={cn(
+            'fixed inset-y-0 left-0 z-40 hidden flex-col bg-sidebar transition-[width] duration-200 xl:flex',
+            sidebarExpanded ? 'w-64' : 'w-16',
+          )}
+        >
+          <DesktopSidebar
+            expanded={sidebarExpanded}
+            onToggleExpanded={toggleSidebarExpanded}
+          />
         </aside>
 
-        <div className="flex min-h-[100dvh] flex-1 flex-col xl:pl-64">
+        <div
+          className={cn(
+            'flex min-h-[100dvh] flex-1 flex-col transition-[padding] duration-200',
+            sidebarExpanded ? 'xl:pl-64' : 'xl:pl-16',
+          )}
+        >
           {/* Mobile / tablet app header */}
           <header className="app-top-bar sticky top-0 z-40 flex h-[calc(3rem+env(safe-area-inset-top))] shrink-0 items-end border-b border-border/80 bg-card/90 px-4 pb-2 backdrop-blur-xl xl:h-16 xl:items-center xl:px-6">
             <div className="flex w-full items-center gap-2 pt-[env(safe-area-inset-top)] xl:pt-0">

@@ -26,7 +26,8 @@ import {
   type MinistryCellsRole,
 } from './ministry-cells-access.service';
 import {
-  assertCoverageIncludesCell,
+  cellPostcodeMatchesCoverage,
+  coverageKeyForCell,
   findMatchingProvinceId,
   normalizeCoveragePostcodes,
   requireCellPostcode,
@@ -1907,10 +1908,30 @@ export class MinistryCellsService {
       include: { postcodes: true },
     });
     if (!province) throw new NotFoundException('Province not found');
-    assertCoverageIncludesCell(
-      branch.postcode,
-      province.postcodes.map((p) => p.postcodeNormalized),
-    );
+
+    const coverage = province.postcodes.map((p) => p.postcodeNormalized);
+    if (!cellPostcodeMatchesCoverage(branch.postcode, coverage)) {
+      const key = coverageKeyForCell(branch.postcode);
+      const owned = await this.prisma.cellProvincePostcode.findFirst({
+        where: { churchId, postcodeNormalized: key },
+        include: { province: { select: { id: true, name: true } } },
+      });
+      if (owned && owned.provinceId !== provinceId) {
+        throw new BadRequestException(
+          `Postcode ${key} already belongs to province "${owned.province.name}". Update that coverage first.`,
+        );
+      }
+      if (!owned) {
+        await this.prisma.cellProvincePostcode.create({
+          data: {
+            churchId,
+            provinceId,
+            postcodeNormalized: key,
+          },
+        });
+      }
+    }
+
     return this.prisma.cellBranch.update({
       where: { id: branchId },
       data: { provinceId },
