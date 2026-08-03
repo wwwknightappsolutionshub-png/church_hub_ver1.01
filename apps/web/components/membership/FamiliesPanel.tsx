@@ -26,12 +26,19 @@ interface ServiceUnit {
 
 interface FamiliesPanelProps {
   canManage: boolean;
+  canAdd?: boolean;
+  canViewDirectory?: boolean;
   members: Array<{ id: string; firstName: string; lastName: string }>;
 }
 
 type ViewMode = 'grid' | 'list';
 
-export function FamiliesPanel({ canManage, members: _members }: FamiliesPanelProps) {
+export function FamiliesPanel({
+  canManage,
+  canAdd = canManage,
+  canViewDirectory = true,
+  members: _members,
+}: FamiliesPanelProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -41,6 +48,7 @@ export function FamiliesPanel({ canManage, members: _members }: FamiliesPanelPro
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null);
   const [showEditor, setShowEditor] = useState(false);
   const [editFamilyId, setEditFamilyId] = useState<string | null>(null);
+  const addOnly = !canViewDirectory && canAdd;
 
   const familiesUrl = useMemo(() => {
     const params = new URLSearchParams();
@@ -53,8 +61,11 @@ export function FamiliesPanel({ canManage, members: _members }: FamiliesPanelPro
   const { data: families, isLoading } = useApiQuery<FamilyRow[]>(
     ['membership-families', search, serviceUnitId],
     familiesUrl,
+    { enabled: canViewDirectory },
   );
-  const { data: serviceUnits } = useApiQuery<ServiceUnit[]>(['service-units-list'], '/service-units');
+  const { data: serviceUnits } = useApiQuery<ServiceUnit[]>(['service-units-list'], '/service-units', {
+    enabled: canViewDirectory,
+  });
 
   const invalidate = () => invalidateMembershipQueries(queryClient);
 
@@ -71,11 +82,50 @@ export function FamiliesPanel({ canManage, members: _members }: FamiliesPanelPro
   };
 
   useEffect(() => {
-    if (searchParams.get('add') === '1' && canManage) {
+    if (addOnly) {
+      openCreate();
+      if (searchParams.get('add') === '1') {
+        router.replace('/dashboard/membership/families');
+      }
+      return;
+    }
+    if (searchParams.get('add') === '1' && canAdd) {
       openCreate();
       router.replace('/dashboard/membership/families');
     }
-  }, [searchParams, canManage, router]);
+  }, [searchParams, canAdd, router, addOnly]);
+
+  if (addOnly) {
+    return (
+      <div className="space-y-4" data-testid="families-panel-add-only">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Add Family</h2>
+          <p className="text-sm text-muted-foreground">
+            Register a new household. Family directories are visible to Church Admin and Pastor only.
+          </p>
+        </div>
+        {showEditor && canAdd ? (
+          <LazyFamilyEditorDialog
+            familyId={null}
+            onClose={() => {
+              setShowEditor(false);
+              router.push('/dashboard/membership');
+            }}
+            onSaved={() => {
+              invalidate();
+              setShowEditor(false);
+              router.push('/dashboard/membership');
+            }}
+          />
+        ) : (
+          <Button size="sm" className="shadow-brand" onClick={openCreate} data-testid="families-add-button">
+            <UserPlus className="mr-1.5 h-4 w-4" />
+            Add Family
+          </Button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4" data-testid="families-panel">
@@ -87,7 +137,7 @@ export function FamiliesPanel({ canManage, members: _members }: FamiliesPanelPro
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {canManage ? (
+          {canAdd ? (
             <Button size="sm" className="shadow-brand" onClick={openCreate} data-testid="families-add-button">
               <UserPlus className="mr-1.5 h-4 w-4" />
               Add Family
@@ -215,7 +265,7 @@ export function FamiliesPanel({ canManage, members: _members }: FamiliesPanelPro
       {(families ?? []).length === 0 && !isLoading ? (
         <p className="py-8 text-center text-sm text-muted-foreground">
           No families match your filters.{' '}
-          {canManage ? (
+          {canAdd ? (
             <button type="button" className="text-primary underline" onClick={openCreate}>
               Add a family
             </button>
@@ -236,7 +286,7 @@ export function FamiliesPanel({ canManage, members: _members }: FamiliesPanelPro
         />
       ) : null}
 
-      {showEditor && canManage ? (
+      {showEditor && canAdd ? (
         <LazyFamilyEditorDialog
           familyId={editFamilyId}
           onClose={() => {

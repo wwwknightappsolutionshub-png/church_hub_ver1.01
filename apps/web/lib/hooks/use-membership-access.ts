@@ -1,6 +1,7 @@
 'use client';
 
 import { useApiQuery } from '@/lib/hooks/use-api-query';
+import { isChurchLeadershipRole, isLeaderRole } from '@/lib/session-role';
 
 export interface AuthMeResponse {
   user: {
@@ -28,6 +29,8 @@ export interface AuthMeResponse {
   canAccessMyProfile?: boolean;
   memberRoles: string[];
   canManageMembers: boolean;
+  canViewMembershipDirectory?: boolean;
+  canAddCongregants?: boolean;
   isMemberAdmin: boolean;
 }
 
@@ -38,11 +41,21 @@ export function useMembershipAccess() {
     { staleTime: 60_000 },
   );
 
+  const userRoles = data?.user?.userRoles ?? [];
+  const canManageMembers = data?.canManageMembers ?? false;
+  const canViewMembershipDirectory =
+    data?.canViewMembershipDirectory ?? isChurchLeadershipRole(userRoles);
+  const canAddCongregants =
+    data?.canAddCongregants ??
+    (Boolean(data?.user) || canManageMembers || isLeaderRole(userRoles) || canViewMembershipDirectory);
+
   return {
     isLoading,
-    canManageMembers: data?.canManageMembers ?? false,
+    canManageMembers,
+    canViewMembershipDirectory,
+    canAddCongregants,
     isMemberAdmin: data?.isMemberAdmin ?? false,
-    userRoles: data?.user?.userRoles ?? [],
+    userRoles,
     member: data?.member ?? null,
   };
 }

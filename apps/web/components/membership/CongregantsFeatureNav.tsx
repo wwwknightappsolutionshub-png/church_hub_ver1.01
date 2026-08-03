@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { FileText, Home, Mail, MapPin, Users } from 'lucide-react';
 import { CONGREGANTS_PRIMARY_NAV, CONGREGANTS_ROUTES } from '@/lib/membership/routes';
+import { useMembershipAccess } from '@/lib/hooks/use-membership-access';
 import { cn } from '@/lib/utils';
 
 const NAV_ICONS = {
@@ -14,6 +15,12 @@ const NAV_ICONS = {
   [CONGREGANTS_ROUTES.reports]: FileText,
 } as const;
 
+const DIRECTORY_HREFS = new Set<string>([
+  CONGREGANTS_ROUTES.members,
+  CONGREGANTS_ROUTES.families,
+  CONGREGANTS_ROUTES.familyMap,
+]);
+
 function isActive(pathname: string, href: string) {
   if (href === CONGREGANTS_ROUTES.overview) return pathname === href;
   const base = href.split('?')[0];
@@ -22,7 +29,11 @@ function isActive(pathname: string, href: string) {
 
 export function CongregantsFeatureNav() {
   const pathname = usePathname();
+  const { canViewMembershipDirectory } = useMembershipAccess();
   const onOverview = pathname === CONGREGANTS_ROUTES.overview;
+  const navItems = CONGREGANTS_PRIMARY_NAV.filter(
+    ({ href }) => canViewMembershipDirectory || !DIRECTORY_HREFS.has(href),
+  );
 
   return (
     <nav
@@ -44,7 +55,7 @@ export function CongregantsFeatureNav() {
         >
           Overview
         </Link>
-        {CONGREGANTS_PRIMARY_NAV.map(({ href, label, testId }) => {
+        {navItems.map(({ href, label, testId }) => {
           const Icon = NAV_ICONS[href as keyof typeof NAV_ICONS];
           const active = isActive(pathname, href);
           return (

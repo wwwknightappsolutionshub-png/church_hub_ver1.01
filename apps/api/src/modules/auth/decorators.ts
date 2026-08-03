@@ -16,6 +16,10 @@ export const RequirePlatformPermission = (
 export const MEMBER_ADMIN_KEY = 'memberAdmin';
 export const MemberAdmin = () => SetMetadata(MEMBER_ADMIN_KEY, true);
 
+/** Allows creating congregants/families: member-admins plus LEADER (add-only; no directory list). */
+export const MEMBER_CREATE_KEY = 'memberCreate';
+export const MemberCreate = () => SetMetadata(MEMBER_CREATE_KEY, true);
+
 /** Requires follow-up module access (staff, unit membership, or discipleship roles). */
 export const FOLLOW_UP_ACCESS_KEY = 'followUpAccess';
 export const FollowUpAccess = () => SetMetadata(FOLLOW_UP_ACCESS_KEY, true);

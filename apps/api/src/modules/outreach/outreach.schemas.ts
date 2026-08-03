@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import {
-  optionalEmailSchema,
-  optionalPhoneSchema,
+  emailSchema,
   optionalUkPostcodeSchema,
+  phoneSchema,
   PublicOutreachRegisterSchema,
   sanitizeText,
 } from '@church-hub/shared-types';
@@ -19,8 +19,8 @@ export const outreachCaptureSchema = z.object({
       return s || undefined;
     })
     .optional(),
-  phone: optionalPhoneSchema,
-  email: optionalEmailSchema,
+  phone: phoneSchema,
+  email: emailSchema,
   evangelistId: z.string().uuid().optional(),
   qrCodeId: z.string().uuid().optional(),
   latitude: z.number().min(-90).max(90).optional(),

@@ -16,6 +16,7 @@ import {
   LazyMemberOnboardingWizard,
 } from '@/lib/membership-lazy';
 import { invalidateMembershipQueries } from '@/lib/membership/invalidate-membership';
+import { CONGREGANTS_ROUTES } from '@/lib/membership/routes';
 import { DashboardPageSkeleton } from '@/components/dashboard/DashboardPageSkeleton';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useMembershipAccess } from '@/lib/hooks/use-membership-access';
@@ -76,7 +77,12 @@ function membershipErrorMessage(err: AxiosError | null): string {
 export function CongregantsMembersView() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { canManageMembers } = useMembershipAccess();
+  const {
+    canManageMembers,
+    canViewMembershipDirectory,
+    canAddCongregants,
+    isLoading: accessLoading,
+  } = useMembershipAccess();
   const searchParams = useSearchParams();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | undefined>(
@@ -90,6 +96,7 @@ export function CongregantsMembersView() {
   const [editCongregantId, setEditCongregantId] = useState<string | null>(null);
   const [wizardMemberId, setWizardMemberId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const addOnly = !canViewMembershipDirectory && canAddCongregants;
 
   useEffect(() => {
     setPage(1);
@@ -111,6 +118,7 @@ export function CongregantsMembersView() {
   } = useApiQuery<PaginatedMembersDto<MemberListItem> | MemberListItem[]>(
     ['membership-members', String(page), String(pageSize), search, statusFilter ?? '', roleFilter ?? ''],
     membersUrl,
+    { enabled: canViewMembershipDirectory },
   );
   const paginated = normalizeMembersListResponse(rawPaginated) as PaginatedMembersDto<MemberListItem>;
   const members = (paginated.items ?? []).map((m) => ({
@@ -122,12 +130,16 @@ export function CongregantsMembersView() {
   const total = paginated.total ?? 0;
   const totalPages = paginated.totalPages ?? 0;
 
-  const { data: catalog } = useApiQuery<Catalog>(['membership-catalog'], '/membership/catalog');
-  const { data: families } = useApiQuery<Family[]>(['membership-families'], '/membership/families');
+  const { data: catalog } = useApiQuery<Catalog>(['membership-catalog'], '/membership/catalog', {
+    enabled: canViewMembershipDirectory || canAddCongregants,
+  });
+  const { data: families } = useApiQuery<Family[]>(['membership-families'], '/membership/families', {
+    enabled: canViewMembershipDirectory,
+  });
   const { data: selectedMember } = useApiQuery<MemberDetail>(
     ['membership-member', selectedId ?? ''],
     `/membership/members/${selectedId}`,
-    { enabled: !!selectedId },
+    { enabled: !!selectedId && canViewMembershipDirectory },
   );
 
   const ministryOptions = catalog?.ministryInterests ?? [];
@@ -151,12 +163,32 @@ export function CongregantsMembersView() {
   };
 
   useEffect(() => {
-    if (searchParams.get('add') === '1') {
+    if (accessLoading) return;
+    if (!canViewMembershipDirectory && !canAddCongregants) {
+      router.replace(CONGREGANTS_ROUTES.overview);
+      return;
+    }
+    if (addOnly) {
       window.scrollTo(0, 0);
       openCongregantEditor();
-      router.replace('/dashboard/membership/members');
+      if (searchParams.get('add') === '1') {
+        router.replace(CONGREGANTS_ROUTES.members);
+      }
+      return;
     }
-  }, [searchParams, router]);
+    if (searchParams.get('add') === '1' && canAddCongregants) {
+      window.scrollTo(0, 0);
+      openCongregantEditor();
+      router.replace(CONGREGANTS_ROUTES.members);
+    }
+  }, [
+    searchParams,
+    router,
+    accessLoading,
+    canViewMembershipDirectory,
+    canAddCongregants,
+    addOnly,
+  ]);
 
   const handleMemberClick = (id: string) => {
     const m = members.find((x) => x.id === id);
@@ -170,6 +202,43 @@ export function CongregantsMembersView() {
   const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const rangeEnd = Math.min(page * pageSize, total);
 
+  if (accessLoading) {
+    return <DashboardPageSkeleton cards={3} />;
+  }
+
+  if (addOnly) {
+    return (
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Add Congregant</h2>
+          <p className="text-sm text-muted-foreground">
+            Submit a new congregant. Member directories are visible to Church Admin and Pastor only.
+          </p>
+        </div>
+        {showCongregantEditor && canAddCongregants ? (
+          <LazyCongregantEditorForm
+            memberId={null}
+            families={[]}
+            onClose={() => {
+              setShowCongregantEditor(false);
+              router.push(CONGREGANTS_ROUTES.overview);
+            }}
+            onSaved={() => {
+              invalidateMembership();
+              setShowCongregantEditor(false);
+              router.push(CONGREGANTS_ROUTES.overview);
+            }}
+          />
+        ) : (
+          <Button size="sm" className="shadow-brand" onClick={() => openCongregantEditor()}>
+            <UserPlus className="mr-1.5 h-4 w-4" />
+            Add New Congregant
+          </Button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -177,7 +246,7 @@ export function CongregantsMembersView() {
           <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Members</h2>
           <p className="text-sm text-muted-foreground">Search, filter, and manage congregant records.</p>
         </div>
-        {canManageMembers ? (
+        {canAddCongregants ? (
           <Button size="sm" className="shadow-brand" onClick={() => openCongregantEditor()} data-testid="quick-add-congregant">
             <UserPlus className="mr-1.5 h-4 w-4" />
             Add New Congregant
@@ -303,7 +372,7 @@ export function CongregantsMembersView() {
         {members.length === 0 && !isLoading && (
           <p className="p-8 text-center text-sm text-muted-foreground">
             No members match your filters.{' '}
-            {canManageMembers && (
+            {canAddCongregants && (
               <button type="button" className="text-primary underline" onClick={() => openCongregantEditor()}>
                 Add congregant
               </button>
@@ -375,7 +444,7 @@ export function CongregantsMembersView() {
         />
       )}
 
-      {showCongregantEditor && canManageMembers && (
+      {showCongregantEditor && canAddCongregants && (
         <LazyCongregantEditorForm
           memberId={editCongregantId}
           families={(families ?? []).map((f) => ({ id: f.id, name: f.name }))}

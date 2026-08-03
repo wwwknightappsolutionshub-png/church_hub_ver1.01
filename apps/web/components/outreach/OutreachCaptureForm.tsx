@@ -308,12 +308,13 @@ function OutreachCaptureFormInner({
           data-form-type="other"
         />
         <Input
-          placeholder="UK phone (e.g. 07123 456789)"
+          placeholder="UK phone (e.g. 07123 456789) *"
           {...register('phone', {
             onChange: (e) => {
               e.target.value = filterPhoneTyping(e.target.value);
             },
           })}
+          required
           autoComplete="off"
           inputMode="tel"
           type="tel"
@@ -329,10 +330,11 @@ function OutreachCaptureFormInner({
           <p className="sm:col-span-2 -mt-2 text-xs text-destructive">{String(errors.phone.message)}</p>
         ) : null}
         <Input
-          placeholder="Email"
+          placeholder="Email *"
           type="email"
           inputMode="email"
           {...register('email')}
+          required
           autoComplete="off"
           readOnly
           onFocus={unlockAutofill}

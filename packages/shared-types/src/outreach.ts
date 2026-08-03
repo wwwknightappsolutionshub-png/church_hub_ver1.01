@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import {
+  emailSchema,
   optionalEmailSchema,
   optionalPhoneSchema,
   optionalUkPostcodeSchema,
   personNameSchema,
+  phoneSchema,
   sanitizeText,
 } from './validation';
 
@@ -16,8 +18,8 @@ export const OutreachCaptureSchema = z.object({
       return s || undefined;
     })
     .optional(),
-  phone: optionalPhoneSchema,
-  email: optionalEmailSchema,
+  phone: phoneSchema,
+  email: emailSchema,
   evangelistId: z.string().uuid().optional(),
   qrCodeId: z.string().uuid().optional(),
   latitude: z.number().min(-90).max(90).optional(),

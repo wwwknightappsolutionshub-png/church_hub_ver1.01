@@ -12,7 +12,7 @@ import { MembershipAnalyticsService } from './membership-analytics.service';
 import { MembershipCelebrationsService } from './membership-celebrations.service';
 import { MembershipFamilyMapService } from './membership-family-map.service';
 import { AuthUser, ChurchId, CurrentUser } from '../auth/current-user.decorator';
-import { MemberAdmin, Roles } from '../auth/decorators';
+import { MemberAdmin, MemberCreate, Roles } from '../auth/decorators';
 
 @ApiTags('membership')
 @ApiBearerAuth()
@@ -41,8 +41,8 @@ export class MembershipController {
   }
 
   @Get('members')
-  @Roles('ADMIN', 'PASTOR', 'LEADER')
-  @ApiOperation({ summary: 'List church members' })
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({ summary: 'List church members (Church Admin / Pastor only)' })
   listMembers(
     @ChurchId() churchId: string,
     @Query('status') status?: MemberStatus,
@@ -66,13 +66,13 @@ export class MembershipController {
   }
 
   @Get('members/:id')
-  @Roles('ADMIN', 'PASTOR', 'LEADER')
+  @Roles('ADMIN', 'PASTOR')
   getMember(@ChurchId() churchId: string, @Param('id') id: string) {
     return this.membershipService.getMember(churchId, id);
   }
 
   @Post('members')
-  @MemberAdmin()
+  @MemberCreate()
   createMember(@ChurchId() churchId: string, @Body() body: Record<string, unknown>) {
     return this.membershipService.createMember(
       churchId,
@@ -156,6 +156,8 @@ export class MembershipController {
   }
 
   @Get('families')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({ summary: 'List families (Church Admin / Pastor only)' })
   listFamilies(
     @ChurchId() churchId: string,
     @Query('search') search?: string,
@@ -165,7 +167,7 @@ export class MembershipController {
   }
 
   @Post('families')
-  @MemberAdmin()
+  @MemberCreate()
   createFamily(
     @ChurchId() churchId: string,
     @Body()
@@ -514,8 +516,8 @@ export class MembershipController {
   }
 
   @Get('family-map')
-  @Roles('ADMIN', 'PASTOR', 'LEADER')
-  @ApiOperation({ summary: 'Geocoded family locations by post code for map display' })
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({ summary: 'Geocoded family locations (Church Admin / Pastor only)' })
   getFamilyMap(@ChurchId() churchId: string) {
     return this.membershipFamilyMap.getFamilyMapPins(churchId);
   }

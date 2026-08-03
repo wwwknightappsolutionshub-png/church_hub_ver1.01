@@ -41,9 +41,15 @@ interface VoiceNotesFieldProps {
   value: string;
   onChange: (text: string) => void;
   className?: string;
+  placeholder?: string;
 }
 
-export function VoiceNotesField({ value, onChange, className }: VoiceNotesFieldProps) {
+export function VoiceNotesField({
+  value,
+  onChange,
+  className,
+  placeholder = 'Prayer requests or any other special notes from your conversation with the first timer',
+}: VoiceNotesFieldProps) {
   const [listening, setListening] = useState(false);
   const [supported, setSupported] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
@@ -101,7 +107,7 @@ export function VoiceNotesField({ value, onChange, className }: VoiceNotesFieldP
     <div className={cn('space-y-2', className)}>
       <textarea
         className="min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-        placeholder="Notes from conversation (type or use voice)…"
+        placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />

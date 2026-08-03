@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { MembershipAccessService } from '../membership/membership-access.service';
-import { MEMBER_ADMIN_KEY } from './decorators';
+import { MEMBER_ADMIN_KEY, MEMBER_CREATE_KEY } from './decorators';
 
 @Injectable()
 export class MemberAdminGuard implements CanActivate {
@@ -20,13 +20,30 @@ export class MemberAdminGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
+    const requiresMemberCreate = this.reflector.getAllAndOverride<boolean>(MEMBER_CREATE_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
 
-    if (!requiresMemberAdmin) return true;
+    if (!requiresMemberAdmin && !requiresMemberCreate) return true;
 
     const request = context.switchToHttp().getRequest();
     const user = request.user;
     if (!user?.userId || !user?.churchId) {
       throw new ForbiddenException('Authentication required');
+    }
+
+    if (requiresMemberCreate) {
+      const canCreate = await this.membershipAccess.canCreateMembers(
+        user.userId,
+        user.churchId,
+      );
+      if (!canCreate) {
+        throw new ForbiddenException(
+          'Adding congregants requires an active church account',
+        );
+      }
+      return true;
     }
 
     const allowed = await this.membershipAccess.canManageMembers(

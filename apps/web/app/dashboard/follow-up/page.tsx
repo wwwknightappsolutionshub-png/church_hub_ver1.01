@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import type { AxiosError } from 'axios';
@@ -25,11 +25,10 @@ import {
 import { FollowUpTable } from '@/components/follow-up/FollowUpTable';
 import { FollowUpDetailPanel } from '@/components/follow-up/FollowUpDetailPanel';
 import { FollowUpNewLeadSheet } from '@/components/follow-up/FollowUpNewLeadSheet';
-import { FollowUpMembersPanel } from '@/components/follow-up/FollowUpMembersPanel';
 import { FollowUpAutomationPanel } from '@/components/follow-up/FollowUpAutomationPanel';
 import { useMembershipAccess } from '@/lib/hooks/use-membership-access';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
-import { canArchiveFollowUp, canExportOutreachDirectory } from '@/lib/session-role';
+import { canArchiveFollowUp, canExportOutreachDirectory, isChurchLeadershipRole } from '@/lib/session-role';
 import { FollowUpCalendar } from '@/components/follow-up/FollowUpCalendar';
 import { FollowUpArchivedTable } from '@/components/follow-up/FollowUpArchivedTable';
 import { ModuleGate } from '@/components/app/ModuleGate';
@@ -97,7 +96,7 @@ function FollowUpPageContent() {
   const canExport = canExportOutreachDirectory(userRoles);
   const canArchive = canArchiveFollowUp(userRoles);
   const canRequestArchive = !canArchive;
-  const [view, setView] = useState<'pipeline' | 'table' | 'calendar' | 'archived' | 'members'>(
+  const [view, setView] = useState<'pipeline' | 'table' | 'calendar' | 'archived'>(
     'pipeline',
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -109,6 +108,28 @@ function FollowUpPageContent() {
   const [search, setSearch] = useState('');
   const [exportOpen, setExportOpen] = useState(false);
   const [archiveBusy, setArchiveBusy] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!exportOpen) return;
+    const onPointerDown = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node | null;
+      if (target && !exportMenuRef.current?.contains(target)) {
+        setExportOpen(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setExportOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('touchstart', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('touchstart', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [exportOpen]);
 
   const listUrl = assigneeFilter
     ? `/follow-up?assignedToId=${encodeURIComponent(assigneeFilter)}`
@@ -128,7 +149,10 @@ function FollowUpPageContent() {
   const { data: templates } = useApiQuery<Template[]>(['follow-up-templates'], '/follow-up/templates');
   const { data: churchMembers } = useApiQuery<
     Array<{ id: string; firstName: string; lastName: string }>
-  >(['membership-members-list'], '/membership/members', { retry: false });
+  >(['membership-members-list'], '/membership/members', {
+    retry: false,
+    enabled: isChurchLeadershipRole(userRoles),
+  });
 
   const { data: selectedDetail } = useApiQuery<
     FollowUpCard & { reminders: FollowUpCard['reminders'] }
@@ -292,22 +316,23 @@ function FollowUpPageContent() {
                 ? `Archived (${stats.archived})`
                 : 'Archived Leads',
           },
-          { id: 'members', label: 'Members' },
         ]}
         active={view}
         onChange={(id) => {
           setExportOpen(false);
-          setView(id as 'pipeline' | 'table' | 'calendar' | 'archived' | 'members');
+          setView(id as 'pipeline' | 'table' | 'calendar' | 'archived');
         }}
         actions={
           <>
             {view === 'table' && canExport ? (
-              <div className="relative">
+              <div className="relative" ref={exportMenuRef}>
                 <Button
                   size="sm"
                   variant="outline"
                   type="button"
                   className="h-9 whitespace-nowrap"
+                  aria-expanded={exportOpen}
+                  aria-haspopup="menu"
                   onClick={() => setExportOpen((o) => !o)}
                   disabled={filteredItems.length === 0}
                 >
@@ -315,11 +340,15 @@ function FollowUpPageContent() {
                   Export PDF
                 </Button>
                 {exportOpen ? (
-                  <div className="absolute right-0 z-30 mt-1 w-64 rounded-lg border border-border bg-card p-1 shadow-lg">
+                  <div
+                    role="menu"
+                    className="absolute right-0 z-30 mt-1 w-64 rounded-lg border border-border bg-card p-1 shadow-lg"
+                  >
                     {FOLLOW_UP_EXPORT_OPTIONS.map((opt) => (
                       <button
                         key={opt.label}
                         type="button"
+                        role="menuitem"
                         className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
                         onClick={() => runExport(opt.scope)}
                       >
@@ -344,7 +373,7 @@ function FollowUpPageContent() {
       />
 
       <EnterpriseContent className="max-w-[1600px]">
-        {view !== 'calendar' && view !== 'archived' && view !== 'members' && (
+        {view !== 'calendar' && view !== 'archived' && (
         <div className="mb-6 flex flex-wrap items-center gap-3">
           <div className="relative min-w-[200px] flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -404,20 +433,20 @@ function FollowUpPageContent() {
         </div>
         )}
 
-        {view !== 'calendar' && view !== 'archived' && view !== 'members' && isLoading && (
+        {view !== 'calendar' && view !== 'archived' && isLoading && (
           <div className="flex flex-col items-center justify-center gap-3 py-24">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
             <p className="text-sm text-muted-foreground">Loading pipeline…</p>
           </div>
         )}
 
-        {view !== 'calendar' && view !== 'archived' && view !== 'members' && isError && !isLoading && (
+        {view !== 'calendar' && view !== 'archived' && isError && !isLoading && (
           <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
             {followUpErrorMessage(error)}
           </div>
         )}
 
-        {!isLoading && !isError && filteredItems.length === 0 && (data?.length ?? 0) > 0 && view !== 'calendar' && view !== 'archived' && view !== 'members' && (
+        {!isLoading && !isError && filteredItems.length === 0 && (data?.length ?? 0) > 0 && view !== 'calendar' && view !== 'archived' && (
           <p className="mb-4 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
             No matches for the current search or filters. Clear search, stage, or date to see more
             people.
@@ -440,8 +469,6 @@ function FollowUpPageContent() {
             </div>
           </div>
         )}
-
-        {view === 'members' && <FollowUpMembersPanel canManageMembers={canManageMembers} />}
 
         {view === 'calendar' && (
           <FollowUpCalendar selectedId={selectedId} onSelect={setSelectedId} />

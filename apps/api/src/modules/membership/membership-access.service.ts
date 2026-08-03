@@ -37,6 +37,26 @@ export class MembershipAccessService {
     return user.member?.roles.includes('ADMIN') ?? false;
   }
 
+  /** Directory list/detail visibility — Church Admin or Pastor UserRole only. */
+  async canViewMembershipDirectory(userId: string, churchId: string): Promise<boolean> {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, churchId, isActive: true },
+      include: { roles: { include: { role: { select: { name: true } } } } },
+    });
+    if (!user) return false;
+    const names = user.roles.map((r) => r.role.name);
+    return names.some((n) => CHURCH_STAFF_ROLES.includes(n as (typeof CHURCH_STAFF_ROLES)[number]));
+  }
+
+  /** Add congregant/family: any active church user (directories remain Admin/Pastor-only). */
+  async canCreateMembers(userId: string, churchId: string): Promise<boolean> {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, churchId, isActive: true },
+      select: { id: true },
+    });
+    return Boolean(user);
+  }
+
   async getChurchSummary(churchId: string | null) {
     if (!churchId) return null;
     return this.prisma.church.findUnique({
@@ -82,6 +102,8 @@ export class MembershipAccessService {
         member: null,
         memberRoles: [] as string[],
         canManageMembers: false,
+        canViewMembershipDirectory: false,
+        canAddCongregants: false,
         isMemberAdmin: false,
       };
     }
@@ -117,6 +139,8 @@ export class MembershipAccessService {
         member: null,
         memberRoles: [] as string[],
         canManageMembers: false,
+        canViewMembershipDirectory: false,
+        canAddCongregants: false,
         isMemberAdmin: false,
       };
     }
@@ -152,6 +176,12 @@ export class MembershipAccessService {
     const canManageMembers = user
       ? await this.canManageMembers(userId, churchId)
       : false;
+    const canViewMembershipDirectory = user
+      ? await this.canViewMembershipDirectory(userId, churchId)
+      : false;
+    const canAddCongregants = user
+      ? await this.canCreateMembers(userId, churchId)
+      : false;
 
     return {
       user: user
@@ -169,6 +199,8 @@ export class MembershipAccessService {
       member: user?.member ?? null,
       memberRoles,
       canManageMembers,
+      canViewMembershipDirectory,
+      canAddCongregants,
       isMemberAdmin: memberRoles.includes('ADMIN'),
     };
   }
