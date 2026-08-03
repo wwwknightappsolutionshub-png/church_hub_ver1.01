@@ -9,7 +9,6 @@ import {
   Loader2,
   Mail,
   MessageSquare,
-  Search,
   Send,
   X,
 } from 'lucide-react';
@@ -184,10 +183,22 @@ const KIND_OPTIONS: Array<{ value: TriageKind; label: string }> = [
   { value: 'message', label: 'In-app messages' },
 ];
 
-function matchesSearch(text: string, query: string) {
-  if (!query.trim()) return true;
-  return text.toLowerCase().includes(query.trim().toLowerCase());
-}
+/** Left-rail + overview cards (no “All types”). */
+const SOURCE_OPTIONS = KIND_OPTIONS.filter(
+  (o): o is { value: Exclude<TriageKind, 'all'>; label: string } => o.value !== 'all',
+);
+
+const SOURCE_CARD_CLASS: Record<Exclude<TriageKind, 'all'>, string> = {
+  department: 'border-sky-200 bg-sky-100 text-sky-950 hover:bg-sky-200/80 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-50',
+  weekly: 'border-indigo-200 bg-indigo-100 text-indigo-950 hover:bg-indigo-200/80 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-50',
+  meeting: 'border-violet-200 bg-violet-100 text-violet-950 hover:bg-violet-200/80 dark:border-violet-800 dark:bg-violet-950/50 dark:text-violet-50',
+  rtp: 'border-orange-200 bg-orange-100 text-orange-950 hover:bg-orange-200/80 dark:border-orange-800 dark:bg-orange-950/50 dark:text-orange-50',
+  cell: 'border-emerald-200 bg-emerald-100 text-emerald-950 hover:bg-emerald-200/80 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-50',
+  unit: 'border-teal-200 bg-teal-100 text-teal-950 hover:bg-teal-200/80 dark:border-teal-800 dark:bg-teal-950/50 dark:text-teal-50',
+  queue: 'border-rose-200 bg-rose-100 text-rose-950 hover:bg-rose-200/80 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-50',
+  notification: 'border-amber-200 bg-amber-100 text-amber-950 hover:bg-amber-200/80 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-50',
+  message: 'border-slate-200 bg-slate-100 text-slate-950 hover:bg-slate-200/80 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-50',
+};
 
 function formatWeekLabel(iso: string) {
   const start = new Date(iso);
@@ -793,10 +804,11 @@ export function ReportsInboxPanel({
   const [digestBusy, setDigestBusy] = useState<'dept' | 'cell' | null>(null);
   const [digestMenuOpen, setDigestMenuOpen] = useState(false);
   const digestMenuRef = useRef<HTMLDivElement>(null);
-  const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | QueueStatus>('all');
   const [kindFilter, setKindFilter] = useState<TriageKind>('all');
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyLevel | 'all'>('all');
+  const [replyOpen, setReplyOpen] = useState(false);
+  const isOverview = kindFilter === 'all';
 
   useEffect(() => {
     if (!digestMenuOpen) return;
@@ -869,35 +881,29 @@ export function ReportsInboxPanel({
       recipientId: target.userId,
       subject: target.subject,
     }));
-    document.getElementById(replyFormId)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    setReplyOpen(true);
+    requestAnimationFrame(() => {
+      document.getElementById(replyFormId)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
   };
 
   const deptReports = useMemo(() => {
     if (kindFilter !== 'all' && kindFilter !== 'department') return [];
     if (urgencyFilter !== 'all' && urgencyFilter !== 'medium') return [];
-    return (data?.reports.department ?? []).filter((r) => {
-      const blob = `${r.title} ${r.body} ${r.serviceUnit.name} ${r.author.firstName} ${r.author.lastName}`;
-      return matchesSearch(blob, search);
-    });
-  }, [data, kindFilter, search, urgencyFilter]);
+    return data?.reports.department ?? [];
+  }, [data, kindFilter, urgencyFilter]);
 
   const weeklyReports = useMemo(() => {
     if (kindFilter !== 'all' && kindFilter !== 'weekly') return [];
     if (urgencyFilter !== 'all' && urgencyFilter !== 'info') return [];
-    return (data?.reports.weekly ?? []).filter((r) => {
-      const blob = `${r.body} ${r.serviceUnit.name}`;
-      return matchesSearch(blob, search);
-    });
-  }, [data, kindFilter, search, urgencyFilter]);
+    return data?.reports.weekly ?? [];
+  }, [data, kindFilter, urgencyFilter]);
 
   const cellAttendanceAll = useMemo(() => {
     if (kindFilter !== 'all' && kindFilter !== 'cell') return [];
     if (urgencyFilter !== 'all' && urgencyFilter !== 'low') return [];
-    return (data?.reports.cellAttendance ?? []).filter((r) => {
-      const blob = `${r.branchName} ${r.location ?? ''} ${r.presentCount} ${r.maleCount} ${r.femaleCount} ${r.boysCount} ${r.girlsCount} ${r.firstTimersCount}`;
-      return matchesSearch(blob, search);
-    });
-  }, [data, kindFilter, search, urgencyFilter]);
+    return data?.reports.cellAttendance ?? [];
+  }, [data, kindFilter, urgencyFilter]);
 
   const cellAttendanceReports = useMemo(
     () =>
@@ -912,11 +918,8 @@ export function ReportsInboxPanel({
   const unitAttendanceAll = useMemo(() => {
     if (kindFilter !== 'all' && kindFilter !== 'unit') return [];
     if (urgencyFilter !== 'all' && urgencyFilter !== 'low') return [];
-    return (data?.reports.unitAttendance ?? []).filter((r) => {
-      const blob = `${r.serviceUnitName} ${r.departmentCode ?? ''} ${r.presentCount} ${r.maleCount} ${r.femaleCount} ${r.firstTimersCount}`;
-      return matchesSearch(blob, search);
-    });
-  }, [data, kindFilter, search, urgencyFilter]);
+    return data?.reports.unitAttendance ?? [];
+  }, [data, kindFilter, urgencyFilter]);
 
   const unitAttendanceReports = useMemo(
     () =>
@@ -931,51 +934,38 @@ export function ReportsInboxPanel({
   const meetingSummaries = useMemo(() => {
     if (kindFilter !== 'all' && kindFilter !== 'meeting') return [];
     if (urgencyFilter !== 'all' && urgencyFilter !== 'medium') return [];
-    return (data?.reports.meetingSummaries ?? []).filter((r) => {
-      const blob = `${r.title} ${r.body} ${r.serviceUnit.name} ${r.author.firstName} ${r.author.lastName}`;
-      return matchesSearch(blob, search);
-    });
-  }, [data, kindFilter, search, urgencyFilter]);
+    return data?.reports.meetingSummaries ?? [];
+  }, [data, kindFilter, urgencyFilter]);
 
   const rtpRequests = useMemo(() => {
     if (kindFilter !== 'all' && kindFilter !== 'rtp') return [];
     return (data?.reports.rtpRequests ?? []).filter((r) => {
       const urgency =
         r.status === 'SUBMITTED' ? 'high' : r.status === 'PROCESSING' ? 'medium' : 'info';
-      if (urgencyFilter !== 'all' && urgencyFilter !== urgency) return false;
-      const values = Object.values(r.fieldValues ?? {}).join(' ');
-      const blob = `${r.title} ${r.status} ${r.serviceUnit.name} ${r.submittedBy.firstName} ${r.submittedBy.lastName} ${values}`;
-      return matchesSearch(blob, search);
+      return urgencyFilter === 'all' || urgencyFilter === urgency;
     });
-  }, [data, kindFilter, search, urgencyFilter]);
+  }, [data, kindFilter, urgencyFilter]);
 
   const queueItems = useMemo(() => {
     if (kindFilter !== 'all' && kindFilter !== 'queue') return [];
     return (data?.queue ?? []).filter((q) => {
       if (statusFilter !== 'all' && q.status !== statusFilter) return false;
       if (urgencyFilter !== 'all' && queueUrgency(q.status) !== urgencyFilter) return false;
-      const blob = `${q.title} ${q.body} ${q.kind} ${q.status} ${q.serviceUnit?.name ?? ''}`;
-      return matchesSearch(blob, search);
+      return true;
     });
-  }, [data, kindFilter, search, statusFilter, urgencyFilter]);
+  }, [data, kindFilter, statusFilter, urgencyFilter]);
 
   const notifications = useMemo(() => {
     if (kindFilter !== 'all' && kindFilter !== 'notification') return [];
     if (urgencyFilter !== 'all' && urgencyFilter !== 'info') return [];
-    return (data?.notifications ?? []).filter((n) => {
-      const blob = `${n.title} ${n.body} ${n.type}`;
-      return matchesSearch(blob, search);
-    });
-  }, [data, kindFilter, search, urgencyFilter]);
+    return data?.notifications ?? [];
+  }, [data, kindFilter, urgencyFilter]);
 
   const messages = useMemo(() => {
     if (kindFilter !== 'all' && kindFilter !== 'message') return [];
     if (urgencyFilter !== 'all' && urgencyFilter !== 'info') return [];
-    return (data?.messages ?? []).filter((m) => {
-      const blob = `${m.subject ?? ''} ${m.body} ${m.sender.firstName} ${m.sender.lastName} ${m.recipient.firstName} ${m.recipient.lastName}`;
-      return matchesSearch(blob, search);
-    });
-  }, [data, kindFilter, search, urgencyFilter]);
+    return data?.messages ?? [];
+  }, [data, kindFilter, urgencyFilter]);
 
   const triageCount =
     deptReports.length +
@@ -1085,16 +1075,14 @@ export function ReportsInboxPanel({
     (data?.reports.unitAttendance?.length ?? 0);
   const criticalNeeds = urgencyCounts.critical + urgencyCounts.high;
 
-  /** Right pane shows only sources selected on the left rail (plus urgency match). */
-  const showSource = (kind: Exclude<TriageKind, 'all'>, count: number) => {
-    if (kindFilter !== 'all' && kindFilter !== kind) return false;
-    if (kindFilter === kind) return true;
-    if (urgencyFilter !== 'all') return count > 0;
-    return true;
+  /** Right pane lists a source only when that source is selected (not on overview). */
+  const showSource = (kind: Exclude<TriageKind, 'all'>, _count: number) => {
+    return kindFilter === kind;
   };
 
-  const selectedSourceLabel =
-    KIND_OPTIONS.find((o) => o.value === kindFilter)?.label ?? 'All types';
+  const selectedSourceLabel = isOverview
+    ? 'Sources overview'
+    : (SOURCE_OPTIONS.find((o) => o.value === kindFilter)?.label ?? 'Source');
   const selectedUrgencyLabel =
     urgencyFilter === 'all' ? 'All priorities' : URGENCY_META[urgencyFilter].label;
 
@@ -1213,10 +1201,13 @@ export function ReportsInboxPanel({
               <div className="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
                 <button
                   type="button"
-                  onClick={() => setUrgencyFilter('all')}
+                  onClick={() => {
+                    setUrgencyFilter('all');
+                    setKindFilter('all');
+                  }}
                   className={cn(
                     'flex shrink-0 items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left text-sm transition lg:w-full',
-                    urgencyFilter === 'all'
+                    urgencyFilter === 'all' && isOverview
                       ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
                       : 'text-slate-700 hover:bg-slate-200/80 dark:text-slate-300 dark:hover:bg-slate-800',
                   )}
@@ -1251,7 +1242,7 @@ export function ReportsInboxPanel({
                 Sources
               </p>
               <div className="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
-                {KIND_OPTIONS.map((o) => (
+                {SOURCE_OPTIONS.map((o) => (
                   <button
                     key={o.value}
                     type="button"
@@ -1265,7 +1256,7 @@ export function ReportsInboxPanel({
                   >
                     <span className="truncate">{o.label}</span>
                     <span className="tabular-nums text-xs opacity-70">
-                      {sourceCounts[o.value as keyof typeof sourceCounts] ?? 0}
+                      {sourceCounts[o.value] ?? 0}
                     </span>
                   </button>
                 ))}
@@ -1277,23 +1268,8 @@ export function ReportsInboxPanel({
         {/* Working surface */}
         <div className="min-w-0 flex-1 space-y-4 p-4 md:p-5">
           <div className="sticky top-[calc(3rem+env(safe-area-inset-top))] z-10 -mx-4 border-b border-border bg-background/95 px-4 py-3 backdrop-blur md:-mx-5 md:px-5 xl:top-16">
-            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-              <div className="min-w-[200px] flex-1 space-y-1">
-                <Label htmlFor={`${replyFormId}-search`} className="text-xs text-muted-foreground">
-                  Search
-                </Label>
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id={`${replyFormId}-search`}
-                    className="pl-8"
-                    placeholder="Title, department, sender, body..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </div>
-              </div>
-              {kindFilter === 'all' || kindFilter === 'queue' ? (
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+              {kindFilter === 'queue' ? (
                 <div className="space-y-1">
                   <Label htmlFor={`${replyFormId}-status`} className="text-xs text-muted-foreground">
                     Queue status
@@ -1311,14 +1287,29 @@ export function ReportsInboxPanel({
                     ))}
                   </select>
                 </div>
-              ) : null}
-              <div className="pb-2 sm:ml-auto sm:text-right">
+              ) : (
+                <div />
+              )}
+              <div className="sm:text-right">
                 <p className="text-xs font-medium text-foreground">
                   {selectedUrgencyLabel} · {selectedSourceLabel}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {isLoading ? 'Loading…' : `${triageCount} item${triageCount === 1 ? '' : 's'} match`}
+                  {isLoading
+                    ? 'Loading…'
+                    : isOverview
+                      ? `${sourceCounts.all} update${sourceCounts.all === 1 ? '' : 's'} across sources`
+                      : `${triageCount} item${triageCount === 1 ? '' : 's'} match`}
                 </p>
+                {!isOverview ? (
+                  <button
+                    type="button"
+                    className="mt-1 text-xs font-medium text-primary hover:underline"
+                    onClick={() => setKindFilter('all')}
+                  >
+                    Back to sources overview
+                  </button>
+                ) : null}
               </div>
             </div>
           </div>
@@ -1329,10 +1320,96 @@ export function ReportsInboxPanel({
         </div>
       ) : (
         <div className="space-y-4" data-testid="reports-inbox-grid">
-          {triageCount === 0 && kindFilter === 'all' && urgencyFilter !== 'all' ? (
+          {isOverview ? (
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" data-testid="reports-sources-overview">
+                {SOURCE_OPTIONS.map((o) => {
+                  const count = sourceCounts[o.value] ?? 0;
+                  return (
+                    <button
+                      key={o.value}
+                      type="button"
+                      onClick={() => setKindFilter(o.value)}
+                      className={cn(
+                        'flex min-h-[7.5rem] flex-col justify-between rounded-xl border p-4 text-left shadow-sm transition',
+                        SOURCE_CARD_CLASS[o.value],
+                      )}
+                    >
+                      <span className="text-sm font-semibold leading-snug">{o.label}</span>
+                      <span className="mt-3 text-3xl font-bold tabular-nums tracking-tight">{count}</span>
+                      <span className="mt-1 text-[11px] font-medium opacity-70">
+                        {count === 1 ? 'update' : 'updates'} · open
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <Card id={`${replyFormId}-overview`}>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between gap-3 px-6 py-4 text-left"
+                  aria-expanded={replyOpen}
+                  onClick={() => setReplyOpen((o) => !o)}
+                >
+                  <div>
+                    <CardTitle className="text-base">Reply</CardTitle>
+                    <CardDescription className="text-xs">
+                      Respond to a report author, queue target, or staff member.
+                    </CardDescription>
+                  </div>
+                  {replyOpen ? (
+                    <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  )}
+                </button>
+                {replyOpen ? (
+                  <CardContent className="border-t border-border pt-4">
+                    <form onSubmit={submitReply} className="space-y-3">
+                      <div className="space-y-1">
+                        <Label htmlFor={`${replyFormId}-target-ov`} className="text-xs text-muted-foreground">
+                          Recipient (member, leader, or pastor)
+                        </Label>
+                        <select
+                          id={`${replyFormId}-target-ov`}
+                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                          value={reply.recipientId}
+                          onChange={(e) => setReply((p) => ({ ...p, recipientId: e.target.value }))}
+                        >
+                          <option value="">Select recipient…</option>
+                          {(data?.replyTargets ?? []).map((t) => (
+                            <option key={t.userId} value={t.userId}>
+                              {t.label} — {t.source}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <Input
+                        placeholder="Subject"
+                        value={reply.subject}
+                        onChange={(e) => setReply((p) => ({ ...p, subject: e.target.value }))}
+                      />
+                      <textarea
+                        className="min-h-[120px] w-full rounded-md border border-input px-3 py-2 text-sm"
+                        placeholder="Write reply..."
+                        value={reply.body}
+                        onChange={(e) => setReply((p) => ({ ...p, body: e.target.value }))}
+                      />
+                      <Button type="submit" disabled={busy} className="gap-1">
+                        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        Send reply
+                      </Button>
+                    </form>
+                  </CardContent>
+                ) : null}
+              </Card>
+            </div>
+          ) : (
+            <>
+          {triageCount === 0 ? (
             <Card>
               <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                No items match {selectedUrgencyLabel.toLowerCase()} across all sources.
+                No items match {selectedUrgencyLabel.toLowerCase()} in {selectedSourceLabel}.
               </CardContent>
             </Card>
           ) : null}
@@ -1729,54 +1806,68 @@ export function ReportsInboxPanel({
             </div>
           ) : null}
 
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:items-start">
+          <div className="grid gap-4 xl:grid-cols-1 xl:items-start">
             <Card id={replyFormId} className="xl:sticky xl:top-4">
-              <CardHeader>
-                <CardTitle className="text-base">Reply</CardTitle>
-                <CardDescription className="text-xs">
-                  Respond to a report author, queue target, or staff member.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={submitReply} className="space-y-3">
-                  <div className="space-y-1">
-                    <Label htmlFor={`${replyFormId}-target`} className="text-xs text-muted-foreground">
-                      Recipient (member, leader, or pastor)
-                    </Label>
-                    <select
-                      id={`${replyFormId}-target`}
-                      className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                      value={reply.recipientId}
-                      onChange={(e) => setReply((p) => ({ ...p, recipientId: e.target.value }))}
-                    >
-                      <option value="">Select recipient…</option>
-                      {(data?.replyTargets ?? []).map((t) => (
-                        <option key={t.userId} value={t.userId}>
-                          {t.label} — {t.source}
-                        </option>
-                      ))}
-                    </select>
-                    {selectedTarget && (
-                      <p className="text-xs text-muted-foreground">{selectedTarget.source}</p>
-                    )}
-                  </div>
-                  <Input
-                    placeholder="Subject"
-                    value={reply.subject}
-                    onChange={(e) => setReply((p) => ({ ...p, subject: e.target.value }))}
-                  />
-                  <textarea
-                    className="min-h-[120px] w-full rounded-md border border-input px-3 py-2 text-sm"
-                    placeholder="Write reply..."
-                    value={reply.body}
-                    onChange={(e) => setReply((p) => ({ ...p, body: e.target.value }))}
-                  />
-                  <Button type="submit" disabled={busy} className="gap-1">
-                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                    Send reply
-                  </Button>
-                </form>
-              </CardContent>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-3 px-6 py-4 text-left"
+                aria-expanded={replyOpen}
+                onClick={() => setReplyOpen((o) => !o)}
+              >
+                <div>
+                  <CardTitle className="text-base">Reply</CardTitle>
+                  <CardDescription className="text-xs">
+                    Respond to a report author, queue target, or staff member.
+                  </CardDescription>
+                </div>
+                {replyOpen ? (
+                  <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                )}
+              </button>
+              {replyOpen ? (
+                <CardContent className="border-t border-border pt-4">
+                  <form onSubmit={submitReply} className="space-y-3">
+                    <div className="space-y-1">
+                      <Label htmlFor={`${replyFormId}-target`} className="text-xs text-muted-foreground">
+                        Recipient (member, leader, or pastor)
+                      </Label>
+                      <select
+                        id={`${replyFormId}-target`}
+                        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        value={reply.recipientId}
+                        onChange={(e) => setReply((p) => ({ ...p, recipientId: e.target.value }))}
+                      >
+                        <option value="">Select recipient…</option>
+                        {(data?.replyTargets ?? []).map((t) => (
+                          <option key={t.userId} value={t.userId}>
+                            {t.label} — {t.source}
+                          </option>
+                        ))}
+                      </select>
+                      {selectedTarget && (
+                        <p className="text-xs text-muted-foreground">{selectedTarget.source}</p>
+                      )}
+                    </div>
+                    <Input
+                      placeholder="Subject"
+                      value={reply.subject}
+                      onChange={(e) => setReply((p) => ({ ...p, subject: e.target.value }))}
+                    />
+                    <textarea
+                      className="min-h-[120px] w-full rounded-md border border-input px-3 py-2 text-sm"
+                      placeholder="Write reply..."
+                      value={reply.body}
+                      onChange={(e) => setReply((p) => ({ ...p, body: e.target.value }))}
+                    />
+                    <Button type="submit" disabled={busy} className="gap-1">
+                      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                      Send reply
+                    </Button>
+                  </form>
+                </CardContent>
+              ) : null}
             </Card>
 
             {showSource('message', messages.length) ? (
@@ -1830,6 +1921,8 @@ export function ReportsInboxPanel({
               </InboxScrollCard>
             ) : null}
           </div>
+            </>
+          )}
         </div>
       )}
         </div>
