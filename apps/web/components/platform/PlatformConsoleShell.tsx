@@ -9,6 +9,7 @@ import {
   FileText,
   Mail,
   MessageSquare,
+  Plug,
   Shield,
   Sparkles,
   Users,
@@ -59,6 +60,12 @@ const PLATFORM_NAV: PlatformNavItem[] = [
     label: 'Marketing',
     icon: Mail,
     permission: 'platform.marketing:read',
+  },
+  {
+    href: '/dashboard/platform/integrations',
+    label: 'Integrations',
+    icon: Plug,
+    permission: 'platform.integrations:read',
   },
   {
     href: '/dashboard/platform/content',

@@ -19,7 +19,9 @@ export type PlatformPermissionKey =
   | 'platform.content:read'
   | 'platform.content:write'
   | 'platform.privacy:read'
-  | 'platform.privacy:write';
+  | 'platform.privacy:write'
+  | 'platform.integrations:read'
+  | 'platform.integrations:write';
 
 export type PlatformPermissionDef = {
   key: PlatformPermissionKey;
@@ -182,6 +184,22 @@ export const PLATFORM_PERMISSION_CATALOG: PlatformPermissionDef[] = [
     label: 'Handle privacy requests',
     group: 'Privacy',
     description: 'Update DSAR status and complete erasure actions.',
+  },
+  {
+    key: 'platform.integrations:read',
+    resource: 'platform.integrations',
+    action: 'read',
+    label: 'View integrations',
+    group: 'Integrations',
+    description: 'See platform WhatsApp gateway and other integrations.',
+  },
+  {
+    key: 'platform.integrations:write',
+    resource: 'platform.integrations',
+    action: 'write',
+    label: 'Manage integrations',
+    group: 'Integrations',
+    description: 'Update and rotate WhatsApp API key and session.',
   },
 ];
 

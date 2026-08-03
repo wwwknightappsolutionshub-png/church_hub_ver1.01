@@ -27,9 +27,11 @@ import {
   PlatformPrivacyController,
   PrivacySelfServiceController,
 } from './platform-privacy.controller';
+import { PlatformWhatsAppConfigModule } from './platform-whatsapp-config.module';
+import { PlatformWhatsAppController } from './platform-whatsapp.controller';
 
 @Module({
-  imports: [MembershipModule, UploadsModule],
+  imports: [MembershipModule, UploadsModule, PlatformWhatsAppConfigModule],
   controllers: [
     PlatformController,
     PlatformMarketingController,
@@ -41,6 +43,7 @@ import {
     PlatformCmsController,
     PlatformPrivacyController,
     PrivacySelfServiceController,
+    PlatformWhatsAppController,
   ],
   providers: [
     PlatformService,
@@ -66,6 +69,7 @@ import {
     PlatformPermissionGuard,
     PlatformCmsService,
     PlatformPrivacyService,
+    PlatformWhatsAppConfigModule,
   ],
 })
 export class PlatformModule {}

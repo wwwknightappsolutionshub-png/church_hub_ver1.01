@@ -1,5 +1,6 @@
 import { DynamicModule, Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
+import { PlatformWhatsAppConfigModule } from '../platform/platform-whatsapp-config.module';
 import { NOTIFICATIONS_QUEUE } from './notifications.constants';
 import { NotificationsProcessor } from './notifications.processor';
 import { NotificationsQueueService } from './notifications-queue.service';
@@ -16,7 +17,10 @@ export class NotificationsModule {
     return {
       module: NotificationsModule,
       global: true,
-      imports: redisEnabled ? [BullModule.registerQueue({ name: NOTIFICATIONS_QUEUE })] : [],
+      imports: [
+        PlatformWhatsAppConfigModule,
+        ...(redisEnabled ? [BullModule.registerQueue({ name: NOTIFICATIONS_QUEUE })] : []),
+      ],
       providers: [
         NotificationDeliveryService,
         NotificationsQueueService,

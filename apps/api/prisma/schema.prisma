@@ -402,6 +402,7 @@ model User {
   platformSupportThreadsCreated PlatformSupportThread[] @relation("PlatformSupportThreadCreator")
   platformSupportMessages PlatformSupportMessage[] @relation("PlatformSupportMessageSender")
   pushSubscriptions       PushSubscription[]
+  platformWhatsAppConfigsUpdated PlatformWhatsAppConfig[] @relation("PlatformWhatsAppConfigUpdater")
 
   @@unique([churchId, email])
   @@map("users")
@@ -5440,6 +5441,33 @@ model PlatformDsarRequest {
   @@index([status, createdAt])
   @@index([userId])
   @@map("platform_dsar_requests")
+}
+
+/// Singleton platform WhatsApp gateway config (one global session for all tenants).
+model PlatformWhatsAppConfig {
+  /// Fixed singleton id — always "global".
+  id                   String   @id @default("global")
+  enabled              Boolean  @default(false)
+  /// Provider send URL, e.g. https://restapi.example.com/api/send
+  apiUrl               String?
+  /// Encrypted API key (AES-256-GCM). Never returned in API responses.
+  apiKeyEncrypted      String?  @db.Text
+  /// Provider session / instance id for the linked WhatsApp number.
+  sessionId            String?
+  /// Optional header name (default x-api-key).
+  apiKeyHeader         String   @default("x-api-key")
+  lastTestAt           DateTime?
+  lastTestOk           Boolean?
+  lastTestMessage      String?
+  lastSendAt           DateTime?
+  lastSendOk           Boolean?
+  updatedByUserId      String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  updatedBy User? @relation("PlatformWhatsAppConfigUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@map("platform_whatsapp_config")
 }
 
 // ─── Wisdom365+ (licensed daily wisdom journeys) ───────────────
