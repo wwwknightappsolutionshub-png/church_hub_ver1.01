@@ -6,6 +6,7 @@ export const FOLLOW_UP_STAGE_ORDER: FollowUpStage[] = [
   'VISITED',
   'ATTENDED',
   'JOINED_GROUP',
+  'ENLISTED_FOR_BAPTISM',
 ];
 
 export const DEFAULT_FOLLOW_UP_TEMPLATES = [

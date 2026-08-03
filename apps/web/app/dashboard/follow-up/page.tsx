@@ -10,7 +10,6 @@ import {
   Loader2,
   Megaphone,
   Plus,
-  Search,
   Sparkles,
   UserPlus,
 } from 'lucide-react';
@@ -37,7 +36,13 @@ import {
   FOLLOW_UP_EXPORT_OPTIONS,
   exportFollowUpPdf,
 } from '@/lib/follow-up-pdf';
-import { FOLLOW_UP_STAGES, STAGE_LABELS } from '@/lib/follow-up';
+import {
+  FOLLOW_UP_STAGES,
+  STAGE_BADGE_CLASS,
+  STAGE_LABELS,
+  sortByNewestFirst,
+} from '@/lib/follow-up';
+import { cn } from '@/lib/utils';
 import {
   EnterpriseContent,
   EnterpriseHero,
@@ -105,7 +110,6 @@ function FollowUpPageContent() {
   const [stageFilter, setStageFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [search, setSearch] = useState('');
   const [exportOpen, setExportOpen] = useState(false);
   const [archiveBusy, setArchiveBusy] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -168,11 +172,10 @@ function FollowUpPageContent() {
 
   const filteredItems = useMemo(() => {
     const list = data ?? [];
-    const q = search.trim().toLowerCase();
     const fromMs = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
     const toMs = dateTo ? new Date(`${dateTo}T23:59:59.999`).getTime() : null;
 
-    return list.filter((f) => {
+    const filtered = list.filter((f) => {
       if (stageFilter && f.stage !== stageFilter) return false;
 
       if (fromMs != null || toMs != null) {
@@ -184,17 +187,28 @@ function FollowUpPageContent() {
         if (toMs != null && t > toMs) return false;
       }
 
-      if (!q) return true;
-      return (
-        f.contactName.toLowerCase().includes(q) ||
-        f.contactPhone?.includes(q) ||
-        f.contactEmail?.toLowerCase().includes(q) ||
-        f.assignedTo?.firstName.toLowerCase().includes(q) ||
-        f.assignedTo?.lastName.toLowerCase().includes(q) ||
-        f.referredBy?.toLowerCase().includes(q)
-      );
+      return true;
     });
-  }, [data, search, stageFilter, dateFrom, dateTo]);
+
+    return sortByNewestFirst(filtered);
+  }, [data, stageFilter, dateFrom, dateTo]);
+
+  /** Stage chips use date-filtered counts (ignore stage dropdown so totals stay visible). */
+  const stageSummaryItems = useMemo(() => {
+    const list = data ?? [];
+    const fromMs = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
+    const toMs = dateTo ? new Date(`${dateTo}T23:59:59.999`).getTime() : null;
+    if (fromMs == null && toMs == null) return list;
+    return list.filter((f) => {
+      const raw = f.createdAt || f.dueAt;
+      if (!raw) return false;
+      const t = new Date(raw).getTime();
+      if (Number.isNaN(t)) return false;
+      if (fromMs != null && t < fromMs) return false;
+      if (toMs != null && t > toMs) return false;
+      return true;
+    });
+  }, [data, dateFrom, dateTo]);
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['follow-up'] });
@@ -375,14 +389,27 @@ function FollowUpPageContent() {
       <EnterpriseContent className="max-w-[1600px]">
         {view !== 'calendar' && view !== 'archived' && (
         <div className="mb-6 flex flex-wrap items-center gap-3">
-          <div className="relative min-w-[200px] flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search name, phone, email, assignee…"
-              className="pl-9"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          <div className="flex min-w-[200px] flex-1 flex-wrap items-center gap-1.5 rounded-xl border border-dashed border-border bg-muted/20 p-2.5">
+            {FOLLOW_UP_STAGES.map((stage) => {
+              const n = stageSummaryItems.filter((f) => f.stage === stage).length;
+              const active = stageFilter === stage;
+              return (
+                <button
+                  key={stage}
+                  type="button"
+                  onClick={() => setStageFilter((prev) => (prev === stage ? '' : stage))}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition',
+                    STAGE_BADGE_CLASS[stage] ?? 'border-border bg-card text-foreground',
+                    active && 'ring-2 ring-primary/50',
+                  )}
+                  aria-pressed={active}
+                  title={`Filter: ${STAGE_LABELS[stage]}`}
+                >
+                  {STAGE_LABELS[stage]}: {n}
+                </button>
+              );
+            })}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
@@ -448,8 +475,7 @@ function FollowUpPageContent() {
 
         {!isLoading && !isError && filteredItems.length === 0 && (data?.length ?? 0) > 0 && view !== 'calendar' && view !== 'archived' && (
           <p className="mb-4 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
-            No matches for the current search or filters. Clear search, stage, or date to see more
-            people.
+            No matches for the current filters. Clear stage or date to see more people.
           </p>
         )}
 

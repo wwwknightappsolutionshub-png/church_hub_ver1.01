@@ -996,48 +996,85 @@ export function ReportsInboxPanel({
       low: 0,
       info: 0,
     };
-    for (const q of data?.queue ?? []) {
-      counts[queueUrgency(q.status)] += 1;
-    }
-    counts.medium += data?.reports.department.length ?? 0;
-    counts.info += data?.reports.weekly.length ?? 0;
-    counts.medium += data?.reports.meetingSummaries?.length ?? 0;
-    for (const r of data?.reports.rtpRequests ?? []) {
-      if (r.status === 'SUBMITTED') counts.high += 1;
-      else if (r.status === 'PROCESSING') counts.medium += 1;
-      else counts.info += 1;
-    }
-    counts.low += data?.reports.cellAttendance?.length ?? 0;
-    counts.low += data?.reports.unitAttendance?.length ?? 0;
-    counts.info += data?.notifications.length ?? 0;
-    counts.info += data?.messages.length ?? 0;
-    return counts;
-  }, [data]);
+    const include = (kind: Exclude<TriageKind, 'all'>) =>
+      kindFilter === 'all' || kindFilter === kind;
 
-  const sourceCounts = useMemo(
-    () => ({
-      all:
-        (data?.reports.department.length ?? 0) +
-        (data?.reports.weekly.length ?? 0) +
-        (data?.reports.meetingSummaries?.length ?? 0) +
-        (data?.reports.rtpRequests?.length ?? 0) +
-        (data?.reports.cellAttendance?.length ?? 0) +
-        (data?.reports.unitAttendance?.length ?? 0) +
-        (data?.queue.length ?? 0) +
-        (data?.notifications.length ?? 0) +
-        (data?.messages.length ?? 0),
-      department: data?.reports.department.length ?? 0,
-      weekly: data?.reports.weekly.length ?? 0,
-      meeting: data?.reports.meetingSummaries?.length ?? 0,
-      rtp: data?.reports.rtpRequests?.length ?? 0,
-      cell: data?.reports.cellAttendance?.length ?? 0,
-      unit: data?.reports.unitAttendance?.length ?? 0,
-      queue: data?.queue.length ?? 0,
-      notification: data?.notifications.length ?? 0,
-      message: data?.messages.length ?? 0,
-    }),
-    [data],
+    if (include('queue')) {
+      for (const q of data?.queue ?? []) {
+        counts[queueUrgency(q.status)] += 1;
+      }
+    }
+    if (include('department')) counts.medium += data?.reports.department.length ?? 0;
+    if (include('weekly')) counts.info += data?.reports.weekly.length ?? 0;
+    if (include('meeting')) counts.medium += data?.reports.meetingSummaries?.length ?? 0;
+    if (include('rtp')) {
+      for (const r of data?.reports.rtpRequests ?? []) {
+        if (r.status === 'SUBMITTED') counts.high += 1;
+        else if (r.status === 'PROCESSING') counts.medium += 1;
+        else counts.info += 1;
+      }
+    }
+    if (include('cell')) counts.low += data?.reports.cellAttendance?.length ?? 0;
+    if (include('unit')) counts.low += data?.reports.unitAttendance?.length ?? 0;
+    if (include('notification')) counts.info += data?.notifications.length ?? 0;
+    if (include('message')) counts.info += data?.messages.length ?? 0;
+    return counts;
+  }, [data, kindFilter]);
+
+  const allPriorityCount = useMemo(
+    () =>
+      urgencyCounts.critical +
+      urgencyCounts.high +
+      urgencyCounts.medium +
+      urgencyCounts.low +
+      urgencyCounts.info,
+    [urgencyCounts],
   );
+
+  const sourceCounts = useMemo(() => {
+    const dept = (data?.reports.department ?? []).filter(() =>
+      urgencyFilter === 'all' || urgencyFilter === 'medium',
+    ).length;
+    const weekly = (data?.reports.weekly ?? []).filter(() =>
+      urgencyFilter === 'all' || urgencyFilter === 'info',
+    ).length;
+    const meeting = (data?.reports.meetingSummaries ?? []).filter(() =>
+      urgencyFilter === 'all' || urgencyFilter === 'medium',
+    ).length;
+    const rtp = (data?.reports.rtpRequests ?? []).filter((r) => {
+      const urgency =
+        r.status === 'SUBMITTED' ? 'high' : r.status === 'PROCESSING' ? 'medium' : 'info';
+      return urgencyFilter === 'all' || urgencyFilter === urgency;
+    }).length;
+    const cell = (data?.reports.cellAttendance ?? []).filter(() =>
+      urgencyFilter === 'all' || urgencyFilter === 'low',
+    ).length;
+    const unit = (data?.reports.unitAttendance ?? []).filter(() =>
+      urgencyFilter === 'all' || urgencyFilter === 'low',
+    ).length;
+    const queue = (data?.queue ?? []).filter((q) => {
+      if (statusFilter !== 'all' && q.status !== statusFilter) return false;
+      return urgencyFilter === 'all' || queueUrgency(q.status) === urgencyFilter;
+    }).length;
+    const notification = (data?.notifications ?? []).filter(() =>
+      urgencyFilter === 'all' || urgencyFilter === 'info',
+    ).length;
+    const message = (data?.messages ?? []).filter(() =>
+      urgencyFilter === 'all' || urgencyFilter === 'info',
+    ).length;
+    return {
+      all: dept + weekly + meeting + rtp + cell + unit + queue + notification + message,
+      department: dept,
+      weekly,
+      meeting,
+      rtp,
+      cell,
+      unit,
+      queue,
+      notification,
+      message,
+    };
+  }, [data, statusFilter, urgencyFilter]);
 
   const reportTotal =
     (data?.reports.department.length ?? 0) +
@@ -1047,6 +1084,19 @@ export function ReportsInboxPanel({
     (data?.reports.cellAttendance?.length ?? 0) +
     (data?.reports.unitAttendance?.length ?? 0);
   const criticalNeeds = urgencyCounts.critical + urgencyCounts.high;
+
+  /** Right pane shows only sources selected on the left rail (plus urgency match). */
+  const showSource = (kind: Exclude<TriageKind, 'all'>, count: number) => {
+    if (kindFilter !== 'all' && kindFilter !== kind) return false;
+    if (kindFilter === kind) return true;
+    if (urgencyFilter !== 'all') return count > 0;
+    return true;
+  };
+
+  const selectedSourceLabel =
+    KIND_OPTIONS.find((o) => o.value === kindFilter)?.label ?? 'All types';
+  const selectedUrgencyLabel =
+    urgencyFilter === 'all' ? 'All priorities' : URGENCY_META[urgencyFilter].label;
 
   const submitReply = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1172,7 +1222,7 @@ export function ReportsInboxPanel({
                   )}
                 >
                   <span>All priorities</span>
-                  <span className="tabular-nums text-xs opacity-80">{sourceCounts.all}</span>
+                  <span className="tabular-nums text-xs opacity-80">{allPriorityCount}</span>
                 </button>
                 {(Object.keys(URGENCY_META) as UrgencyLevel[]).map((level) => (
                   <button
@@ -1243,26 +1293,33 @@ export function ReportsInboxPanel({
                   />
                 </div>
               </div>
-              <div className="space-y-1">
-                <Label htmlFor={`${replyFormId}-status`} className="text-xs text-muted-foreground">
-                  Queue status
-                </Label>
-                <select
-                  id={`${replyFormId}-status`}
-                  className="h-10 w-full min-w-[140px] rounded-md border border-input bg-background px-3 text-sm"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as 'all' | QueueStatus)}
-                >
-                  {STATUS_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
+              {kindFilter === 'all' || kindFilter === 'queue' ? (
+                <div className="space-y-1">
+                  <Label htmlFor={`${replyFormId}-status`} className="text-xs text-muted-foreground">
+                    Queue status
+                  </Label>
+                  <select
+                    id={`${replyFormId}-status`}
+                    className="h-10 w-full min-w-[140px] rounded-md border border-input bg-background px-3 text-sm"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as 'all' | QueueStatus)}
+                  >
+                    {STATUS_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
+              <div className="pb-2 sm:ml-auto sm:text-right">
+                <p className="text-xs font-medium text-foreground">
+                  {selectedUrgencyLabel} · {selectedSourceLabel}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {isLoading ? 'Loading…' : `${triageCount} item${triageCount === 1 ? '' : 's'} match`}
+                </p>
               </div>
-              <p className="pb-2 text-xs text-muted-foreground sm:ml-auto">
-                {isLoading ? 'Loading…' : `${triageCount} item${triageCount === 1 ? '' : 's'} match`}
-              </p>
             </div>
           </div>
 
@@ -1272,377 +1329,405 @@ export function ReportsInboxPanel({
         </div>
       ) : (
         <div className="space-y-4" data-testid="reports-inbox-grid">
-          <div className="grid gap-4 xl:grid-cols-2 xl:items-stretch">
-            <InboxScrollCard
-              title="Department reports"
-              description="Submitted from department modules and leadership workflows."
-              count={deptReports.length}
-              emptyMessage="No department reports match your filters."
-              testId="reports-dept-inbox"
-            >
-              {deptReports.map((r) => (
-                <div
-                  key={r.id}
-                  className={cn('rounded-lg border px-3 py-2.5 text-sm', URGENCY_META.medium.card)}
+          {triageCount === 0 && kindFilter === 'all' && urgencyFilter !== 'all' ? (
+            <Card>
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                No items match {selectedUrgencyLabel.toLowerCase()} across all sources.
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {showSource('department', deptReports.length) || showSource('weekly', weeklyReports.length) ? (
+            <div className="grid gap-4 xl:grid-cols-2 xl:items-stretch">
+              {showSource('department', deptReports.length) ? (
+                <InboxScrollCard
+                  title="Department reports"
+                  description="Submitted from department modules and leadership workflows."
+                  count={deptReports.length}
+                  emptyMessage="No department reports match your filters."
+                  testId="reports-dept-inbox"
                 >
-                  <p className="font-medium">{r.title}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {r.serviceUnit.name} · {r.author.firstName} {r.author.lastName} ·{' '}
-                    {new Date(r.submittedAt).toLocaleString()}
-                  </p>
-                  <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">{r.body}</p>
-                  {r.author.userId ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="mt-2"
-                      onClick={() =>
-                        pickReply({
-                          userId: r.author.userId!,
-                          subject: `Re: ${r.title}`,
-                        })
-                      }
+                  {deptReports.map((r) => (
+                    <div
+                      key={r.id}
+                      className={cn('rounded-lg border px-3 py-2.5 text-sm', URGENCY_META.medium.card)}
                     >
-                      <MessageSquare className="mr-1 h-3.5 w-3.5" />
-                      Reply to sender
-                    </Button>
-                  ) : (
-                    <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
-                      No linked user account — pick recipient manually below.
-                    </p>
-                  )}
-                </div>
-              ))}
-            </InboxScrollCard>
-
-            <InboxScrollCard
-              title="Weekly reports"
-              description="Auto-generated department summaries with attendance and activity stats."
-              count={weeklyReports.length}
-              emptyMessage="No weekly reports match your filters."
-              testId="reports-weekly-inbox"
-            >
-              {weeklyReports.map((r) => (
-                <WeeklyReportItem key={r.id} report={r} />
-              ))}
-            </InboxScrollCard>
-          </div>
-
-          <InboxScrollCard
-            title="Ministry / Cells attendance"
-            description="Latest report per branch/cell — click a card for 3-month history and PDF export."
-            count={cellAttendanceReports.length}
-            emptyMessage="No Ministry/Cells attendance reports yet. Record attendance from a branch Weekly tab."
-            testId="reports-cell-attendance-inbox"
-          >
-            {cellAttendanceReports.map((r) => (
-              <CellAttendanceReportItemCard
-                key={r.branchId}
-                report={r}
-                history={historyInWindow(
-                  cellAttendanceAll,
-                  r.branchId,
-                  (x) => x.branchId,
-                  (x) => x.meetingDate || x.createdAt,
-                )}
-              />
-            ))}
-          </InboxScrollCard>
-
-          <InboxScrollCard
-            title="Service unit attendance"
-            description="Latest report per service unit — click a card for 3-month history and PDF export."
-            count={unitAttendanceReports.length}
-            emptyMessage="No service unit attendance reports yet. Record attendance from a unit Attendance tab."
-            testId="reports-unit-attendance-inbox"
-          >
-            {unitAttendanceReports.map((r) => (
-              <UnitAttendanceReportItemCard
-                key={r.serviceUnitId}
-                report={r}
-                history={historyInWindow(
-                  unitAttendanceAll,
-                  r.serviceUnitId,
-                  (x) => x.serviceUnitId,
-                  (x) => x.meetingDate || x.createdAt,
-                )}
-              />
-            ))}
-          </InboxScrollCard>
-
-          <InboxScrollCard
-            title="Meeting summaries"
-            description="Published service unit meeting summaries."
-            count={meetingSummaries.length}
-            emptyMessage="No meeting summaries match your filters."
-            testId="reports-meeting-summaries-inbox"
-          >
-            {meetingSummaries.map((s) => (
-              <article
-                key={s.id}
-                className={cn('rounded-lg border px-3 py-2.5 text-sm', URGENCY_META.medium.card)}
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-medium">{s.title}</p>
-                  <Badge variant="secondary" className="text-[10px]">
-                    {s.serviceUnit.name}
-                  </Badge>
-                </div>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {s.author.firstName} {s.author.lastName}
-                  {s.meetingDate ? ` · ${formatAttendanceDate(s.meetingDate)}` : ''}
-                  {` · ${new Date(s.createdAt).toLocaleString()}`}
-                </p>
-                <pre className="mt-2 whitespace-pre-wrap rounded-md bg-muted/45 p-2.5 font-sans text-xs leading-relaxed">
-                  {s.body}
-                </pre>
-              </article>
-            ))}
-          </InboxScrollCard>
-
-          <InboxScrollCard
-            title="RTP Requests"
-            description="Service unit Request to Purchase — mark Received to stop 15-minute reminders and notify the originator (Processing)."
-            count={rtpRequests.length}
-            emptyMessage="No RTP requests match your filters."
-            testId="reports-rtp-inbox"
-          >
-            {rtpRequests.map((r) => {
-              const urgency =
-                r.status === 'SUBMITTED' ? 'high' : r.status === 'PROCESSING' ? 'medium' : 'info';
-              const meta = URGENCY_META[urgency];
-              const values = r.fieldValues ?? {};
-              const lineItems = Array.isArray(values.line_items)
-                ? (values.line_items as Array<Record<string, unknown>>)
-                : [];
-              const skipKeys = new Set([
-                'line_items',
-                'item_description',
-                'quantity',
-                'unit_cost',
-              ]);
-              const entries = Object.entries(values).filter(([key]) => !skipKeys.has(key));
-              return (
-                <article key={r.id} className={cn('rounded-lg border px-3 py-2.5 text-sm', meta.card)}>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium">{r.title}</p>
-                    <Badge className={cn('text-[10px]', meta.badge)}>{r.status}</Badge>
-                    <Badge variant="secondary" className="text-[10px]">
-                      {r.serviceUnit.name}
-                    </Badge>
-                  </div>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {r.submittedBy.firstName} {r.submittedBy.lastName}
-                    {` · ${new Date(r.createdAt).toLocaleString()}`}
-                  </p>
-                  {lineItems.length > 0 && (
-                    <div className="mt-2 overflow-x-auto">
-                      <table className="w-full min-w-[480px] text-xs">
-                        <thead>
-                          <tr className="border-b border-border/60 text-left text-muted-foreground">
-                            <th className="py-1 pr-2 font-medium">Item</th>
-                            <th className="py-1 pr-2 font-medium">Qty</th>
-                            <th className="py-1 pr-2 font-medium">Unit</th>
-                            <th className="py-1 pr-2 font-medium">Total</th>
-                            <th className="py-1 font-medium">Link</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {lineItems.map((item, idx) => {
-                            const url = String(item.websiteUrl ?? item.website_url ?? '');
-                            return (
-                              <tr key={idx} className="border-b border-border/40 last:border-0">
-                                <td className="py-1 pr-2 align-top">
-                                  {String(item.description ?? '—')}
-                                </td>
-                                <td className="py-1 pr-2 align-top">{String(item.quantity ?? '—')}</td>
-                                <td className="py-1 pr-2 align-top">{String(item.unitCost ?? '—')}</td>
-                                <td className="py-1 pr-2 align-top">
-                                  {String(item.lineTotal ?? '—')}
-                                </td>
-                                <td className="py-1 align-top">
-                                  {url ? (
-                                    <a
-                                      href={url}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="text-primary underline-offset-2 hover:underline"
-                                    >
-                                      Open
-                                    </a>
-                                  ) : (
-                                    '—'
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                  {entries.length > 0 && (
-                    <div className="mt-2 overflow-x-auto">
-                      <table className="w-full min-w-[280px] text-xs">
-                        <thead>
-                          <tr className="border-b border-border/60 text-left text-muted-foreground">
-                            <th className="py-1 pr-3 font-medium">Field</th>
-                            <th className="py-1 font-medium">Value</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {entries.map(([key, value]) => (
-                            <tr key={key} className="border-b border-border/40 last:border-0">
-                              <td className="py-1 pr-3 align-top font-medium">
-                                {key.replace(/_/g, ' ')}
-                              </td>
-                              <td className="py-1 align-top whitespace-pre-wrap">
-                                {value === null || value === undefined || value === ''
-                                  ? '—'
-                                  : String(value)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {r.status === 'SUBMITTED' && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={async () => {
-                          try {
-                            await api.post(`/rtp/requests/${r.id}/received`);
-                            toast.success('Marked Received — originator notified (Processing)');
-                            qc.invalidateQueries({ queryKey: [queryKey] });
-                          } catch (e) {
-                            toast.error(apiErrorMessage(e, 'Could not mark received'));
-                          }
-                        }}
-                      >
-                        Received
-                      </Button>
-                    )}
-                    {(r.status === 'SUBMITTED' || r.status === 'PROCESSING') && (
-                      <>
+                      <p className="font-medium">{r.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {r.serviceUnit.name} · {r.author.firstName} {r.author.lastName} ·{' '}
+                        {new Date(r.submittedAt).toLocaleString()}
+                      </p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">{r.body}</p>
+                      {r.author.userId ? (
                         <Button
                           type="button"
                           size="sm"
                           variant="outline"
-                          onClick={async () => {
-                            try {
-                              await api.post(`/rtp/requests/${r.id}/approve`);
-                              toast.success('RTP approved');
-                              qc.invalidateQueries({ queryKey: [queryKey] });
-                            } catch (e) {
-                              toast.error(apiErrorMessage(e, 'Could not approve RTP'));
-                            }
-                          }}
+                          className="mt-2"
+                          onClick={() =>
+                            pickReply({
+                              userId: r.author.userId!,
+                              subject: `Re: ${r.title}`,
+                            })
+                          }
                         >
-                          Approve
+                          <MessageSquare className="mr-1 h-3.5 w-3.5" />
+                          Reply to sender
                         </Button>
+                      ) : (
+                        <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                          No linked user account — pick recipient manually below.
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </InboxScrollCard>
+              ) : null}
+
+              {showSource('weekly', weeklyReports.length) ? (
+                <InboxScrollCard
+                  title="Weekly reports"
+                  description="Auto-generated department summaries with attendance and activity stats."
+                  count={weeklyReports.length}
+                  emptyMessage="No weekly reports match your filters."
+                  testId="reports-weekly-inbox"
+                >
+                  {weeklyReports.map((r) => (
+                    <WeeklyReportItem key={r.id} report={r} />
+                  ))}
+                </InboxScrollCard>
+              ) : null}
+            </div>
+          ) : null}
+
+          {showSource('cell', cellAttendanceReports.length) ? (
+            <InboxScrollCard
+              title="Ministry / Cells attendance"
+              description="Latest report per branch/cell — click a card for 3-month history and PDF export."
+              count={cellAttendanceReports.length}
+              emptyMessage="No Ministry/Cells attendance reports yet. Record attendance from a branch Weekly tab."
+              testId="reports-cell-attendance-inbox"
+            >
+              {cellAttendanceReports.map((r) => (
+                <CellAttendanceReportItemCard
+                  key={r.branchId}
+                  report={r}
+                  history={historyInWindow(
+                    cellAttendanceAll,
+                    r.branchId,
+                    (x) => x.branchId,
+                    (x) => x.meetingDate || x.createdAt,
+                  )}
+                />
+              ))}
+            </InboxScrollCard>
+          ) : null}
+
+          {showSource('unit', unitAttendanceReports.length) ? (
+            <InboxScrollCard
+              title="Service unit attendance"
+              description="Latest report per service unit — click a card for 3-month history and PDF export."
+              count={unitAttendanceReports.length}
+              emptyMessage="No service unit attendance reports yet. Record attendance from a unit Attendance tab."
+              testId="reports-unit-attendance-inbox"
+            >
+              {unitAttendanceReports.map((r) => (
+                <UnitAttendanceReportItemCard
+                  key={r.serviceUnitId}
+                  report={r}
+                  history={historyInWindow(
+                    unitAttendanceAll,
+                    r.serviceUnitId,
+                    (x) => x.serviceUnitId,
+                    (x) => x.meetingDate || x.createdAt,
+                  )}
+                />
+              ))}
+            </InboxScrollCard>
+          ) : null}
+
+          {showSource('meeting', meetingSummaries.length) ? (
+            <InboxScrollCard
+              title="Meeting summaries"
+              description="Published service unit meeting summaries."
+              count={meetingSummaries.length}
+              emptyMessage="No meeting summaries match your filters."
+              testId="reports-meeting-summaries-inbox"
+            >
+              {meetingSummaries.map((s) => (
+                <article
+                  key={s.id}
+                  className={cn('rounded-lg border px-3 py-2.5 text-sm', URGENCY_META.medium.card)}
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium">{s.title}</p>
+                    <Badge variant="secondary" className="text-[10px]">
+                      {s.serviceUnit.name}
+                    </Badge>
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {s.author.firstName} {s.author.lastName}
+                    {s.meetingDate ? ` · ${formatAttendanceDate(s.meetingDate)}` : ''}
+                    {` · ${new Date(s.createdAt).toLocaleString()}`}
+                  </p>
+                  <pre className="mt-2 whitespace-pre-wrap rounded-md bg-muted/45 p-2.5 font-sans text-xs leading-relaxed">
+                    {s.body}
+                  </pre>
+                </article>
+              ))}
+            </InboxScrollCard>
+          ) : null}
+
+          {showSource('rtp', rtpRequests.length) ? (
+            <InboxScrollCard
+              title="RTP Requests"
+              description="Service unit Request to Purchase — mark Received to stop 15-minute reminders and notify the originator (Processing)."
+              count={rtpRequests.length}
+              emptyMessage="No RTP requests match your filters."
+              testId="reports-rtp-inbox"
+            >
+              {rtpRequests.map((r) => {
+                const urgency =
+                  r.status === 'SUBMITTED' ? 'high' : r.status === 'PROCESSING' ? 'medium' : 'info';
+                const meta = URGENCY_META[urgency];
+                const values = r.fieldValues ?? {};
+                const lineItems = Array.isArray(values.line_items)
+                  ? (values.line_items as Array<Record<string, unknown>>)
+                  : [];
+                const skipKeys = new Set([
+                  'line_items',
+                  'item_description',
+                  'quantity',
+                  'unit_cost',
+                ]);
+                const entries = Object.entries(values).filter(([key]) => !skipKeys.has(key));
+                return (
+                  <article key={r.id} className={cn('rounded-lg border px-3 py-2.5 text-sm', meta.card)}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium">{r.title}</p>
+                      <Badge className={cn('text-[10px]', meta.badge)}>{r.status}</Badge>
+                      <Badge variant="secondary" className="text-[10px]">
+                        {r.serviceUnit.name}
+                      </Badge>
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {r.submittedBy.firstName} {r.submittedBy.lastName}
+                      {` · ${new Date(r.createdAt).toLocaleString()}`}
+                    </p>
+                    {lineItems.length > 0 && (
+                      <div className="mt-2 overflow-x-auto">
+                        <table className="w-full min-w-[480px] text-xs">
+                          <thead>
+                            <tr className="border-b border-border/60 text-left text-muted-foreground">
+                              <th className="py-1 pr-2 font-medium">Item</th>
+                              <th className="py-1 pr-2 font-medium">Qty</th>
+                              <th className="py-1 pr-2 font-medium">Unit</th>
+                              <th className="py-1 pr-2 font-medium">Total</th>
+                              <th className="py-1 font-medium">Link</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {lineItems.map((item, idx) => {
+                              const url = String(item.websiteUrl ?? item.website_url ?? '');
+                              return (
+                                <tr key={idx} className="border-b border-border/40 last:border-0">
+                                  <td className="py-1 pr-2 align-top">
+                                    {String(item.description ?? '—')}
+                                  </td>
+                                  <td className="py-1 pr-2 align-top">{String(item.quantity ?? '—')}</td>
+                                  <td className="py-1 pr-2 align-top">{String(item.unitCost ?? '—')}</td>
+                                  <td className="py-1 pr-2 align-top">
+                                    {String(item.lineTotal ?? '—')}
+                                  </td>
+                                  <td className="py-1 align-top">
+                                    {url ? (
+                                      <a
+                                        href={url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-primary underline-offset-2 hover:underline"
+                                      >
+                                        Open
+                                      </a>
+                                    ) : (
+                                      '—'
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                    {entries.length > 0 && (
+                      <div className="mt-2 overflow-x-auto">
+                        <table className="w-full min-w-[280px] text-xs">
+                          <thead>
+                            <tr className="border-b border-border/60 text-left text-muted-foreground">
+                              <th className="py-1 pr-3 font-medium">Field</th>
+                              <th className="py-1 font-medium">Value</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {entries.map(([key, value]) => (
+                              <tr key={key} className="border-b border-border/40 last:border-0">
+                                <td className="py-1 pr-3 align-top font-medium">
+                                  {key.replace(/_/g, ' ')}
+                                </td>
+                                <td className="py-1 align-top whitespace-pre-wrap">
+                                  {value === null || value === undefined || value === ''
+                                    ? '—'
+                                    : String(value)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {r.status === 'SUBMITTED' && (
                         <Button
                           type="button"
                           size="sm"
-                          variant="ghost"
                           onClick={async () => {
-                            const reason = window.prompt('Rejection reason (optional)') ?? undefined;
                             try {
-                              await api.post(`/rtp/requests/${r.id}/reject`, { reason });
-                              toast.success('RTP rejected');
+                              await api.post(`/rtp/requests/${r.id}/received`);
+                              toast.success('Marked Received — originator notified (Processing)');
                               qc.invalidateQueries({ queryKey: [queryKey] });
                             } catch (e) {
-                              toast.error(apiErrorMessage(e, 'Could not reject RTP'));
+                              toast.error(apiErrorMessage(e, 'Could not mark received'));
                             }
                           }}
                         >
-                          Reject
+                          Received
                         </Button>
-                      </>
-                    )}
-                  </div>
-                </article>
-              );
-            })}
-          </InboxScrollCard>
-
-          <div className="grid gap-4 xl:grid-cols-2 xl:items-stretch">
-            <InboxScrollCard
-              title="Queue alerts"
-              description="Automation queue items — failed sends and pending pastoral alerts."
-              count={queueItems.length}
-              emptyMessage="No queue alerts match your filters."
-              testId="reports-queue-inbox"
-            >
-              {queueItems.map((q) => {
-                const urgency = queueUrgency(q.status);
-                const meta = URGENCY_META[urgency];
-                return (
-                  <div key={q.id} className={cn('rounded-lg border px-3 py-2.5 text-sm', meta.card)}>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium">{q.title}</p>
-                      <Badge className={cn('text-[10px]', meta.badge)}>
-                        {meta.label} · {q.status}
-                      </Badge>
-                      {(q.metadata?.tags ?? []).map((tag) => (
-                        <Badge key={tag} variant="outline" className="text-[10px]">
-                          {tag}
-                        </Badge>
-                      ))}
+                      )}
+                      {(r.status === 'SUBMITTED' || r.status === 'PROCESSING') && (
+                        <>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              try {
+                                await api.post(`/rtp/requests/${r.id}/approve`);
+                                toast.success('RTP approved');
+                                qc.invalidateQueries({ queryKey: [queryKey] });
+                              } catch (e) {
+                                toast.error(apiErrorMessage(e, 'Could not approve RTP'));
+                              }
+                            }}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={async () => {
+                              const reason = window.prompt('Rejection reason (optional)') ?? undefined;
+                              try {
+                                await api.post(`/rtp/requests/${r.id}/reject`, { reason });
+                                toast.success('RTP rejected');
+                                qc.invalidateQueries({ queryKey: [queryKey] });
+                              } catch (e) {
+                                toast.error(apiErrorMessage(e, 'Could not reject RTP'));
+                              }
+                            }}
+                          >
+                            Reject
+                          </Button>
+                        </>
+                      )}
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {q.kind} · {new Date(q.createdAt).toLocaleString()}
-                      {q.serviceUnit?.name ? ` · ${q.serviceUnit.name}` : ''}
-                      {q.metadata?.branchName ? ` · ${q.metadata.branchName}` : ''}
-                    </p>
-                    <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-                      {q.body}
-                    </p>
-                    {q.targetUserId ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="mt-2"
-                        onClick={() =>
-                          pickReply({
-                            userId: q.targetUserId!,
-                            subject: `Re: ${q.title}`,
-                          })
-                        }
-                      >
-                        <MessageSquare className="mr-1 h-3.5 w-3.5" />
-                        Reply
-                      </Button>
-                    ) : null}
-                  </div>
+                  </article>
                 );
               })}
             </InboxScrollCard>
+          ) : null}
 
-            <InboxScrollCard
-              title="Notifications"
-              description="In-app alerts sent to administrators and pastoral staff."
-              count={notifications.length}
-              emptyMessage="No notifications match your filters."
-              testId="reports-notifications-inbox"
-            >
-              {notifications.map((n) => (
-                <div key={n.id} className="rounded-lg border bg-card px-3 py-2.5 text-sm">
-                  <p className="font-medium">{n.title}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {n.type} · {new Date(n.sentAt).toLocaleString()}
-                  </p>
-                  <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-                    {n.body}
-                  </p>
-                </div>
-              ))}
-            </InboxScrollCard>
-          </div>
+          {showSource('queue', queueItems.length) || showSource('notification', notifications.length) ? (
+            <div className="grid gap-4 xl:grid-cols-2 xl:items-stretch">
+              {showSource('queue', queueItems.length) ? (
+                <InboxScrollCard
+                  title="Queue alerts"
+                  description="Automation queue items — failed sends and pending pastoral alerts."
+                  count={queueItems.length}
+                  emptyMessage="No queue alerts match your filters."
+                  testId="reports-queue-inbox"
+                >
+                  {queueItems.map((q) => {
+                    const urgency = queueUrgency(q.status);
+                    const meta = URGENCY_META[urgency];
+                    return (
+                      <div key={q.id} className={cn('rounded-lg border px-3 py-2.5 text-sm', meta.card)}>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium">{q.title}</p>
+                          <Badge className={cn('text-[10px]', meta.badge)}>
+                            {meta.label} · {q.status}
+                          </Badge>
+                          {(q.metadata?.tags ?? []).map((tag) => (
+                            <Badge key={tag} variant="outline" className="text-[10px]">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {q.kind} · {new Date(q.createdAt).toLocaleString()}
+                          {q.serviceUnit?.name ? ` · ${q.serviceUnit.name}` : ''}
+                          {q.metadata?.branchName ? ` · ${q.metadata.branchName}` : ''}
+                        </p>
+                        <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+                          {q.body}
+                        </p>
+                        {q.targetUserId ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="mt-2"
+                            onClick={() =>
+                              pickReply({
+                                userId: q.targetUserId!,
+                                subject: `Re: ${q.title}`,
+                              })
+                            }
+                          >
+                            <MessageSquare className="mr-1 h-3.5 w-3.5" />
+                            Reply
+                          </Button>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </InboxScrollCard>
+              ) : null}
+
+              {showSource('notification', notifications.length) ? (
+                <InboxScrollCard
+                  title="Notifications"
+                  description="In-app alerts sent to administrators and pastoral staff."
+                  count={notifications.length}
+                  emptyMessage="No notifications match your filters."
+                  testId="reports-notifications-inbox"
+                >
+                  {notifications.map((n) => (
+                    <div key={n.id} className="rounded-lg border bg-card px-3 py-2.5 text-sm">
+                      <p className="font-medium">{n.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {n.type} · {new Date(n.sentAt).toLocaleString()}
+                      </p>
+                      <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+                        {n.body}
+                      </p>
+                    </div>
+                  ))}
+                </InboxScrollCard>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:items-start">
             <Card id={replyFormId} className="xl:sticky xl:top-4">
@@ -1694,7 +1779,7 @@ export function ReportsInboxPanel({
               </CardContent>
             </Card>
 
-            {messages.length > 0 ? (
+            {showSource('message', messages.length) ? (
               <InboxScrollCard
                 title="In-app messages"
                 description="Church-wide direct messages between members and leadership."

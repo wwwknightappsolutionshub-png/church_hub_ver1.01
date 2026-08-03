@@ -52,7 +52,7 @@ export class FollowUpService {
       include: followUpInclude,
       orderBy: archived
         ? [{ archivedAt: 'desc' }, { createdAt: 'desc' }]
-        : [{ dueAt: 'asc' }, { createdAt: 'desc' }],
+        : [{ createdAt: 'desc' }],
     });
   }
 
@@ -113,13 +113,17 @@ export class FollowUpService {
 
     const [pending, overdue, remindersDue, archived, archiveRequested] = await Promise.all([
       this.prisma.followUp.count({
-        where: { churchId, archivedAt: null, stage: { not: 'JOINED_GROUP' } },
+        where: {
+          churchId,
+          archivedAt: null,
+          stage: { notIn: ['JOINED_GROUP', 'ENLISTED_FOR_BAPTISM'] },
+        },
       }),
       this.prisma.followUp.count({
         where: {
           churchId,
           archivedAt: null,
-          stage: { not: 'JOINED_GROUP' },
+          stage: { notIn: ['JOINED_GROUP', 'ENLISTED_FOR_BAPTISM'] },
           dueAt: { lt: new Date() },
         },
       }),

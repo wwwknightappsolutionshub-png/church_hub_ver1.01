@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { OutreachCaptureSchema } from '@church-hub/shared-types';
+import { OutreachCaptureSchema, UK_PHONE_HINT } from '@church-hub/shared-types';
 import { z } from 'zod';
-import { Camera, Loader2, MapPin, WifiOff } from 'lucide-react';
+import { Loader2, WifiOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import {
@@ -70,22 +70,26 @@ function OutreachCaptureFormInner({
   qrCodeId,
   onReadyForNext,
 }: OutreachCaptureFormProps & { onReadyForNext: () => void }) {
-  const [gpsLoading, setGpsLoading] = useState(false);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [postcodeHints, setPostcodeHints] = useState<string[]>([]);
   const [postcodeBusy, setPostcodeBusy] = useState(false);
   const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lookupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const allowDraftRestore = useRef(true);
 
-  const { register, handleSubmit, reset, setValue, watch, formState: { isSubmitting, errors } } =
-    useForm<FormData>({
-      resolver: zodResolver(formSchema),
-      defaultValues: EMPTY_FORM,
-    });
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    watch,
+    formState: { isSubmitting, errors },
+  } = useForm<FormData>({
+    resolver: zodResolver(formSchema),
+    mode: 'onBlur',
+    reValidateMode: 'onChange',
+    defaultValues: EMPTY_FORM,
+  });
 
-  const photoConsent = watch('photoConsent');
   const needsBusPickup = watch('needsBusPickup');
   const voiceNotes = watch('voiceNotes') ?? '';
   const postcode = watch('postcode') ?? '';
@@ -131,7 +135,6 @@ function OutreachCaptureFormInner({
       setValue('postcode', data.postcode);
       setValue('latitude', data.latitude);
       setValue('longitude', data.longitude);
-      setCoords({ lat: data.latitude, lng: data.longitude });
       const label = [data.parish, data.adminDistrict, data.region].filter(Boolean).join(', ');
       if (label) {
         setValue('locationLabel', label);
@@ -175,58 +178,10 @@ function OutreachCaptureFormInner({
     }
   };
 
-  const captureGps = () => {
-    if (!navigator.geolocation) {
-      toast.error('GPS not supported on this device');
-      return;
-    }
-    setGpsLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setValue('latitude', pos.coords.latitude);
-        setValue('longitude', pos.coords.longitude);
-        toast.success('Location tagged');
-        setGpsLoading(false);
-      },
-      () => {
-        toast.error('Could not get GPS location');
-        setGpsLoading(false);
-      },
-      { enableHighAccuracy: true, timeout: 12000 },
-    );
-  };
-
-  const onPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!photoConsent) {
-      toast.error('Enable photo consent before capturing');
-      return;
-    }
-    if (!/^image\//.test(file.type)) {
-      toast.error('Only image files are allowed');
-      return;
-    }
-    if (file.size > 800_000) {
-      toast.error('Photo too large — use a smaller image');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      setPhotoPreview(dataUrl);
-      setValue('photoUrl', dataUrl);
-    };
-    reader.readAsDataURL(file);
-  };
-
   const prepareNextCapture = async () => {
     allowDraftRestore.current = false;
     await clearCachedForm(OUTREACH_FORM_CACHE_ID);
     reset(EMPTY_FORM);
-    setPhotoPreview(null);
-    setCoords(null);
     setPostcodeHints([]);
     onSuccess();
     onReadyForNext();
@@ -239,8 +194,8 @@ function OutreachCaptureFormInner({
       capturedAt: new Date().toISOString(),
       evangelistId,
       qrCodeId,
-      latitude: coords?.lat ?? data.latitude,
-      longitude: coords?.lng ?? data.longitude,
+      photoConsent: false,
+      photoUrl: undefined,
     };
 
     try {
@@ -273,6 +228,7 @@ function OutreachCaptureFormInner({
       data-lpignore="true"
       data-1p-ignore
       data-bwignore
+      noValidate
     >
       {!online && (
         <div className="flex items-center gap-2 rounded-lg border border-amber-300/50 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
@@ -285,7 +241,6 @@ function OutreachCaptureFormInner({
         <Input
           placeholder="First name *"
           {...register('firstName')}
-          required
           autoComplete="off"
           autoCorrect="off"
           spellCheck={false}
@@ -307,46 +262,55 @@ function OutreachCaptureFormInner({
           data-1p-ignore
           data-form-type="other"
         />
-        <Input
-          placeholder="UK phone (e.g. 07123 456789) *"
-          {...register('phone', {
-            onChange: (e) => {
-              e.target.value = filterPhoneTyping(e.target.value);
-            },
-          })}
-          required
-          autoComplete="off"
-          inputMode="tel"
-          type="tel"
-          readOnly
-          onFocus={unlockAutofill}
-          aria-invalid={!!errors.phone}
-          className={cn(errors.phone && 'border-destructive')}
-          data-lpignore="true"
-          data-1p-ignore
-          data-form-type="other"
-        />
-        {errors.phone?.message ? (
-          <p className="sm:col-span-2 -mt-2 text-xs text-destructive">{String(errors.phone.message)}</p>
-        ) : null}
-        <Input
-          placeholder="Email *"
-          type="email"
-          inputMode="email"
-          {...register('email')}
-          required
-          autoComplete="off"
-          readOnly
-          onFocus={unlockAutofill}
-          aria-invalid={!!errors.email}
-          className={cn(errors.email && 'border-destructive')}
-          data-lpignore="true"
-          data-1p-ignore
-          data-form-type="other"
-        />
-        {errors.email?.message ? (
-          <p className="sm:col-span-2 -mt-2 text-xs text-destructive">{String(errors.email.message)}</p>
-        ) : null}
+        <div className="space-y-1">
+          <Input
+            placeholder="UK phone (e.g. 07123 456789) *"
+            {...register('phone', {
+              onChange: (e) => {
+                e.target.value = filterPhoneTyping(e.target.value);
+              },
+            })}
+            autoComplete="off"
+            inputMode="tel"
+            type="tel"
+            readOnly
+            onFocus={unlockAutofill}
+            aria-invalid={!!errors.phone}
+            aria-describedby={errors.phone ? 'outreach-phone-error' : 'outreach-phone-hint'}
+            className={cn(errors.phone && 'border-destructive')}
+            data-lpignore="true"
+            data-1p-ignore
+            data-form-type="other"
+          />
+          {errors.phone?.message ? (
+            <p id="outreach-phone-error" className="text-xs text-destructive">
+              {String(errors.phone.message)}
+            </p>
+          ) : (
+            <p id="outreach-phone-hint" className="text-xs text-muted-foreground">
+              {UK_PHONE_HINT}
+            </p>
+          )}
+        </div>
+        <div className="space-y-1">
+          <Input
+            placeholder="Email (optional)"
+            type="email"
+            inputMode="email"
+            {...register('email')}
+            autoComplete="off"
+            readOnly
+            onFocus={unlockAutofill}
+            aria-invalid={!!errors.email}
+            className={cn(errors.email && 'border-destructive')}
+            data-lpignore="true"
+            data-1p-ignore
+            data-form-type="other"
+          />
+          {errors.email?.message ? (
+            <p className="text-xs text-destructive">{String(errors.email.message)}</p>
+          ) : null}
+        </div>
         <Input
           placeholder="Who referred you? (name)"
           className="sm:col-span-2"
@@ -428,60 +392,12 @@ function OutreachCaptureFormInner({
         {needsBusPickup && (
           <>
             <Input
-              placeholder="Pickup address (or use GPS / postcode above)"
+              placeholder="Pickup address (or use postcode above)"
               {...register('pickupAddress')}
             />
             <Input placeholder="Bus notes (e.g. Sunday 9am)" {...register('busPickupNotes')} />
           </>
         )}
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={captureGps} disabled={gpsLoading}>
-          {gpsLoading ? (
-            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-          ) : (
-            <MapPin className="mr-1.5 h-4 w-4" />
-          )}
-          Tag GPS location
-        </Button>
-        {coords && (
-          <span className="self-center text-xs text-muted-foreground">
-            {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
-          </span>
-        )}
-      </div>
-
-      <div className="rounded-lg border border-border p-4">
-        <label className="flex items-center gap-2 text-sm font-medium">
-          <input type="checkbox" {...register('photoConsent')} className="rounded" />
-          Photo consent given
-        </label>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Required before taking a photo. Stored securely with the contact record.
-        </p>
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <label
-            className={cn(
-              'inline-flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm',
-              photoConsent ? 'border-primary bg-primary/5' : 'opacity-50 pointer-events-none',
-            )}
-          >
-            <Camera className="h-4 w-4" />
-            Take / upload photo
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={onPhotoChange}
-            />
-          </label>
-          {photoPreview ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={photoPreview} alt="Capture preview" className="h-16 w-16 rounded-md object-cover" />
-          ) : null}
-        </div>
       </div>
 
       <Button type="submit" className="w-full" disabled={isSubmitting}>

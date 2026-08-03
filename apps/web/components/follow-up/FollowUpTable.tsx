@@ -1,13 +1,16 @@
 'use client';
 
-import { useState } from 'react';
-import { ArrowRightCircle, Calendar, Eye, Mail, Phone, User } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ArrowRightCircle, Calendar, Clock, Eye, Mail, Phone, User } from 'lucide-react';
 import {
   STAGE_BADGE_CLASS,
   STAGE_LABELS,
   STAGE_ROW_CLASS,
+  STAGE_ROW_MUTED_CLASS,
+  formatCapturedAt,
   formatDue,
   nextStage,
+  sortByNewestFirst,
   stageStatusLabel,
 } from '@/lib/follow-up';
 import type { FollowUpCard, ProgressAdvancePayload } from '@/components/follow-up/FollowUpPipeline';
@@ -42,6 +45,8 @@ export function FollowUpTable({
     contactName: string;
     stage: string;
   } | null>(null);
+
+  const sorted = useMemo(() => sortByNewestFirst(items), [items]);
 
   if (items.length === 0) {
     return (
@@ -83,20 +88,22 @@ export function FollowUpTable({
               <th className="px-3 py-2.5 font-semibold">Email</th>
               <th className="px-3 py-2.5 font-semibold">Assignee</th>
               <th className="px-3 py-2.5 font-semibold">Due</th>
+              <th className="px-3 py-2.5 font-semibold">Captured</th>
               <th className="px-3 py-2.5 font-semibold">Referred by</th>
-              <th className="px-3 py-2.5 font-semibold">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {items.map((item) => {
+            {sorted.map((item) => {
               const due = formatDue(item.dueAt);
               const nxt = nextStage(item.stage);
               const referred = item.referredBy?.trim() || null;
+              const captured = formatCapturedAt(item.createdAt);
+              const muted = STAGE_ROW_MUTED_CLASS[item.stage] ?? 'text-muted-foreground';
               return (
                 <tr
                   key={item.id}
                   className={cn(
-                    'border-b border-border/70 transition-colors hover:brightness-[0.98] dark:hover:brightness-110',
+                    'border-b border-border/50 transition-colors hover:brightness-[0.97] dark:hover:brightness-110',
                     STAGE_ROW_CLASS[item.stage] ?? 'bg-card',
                     selectedId === item.id && 'ring-2 ring-inset ring-primary/40',
                   )}
@@ -104,7 +111,7 @@ export function FollowUpTable({
                   <td className="px-3 py-2.5">
                     <button
                       type="button"
-                      className="font-medium text-foreground hover:text-primary hover:underline"
+                      className="font-medium hover:underline"
                       onClick={() => onSelect(item.id)}
                     >
                       {item.contactName}
@@ -120,12 +127,12 @@ export function FollowUpTable({
                       >
                         {stageStatusLabel(item.stage)}
                       </Badge>
-                      <span className="text-[11px] text-muted-foreground">
+                      <span className={cn('text-[11px]', muted)}>
                         {STAGE_LABELS[item.stage] ?? item.stage}
                       </span>
                     </div>
                   </td>
-                  <td className="px-3 py-2.5 text-muted-foreground">
+                  <td className={cn('px-3 py-2.5', muted)}>
                     {item.contactPhone ? (
                       <span className="inline-flex items-center gap-1">
                         <Phone className="h-3 w-3" />
@@ -135,7 +142,7 @@ export function FollowUpTable({
                       '—'
                     )}
                   </td>
-                  <td className="max-w-[180px] truncate px-3 py-2.5 text-muted-foreground">
+                  <td className={cn('max-w-[180px] truncate px-3 py-2.5', muted)}>
                     {item.contactEmail ? (
                       <span className="inline-flex items-center gap-1">
                         <Mail className="h-3 w-3 shrink-0" />
@@ -145,7 +152,7 @@ export function FollowUpTable({
                       '—'
                     )}
                   </td>
-                  <td className="px-3 py-2.5 text-muted-foreground">
+                  <td className={cn('px-3 py-2.5', muted)}>
                     {item.assignedTo ? (
                       <span className="inline-flex items-center gap-1">
                         <User className="h-3 w-3" />
@@ -160,7 +167,7 @@ export function FollowUpTable({
                       <span
                         className={cn(
                           'inline-flex items-center gap-1 text-xs font-medium',
-                          due.overdue ? 'text-destructive' : 'text-muted-foreground',
+                          due.overdue ? 'text-destructive' : muted,
                         )}
                       >
                         <Calendar className="h-3 w-3" />
@@ -168,19 +175,29 @@ export function FollowUpTable({
                         {due.label}
                       </span>
                     ) : (
+                      <span className={muted}>—</span>
+                    )}
+                  </td>
+                  <td className={cn('px-3 py-2.5 text-xs', muted)}>
+                    {captured ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {captured}
+                      </span>
+                    ) : (
                       '—'
                     )}
                   </td>
-                  <td className="max-w-[140px] truncate px-3 py-2.5 text-muted-foreground">
-                    {referred ?? '—'}
-                  </td>
                   <td className="px-3 py-2.5">
                     <div className="flex items-center gap-1">
+                      <span className={cn('max-w-[120px] truncate text-sm', muted)}>
+                        {referred ?? '—'}
+                      </span>
                       <Button
                         type="button"
                         variant="outline"
                         size="icon"
-                        className="h-8 w-8"
+                        className="ml-auto h-8 w-8 shrink-0 bg-background/70"
                         title="View detailed"
                         aria-label={`View detailed — ${item.contactName}`}
                         onClick={() => onSelect(item.id)}
@@ -192,7 +209,7 @@ export function FollowUpTable({
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-primary"
+                          className="h-8 w-8 shrink-0"
                           title="Advance to next stage"
                           aria-label={`Advance ${item.contactName} to next stage`}
                           disabled={advancing}

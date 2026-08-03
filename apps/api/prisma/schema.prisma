@@ -1084,6 +1084,7 @@ enum FollowUpStage {
   VISITED
   ATTENDED
   JOINED_GROUP
+  ENLISTED_FOR_BAPTISM
 }
 
 model FollowUp {

@@ -4,39 +4,39 @@ export const FOLLOW_UP_STAGES = [
   'VISITED',
   'ATTENDED',
   'JOINED_GROUP',
+  'ENLISTED_FOR_BAPTISM',
 ] as const;
 
 export const STAGE_LABELS: Record<string, string> = {
   NEW_LEAD: 'Fresh Contact',
   CONTACTED: 'Contacted',
-  VISITED: 'Visited',
-  ATTENDED: 'Attended',
+  VISITED: 'Attended Service',
+  ATTENDED: 'Engrafted In WSF',
   JOINED_GROUP: 'Joined Group',
+  ENLISTED_FOR_BAPTISM: 'Enlisted for Baptism',
 };
 
 export const STAGE_SHORT: Record<string, string> = {
   NEW_LEAD: 'Fresh',
   CONTACTED: 'Contacted',
-  VISITED: 'Visited',
-  ATTENDED: 'Attended',
+  VISITED: 'Service',
+  ATTENDED: 'WSF',
   JOINED_GROUP: 'Joined',
+  ENLISTED_FOR_BAPTISM: 'Baptism',
 };
 
 /**
  * Journey status pill colors — shared by pipeline cards and Outreach Directory.
- * Fresh (NEW_LEAD) matches the gold/peach card badge.
  */
 export const STAGE_BADGE_CLASS: Record<string, string> = {
-  NEW_LEAD:
-    'border-transparent bg-amber-100/90 text-amber-900 dark:bg-amber-950/80 dark:text-amber-200',
-  CONTACTED:
-    'border-transparent bg-sky-100 text-sky-900 dark:bg-sky-950/80 dark:text-sky-200',
-  VISITED:
-    'border-transparent bg-yellow-100 text-amber-950 dark:bg-amber-950/70 dark:text-amber-100',
-  ATTENDED:
-    'border-transparent bg-orange-100 text-orange-900 dark:bg-orange-950/70 dark:text-orange-100',
+  NEW_LEAD: 'border-transparent bg-[#7d3d19]/25 text-[#7d3d19] dark:text-amber-100',
+  CONTACTED: 'border-transparent bg-[#e0f2fe] text-sky-900 dark:bg-sky-950/80 dark:text-sky-200',
+  VISITED: 'border-transparent bg-[#fef3c7] text-amber-950 dark:bg-amber-950/70 dark:text-amber-100',
+  ATTENDED: 'border-transparent bg-[#b58b62]/30 text-[#5c4030] dark:text-amber-100',
   JOINED_GROUP:
-    'border-transparent bg-emerald-100 text-emerald-900 dark:bg-emerald-950/80 dark:text-emerald-100',
+    'border-transparent bg-[#d1fae5] text-emerald-900 dark:bg-emerald-950/80 dark:text-emerald-100',
+  ENLISTED_FOR_BAPTISM:
+    'border-transparent bg-violet-100 text-violet-900 dark:bg-violet-950/80 dark:text-violet-100',
 };
 
 export function stageStatusLabel(stage: string): string {
@@ -57,15 +57,15 @@ export const PIPELINE_COLUMNS = [
     dotClass: 'bg-sky-600',
     stages: ['NEW_LEAD', 'CONTACTED'] as const,
     stageAccent: {
-      NEW_LEAD: 'border-t-sky-500',
-      CONTACTED: 'border-t-blue-500',
+      NEW_LEAD: 'border-t-[#7d3d19]',
+      CONTACTED: 'border-t-sky-400',
     },
   },
   {
     id: 'engagement',
     step: 2,
     title: 'Growing Engagement',
-    subtitle: 'Visits & service attendance',
+    subtitle: 'Service attendance & WSF',
     accent: 'amber',
     headerClass: 'bg-amber-100 border-amber-200 dark:bg-amber-950 dark:border-amber-800',
     titleClass: 'text-amber-950 dark:text-amber-50',
@@ -73,44 +73,48 @@ export const PIPELINE_COLUMNS = [
     dotClass: 'bg-amber-600',
     stages: ['VISITED', 'ATTENDED'] as const,
     stageAccent: {
-      VISITED: 'border-t-amber-500',
-      ATTENDED: 'border-t-orange-500',
+      VISITED: 'border-t-amber-400',
+      ATTENDED: 'border-t-[#b58b62]',
     },
   },
   {
     id: 'belonging',
     step: 3,
     title: 'Belonging & Discipleship',
-    subtitle: 'Cell group & maturity',
+    subtitle: 'Cell group, maturity & baptism',
     accent: 'emerald',
     headerClass: 'bg-emerald-100 border-emerald-200 dark:bg-emerald-950 dark:border-emerald-800',
     titleClass: 'text-emerald-950 dark:text-emerald-50',
     subtitleClass: 'text-emerald-900 dark:text-emerald-200',
     dotClass: 'bg-emerald-600',
-    stages: ['JOINED_GROUP'] as const,
+    stages: ['JOINED_GROUP', 'ENLISTED_FOR_BAPTISM'] as const,
     stageAccent: {
       JOINED_GROUP: 'border-t-emerald-500',
+      ENLISTED_FOR_BAPTISM: 'border-t-violet-500',
     },
   },
 ] as const;
 
-/** Distinctive row backgrounds for Outreach Directory — keyed by journey phase. */
-export const PHASE_ROW_CLASS: Record<(typeof PIPELINE_COLUMNS)[number]['id'], string> = {
-  outreach:
-    'bg-sky-50/95 border-l-4 border-l-sky-500 dark:bg-sky-950/45 dark:border-l-sky-400',
-  engagement:
-    'bg-amber-50/95 border-l-4 border-l-amber-500 dark:bg-amber-950/45 dark:border-l-amber-400',
-  belonging:
-    'bg-emerald-50/95 border-l-4 border-l-emerald-600 dark:bg-emerald-950/45 dark:border-l-emerald-400',
+/** Full-row backgrounds for pipeline cards and Outreach Directory (stage tint). */
+export const STAGE_ROW_CLASS: Record<string, string> = {
+  NEW_LEAD: 'bg-[#7d3d19] text-amber-50 border-[#7d3d19]',
+  CONTACTED: 'bg-[#e0f2fe] text-sky-950 border-sky-200 dark:bg-sky-950/50 dark:text-sky-50',
+  VISITED: 'bg-[#fef3c7] text-amber-950 border-amber-200 dark:bg-amber-950/40 dark:text-amber-50',
+  ATTENDED: 'bg-[#b58b62] text-amber-50 border-[#b58b62]',
+  JOINED_GROUP:
+    'bg-[#d1fae5] text-emerald-950 border-emerald-200 dark:bg-emerald-950/45 dark:text-emerald-50',
+  ENLISTED_FOR_BAPTISM:
+    'bg-violet-100 text-violet-950 border-violet-200 dark:bg-violet-950/45 dark:text-violet-50',
 };
 
-/** Distinctive row backgrounds for Outreach Directory table (stage → phase tint). */
-export const STAGE_ROW_CLASS: Record<string, string> = {
-  NEW_LEAD: PHASE_ROW_CLASS.outreach,
-  CONTACTED: PHASE_ROW_CLASS.outreach,
-  VISITED: PHASE_ROW_CLASS.engagement,
-  ATTENDED: PHASE_ROW_CLASS.engagement,
-  JOINED_GROUP: PHASE_ROW_CLASS.belonging,
+/** Muted text on dark stage rows. */
+export const STAGE_ROW_MUTED_CLASS: Record<string, string> = {
+  NEW_LEAD: 'text-amber-100/85',
+  CONTACTED: 'text-sky-800/80 dark:text-sky-200/80',
+  VISITED: 'text-amber-900/75 dark:text-amber-100/75',
+  ATTENDED: 'text-amber-50/85',
+  JOINED_GROUP: 'text-emerald-900/75 dark:text-emerald-100/75',
+  ENLISTED_FOR_BAPTISM: 'text-violet-900/75 dark:text-violet-100/75',
 };
 
 export const CHANNEL_LABELS: Record<string, string> = {
@@ -142,9 +146,34 @@ export function formatDue(dueAt?: string | null) {
   };
 }
 
+export function formatCapturedAt(createdAt?: string | null) {
+  if (!createdAt) return null;
+  const d = new Date(createdAt);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+export function sortByNewestFirst<T extends { createdAt?: string | null }>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return tb - ta;
+  });
+}
+
 export function phaseForStage(stage: string): (typeof PIPELINE_COLUMNS)[number]['id'] {
   for (const col of PIPELINE_COLUMNS) {
     if ((col.stages as readonly string[]).includes(stage)) return col.id;
   }
   return 'outreach';
+}
+
+/** Stages that block archive (must convert / progress instead). */
+export function isArchiveBlockedStage(stage: string): boolean {
+  return stage === 'JOINED_GROUP';
 }

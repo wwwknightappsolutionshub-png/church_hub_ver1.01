@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {
-  emailSchema,
+  optionalEmailSchema,
   optionalUkPostcodeSchema,
   phoneSchema,
   PublicOutreachRegisterSchema,
@@ -20,7 +20,7 @@ export const outreachCaptureSchema = z.object({
     })
     .optional(),
   phone: phoneSchema,
-  email: emailSchema,
+  email: optionalEmailSchema,
   evangelistId: z.string().uuid().optional(),
   qrCodeId: z.string().uuid().optional(),
   latitude: z.number().min(-90).max(90).optional(),

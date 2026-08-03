@@ -25,6 +25,7 @@ export const FollowUpStageSchema = z.enum([
   'VISITED',
   'ATTENDED',
   'JOINED_GROUP',
+  'ENLISTED_FOR_BAPTISM',
 ]);
 export type FollowUpStage = z.infer<typeof FollowUpStageSchema>;
 
