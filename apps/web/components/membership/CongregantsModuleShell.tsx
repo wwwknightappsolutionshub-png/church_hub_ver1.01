@@ -36,7 +36,7 @@ export function CongregantsModuleShell({
         actions={actions}
       />
       <CongregantsFeatureNav />
-      <div className="mx-auto max-w-7xl space-y-6 p-6 md:p-8">{children}</div>
+      <div className="mx-auto max-w-7xl space-y-5 p-4 md:p-6">{children}</div>
     </EnterpriseShell>
   );
 }

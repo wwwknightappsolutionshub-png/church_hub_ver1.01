@@ -3,9 +3,9 @@
  */
 export const MODULE_DESCRIPTIONS = {
   dashboard:
-    'Attendance chart, church calendar, birthdays and anniversaries, and pinned events on your admin home screen.',
+    'Church KPIs, operations pulse, celebrations, growth charts, attendance, ministry modules, and the church calendar — one leadership home.',
   admin:
-    'Shortcuts to congregants, automation, communications, analytics, and reports — your church admin starting point.',
+    'Redirects to Dashboard — Admin Centre is merged into the main leadership home.',
   analytics:
     'Attendance trends, membership status mix, outreach pipeline, and follow-up conversion charts for leadership review.',
   automation:

@@ -21,7 +21,6 @@ import {
   Star,
   Network,
   Settings,
-  Shield,
   Zap,
   UserCircle,
   UserCog,
@@ -79,13 +78,7 @@ export const MEMBER_NAV: DashboardNavItem[] = [...OPEN_MEMBER_NAV, ...GATED_MEMB
 
 /** Admin & pastor — Section 1: Leadership */
 export const STAFF_LEADERSHIP_NAV: DashboardNavItem[] = [
-  { href: '/dashboard', label: 'Overview', icon: LayoutDashboard, exact: true },
-  {
-    href: '/dashboard/admin',
-    label: 'Admin Centre',
-    icon: Shield,
-    requiresChurchLeadership: true,
-  },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/dashboard/follow-up', label: 'Outreach', icon: HeartHandshake },
   {
     href: '/dashboard/ministry-cells',

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ChevronDown,
@@ -791,9 +791,33 @@ export function ReportsInboxPanel({
   const [reply, setReply] = useState({ recipientId: '', subject: '', body: '' });
   const [busy, setBusy] = useState(false);
   const [digestBusy, setDigestBusy] = useState<'dept' | 'cell' | null>(null);
+  const [digestMenuOpen, setDigestMenuOpen] = useState(false);
+  const digestMenuRef = useRef<HTMLDivElement>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | QueueStatus>('all');
   const [kindFilter, setKindFilter] = useState<TriageKind>('all');
+  const [urgencyFilter, setUrgencyFilter] = useState<UrgencyLevel | 'all'>('all');
+
+  useEffect(() => {
+    if (!digestMenuOpen) return;
+    const onPointerDown = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node | null;
+      if (target && !digestMenuRef.current?.contains(target)) {
+        setDigestMenuOpen(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDigestMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('touchstart', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('touchstart', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [digestMenuOpen]);
 
   const sendDepartmentDigest = async () => {
     setDigestBusy('dept');
@@ -850,27 +874,30 @@ export function ReportsInboxPanel({
 
   const deptReports = useMemo(() => {
     if (kindFilter !== 'all' && kindFilter !== 'department') return [];
+    if (urgencyFilter !== 'all' && urgencyFilter !== 'medium') return [];
     return (data?.reports.department ?? []).filter((r) => {
       const blob = `${r.title} ${r.body} ${r.serviceUnit.name} ${r.author.firstName} ${r.author.lastName}`;
       return matchesSearch(blob, search);
     });
-  }, [data, kindFilter, search]);
+  }, [data, kindFilter, search, urgencyFilter]);
 
   const weeklyReports = useMemo(() => {
     if (kindFilter !== 'all' && kindFilter !== 'weekly') return [];
+    if (urgencyFilter !== 'all' && urgencyFilter !== 'info') return [];
     return (data?.reports.weekly ?? []).filter((r) => {
       const blob = `${r.body} ${r.serviceUnit.name}`;
       return matchesSearch(blob, search);
     });
-  }, [data, kindFilter, search]);
+  }, [data, kindFilter, search, urgencyFilter]);
 
   const cellAttendanceAll = useMemo(() => {
     if (kindFilter !== 'all' && kindFilter !== 'cell') return [];
+    if (urgencyFilter !== 'all' && urgencyFilter !== 'low') return [];
     return (data?.reports.cellAttendance ?? []).filter((r) => {
       const blob = `${r.branchName} ${r.location ?? ''} ${r.presentCount} ${r.maleCount} ${r.femaleCount} ${r.boysCount} ${r.girlsCount} ${r.firstTimersCount}`;
       return matchesSearch(blob, search);
     });
-  }, [data, kindFilter, search]);
+  }, [data, kindFilter, search, urgencyFilter]);
 
   const cellAttendanceReports = useMemo(
     () =>
@@ -884,11 +911,12 @@ export function ReportsInboxPanel({
 
   const unitAttendanceAll = useMemo(() => {
     if (kindFilter !== 'all' && kindFilter !== 'unit') return [];
+    if (urgencyFilter !== 'all' && urgencyFilter !== 'low') return [];
     return (data?.reports.unitAttendance ?? []).filter((r) => {
       const blob = `${r.serviceUnitName} ${r.departmentCode ?? ''} ${r.presentCount} ${r.maleCount} ${r.femaleCount} ${r.firstTimersCount}`;
       return matchesSearch(blob, search);
     });
-  }, [data, kindFilter, search]);
+  }, [data, kindFilter, search, urgencyFilter]);
 
   const unitAttendanceReports = useMemo(
     () =>
@@ -902,45 +930,52 @@ export function ReportsInboxPanel({
 
   const meetingSummaries = useMemo(() => {
     if (kindFilter !== 'all' && kindFilter !== 'meeting') return [];
+    if (urgencyFilter !== 'all' && urgencyFilter !== 'medium') return [];
     return (data?.reports.meetingSummaries ?? []).filter((r) => {
       const blob = `${r.title} ${r.body} ${r.serviceUnit.name} ${r.author.firstName} ${r.author.lastName}`;
       return matchesSearch(blob, search);
     });
-  }, [data, kindFilter, search]);
+  }, [data, kindFilter, search, urgencyFilter]);
 
   const rtpRequests = useMemo(() => {
     if (kindFilter !== 'all' && kindFilter !== 'rtp') return [];
     return (data?.reports.rtpRequests ?? []).filter((r) => {
+      const urgency =
+        r.status === 'SUBMITTED' ? 'high' : r.status === 'PROCESSING' ? 'medium' : 'info';
+      if (urgencyFilter !== 'all' && urgencyFilter !== urgency) return false;
       const values = Object.values(r.fieldValues ?? {}).join(' ');
       const blob = `${r.title} ${r.status} ${r.serviceUnit.name} ${r.submittedBy.firstName} ${r.submittedBy.lastName} ${values}`;
       return matchesSearch(blob, search);
     });
-  }, [data, kindFilter, search]);
+  }, [data, kindFilter, search, urgencyFilter]);
 
   const queueItems = useMemo(() => {
     if (kindFilter !== 'all' && kindFilter !== 'queue') return [];
     return (data?.queue ?? []).filter((q) => {
       if (statusFilter !== 'all' && q.status !== statusFilter) return false;
+      if (urgencyFilter !== 'all' && queueUrgency(q.status) !== urgencyFilter) return false;
       const blob = `${q.title} ${q.body} ${q.kind} ${q.status} ${q.serviceUnit?.name ?? ''}`;
       return matchesSearch(blob, search);
     });
-  }, [data, kindFilter, search, statusFilter]);
+  }, [data, kindFilter, search, statusFilter, urgencyFilter]);
 
   const notifications = useMemo(() => {
     if (kindFilter !== 'all' && kindFilter !== 'notification') return [];
+    if (urgencyFilter !== 'all' && urgencyFilter !== 'info') return [];
     return (data?.notifications ?? []).filter((n) => {
       const blob = `${n.title} ${n.body} ${n.type}`;
       return matchesSearch(blob, search);
     });
-  }, [data, kindFilter, search]);
+  }, [data, kindFilter, search, urgencyFilter]);
 
   const messages = useMemo(() => {
     if (kindFilter !== 'all' && kindFilter !== 'message') return [];
+    if (urgencyFilter !== 'all' && urgencyFilter !== 'info') return [];
     return (data?.messages ?? []).filter((m) => {
       const blob = `${m.subject ?? ''} ${m.body} ${m.sender.firstName} ${m.sender.lastName} ${m.recipient.firstName} ${m.recipient.lastName}`;
       return matchesSearch(blob, search);
     });
-  }, [data, kindFilter, search]);
+  }, [data, kindFilter, search, urgencyFilter]);
 
   const triageCount =
     deptReports.length +
@@ -962,29 +997,56 @@ export function ReportsInboxPanel({
       info: 0,
     };
     for (const q of data?.queue ?? []) {
-      if (statusFilter !== 'all' && q.status !== statusFilter) continue;
       counts[queueUrgency(q.status)] += 1;
     }
-    if (deptReports.length) counts.medium += deptReports.length;
-    if (weeklyReports.length) counts.info += weeklyReports.length;
-    if (meetingSummaries.length) counts.medium += meetingSummaries.length;
-    if (rtpRequests.length) {
-      counts.high += rtpRequests.filter((r) => r.status === 'SUBMITTED').length;
-      counts.medium += rtpRequests.filter((r) => r.status === 'PROCESSING').length;
+    counts.medium += data?.reports.department.length ?? 0;
+    counts.info += data?.reports.weekly.length ?? 0;
+    counts.medium += data?.reports.meetingSummaries?.length ?? 0;
+    for (const r of data?.reports.rtpRequests ?? []) {
+      if (r.status === 'SUBMITTED') counts.high += 1;
+      else if (r.status === 'PROCESSING') counts.medium += 1;
+      else counts.info += 1;
     }
-    if (cellAttendanceReports.length) counts.low += cellAttendanceReports.length;
-    if (unitAttendanceReports.length) counts.low += unitAttendanceReports.length;
+    counts.low += data?.reports.cellAttendance?.length ?? 0;
+    counts.low += data?.reports.unitAttendance?.length ?? 0;
+    counts.info += data?.notifications.length ?? 0;
+    counts.info += data?.messages.length ?? 0;
     return counts;
-  }, [
-    data?.queue,
-    deptReports.length,
-    weeklyReports.length,
-    meetingSummaries.length,
-    rtpRequests,
-    cellAttendanceReports.length,
-    unitAttendanceReports.length,
-    statusFilter,
-  ]);
+  }, [data]);
+
+  const sourceCounts = useMemo(
+    () => ({
+      all:
+        (data?.reports.department.length ?? 0) +
+        (data?.reports.weekly.length ?? 0) +
+        (data?.reports.meetingSummaries?.length ?? 0) +
+        (data?.reports.rtpRequests?.length ?? 0) +
+        (data?.reports.cellAttendance?.length ?? 0) +
+        (data?.reports.unitAttendance?.length ?? 0) +
+        (data?.queue.length ?? 0) +
+        (data?.notifications.length ?? 0) +
+        (data?.messages.length ?? 0),
+      department: data?.reports.department.length ?? 0,
+      weekly: data?.reports.weekly.length ?? 0,
+      meeting: data?.reports.meetingSummaries?.length ?? 0,
+      rtp: data?.reports.rtpRequests?.length ?? 0,
+      cell: data?.reports.cellAttendance?.length ?? 0,
+      unit: data?.reports.unitAttendance?.length ?? 0,
+      queue: data?.queue.length ?? 0,
+      notification: data?.notifications.length ?? 0,
+      message: data?.messages.length ?? 0,
+    }),
+    [data],
+  );
+
+  const reportTotal =
+    (data?.reports.department.length ?? 0) +
+    (data?.reports.weekly.length ?? 0) +
+    (data?.reports.meetingSummaries?.length ?? 0) +
+    (data?.reports.rtpRequests?.length ?? 0) +
+    (data?.reports.cellAttendance?.length ?? 0) +
+    (data?.reports.unitAttendance?.length ?? 0);
+  const criticalNeeds = urgencyCounts.critical + urgencyCounts.high;
 
   const submitReply = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1015,134 +1077,194 @@ export function ReportsInboxPanel({
       title={title}
       description={description}
       badge={
-        <Badge variant="success" className="gap-1 border-emerald-600/50 bg-emerald-900/40 text-emerald-100">
-          <Mail className="h-3 w-3" />
-          {(data?.reports.department.length ?? 0) +
-            (data?.reports.weekly.length ?? 0) +
-            (data?.reports.meetingSummaries?.length ?? 0) +
-            (data?.reports.rtpRequests?.length ?? 0) +
-            (data?.reports.cellAttendance?.length ?? 0) +
-            (data?.reports.unitAttendance?.length ?? 0)}{' '}
-          reports ·{' '}
-          {data?.messages.length ?? 0} messages
-        </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="success" className="gap-1 border-emerald-600/50 bg-emerald-900/40 text-emerald-100">
+            <Mail className="h-3 w-3" />
+            {reportTotal} reports · {data?.messages.length ?? 0} messages
+          </Badge>
+          {criticalNeeds > 0 ? (
+            <Badge className="border-red-500/40 bg-red-600/90 text-white">
+              {criticalNeeds} need attention
+            </Badge>
+          ) : null}
+        </div>
       }
-    >
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5" data-testid="reports-urgency-strip">
-        {(Object.keys(URGENCY_META) as UrgencyLevel[]).map((level) => (
-          <div
-            key={level}
-            className={cn(
-              'rounded-xl border px-4 py-3 shadow-sm',
-              URGENCY_META[level].card,
-            )}
-          >
-            <div className="flex items-center gap-2">
-              <span className={cn('h-2 w-2 rounded-full', URGENCY_META[level].dot)} aria-hidden />
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {URGENCY_META[level].label}
-              </p>
-            </div>
-            <p className="mt-1 text-2xl font-bold tabular-nums">{urgencyCounts[level]}</p>
-          </div>
-        ))}
-      </div>
-
-      <Card className="border-primary/20 bg-primary/[0.03] shadow-sm" data-testid="reports-digest-actions">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Email digests</CardTitle>
-          <CardDescription className="text-xs">
-            Send one table to one Church Admin + one Pastor (reports mailbox). Also runs
-            automatically: departments Mon 10:00, cells Sat 21:00 (Europe/London).
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            size="sm"
-            disabled={digestBusy !== null}
-            onClick={() => void sendDepartmentDigest()}
-          >
-            {digestBusy === 'dept' ? (
-              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="mr-1.5 h-4 w-4" />
-            )}
-            Send department digest
-          </Button>
+      actions={
+        <div className="relative" ref={digestMenuRef} data-testid="reports-digest-actions">
           <Button
             type="button"
             size="sm"
             variant="secondary"
+            className="border-white/25 bg-white/10 text-white hover:bg-white/20"
+            aria-expanded={digestMenuOpen}
+            aria-haspopup="menu"
             disabled={digestBusy !== null}
-            onClick={() => void sendCellDigest()}
+            onClick={() => setDigestMenuOpen((o) => !o)}
           >
-            {digestBusy === 'cell' ? (
+            {digestBusy ? (
               <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
             ) : (
-              <Mail className="mr-1.5 h-4 w-4" />
+              <Send className="mr-1.5 h-4 w-4" />
             )}
-            Send cell digest
+            Send digests
+            <ChevronDown className="ml-1.5 h-3.5 w-3.5 opacity-80" />
           </Button>
-        </CardContent>
-      </Card>
+          {digestMenuOpen ? (
+            <div
+              role="menu"
+              className="absolute left-0 z-30 mt-1 w-64 rounded-lg border border-border bg-card p-1 text-foreground shadow-lg sm:left-auto sm:right-0"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
+                disabled={digestBusy !== null}
+                onClick={() => {
+                  setDigestMenuOpen(false);
+                  void sendDepartmentDigest();
+                }}
+              >
+                <Send className="h-4 w-4 shrink-0" />
+                Department digest
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
+                disabled={digestBusy !== null}
+                onClick={() => {
+                  setDigestMenuOpen(false);
+                  void sendCellDigest();
+                }}
+              >
+                <Mail className="h-4 w-4 shrink-0" />
+                Cell digest
+              </button>
+              <p className="border-t border-border px-3 py-2 text-[10px] leading-snug text-muted-foreground">
+                Auto: departments Mon 10:00 · cells Sat 21:00 (Europe/London)
+              </p>
+            </div>
+          ) : null}
+        </div>
+      }
+      contentClassName="!p-0 md:!p-0"
+    >
+      <div className="flex flex-col gap-0 lg:min-h-[calc(100dvh-11rem)] lg:flex-row">
+        {/* Triage rail */}
+        <aside
+          className="shrink-0 border-b border-border bg-slate-50/80 lg:w-56 lg:border-b-0 lg:border-r dark:bg-slate-950/40"
+          data-testid="reports-urgency-strip"
+        >
+          <div className="space-y-4 p-3 sm:p-4">
+            <div>
+              <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Needs action
+              </p>
+              <div className="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
+                <button
+                  type="button"
+                  onClick={() => setUrgencyFilter('all')}
+                  className={cn(
+                    'flex shrink-0 items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left text-sm transition lg:w-full',
+                    urgencyFilter === 'all'
+                      ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                      : 'text-slate-700 hover:bg-slate-200/80 dark:text-slate-300 dark:hover:bg-slate-800',
+                  )}
+                >
+                  <span>All priorities</span>
+                  <span className="tabular-nums text-xs opacity-80">{sourceCounts.all}</span>
+                </button>
+                {(Object.keys(URGENCY_META) as UrgencyLevel[]).map((level) => (
+                  <button
+                    key={level}
+                    type="button"
+                    onClick={() => setUrgencyFilter(level)}
+                    className={cn(
+                      'flex shrink-0 items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left text-sm transition lg:w-full',
+                      urgencyFilter === level
+                        ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                        : 'text-slate-700 hover:bg-slate-200/80 dark:text-slate-300 dark:hover:bg-slate-800',
+                    )}
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <span className={cn('h-2 w-2 rounded-full', URGENCY_META[level].dot)} aria-hidden />
+                      {URGENCY_META[level].label}
+                    </span>
+                    <span className="tabular-nums text-xs opacity-80">{urgencyCounts[level]}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
 
-      <Card className="border-slate-200/80 shadow-sm">
-        <CardContent className="flex flex-col gap-3 pt-6 sm:flex-row sm:flex-wrap sm:items-end">
-          <div className="min-w-[200px] flex-1 space-y-1">
-            <Label htmlFor={`${replyFormId}-search`} className="text-xs text-muted-foreground">
-              Search
-            </Label>
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                id={`${replyFormId}-search`}
-                className="pl-8"
-                placeholder="Title, department, sender, body..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+            <div>
+              <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Sources
+              </p>
+              <div className="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
+                {KIND_OPTIONS.map((o) => (
+                  <button
+                    key={o.value}
+                    type="button"
+                    onClick={() => setKindFilter(o.value)}
+                    className={cn(
+                      'flex shrink-0 items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left text-sm transition lg:w-full',
+                      kindFilter === o.value
+                        ? 'bg-primary/15 font-medium text-primary'
+                        : 'text-slate-700 hover:bg-slate-200/80 dark:text-slate-300 dark:hover:bg-slate-800',
+                    )}
+                  >
+                    <span className="truncate">{o.label}</span>
+                    <span className="tabular-nums text-xs opacity-70">
+                      {sourceCounts[o.value as keyof typeof sourceCounts] ?? 0}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-          <div className="space-y-1">
-            <Label htmlFor={`${replyFormId}-status`} className="text-xs text-muted-foreground">
-              Queue status
-            </Label>
-            <select
-              id={`${replyFormId}-status`}
-              className="h-10 w-full min-w-[140px] rounded-md border border-input bg-background px-3 text-sm"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as 'all' | QueueStatus)}
-            >
-              {STATUS_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+        </aside>
+
+        {/* Working surface */}
+        <div className="min-w-0 flex-1 space-y-4 p-4 md:p-5">
+          <div className="sticky top-[calc(3rem+env(safe-area-inset-top))] z-10 -mx-4 border-b border-border bg-background/95 px-4 py-3 backdrop-blur md:-mx-5 md:px-5 xl:top-16">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+              <div className="min-w-[200px] flex-1 space-y-1">
+                <Label htmlFor={`${replyFormId}-search`} className="text-xs text-muted-foreground">
+                  Search
+                </Label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id={`${replyFormId}-search`}
+                    className="pl-8"
+                    placeholder="Title, department, sender, body..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor={`${replyFormId}-status`} className="text-xs text-muted-foreground">
+                  Queue status
+                </Label>
+                <select
+                  id={`${replyFormId}-status`}
+                  className="h-10 w-full min-w-[140px] rounded-md border border-input bg-background px-3 text-sm"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as 'all' | QueueStatus)}
+                >
+                  {STATUS_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="pb-2 text-xs text-muted-foreground sm:ml-auto">
+                {isLoading ? 'Loading…' : `${triageCount} item${triageCount === 1 ? '' : 's'} match`}
+              </p>
+            </div>
           </div>
-          <div className="space-y-1">
-            <Label htmlFor={`${replyFormId}-kind`} className="text-xs text-muted-foreground">
-              Type
-            </Label>
-            <select
-              id={`${replyFormId}-kind`}
-              className="h-10 w-full min-w-[160px] rounded-md border border-input bg-background px-3 text-sm"
-              value={kindFilter}
-              onChange={(e) => setKindFilter(e.target.value as TriageKind)}
-            >
-              {KIND_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <p className="pb-2 text-xs text-muted-foreground sm:ml-auto">
-            {isLoading ? 'Loading…' : `${triageCount} item${triageCount === 1 ? '' : 's'} match`}
-          </p>
-        </CardContent>
-      </Card>
 
       {isLoading ? (
         <div className="flex justify-center py-12">
@@ -1625,6 +1747,8 @@ export function ReportsInboxPanel({
           </div>
         </div>
       )}
+        </div>
+      </div>
     </DashboardModuleShell>
   );
 }

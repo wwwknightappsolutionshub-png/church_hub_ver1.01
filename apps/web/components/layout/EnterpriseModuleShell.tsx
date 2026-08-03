@@ -68,34 +68,34 @@ export function EnterpriseHero({
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute -left-16 top-0 h-56 w-56 rounded-full bg-indigo-500/25 blur-3xl"
+        className="pointer-events-none absolute -left-16 top-0 h-32 w-32 rounded-full bg-indigo-500/20 blur-3xl"
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute -right-10 bottom-0 h-48 w-48 rounded-full bg-amber-400/20 blur-3xl"
+        className="pointer-events-none absolute -right-10 bottom-0 h-28 w-28 rounded-full bg-amber-400/15 blur-3xl"
         aria-hidden
       />
 
-      <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 md:py-10 md:px-8">
+      <div className="relative mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-5 md:px-8">
         {showEyebrow ? (
-          <p className="inline-flex items-center rounded-full border border-amber-300/35 bg-amber-400/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100">
+          <p className="inline-flex items-center rounded-full border border-amber-300/35 bg-amber-400/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-100">
             {eyebrow}
           </p>
         ) : null}
         <div
           className={cn(
-            'flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between',
-            showEyebrow && 'mt-3',
+            'flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between',
+            showEyebrow && 'mt-2',
           )}
         >
           <div className="min-w-0 flex-1">
-            <h1 className="font-heading text-2xl font-bold tracking-tight text-white sm:text-3xl">
+            <h1 className="font-heading text-xl font-bold tracking-tight text-white sm:text-2xl">
               {title}
             </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-100/90 sm:text-base">
+            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-200/85 line-clamp-2 sm:text-sm">
               {description}
             </p>
-            {actions && <div className="mt-4 flex flex-wrap gap-2">{actions}</div>}
+            {actions && <div className="mt-2.5 flex flex-wrap gap-2">{actions}</div>}
           </div>
           {badge ? <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">{badge}</div> : null}
         </div>
@@ -151,8 +151,8 @@ export function EnterpriseTabNav({
 
 export function EnterpriseContent({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn('mx-auto max-w-7xl px-4 py-6 sm:px-6 md:px-8', className)}>
-      <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-6 dark:border-slate-800 dark:bg-card">
+    <div className={cn('mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-5 md:px-8', className)}>
+      <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5 dark:border-slate-800 dark:bg-card">
         {children}
       </div>
     </div>

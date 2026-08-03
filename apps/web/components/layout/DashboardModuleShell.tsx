@@ -60,7 +60,7 @@ export function DashboardModuleShell({
           ariaLabel={tabAriaLabel}
         />
       )}
-      <div className={cn('space-y-6 p-6 md:p-8', contentClassName)}>{children}</div>
+      <div className={cn('space-y-5 p-4 md:p-6', contentClassName)}>{children}</div>
     </EnterpriseShell>
   );
 }
