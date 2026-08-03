@@ -2,7 +2,14 @@
 
 import { useState } from 'react';
 import { Calendar, ChevronRight, Mail, Phone, User } from 'lucide-react';
-import { STAGE_LABELS, STAGE_ROW_CLASS, formatDue, nextStage } from '@/lib/follow-up';
+import {
+  STAGE_BADGE_CLASS,
+  STAGE_LABELS,
+  STAGE_ROW_CLASS,
+  formatDue,
+  nextStage,
+  stageStatusLabel,
+} from '@/lib/follow-up';
 import type { FollowUpCard, ProgressAdvancePayload } from '@/components/follow-up/FollowUpPipeline';
 import {
   ProgressStageDialog,
@@ -102,14 +109,21 @@ export function FollowUpTable({
                     >
                       {item.contactName}
                     </button>
-                    {item.stage === 'NEW_LEAD' ? (
-                      <Badge variant="gold" className="ml-1.5 text-[10px]">
-                        Fresh
-                      </Badge>
-                    ) : null}
                   </td>
-                  <td className="px-3 py-2.5 font-medium text-foreground">
-                    {STAGE_LABELS[item.stage] ?? item.stage}
+                  <td className="px-3 py-2.5">
+                    <div className="flex flex-col gap-0.5">
+                      <Badge
+                        className={cn(
+                          'w-fit text-[10px]',
+                          STAGE_BADGE_CLASS[item.stage] ?? 'bg-muted text-muted-foreground',
+                        )}
+                      >
+                        {stageStatusLabel(item.stage)}
+                      </Badge>
+                      <span className="text-[11px] text-muted-foreground">
+                        {STAGE_LABELS[item.stage] ?? item.stage}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-3 py-2.5 text-muted-foreground">
                     {item.contactPhone ? (
@@ -163,7 +177,7 @@ export function FollowUpTable({
                   <td className="px-3 py-2.5">
                     <div className="flex flex-wrap gap-1">
                       <Button type="button" variant="outline" size="sm" onClick={() => onSelect(item.id)}>
-                        Open
+                        View detailed
                       </Button>
                       {nxt ? (
                         <Button
@@ -180,7 +194,7 @@ export function FollowUpTable({
                             })
                           }
                         >
-                          Progress
+                          Advance to next stage
                           <ChevronRight className="ml-0.5 h-3.5 w-3.5" />
                         </Button>
                       ) : null}

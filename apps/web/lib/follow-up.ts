@@ -32,6 +32,27 @@ export const STAGE_ROW_CLASS: Record<string, string> = {
     'bg-emerald-50/90 border-l-4 border-l-emerald-600 dark:bg-emerald-950/40 dark:border-l-emerald-400',
 };
 
+/**
+ * Journey status pill colors — shared by pipeline cards and Outreach Directory.
+ * Fresh (NEW_LEAD) matches the gold/peach card badge.
+ */
+export const STAGE_BADGE_CLASS: Record<string, string> = {
+  NEW_LEAD:
+    'border-transparent bg-amber-100/90 text-amber-900 dark:bg-amber-950/80 dark:text-amber-200',
+  CONTACTED:
+    'border-transparent bg-sky-100 text-sky-900 dark:bg-sky-950/80 dark:text-sky-200',
+  VISITED:
+    'border-transparent bg-yellow-100 text-amber-950 dark:bg-amber-950/70 dark:text-amber-100',
+  ATTENDED:
+    'border-transparent bg-orange-100 text-orange-900 dark:bg-orange-950/70 dark:text-orange-100',
+  JOINED_GROUP:
+    'border-transparent bg-emerald-100 text-emerald-900 dark:bg-emerald-950/80 dark:text-emerald-100',
+};
+
+export function stageStatusLabel(stage: string): string {
+  return STAGE_SHORT[stage] ?? STAGE_LABELS[stage] ?? stage;
+}
+
 /** Macro phases grouping pipeline stages */
 export const PIPELINE_COLUMNS = [
   {

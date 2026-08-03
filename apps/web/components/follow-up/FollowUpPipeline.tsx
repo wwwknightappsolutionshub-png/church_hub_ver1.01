@@ -3,11 +3,8 @@
 import { useState } from 'react';
 import {
   ArrowRight,
-  Calendar,
   ChevronRight,
   HeartHandshake,
-  Mail,
-  Phone,
   Sprout,
   User,
   Users,
@@ -17,16 +14,13 @@ import { cn } from '@/lib/utils';
 import {
   FOLLOW_UP_STAGES,
   PIPELINE_COLUMNS,
+  STAGE_BADGE_CLASS,
   STAGE_LABELS,
-  formatDue,
-  nextStage,
+  stageStatusLabel,
 } from '@/lib/follow-up';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  ProgressStageDialog,
-  type ProgressFormValues,
-} from '@/components/follow-up/ProgressStageDialog';
+import type { ProgressFormValues } from '@/components/follow-up/ProgressStageDialog';
 import {
   ArchiveIconButton,
   DndIconButton,
@@ -57,8 +51,6 @@ interface FollowUpPipelineProps {
   items: FollowUpCard[];
   selectedId: string | null;
   onSelect: (id: string) => void;
-  onAdvance: (id: string, payload: ProgressAdvancePayload) => void | Promise<void>;
-  advancing?: boolean;
   canArchive?: boolean;
   canRequestArchive?: boolean;
   onArchive?: (id: string, reason: string) => void | Promise<void>;
@@ -79,7 +71,6 @@ function LeadCard({
   selected,
   stageAccent,
   onSelect,
-  onRequestProgress,
   canArchive,
   canRequestArchive,
   onArchiveClick,
@@ -91,7 +82,6 @@ function LeadCard({
   selected: boolean;
   stageAccent: string;
   onSelect: () => void;
-  onRequestProgress: (stage: string) => void;
   canArchive?: boolean;
   canRequestArchive?: boolean;
   onArchiveClick?: () => void;
@@ -99,11 +89,8 @@ function LeadCard({
   onApproveClick?: () => void;
   onDeclineClick?: () => void;
 }) {
-  const due = formatDue(item.dueAt);
-  const nxt = nextStage(item.stage);
-  const pendingReminder = item.reminders?.find((r) => !r.sentAt);
-  const isFresh = item.stage === 'NEW_LEAD';
   const archiveRequested = !!item.archiveRequestedAt;
+  const referred = item.referredBy?.trim() || null;
 
   return (
     <article
@@ -117,83 +104,38 @@ function LeadCard({
         'border-t-[3px]',
       )}
     >
-      <button type="button" onClick={onSelect} className="w-full p-3.5 text-left">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-bold text-foreground">
+      <button type="button" onClick={onSelect} className="w-full p-3 text-left">
+        <div className="flex items-start gap-2.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-bold text-foreground">
             {item.contactName.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
               <h4 className="font-semibold leading-tight text-foreground">{item.contactName}</h4>
-              {isFresh && (
-                <Badge variant="gold" className="text-[10px]">
-                  Fresh
-                </Badge>
-              )}
+              <Badge
+                className={cn(
+                  'text-[10px]',
+                  STAGE_BADGE_CLASS[item.stage] ?? 'bg-muted text-muted-foreground',
+                )}
+              >
+                {stageStatusLabel(item.stage)}
+              </Badge>
               {archiveRequested && (
                 <Badge variant="destructive" className="text-[10px]">
                   Archive requested
                 </Badge>
               )}
-              {item.member && (
-                <Badge variant="outline" className="text-[10px]">
-                  Member
-                </Badge>
-              )}
             </div>
-            <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-              {item.contactPhone && (
-                <p className="flex items-center gap-1.5">
-                  <Phone className="h-3 w-3 shrink-0" />
-                  {item.contactPhone}
-                </p>
-              )}
-              {item.contactEmail && (
-                <p className="flex items-center gap-1.5 truncate">
-                  <Mail className="h-3 w-3 shrink-0" />
-                  {item.contactEmail}
-                </p>
-              )}
-              {item.referredBy?.trim() && (
-                <p className="flex items-center gap-1.5 truncate">
-                  <User className="h-3 w-3 shrink-0" />
-                  Referred by {item.referredBy.trim()}
-                </p>
-              )}
-              {item.assignedTo && (
-                <p className="flex items-center gap-1.5 font-medium text-foreground/80">
-                  <User className="h-3 w-3 shrink-0 text-primary" />
-                  {item.assignedTo.firstName} {item.assignedTo.lastName}
-                </p>
-              )}
-              {item.nextAction && (
-                <p className="line-clamp-2 text-[11px] text-foreground/70">Next: {item.nextAction}</p>
-              )}
-            </div>
+            {referred ? (
+              <p className="mt-1.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+                <User className="h-3 w-3 shrink-0" />
+                Referred by {referred}
+              </p>
+            ) : (
+              <p className="mt-1.5 text-xs text-muted-foreground/70">No referrer noted</p>
+            )}
           </div>
         </div>
-        {(due || pendingReminder) && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {due && (
-              <span
-                className={cn(
-                  'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium',
-                  due.overdue
-                    ? 'bg-destructive/10 text-destructive'
-                    : 'bg-muted text-muted-foreground',
-                )}
-              >
-                <Calendar className="h-3 w-3" />
-                {due.overdue ? 'Overdue' : 'Due'} {due.label}
-              </span>
-            )}
-            {pendingReminder && (
-              <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-100">
-                Reminder set
-              </span>
-            )}
-          </div>
-        )}
       </button>
       <div className="flex flex-wrap items-center gap-1 border-t border-border/80 px-2 py-1.5">
         {canArchive && onArchiveClick && (
@@ -228,18 +170,16 @@ function LeadCard({
             Decline
           </Button>
         )}
-        {nxt && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="ml-auto h-8 justify-between text-xs font-semibold text-primary"
-            onClick={() => onRequestProgress(nxt)}
-          >
-            Progress to the next
-            <ChevronRight className="ml-1 h-3.5 w-3.5" />
-          </Button>
-        )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="ml-auto h-8 text-xs font-semibold text-primary"
+          onClick={onSelect}
+        >
+          View detailed
+          <ChevronRight className="ml-0.5 h-3.5 w-3.5" />
+        </Button>
       </div>
     </article>
   );
@@ -249,8 +189,6 @@ export function FollowUpPipeline({
   items,
   selectedId,
   onSelect,
-  onAdvance,
-  advancing,
   canArchive,
   canRequestArchive,
   onArchive,
@@ -260,11 +198,6 @@ export function FollowUpPipeline({
   archiveBusy,
 }: FollowUpPipelineProps) {
   const total = items.length;
-  const [pending, setPending] = useState<{
-    id: string;
-    contactName: string;
-    stage: string;
-  } | null>(null);
   const [archiveDlg, setArchiveDlg] = useState<{
     id: string;
     contactName: string;
@@ -273,21 +206,6 @@ export function FollowUpPipeline({
 
   return (
     <div className="space-y-6">
-      <ProgressStageDialog
-        open={!!pending}
-        contactName={pending?.contactName ?? ''}
-        nextStage={pending?.stage ?? ''}
-        submitting={advancing}
-        onClose={() => {
-          if (!advancing) setPending(null);
-        }}
-        onSubmit={async (values) => {
-          if (!pending) return;
-          await onAdvance(pending.id, { ...values, stage: pending.stage });
-          setPending(null);
-        }}
-      />
-
       <FollowUpArchiveDialog
         open={!!archiveDlg}
         mode={archiveDlg?.mode ?? 'archive'}
@@ -321,7 +239,7 @@ export function FollowUpPipeline({
             />
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            {total} people in pipeline · drag-free kanban by stage below
+            {total} people in pipeline · open View detailed to advance stages
           </p>
         </div>
 
@@ -392,13 +310,6 @@ export function FollowUpPipeline({
                               selected={selectedId === item.id}
                               stageAccent={accent}
                               onSelect={() => onSelect(item.id)}
-                              onRequestProgress={(s) =>
-                                setPending({
-                                  id: item.id,
-                                  contactName: item.contactName,
-                                  stage: s,
-                                })
-                              }
                               canArchive={canArchive}
                               canRequestArchive={canRequestArchive}
                               onArchiveClick={
@@ -459,7 +370,10 @@ export function FollowUpPipeline({
           return (
             <span
               key={stage}
-              className="rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground"
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium',
+                STAGE_BADGE_CLASS[stage] ?? 'border-border bg-card text-foreground',
+              )}
             >
               {STAGE_LABELS[stage]}: {n}
             </span>

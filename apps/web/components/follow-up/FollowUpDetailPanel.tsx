@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import {
   Bell,
+  ChevronRight,
   Loader2,
   Lock,
   Mail,
@@ -18,11 +19,16 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
-import { CHANNEL_LABELS, STAGE_LABELS, nextStage } from '@/lib/follow-up';
+import { CHANNEL_LABELS, STAGE_BADGE_CLASS, STAGE_LABELS, nextStage, stageStatusLabel } from '@/lib/follow-up';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import {
+  ProgressStageDialog,
+  type ProgressFormValues,
+} from '@/components/follow-up/ProgressStageDialog';
+import type { ProgressAdvancePayload } from '@/components/follow-up/FollowUpPipeline';
 
 interface Assignee {
   id: string;
@@ -83,6 +89,8 @@ interface FollowUpDetailPanelProps {
   canManageMembers: boolean;
   onClose: () => void;
   onUpdated: () => void;
+  onAdvance?: (id: string, payload: ProgressAdvancePayload) => void | Promise<void>;
+  advancing?: boolean;
 }
 
 const channelIcon: Record<string, typeof Smartphone> = {
@@ -100,6 +108,8 @@ export function FollowUpDetailPanel({
   canManageMembers,
   onClose,
   onUpdated,
+  onAdvance,
+  advancing,
 }: FollowUpDetailPanelProps) {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<'details' | 'reminders' | 'messages' | 'notes'>('details');
@@ -116,6 +126,7 @@ export function FollowUpDetailPanel({
   const [confidential, setConfidential] = useState(true);
   const [linkMemberId, setLinkMemberId] = useState(followUp.member?.id ?? '');
   const [mounted, setMounted] = useState(false);
+  const [showAdvance, setShowAdvance] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -241,6 +252,21 @@ export function FollowUpDetailPanel({
 
   return createPortal(
     <>
+      <ProgressStageDialog
+        open={showAdvance && !!nxt}
+        contactName={followUp.contactName}
+        nextStage={nxt ?? ''}
+        submitting={advancing}
+        onClose={() => {
+          if (!advancing) setShowAdvance(false);
+        }}
+        onSubmit={async (values: ProgressFormValues) => {
+          if (!nxt || !onAdvance) return;
+          await onAdvance(followUp.id, { ...values, stage: nxt });
+          setShowAdvance(false);
+          onUpdated();
+        }}
+      />
       <button
         type="button"
         className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm"
@@ -260,9 +286,17 @@ export function FollowUpDetailPanel({
             </div>
             <div className="min-w-0 flex-1">
               <p className="font-heading text-xl font-bold text-foreground">{followUp.contactName}</p>
-              <Badge variant="outline" className="mt-2">
-                {STAGE_LABELS[followUp.stage]}
+              <Badge
+                className={cn(
+                  'mt-2',
+                  STAGE_BADGE_CLASS[followUp.stage] ?? 'bg-muted text-muted-foreground',
+                )}
+              >
+                {stageStatusLabel(followUp.stage)}
               </Badge>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {STAGE_LABELS[followUp.stage] ?? followUp.stage}
+              </p>
               {followUp.referredBy?.trim() ? (
                 <p className="mt-2 text-sm text-muted-foreground">
                   Referred by{' '}
@@ -276,6 +310,18 @@ export function FollowUpDetailPanel({
                     {followUp.assignedTo.firstName} {followUp.assignedTo.lastName}
                   </span>
                 </p>
+              )}
+              {nxt && onAdvance && (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="mt-3"
+                  disabled={advancing}
+                  onClick={() => setShowAdvance(true)}
+                >
+                  Advance to next stage
+                  <ChevronRight className="ml-1 h-4 w-4" />
+                </Button>
               )}
             </div>
             <Button variant="ghost" size="icon" className="shrink-0" onClick={onClose}>
@@ -386,11 +432,19 @@ export function FollowUpDetailPanel({
               </Button>
             </div>
 
-            {nxt && (
-              <p className="text-xs text-muted-foreground">
-                Quick advance available from pipeline card → {STAGE_LABELS[nxt]}
-              </p>
-            )}
+            {nxt && onAdvance ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full justify-between"
+                disabled={advancing}
+                onClick={() => setShowAdvance(true)}
+              >
+                Advance to next stage → {STAGE_LABELS[nxt]}
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            ) : null}
           </div>
         )}
 

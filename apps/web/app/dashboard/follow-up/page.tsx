@@ -219,7 +219,7 @@ function FollowUpPageContent() {
         whatNext: payload.whatNext,
         dueAt: payload.dueAt ? new Date(payload.dueAt).toISOString() : undefined,
       });
-      toast.success('Progress updated');
+      toast.success('Advanced to next stage');
       queryClient.invalidateQueries({ queryKey: ['pastoral-notes', id] });
       refresh();
     } catch {
@@ -502,8 +502,6 @@ function FollowUpPageContent() {
               items={filteredItems}
               selectedId={selectedId}
               onSelect={setSelectedId}
-              onAdvance={advanceStage}
-              advancing={advancing}
               canArchive={canArchive}
               canRequestArchive={canRequestArchive}
               archiveBusy={archiveBusy}
@@ -578,6 +576,8 @@ function FollowUpPageContent() {
           canManageMembers={canManageMembers}
           onClose={() => setSelectedId(null)}
           onUpdated={refresh}
+          onAdvance={advanceStage}
+          advancing={advancing}
         />
       )}
     </EnterpriseShell>

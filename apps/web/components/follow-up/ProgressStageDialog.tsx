@@ -66,7 +66,7 @@ export function ProgressStageDialog({
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <h2 id="progress-stage-title" className="font-heading text-lg font-bold">
-              Progress to the next
+              Advance to next stage
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {contactName} → {stageLabel}
