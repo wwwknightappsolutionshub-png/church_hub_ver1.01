@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import {
   ArrowRight,
-  ChevronRight,
+  Eye,
   HeartHandshake,
   Sprout,
   User,
@@ -138,11 +138,13 @@ function LeadCard({
         </div>
       </button>
       <div className="flex flex-wrap items-center gap-1 border-t border-border/80 px-2 py-1.5">
-        {canArchive && onArchiveClick && (
+        {canArchive && item.stage !== 'JOINED_GROUP' && onArchiveClick && (
           <ArchiveIconButton title="Archive" onClick={onArchiveClick} />
         )}
-        {canRequestArchive && !canArchive && onDndClick && <DndIconButton onClick={onDndClick} />}
-        {canArchive && archiveRequested && onApproveClick && (
+        {canRequestArchive && !canArchive && item.stage !== 'JOINED_GROUP' && onDndClick && (
+          <DndIconButton onClick={onDndClick} />
+        )}
+        {canArchive && archiveRequested && item.stage !== 'JOINED_GROUP' && onApproveClick && (
           <Button
             type="button"
             variant="ghost"
@@ -156,7 +158,7 @@ function LeadCard({
             Approve archive
           </Button>
         )}
-        {canArchive && archiveRequested && onDeclineClick && (
+        {canArchive && archiveRequested && item.stage !== 'JOINED_GROUP' && onDeclineClick && (
           <Button
             type="button"
             variant="ghost"
@@ -173,12 +175,13 @@ function LeadCard({
         <Button
           type="button"
           variant="ghost"
-          size="sm"
-          className="ml-auto h-8 text-xs font-semibold text-primary"
+          size="icon"
+          className="ml-auto h-8 w-8 text-primary"
+          title="View detailed"
+          aria-label={`View detailed — ${item.contactName}`}
           onClick={onSelect}
         >
-          View detailed
-          <ChevronRight className="ml-0.5 h-3.5 w-3.5" />
+          <Eye className="h-4 w-4" />
         </Button>
       </div>
     </article>

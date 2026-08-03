@@ -197,6 +197,13 @@ export class OutreachController {
   }
 
   @Public()
+  @Get('register/:code/check-email')
+  @ApiOperation({ summary: 'Check if email already exists for this church (public)' })
+  checkRegisterEmail(@Param('code') code: string, @Query('email') email?: string) {
+    return this.outreachService.checkRegisterEmail(code, email ?? '');
+  }
+
+  @Public()
   @Post('register/:code')
   @ApiOperation({ summary: 'Self-registration via team QR or NFC tap' })
   publicRegister(

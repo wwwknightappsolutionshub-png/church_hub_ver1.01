@@ -1,7 +1,8 @@
-import { BadRequestException, forwardRef, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, forwardRef, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import * as QRCode from 'qrcode';
+import { sanitizeEmail } from '@church-hub/shared-types';
 import { PrismaService } from '../../prisma/prisma.module';
 import { FollowUpService } from '../follow-up/follow-up.service';
 import { SmsAdapter } from '../notifications/adapters/sms.adapter';
@@ -529,6 +530,44 @@ export class OutreachService {
     };
   }
 
+  /**
+   * Whether this email is already known for the church behind the QR code
+   * (user, member, active follow-up, or prior outreach capture).
+   */
+  async checkRegisterEmail(code: string, emailRaw: string) {
+    const qr = await this.resolveQrCode(code);
+    const email = sanitizeEmail(emailRaw);
+    if (!email) return { exists: false as const };
+
+    const churchId = qr.churchId;
+    const emailFilter = { equals: email, mode: 'insensitive' as const };
+
+    const [user, member, followUp, outreach] = await Promise.all([
+      this.prisma.user.findFirst({
+        where: { churchId, email: emailFilter },
+        select: { id: true },
+      }),
+      this.prisma.member.findFirst({
+        where: { churchId, email: emailFilter },
+        select: { id: true },
+      }),
+      this.prisma.followUp.findFirst({
+        where: { churchId, archivedAt: null, contactEmail: emailFilter },
+        select: { id: true },
+      }),
+      this.prisma.outreachContact.findFirst({
+        where: { churchId, email: emailFilter },
+        select: { id: true },
+      }),
+    ]);
+
+    return {
+      exists: Boolean(user || member || followUp || outreach),
+      message:
+        'This email Id exists with us. Can you use another or are you this same owner.',
+    };
+  }
+
   async publicSelfRegister(
     code: string,
     data: {
@@ -538,13 +577,27 @@ export class OutreachService {
       email?: string;
       notes?: string;
       referredBy?: string;
+      confirmSameOwner?: boolean;
     },
   ) {
     const qr = await this.resolveQrCode(code);
+    const email = sanitizeEmail(data.email ?? '');
+    if (email) {
+      const check = await this.checkRegisterEmail(code, email);
+      if (check.exists && data.confirmSameOwner !== true) {
+        throw new ConflictException({
+          code: 'EMAIL_EXISTS',
+          message: check.message,
+          exists: true,
+        });
+      }
+    }
+
     const evangelistId =
       qr.isChurchWide || !qr.memberId ? undefined : qr.memberId;
     return this.captureContact(qr.churchId, {
       ...data,
+      email: email || undefined,
       qrCodeId: qr.id,
       evangelistId,
       referredBy: data.referredBy,

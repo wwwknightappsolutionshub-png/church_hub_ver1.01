@@ -80,6 +80,8 @@ export const PublicOutreachRegisterSchema = z.object({
       return s || undefined;
     })
     .optional(),
+  /** Set after the registrant confirms they own an email already on file. */
+  confirmSameOwner: z.boolean().optional(),
 });
 export type PublicOutreachRegisterInput = z.infer<typeof PublicOutreachRegisterSchema>;
 

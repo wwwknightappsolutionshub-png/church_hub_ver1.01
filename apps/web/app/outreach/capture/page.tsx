@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useRef, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { CheckCircle2, Loader2, Nfc, QrCode } from 'lucide-react';
+import { CheckCircle2, Loader2, Nfc, QrCode, X } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { BrandMark } from '@/components/brand/BrandMark';
@@ -14,8 +14,12 @@ import {
   filterPhoneTyping,
   phoneFormatError,
   PublicOutreachRegisterSchema,
+  sanitizeEmail,
 } from '@/lib/contact-validation';
 import { cn } from '@/lib/utils';
+
+const EMAIL_EXISTS_MSG =
+  'This email Id exists with us. Can you use another or are you this same owner.';
 
 function publicApiBaseUrl() {
   if (typeof window !== 'undefined' && window.location?.origin) {
@@ -32,10 +36,9 @@ const publicApi = axios.create({
 
 function apiErrorToastMessage(err: unknown): string {
   if (!axios.isAxiosError(err)) return 'Registration failed — please try again';
-  const data = err.response?.data as { message?: string | string[] } | undefined;
+  const data = err.response?.data as { message?: string | string[]; code?: string } | undefined;
   const raw = data?.message;
   if (typeof raw === 'string' && raw.trim()) {
-    // Never surface opaque Nest 500 text for validation-style failures.
     if (/^internal server error$/i.test(raw.trim())) {
       return 'Could not save your details. Check phone/email and try again.';
     }
@@ -46,6 +49,27 @@ function apiErrorToastMessage(err: unknown): string {
     return 'Please enter a valid UK phone number and email address.';
   }
   return 'Registration failed — please try again';
+}
+
+function isEmailExistsConflict(err: unknown): boolean {
+  if (!axios.isAxiosError(err) || err.response?.status !== 409) return false;
+  const data = err.response.data as
+    | {
+        code?: string;
+        message?: string | { code?: string; message?: string; exists?: boolean };
+        exists?: boolean;
+      }
+    | undefined;
+  if (!data) return false;
+  if (data.code === 'EMAIL_EXISTS' || data.exists === true) return true;
+  if (typeof data.message === 'object' && data.message) {
+    if (data.message.code === 'EMAIL_EXISTS' || data.message.exists === true) return true;
+    if (typeof data.message.message === 'string' && /email id exists/i.test(data.message.message)) {
+      return true;
+    }
+  }
+  if (typeof data.message === 'string' && /email id exists/i.test(data.message)) return true;
+  return false;
 }
 
 interface RegisterInfo {
@@ -63,6 +87,11 @@ function CaptureForm() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{ phone?: string; email?: string }>({});
+  const [emailExistsOpen, setEmailExistsOpen] = useState(false);
+  const [sameOwnerConfirmed, setSameOwnerConfirmed] = useState(false);
+  const [checkingEmail, setCheckingEmail] = useState(false);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const submitAfterConfirmRef = useRef(false);
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -101,13 +130,36 @@ function CaptureForm() {
     return !phoneErr && !emailErr;
   };
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!code || !form.firstName.trim()) return;
-    if (!validateFields()) {
-      toast.error('Please fix the highlighted fields');
-      return;
+  const checkEmailAgainstDb = async (rawEmail: string): Promise<boolean> => {
+    if (!code) return false;
+    const email = sanitizeEmail(rawEmail);
+    if (!email || emailFormatError(email)) return false;
+    setCheckingEmail(true);
+    try {
+      const { data } = await publicApi.get<{ exists: boolean; message?: string }>(
+        `${publicApiBaseUrl()}/outreach/register/${code}/check-email`,
+        { params: { email } },
+      );
+      return data.exists === true;
+    } catch {
+      // Network / API issues — do not block typing; submit still re-checks server-side.
+      return false;
+    } finally {
+      setCheckingEmail(false);
     }
+  };
+
+  const runEmailBlurCheck = async () => {
+    const formatErr = emailFormatError(form.email);
+    setFieldErrors((prev) => ({ ...prev, email: formatErr ?? undefined }));
+    if (formatErr || !sanitizeEmail(form.email)) return;
+    if (sameOwnerConfirmed) return;
+    const exists = await checkEmailAgainstDb(form.email);
+    if (exists) setEmailExistsOpen(true);
+  };
+
+  const performSubmit = async (confirmSameOwner: boolean) => {
+    if (!code || !form.firstName.trim()) return;
 
     const parsed = PublicOutreachRegisterSchema.safeParse({
       firstName: form.firstName.trim(),
@@ -116,6 +168,7 @@ function CaptureForm() {
       email: form.email.trim() || undefined,
       referredBy: form.referredBy.trim() || undefined,
       notes: form.notes.trim() || undefined,
+      confirmSameOwner: confirmSameOwner || undefined,
     });
     if (!parsed.success) {
       const first = parsed.error.issues[0];
@@ -131,10 +184,16 @@ function CaptureForm() {
       await publicApi.post(`${publicApiBaseUrl()}/outreach/register/${code}`, parsed.data);
       setDone(true);
     } catch (err) {
+      if (isEmailExistsConflict(err)) {
+        setSameOwnerConfirmed(false);
+        setEmailExistsOpen(true);
+        return;
+      }
+
       const status = axios.isAxiosError(err) ? err.response?.status : undefined;
       const data = axios.isAxiosError(err) ? err.response?.data : undefined;
       const looksSaved =
-        status === 409 ||
+        (status === 409 && !isEmailExistsConflict(err)) ||
         (data &&
           typeof data === 'object' &&
           ('id' in data || 'firstName' in data || 'outreachContactId' in data));
@@ -147,6 +206,46 @@ function CaptureForm() {
       toast.error(apiErrorToastMessage(err));
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!code || !form.firstName.trim()) return;
+    if (!validateFields()) {
+      toast.error('Please fix the highlighted fields');
+      return;
+    }
+
+    const email = sanitizeEmail(form.email);
+    if (email && !sameOwnerConfirmed) {
+      const exists = await checkEmailAgainstDb(email);
+      if (exists) {
+        submitAfterConfirmRef.current = true;
+        setEmailExistsOpen(true);
+        return;
+      }
+    }
+
+    await performSubmit(sameOwnerConfirmed);
+  };
+
+  const onUseAnotherEmail = () => {
+    setEmailExistsOpen(false);
+    setSameOwnerConfirmed(false);
+    submitAfterConfirmRef.current = false;
+    setForm((f) => ({ ...f, email: '' }));
+    setFieldErrors((prev) => ({ ...prev, email: undefined }));
+    requestAnimationFrame(() => emailInputRef.current?.focus());
+  };
+
+  const onConfirmSameOwner = async () => {
+    setSameOwnerConfirmed(true);
+    setEmailExistsOpen(false);
+    const shouldSubmit = submitAfterConfirmRef.current;
+    submitAfterConfirmRef.current = false;
+    if (shouldSubmit) {
+      await performSubmit(true);
     }
   };
 
@@ -193,7 +292,7 @@ function CaptureForm() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={submit} className="space-y-3" noValidate>
+            <form onSubmit={(e) => void submit(e)} className="space-y-3" noValidate>
               <Input
                 placeholder="First name *"
                 value={form.firstName}
@@ -241,6 +340,7 @@ function CaptureForm() {
               </div>
               <div>
                 <Input
+                  ref={emailInputRef}
                   type="email"
                   inputMode="email"
                   autoComplete="email"
@@ -251,20 +351,25 @@ function CaptureForm() {
                   onChange={(e) => {
                     const email = e.target.value;
                     setForm({ ...form, email });
+                    setSameOwnerConfirmed(false);
                     setFieldErrors((prev) => ({
                       ...prev,
                       email: emailFormatError(email) ?? undefined,
                     }));
                   }}
-                  onBlur={() =>
-                    setFieldErrors((prev) => ({
-                      ...prev,
-                      email: emailFormatError(form.email) ?? undefined,
-                    }))
-                  }
+                  onBlur={() => void runEmailBlurCheck()}
                 />
                 {fieldErrors.email ? (
                   <p className="mt-1 text-xs text-destructive">{fieldErrors.email}</p>
+                ) : checkingEmail ? (
+                  <p className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Checking email…
+                  </p>
+                ) : sameOwnerConfirmed ? (
+                  <p className="mt-1 text-[10px] text-emerald-700">
+                    Confirmed as existing contact — you can submit.
+                  </p>
                 ) : null}
               </div>
               <Input
@@ -283,13 +388,62 @@ function CaptureForm() {
                 By submitting, you agree to be contacted by {info.church.name}. A welcome message
                 will be sent automatically.
               </p>
-              <Button type="submit" className="w-full shadow-brand" disabled={submitting}>
+              <Button
+                type="submit"
+                className="w-full shadow-brand"
+                disabled={submitting || checkingEmail}
+              >
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Submit'}
               </Button>
             </form>
           </CardContent>
         </Card>
       </div>
+
+      {emailExistsOpen ? (
+        <div
+          className="fixed inset-0 z-[120] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="email-exists-title"
+          onClick={onUseAnotherEmail}
+        >
+          <div
+            className="w-full rounded-t-2xl border border-border bg-card p-5 shadow-xl sm:max-w-md sm:rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <h2 id="email-exists-title" className="font-heading text-lg font-bold text-foreground">
+                Email already on file
+              </h2>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={onUseAnotherEmail}
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">{EMAIL_EXISTS_MSG}</p>
+            <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+              <Button type="button" variant="outline" className="flex-1" onClick={onUseAnotherEmail}>
+                Use another email
+              </Button>
+              <Button
+                type="button"
+                className="flex-1"
+                disabled={submitting}
+                onClick={() => void onConfirmSameOwner()}
+              >
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Yes, I'm the same person"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

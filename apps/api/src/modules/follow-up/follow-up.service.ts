@@ -245,14 +245,19 @@ export class FollowUpService {
     });
   }
 
-  async linkMember(churchId: string, followUpId: string, memberId: string) {
+  async linkMember(
+    churchId: string,
+    followUpId: string,
+    memberId: string,
+    actorId?: string,
+  ) {
     await this.getOne(churchId, followUpId);
     const member = await this.prisma.member.findFirst({
       where: { id: memberId, churchId },
     });
     if (!member) throw new NotFoundException('Member not found');
 
-    return this.prisma.followUp.update({
+    const updated = await this.prisma.followUp.update({
       where: { id: followUpId },
       data: {
         memberId: member.id,
@@ -262,9 +267,14 @@ export class FollowUpService {
       },
       include: followUpInclude,
     });
+
+    if (updated.stage === 'JOINED_GROUP' && !updated.archivedAt) {
+      return this.completeJoinedGroupAsMember(churchId, followUpId, actorId ?? null);
+    }
+    return updated;
   }
 
-  async createMemberFromLead(churchId: string, followUpId: string) {
+  async createMemberFromLead(churchId: string, followUpId: string, actorId?: string) {
     const followUp = await this.getOne(churchId, followUpId);
     if (followUp.memberId) {
       throw new BadRequestException('This lead is already linked to a member');
@@ -290,10 +300,66 @@ export class FollowUpService {
       },
     });
 
-    return this.prisma.followUp.update({
+    const updated = await this.prisma.followUp.update({
       where: { id: followUpId },
       data: { memberId: member.id },
       include: followUpInclude,
+    });
+
+    if (updated.stage === 'JOINED_GROUP' && !updated.archivedAt) {
+      return this.completeJoinedGroupAsMember(churchId, followUpId, actorId ?? null);
+    }
+    return updated;
+  }
+
+  /** Leave Joined Group after conversion to Membership (bypasses archive block). */
+  private async completeJoinedGroupAsMember(
+    churchId: string,
+    id: string,
+    actorId: string | null,
+  ) {
+    const existing = await this.prisma.followUp.findFirst({ where: { id, churchId } });
+    if (!existing || existing.stage !== 'JOINED_GROUP' || existing.archivedAt) {
+      return this.getOne(churchId, id);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const row = await tx.followUp.update({
+        where: { id },
+        data: {
+          archivedAt: new Date(),
+          archivedById: actorId,
+          archiveReason: 'Converted to Member from Joined Group',
+          archiveRequestedAt: null,
+          archiveRequestedById: null,
+          archiveRequestReason: null,
+          dueAt: null,
+          completedAt: new Date(),
+        },
+        include: followUpInclude,
+      });
+
+      if (actorId) {
+        await tx.pastoralNote.create({
+          data: {
+            churchId,
+            authorId: actorId,
+            followUpId: id,
+            memberId: row.memberId,
+            content: 'Converted to Member — left Joined Group phase.',
+            isConfidential: false,
+            stageAtTime: existing.stage,
+            kind: 'ARCHIVE',
+          },
+        });
+      }
+
+      await tx.followUpReminder.updateMany({
+        where: { followUpId: id, sentAt: null },
+        data: { sentAt: new Date() },
+      });
+
+      return row;
     });
   }
 
@@ -339,6 +405,11 @@ export class FollowUpService {
     }
     const progressNote = progressNoteParts.join('\n\n');
 
+    const enteringJoinedGroup =
+      data.stage === 'JOINED_GROUP' && existing.stage !== 'JOINED_GROUP';
+    const leavingJoinedGroup =
+      existing.stage === 'JOINED_GROUP' && data.stage !== 'JOINED_GROUP';
+
     const updated = await this.prisma.$transaction(async (tx) => {
       const row = await tx.followUp.update({
         where: { id },
@@ -347,7 +418,11 @@ export class FollowUpService {
           notes: data.notes ?? (progressNote || existing.notes),
           ...(dueAt !== undefined ? { dueAt } : {}),
           ...(whatNext ? { nextAction: whatNext } : {}),
-          completedAt: data.stage === 'JOINED_GROUP' ? new Date() : null,
+          ...(enteringJoinedGroup
+            ? { completedAt: new Date(), joinedGroupDay6NotifiedAt: null }
+            : leavingJoinedGroup
+              ? { completedAt: null, joinedGroupDay6NotifiedAt: null }
+              : {}),
         },
         include: followUpInclude,
       });
@@ -703,6 +778,11 @@ export class FollowUpService {
     const existing = await this.prisma.followUp.findFirst({ where: { id, churchId } });
     if (!existing) throw new NotFoundException('Follow-up not found');
     if (existing.archivedAt) throw new BadRequestException('This lead is already archived');
+    if (existing.stage === 'JOINED_GROUP') {
+      throw new BadRequestException(
+        'Joined Group contacts cannot be archived. Convert them to Members within 7 days.',
+      );
+    }
 
     const trimmed = reason.trim();
     if (trimmed.length < 3) throw new BadRequestException('Enter a reason for archiving');
@@ -756,6 +836,11 @@ export class FollowUpService {
     const existing = await this.prisma.followUp.findFirst({ where: { id, churchId } });
     if (!existing) throw new NotFoundException('Follow-up not found');
     if (existing.archivedAt) throw new BadRequestException('This lead is already archived');
+    if (existing.stage === 'JOINED_GROUP') {
+      throw new BadRequestException(
+        'Joined Group contacts cannot be archived. Convert them to Members within 7 days.',
+      );
+    }
 
     const trimmed = reason.trim();
     if (trimmed.length < 3) {

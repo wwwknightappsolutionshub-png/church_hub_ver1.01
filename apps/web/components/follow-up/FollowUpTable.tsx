@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Calendar, ChevronRight, Mail, Phone, User } from 'lucide-react';
+import { ArrowRightCircle, Calendar, Eye, Mail, Phone, User } from 'lucide-react';
 import {
   STAGE_BADGE_CLASS,
   STAGE_LABELS,
@@ -175,17 +175,27 @@ export function FollowUpTable({
                     {referred ?? '—'}
                   </td>
                   <td className="px-3 py-2.5">
-                    <div className="flex flex-wrap gap-1">
-                      <Button type="button" variant="outline" size="sm" onClick={() => onSelect(item.id)}>
-                        View detailed
+                    <div className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        title="View detailed"
+                        aria-label={`View detailed — ${item.contactName}`}
+                        onClick={() => onSelect(item.id)}
+                      >
+                        <Eye className="h-4 w-4" />
                       </Button>
                       {nxt ? (
                         <Button
                           type="button"
                           variant="ghost"
-                          size="sm"
+                          size="icon"
+                          className="h-8 w-8 text-primary"
+                          title="Advance to next stage"
+                          aria-label={`Advance ${item.contactName} to next stage`}
                           disabled={advancing}
-                          className="text-primary"
                           onClick={() =>
                             setPending({
                               id: item.id,
@@ -194,8 +204,7 @@ export function FollowUpTable({
                             })
                           }
                         >
-                          Advance to next stage
-                          <ChevronRight className="ml-0.5 h-3.5 w-3.5" />
+                          <ArrowRightCircle className="h-4 w-4" />
                         </Button>
                       ) : null}
                     </div>

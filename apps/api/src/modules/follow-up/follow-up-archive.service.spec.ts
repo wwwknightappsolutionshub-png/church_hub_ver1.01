@@ -70,6 +70,20 @@ describe('FollowUpService archive flow', () => {
     userMock.findFirst.mockResolvedValue({ firstName: 'Sam', lastName: 'Member' });
   });
 
+  it('rejects archive for Joined Group contacts', async () => {
+    followUpMock.findFirst.mockResolvedValue({ ...followUpRow, stage: 'JOINED_GROUP' });
+    await expect(service.archive('ch-1', 'fu-1', 'u-1', 'Leaving journey')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
+  it('rejects archive request for Joined Group contacts', async () => {
+    followUpMock.findFirst.mockResolvedValue({ ...followUpRow, stage: 'JOINED_GROUP' });
+    await expect(
+      service.requestArchive('ch-1', 'fu-1', 'u-2', 'Asked not to be contacted'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it('archives a lead and writes an ARCHIVE note', async () => {
     const result = await service.archive('ch-1', 'fu-1', 'u-1', 'Does not want follow-up');
     expect(result.archivedAt).toBeTruthy();

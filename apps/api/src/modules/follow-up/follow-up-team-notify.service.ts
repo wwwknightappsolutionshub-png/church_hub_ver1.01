@@ -208,4 +208,71 @@ export class FollowUpTeamNotifyService {
       `Notified ${team.length} leader(s) of archive request for ${params.followUpId}`,
     );
   }
+
+  /** Day-6 alert: convert Joined Group leads to Members before the 7-day retention ends. */
+  async notifyTeamOnJoinedGroupDay6(params: {
+    churchId: string;
+    followUpId: string;
+    contactName: string;
+    hasMemberLink: boolean;
+  }): Promise<void> {
+    const team = await this.prisma.user.findMany({
+      where: {
+        churchId: params.churchId,
+        isActive: true,
+        roles: { some: { role: { name: { in: [...TEAM_ROLES] } } } },
+      },
+      select: { id: true, firstName: true, lastName: true, email: true },
+    });
+
+    if (team.length === 0) {
+      this.logger.warn(
+        `No follow-up leaders for Joined Group day-6 alert church ${params.churchId}`,
+      );
+      return;
+    }
+
+    const church = await this.prisma.church.findUnique({
+      where: { id: params.churchId },
+      select: { name: true },
+    });
+    const churchName = church?.name ?? 'Your church';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3001';
+
+    const title = `Convert to Member: ${params.contactName}`;
+    const body = params.hasMemberLink
+      ? `${params.contactName} has been in Joined Group for 6 days and leaves this phase tomorrow.\n\nConfirm their Membership status in Outreach: ${appUrl}/dashboard/follow-up`
+      : `${params.contactName} has been in Joined Group for 6 days. Update their status to Members before day 7 (they leave this phase automatically).\n\nOpen Outreach: ${appUrl}/dashboard/follow-up`;
+
+    await Promise.all(
+      team.map(async (user) => {
+        await this.prisma.notification.create({
+          data: {
+            churchId: params.churchId,
+            userId: user.id,
+            title,
+            body,
+            type: 'FOLLOW_UP_JOINED_GROUP_DAY6',
+            data: {
+              followUpId: params.followUpId,
+              channel: 'push',
+            },
+          },
+        });
+
+        if (user.email) {
+          await this.email.send({
+            to: user.email,
+            subject: `[${churchName}] ${title}`,
+            body: `Hi ${user.firstName},\n\n${body}`,
+            churchId: params.churchId,
+          });
+        }
+      }),
+    );
+
+    this.logger.log(
+      `Notified ${team.length} leader(s) of Joined Group day-6 for ${params.followUpId}`,
+    );
+  }
 }

@@ -1108,6 +1108,8 @@ model FollowUp {
   archiveRequestedAt      DateTime?
   archiveRequestedById    String?
   archiveRequestReason    String?
+  /// Day-6 leader alert for Joined Group → convert to Member (once).
+  joinedGroupDay6NotifiedAt DateTime?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
@@ -1124,6 +1126,7 @@ model FollowUp {
   automationRuns FollowUpAutomationRun[]
 
   @@index([churchId, stage])
+  @@index([churchId, stage, completedAt])
   @@index([churchId, archivedAt])
   @@index([assignedToId, dueAt])
   @@map("follow_ups")

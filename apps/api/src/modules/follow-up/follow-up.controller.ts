@@ -267,16 +267,21 @@ export class FollowUpController {
   @ApiOperation({ summary: 'Link an existing member to this follow-up lead' })
   linkMember(
     @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body() body: { memberId: string },
   ) {
-    return this.followUpService.linkMember(churchId, id, body.memberId);
+    return this.followUpService.linkMember(churchId, id, body.memberId, user.userId);
   }
 
   @Post(':id/create-member')
   @MemberAdmin()
   @ApiOperation({ summary: 'Create a membership record from this lead and link it' })
-  createMemberFromLead(@ChurchId() churchId: string, @Param('id') id: string) {
-    return this.followUpService.createMemberFromLead(churchId, id);
+  createMemberFromLead(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.followUpService.createMemberFromLead(churchId, id, user.userId);
   }
 }

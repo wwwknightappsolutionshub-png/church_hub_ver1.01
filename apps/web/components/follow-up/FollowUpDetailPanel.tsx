@@ -376,7 +376,9 @@ export function FollowUpDetailPanel({
               ) : canManageMembers ? (
                 <>
                   <p className="text-xs text-muted-foreground">
-                    Link this lead to an existing member or create a new visitor record.
+                    {followUp.stage === 'JOINED_GROUP'
+                      ? 'Convert to Members within 7 days. On day 6 leaders are reminded; on day 7 this contact leaves Joined Group automatically.'
+                      : 'Link this lead to an existing member or create a new visitor record.'}
                   </p>
                   <select
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
