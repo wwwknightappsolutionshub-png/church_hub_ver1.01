@@ -26,7 +26,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
-type QueueStatus = 'PENDING' | 'PROCESSING' | 'SENT' | 'FAILED';
 type TriageKind =
   | 'all'
   | 'department'
@@ -35,8 +34,6 @@ type TriageKind =
   | 'unit'
   | 'meeting'
   | 'rtp'
-  | 'queue'
-  | 'notification'
   | 'message';
 
 interface ReplyTarget {
@@ -162,14 +159,6 @@ export interface ReportsInboxData {
   replyTargets: ReplyTarget[];
 }
 
-const STATUS_OPTIONS: Array<{ value: 'all' | QueueStatus; label: string }> = [
-  { value: 'all', label: 'All statuses' },
-  { value: 'PENDING', label: 'Pending' },
-  { value: 'PROCESSING', label: 'Processing' },
-  { value: 'SENT', label: 'Sent' },
-  { value: 'FAILED', label: 'Failed' },
-];
-
 const KIND_OPTIONS: Array<{ value: TriageKind; label: string }> = [
   { value: 'all', label: 'All types' },
   { value: 'department', label: 'Department reports' },
@@ -178,8 +167,6 @@ const KIND_OPTIONS: Array<{ value: TriageKind; label: string }> = [
   { value: 'rtp', label: 'RTP Requests' },
   { value: 'cell', label: 'Ministry / Cells' },
   { value: 'unit', label: 'Service units' },
-  { value: 'queue', label: 'Queue alerts' },
-  { value: 'notification', label: 'Notifications' },
   { value: 'message', label: 'In-app messages' },
 ];
 
@@ -195,8 +182,6 @@ const SOURCE_CARD_CLASS: Record<Exclude<TriageKind, 'all'>, string> = {
   rtp: 'border-orange-200 bg-orange-100 text-orange-950 hover:bg-orange-200/80 dark:border-orange-800 dark:bg-orange-950/50 dark:text-orange-50',
   cell: 'border-emerald-200 bg-emerald-100 text-emerald-950 hover:bg-emerald-200/80 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-50',
   unit: 'border-teal-200 bg-teal-100 text-teal-950 hover:bg-teal-200/80 dark:border-teal-800 dark:bg-teal-950/50 dark:text-teal-50',
-  queue: 'border-rose-200 bg-rose-100 text-rose-950 hover:bg-rose-200/80 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-50',
-  notification: 'border-amber-200 bg-amber-100 text-amber-950 hover:bg-amber-200/80 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-50',
   message: 'border-slate-200 bg-slate-100 text-slate-950 hover:bg-slate-200/80 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-50',
 };
 
@@ -732,14 +717,6 @@ function UnitAttendanceReportItemCard({
 
 type UrgencyLevel = 'critical' | 'high' | 'medium' | 'low' | 'info';
 
-function queueUrgency(status: string): UrgencyLevel {
-  if (status === 'FAILED') return 'critical';
-  if (status === 'PENDING') return 'high';
-  if (status === 'PROCESSING') return 'medium';
-  if (status === 'SENT') return 'low';
-  return 'info';
-}
-
 const URGENCY_META: Record<
   UrgencyLevel,
   { label: string; card: string; badge: string; dot: string }
@@ -804,7 +781,6 @@ export function ReportsInboxPanel({
   const [digestBusy, setDigestBusy] = useState<'dept' | 'cell' | null>(null);
   const [digestMenuOpen, setDigestMenuOpen] = useState(false);
   const digestMenuRef = useRef<HTMLDivElement>(null);
-  const [statusFilter, setStatusFilter] = useState<'all' | QueueStatus>('all');
   const [kindFilter, setKindFilter] = useState<TriageKind>('all');
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyLevel | 'all'>('all');
   const [replyOpen, setReplyOpen] = useState(false);
@@ -946,21 +922,6 @@ export function ReportsInboxPanel({
     });
   }, [data, kindFilter, urgencyFilter]);
 
-  const queueItems = useMemo(() => {
-    if (kindFilter !== 'all' && kindFilter !== 'queue') return [];
-    return (data?.queue ?? []).filter((q) => {
-      if (statusFilter !== 'all' && q.status !== statusFilter) return false;
-      if (urgencyFilter !== 'all' && queueUrgency(q.status) !== urgencyFilter) return false;
-      return true;
-    });
-  }, [data, kindFilter, statusFilter, urgencyFilter]);
-
-  const notifications = useMemo(() => {
-    if (kindFilter !== 'all' && kindFilter !== 'notification') return [];
-    if (urgencyFilter !== 'all' && urgencyFilter !== 'info') return [];
-    return data?.notifications ?? [];
-  }, [data, kindFilter, urgencyFilter]);
-
   const messages = useMemo(() => {
     if (kindFilter !== 'all' && kindFilter !== 'message') return [];
     if (urgencyFilter !== 'all' && urgencyFilter !== 'info') return [];
@@ -974,8 +935,6 @@ export function ReportsInboxPanel({
     rtpRequests.length +
     cellAttendanceReports.length +
     unitAttendanceReports.length +
-    queueItems.length +
-    notifications.length +
     messages.length;
 
   const urgencyCounts = useMemo(() => {
@@ -989,11 +948,6 @@ export function ReportsInboxPanel({
     const include = (kind: Exclude<TriageKind, 'all'>) =>
       kindFilter === 'all' || kindFilter === kind;
 
-    if (include('queue')) {
-      for (const q of data?.queue ?? []) {
-        counts[queueUrgency(q.status)] += 1;
-      }
-    }
     if (include('department')) counts.medium += data?.reports.department.length ?? 0;
     if (include('weekly')) counts.info += data?.reports.weekly.length ?? 0;
     if (include('meeting')) counts.medium += data?.reports.meetingSummaries?.length ?? 0;
@@ -1006,7 +960,6 @@ export function ReportsInboxPanel({
     }
     if (include('cell')) counts.low += data?.reports.cellAttendance?.length ?? 0;
     if (include('unit')) counts.low += data?.reports.unitAttendance?.length ?? 0;
-    if (include('notification')) counts.info += data?.notifications.length ?? 0;
     if (include('message')) counts.info += data?.messages.length ?? 0;
     return counts;
   }, [data, kindFilter]);
@@ -1042,29 +995,20 @@ export function ReportsInboxPanel({
     const unit = (data?.reports.unitAttendance ?? []).filter(() =>
       urgencyFilter === 'all' || urgencyFilter === 'low',
     ).length;
-    const queue = (data?.queue ?? []).filter((q) => {
-      if (statusFilter !== 'all' && q.status !== statusFilter) return false;
-      return urgencyFilter === 'all' || queueUrgency(q.status) === urgencyFilter;
-    }).length;
-    const notification = (data?.notifications ?? []).filter(() =>
-      urgencyFilter === 'all' || urgencyFilter === 'info',
-    ).length;
     const message = (data?.messages ?? []).filter(() =>
       urgencyFilter === 'all' || urgencyFilter === 'info',
     ).length;
     return {
-      all: dept + weekly + meeting + rtp + cell + unit + queue + notification + message,
+      all: dept + weekly + meeting + rtp + cell + unit + message,
       department: dept,
       weekly,
       meeting,
       rtp,
       cell,
       unit,
-      queue,
-      notification,
       message,
     };
-  }, [data, statusFilter, urgencyFilter]);
+  }, [data, urgencyFilter]);
 
   const reportTotal =
     (data?.reports.department.length ?? 0) +
@@ -1269,27 +1213,7 @@ export function ReportsInboxPanel({
         <div className="min-w-0 flex-1 space-y-4 p-4 md:p-5">
           <div className="sticky top-[calc(3rem+env(safe-area-inset-top))] z-10 -mx-4 border-b border-border bg-background/95 px-4 py-3 backdrop-blur md:-mx-5 md:px-5 xl:top-16">
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-              {kindFilter === 'queue' ? (
-                <div className="space-y-1">
-                  <Label htmlFor={`${replyFormId}-status`} className="text-xs text-muted-foreground">
-                    Queue status
-                  </Label>
-                  <select
-                    id={`${replyFormId}-status`}
-                    className="h-10 w-full min-w-[140px] rounded-md border border-input bg-background px-3 text-sm"
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value as 'all' | QueueStatus)}
-                  >
-                    {STATUS_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <div />
-              )}
+              <div />
               <div className="sm:text-right">
                 <p className="text-xs font-medium text-foreground">
                   {selectedUrgencyLabel} · {selectedSourceLabel}
@@ -1354,7 +1278,7 @@ export function ReportsInboxPanel({
                   <div>
                     <CardTitle className="text-base">Reply</CardTitle>
                     <CardDescription className="text-xs">
-                      Respond to a report author, queue target, or staff member.
+                      Respond to a report author or staff member.
                     </CardDescription>
                   </div>
                   {replyOpen ? (
@@ -1725,87 +1649,6 @@ export function ReportsInboxPanel({
             </InboxScrollCard>
           ) : null}
 
-          {showSource('queue', queueItems.length) || showSource('notification', notifications.length) ? (
-            <div className="grid gap-4 xl:grid-cols-2 xl:items-stretch">
-              {showSource('queue', queueItems.length) ? (
-                <InboxScrollCard
-                  title="Queue alerts"
-                  description="Automation queue items — failed sends and pending pastoral alerts."
-                  count={queueItems.length}
-                  emptyMessage="No queue alerts match your filters."
-                  testId="reports-queue-inbox"
-                >
-                  {queueItems.map((q) => {
-                    const urgency = queueUrgency(q.status);
-                    const meta = URGENCY_META[urgency];
-                    return (
-                      <div key={q.id} className={cn('rounded-lg border px-3 py-2.5 text-sm', meta.card)}>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium">{q.title}</p>
-                          <Badge className={cn('text-[10px]', meta.badge)}>
-                            {meta.label} · {q.status}
-                          </Badge>
-                          {(q.metadata?.tags ?? []).map((tag) => (
-                            <Badge key={tag} variant="outline" className="text-[10px]">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {q.kind} · {new Date(q.createdAt).toLocaleString()}
-                          {q.serviceUnit?.name ? ` · ${q.serviceUnit.name}` : ''}
-                          {q.metadata?.branchName ? ` · ${q.metadata.branchName}` : ''}
-                        </p>
-                        <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-                          {q.body}
-                        </p>
-                        {q.targetUserId ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="mt-2"
-                            onClick={() =>
-                              pickReply({
-                                userId: q.targetUserId!,
-                                subject: `Re: ${q.title}`,
-                              })
-                            }
-                          >
-                            <MessageSquare className="mr-1 h-3.5 w-3.5" />
-                            Reply
-                          </Button>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </InboxScrollCard>
-              ) : null}
-
-              {showSource('notification', notifications.length) ? (
-                <InboxScrollCard
-                  title="Notifications"
-                  description="In-app alerts sent to administrators and pastoral staff."
-                  count={notifications.length}
-                  emptyMessage="No notifications match your filters."
-                  testId="reports-notifications-inbox"
-                >
-                  {notifications.map((n) => (
-                    <div key={n.id} className="rounded-lg border bg-card px-3 py-2.5 text-sm">
-                      <p className="font-medium">{n.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {n.type} · {new Date(n.sentAt).toLocaleString()}
-                      </p>
-                      <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-                        {n.body}
-                      </p>
-                    </div>
-                  ))}
-                </InboxScrollCard>
-              ) : null}
-            </div>
-          ) : null}
-
           <div className="grid gap-4 xl:grid-cols-1 xl:items-start">
             <Card id={replyFormId} className="xl:sticky xl:top-4">
               <button
@@ -1817,7 +1660,7 @@ export function ReportsInboxPanel({
                 <div>
                   <CardTitle className="text-base">Reply</CardTitle>
                   <CardDescription className="text-xs">
-                    Respond to a report author, queue target, or staff member.
+                    Respond to a report author or staff member.
                   </CardDescription>
                 </div>
                 {replyOpen ? (

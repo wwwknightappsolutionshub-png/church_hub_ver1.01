@@ -40,9 +40,10 @@ test.describe('Dashboard feature UI', () => {
     await expect(page.getByText('Critical')).toBeVisible();
     await expect(page.getByText('High')).toBeVisible();
     await expect(page.getByTestId('reports-inbox-grid')).toBeVisible();
-    await expect(page.getByTestId('reports-weekly-inbox')).toBeVisible();
-    await expect(page.getByTestId('reports-queue-inbox')).toBeVisible();
-    await expect(page.getByTestId('reports-notifications-inbox')).toBeVisible();
+    const sources = page.getByTestId('reports-sources-overview');
+    await expect(sources).toBeVisible();
+    await expect(sources.getByText('Queue alerts')).toHaveCount(0);
+    await expect(sources.getByText('Notifications')).toHaveCount(0);
   });
 
   test('church landing equal-height editor and preview columns', async ({ page }) => {
