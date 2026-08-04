@@ -6,10 +6,12 @@ import {
   ChevronDown,
   ChevronUp,
   FileDown,
+  LayoutGrid,
   Loader2,
   Mail,
   MessageSquare,
   Send,
+  Table2,
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -208,6 +210,7 @@ function InboxScrollCard({
   testId,
   children,
   className,
+  toolbar,
 }: {
   title: string;
   description?: string;
@@ -216,24 +219,28 @@ function InboxScrollCard({
   testId?: string;
   children: React.ReactNode;
   className?: string;
+  toolbar?: React.ReactNode;
 }) {
   return (
     <Card
-      className={cn('flex min-h-[22rem] flex-col xl:min-h-[26rem]', className)}
+      className={cn('flex min-h-[16rem] flex-col xl:min-h-[20rem]', className)}
       data-testid={testId}
     >
-      <CardHeader className="shrink-0 space-y-1 pb-3">
-        <div className="flex items-start justify-between gap-2">
-          <CardTitle className="text-base">{title}</CardTitle>
-          <Badge variant="outline" className="shrink-0 tabular-nums">
+      <CardHeader className="shrink-0 space-y-1.5 p-3 pb-2">
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-sm font-semibold leading-none">{title}</CardTitle>
+          <Badge variant="outline" className="h-5 shrink-0 px-1.5 text-[10px] tabular-nums">
             {count}
           </Badge>
         </div>
-        {description ? <CardDescription className="text-xs">{description}</CardDescription> : null}
+        {description ? (
+          <CardDescription className="text-[11px] leading-snug">{description}</CardDescription>
+        ) : null}
+        {toolbar}
       </CardHeader>
-      <CardContent className="min-h-0 flex-1 overflow-hidden p-0 pb-4">
-        <div className="max-h-[min(26rem,52vh)] overflow-y-auto overscroll-contain px-6">
-          <div className="space-y-3 pb-1">{children}</div>
+      <CardContent className="min-h-0 flex-1 overflow-hidden p-0 pb-3">
+        <div className="max-h-[min(28rem,58vh)] overflow-y-auto overscroll-contain px-3">
+          <div className="space-y-2 pb-1">{children}</div>
           {count === 0 ? (
             <p className="pb-2 text-xs text-muted-foreground">{emptyMessage}</p>
           ) : null}
@@ -348,48 +355,71 @@ function formatAttendanceDate(iso: string) {
   });
 }
 
+/** Local YYYY-MM-DD for date inputs / range compares. */
+function toDateInputValue(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function inDateRange(iso: string, from: string, to: string) {
+  const key = toDateInputValue(iso);
+  if (!key) return !from && !to;
+  if (from && key < from) return false;
+  if (to && key > to) return false;
+  return true;
+}
+
+function exportCellAttendancePdf(
+  report: CellAttendanceReportItem,
+  rows: CellAttendanceReportItem[],
+) {
+  try {
+    openAttendanceReportPdf({
+      title: report.branchName,
+      subtitle: report.location ?? undefined,
+      kindLabel: 'Ministry / Cells attendance',
+      rows: rows.map((r) => ({
+        dateLabel: formatAttendanceDate(r.meetingDate),
+        presentCount: r.presentCount,
+        maleCount: r.maleCount,
+        femaleCount: r.femaleCount,
+        boysCount: r.boysCount,
+        girlsCount: r.girlsCount,
+        testifiersCount: r.testifiersCount,
+        firstTimersCount: r.firstTimersCount,
+        recordedAt: r.createdAt,
+        recordedBy: r.recordedBy
+          ? `${r.recordedBy.firstName} ${r.recordedBy.lastName}`
+          : undefined,
+      })),
+    });
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : 'Could not export PDF');
+  }
+}
+
 function CellAttendanceReportItemCard({
   report,
   history,
+  compact = false,
 }: {
   report: CellAttendanceReportItem;
   history: CellAttendanceReportItem[];
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const dateLabel = formatAttendanceDate(report.meetingDate);
   const details = [
-    { label: 'Male', value: report.maleCount },
-    { label: 'Female', value: report.femaleCount },
-    { label: 'Boys', value: report.boysCount },
-    { label: 'Girls', value: report.girlsCount },
-    { label: 'First timers', value: report.firstTimersCount },
+    { label: 'M', value: report.maleCount },
+    { label: 'F', value: report.femaleCount },
+    { label: 'B', value: report.boysCount },
+    { label: 'G', value: report.girlsCount },
+    { label: 'FT', value: report.firstTimersCount },
   ];
-
-  const exportPdf = (rows: CellAttendanceReportItem[]) => {
-    try {
-      openAttendanceReportPdf({
-        title: report.branchName,
-        subtitle: report.location ?? undefined,
-        kindLabel: 'Ministry / Cells attendance',
-        rows: rows.map((r) => ({
-          dateLabel: formatAttendanceDate(r.meetingDate),
-          presentCount: r.presentCount,
-          maleCount: r.maleCount,
-          femaleCount: r.femaleCount,
-          boysCount: r.boysCount,
-          girlsCount: r.girlsCount,
-          testifiersCount: r.testifiersCount,
-          firstTimersCount: r.firstTimersCount,
-          recordedAt: r.createdAt,
-          recordedBy: r.recordedBy
-            ? `${r.recordedBy.firstName} ${r.recordedBy.lastName}`
-            : undefined,
-        })),
-      });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not export PDF');
-    }
-  };
 
   return (
     <>
@@ -404,62 +434,59 @@ function CellAttendanceReportItemCard({
           }
         }}
         className={cn(
-          'cursor-pointer rounded-lg border px-3 py-2.5 text-sm transition hover:border-primary/40',
+          'cursor-pointer rounded-md border transition hover:border-primary/40',
           URGENCY_META.low.card,
+          compact ? 'px-2.5 py-1.5' : 'px-3 py-2',
         )}
       >
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="font-medium leading-snug">{report.branchName}</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {report.location ? `${report.location} · ` : ''}
-              {dateLabel}
-              {report.recordedBy
-                ? ` · ${report.recordedBy.firstName} ${report.recordedBy.lastName}`
-                : ''}
-              {' · '}
-              <span className="text-primary">Latest · click for history</span>
-            </p>
-          </div>
-          <div className="flex shrink-0 flex-col items-end gap-1">
-            <Badge variant="secondary" className="text-[10px]">
-              Ministry / Cells
-            </Badge>
-            <p className="text-lg font-bold tabular-nums leading-none">{report.presentCount}</p>
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Total attendance
-            </p>
-          </div>
-        </div>
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
-          {details.map((d) => (
-            <div
-              key={d.label}
-              className="rounded-md border border-border/60 bg-background/70 px-2 py-1.5 text-center"
-            >
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{d.label}</p>
-              <p className="text-sm font-semibold tabular-nums">{d.value}</p>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <p className="text-sm font-semibold leading-tight">{report.branchName}</p>
+              <p className="text-[11px] text-muted-foreground">
+                {report.location ? `${report.location} · ` : ''}
+                {dateLabel}
+                {report.recordedBy
+                  ? ` · ${report.recordedBy.firstName} ${report.recordedBy.lastName}`
+                  : ''}
+              </p>
             </div>
-          ))}
-        </div>
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-[10px] text-muted-foreground">
-            Recorded {new Date(report.createdAt).toLocaleString()}
-            {report.testifiersCount > 0 ? ` · Testifiers: ${report.testifiersCount}` : ''}
-          </p>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-7 gap-1 text-xs"
-            onClick={(e) => {
-              e.stopPropagation();
-              exportPdf([report]);
-            }}
-          >
-            <FileDown className="h-3.5 w-3.5" />
-            PDF
-          </Button>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              {details.map((d) => (
+                <span
+                  key={d.label}
+                  className="inline-flex items-center gap-1 rounded border border-border/50 bg-background/70 px-1.5 py-0.5 text-[10px]"
+                >
+                  <span className="text-muted-foreground">{d.label}</span>
+                  <span className="font-semibold tabular-nums">{d.value}</span>
+                </span>
+              ))}
+              {report.testifiersCount > 0 ? (
+                <span className="text-[10px] text-muted-foreground">
+                  Testifiers {report.testifiersCount}
+                </span>
+              ) : null}
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <div className="text-right">
+              <p className="text-base font-bold tabular-nums leading-none">{report.presentCount}</p>
+              <p className="text-[9px] uppercase tracking-wide text-muted-foreground">Total</p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1 px-2 text-[11px]"
+              onClick={(e) => {
+                e.stopPropagation();
+                exportCellAttendancePdf(report, [report]);
+              }}
+            >
+              <FileDown className="h-3.5 w-3.5" />
+              PDF
+            </Button>
+          </div>
         </div>
       </article>
 
@@ -486,7 +513,9 @@ function CellAttendanceReportItemCard({
                       size="sm"
                       variant="outline"
                       className="gap-1"
-                      onClick={() => exportPdf(history.length ? history : [report])}
+                      onClick={() =>
+                        exportCellAttendancePdf(report, history.length ? history : [report])
+                      }
                     >
                       <FileDown className="h-3.5 w-3.5" />
                       Export PDF
@@ -532,6 +561,206 @@ function CellAttendanceReportItemCard({
           )
         : null}
     </>
+  );
+}
+
+function CellAttendanceInbox({ all }: { all: CellAttendanceReportItem[] }) {
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+
+  const filtered = useMemo(() => {
+    const ranged =
+      dateFrom || dateTo
+        ? all.filter((r) => inDateRange(r.meetingDate || r.createdAt, dateFrom, dateTo))
+        : all;
+    if (dateFrom || dateTo) {
+      return [...ranged].sort(
+        (a, b) =>
+          reportSortTime(b.meetingDate || b.createdAt) -
+          reportSortTime(a.meetingDate || a.createdAt),
+      );
+    }
+    return latestByKey(
+      ranged,
+      (r) => r.branchId,
+      (r) => r.meetingDate || r.createdAt,
+    );
+  }, [all, dateFrom, dateTo]);
+
+  const description =
+    dateFrom || dateTo
+      ? 'Filtered by meeting date — scroll for more · click a row for history.'
+      : 'Latest per branch — use dates to filter · scroll for more · click for history.';
+
+  return (
+    <InboxScrollCard
+      title="Ministry / Cells attendance"
+      description={description}
+      count={filtered.length}
+      emptyMessage={
+        dateFrom || dateTo
+          ? 'No attendance reports in this date range.'
+          : 'No Ministry/Cells attendance reports yet. Record attendance from a branch Weekly tab.'
+      }
+      testId="reports-cell-attendance-inbox"
+      toolbar={
+        <div className="flex flex-wrap items-center gap-2 pt-0.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Label htmlFor="cell-att-from" className="sr-only">
+              From date
+            </Label>
+            <Input
+              id="cell-att-from"
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="h-7 w-[8.5rem] px-2 text-[11px]"
+              aria-label="From meeting date"
+            />
+            <span className="text-[10px] text-muted-foreground">to</span>
+            <Label htmlFor="cell-att-to" className="sr-only">
+              To date
+            </Label>
+            <Input
+              id="cell-att-to"
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="h-7 w-[8.5rem] px-2 text-[11px]"
+              aria-label="To meeting date"
+            />
+            {dateFrom || dateTo ? (
+              <button
+                type="button"
+                className="text-[11px] font-medium text-primary hover:underline"
+                onClick={() => {
+                  setDateFrom('');
+                  setDateTo('');
+                }}
+              >
+                Clear
+              </button>
+            ) : null}
+          </div>
+          <div
+            className="ml-auto inline-flex rounded-md border border-border p-0.5"
+            role="group"
+            aria-label="Attendance view mode"
+          >
+            <button
+              type="button"
+              className={cn(
+                'inline-flex h-7 items-center gap-1 rounded-sm px-2 text-[11px] font-medium transition',
+                viewMode === 'cards'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-muted',
+              )}
+              aria-pressed={viewMode === 'cards'}
+              onClick={() => setViewMode('cards')}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Cards
+            </button>
+            <button
+              type="button"
+              className={cn(
+                'inline-flex h-7 items-center gap-1 rounded-sm px-2 text-[11px] font-medium transition',
+                viewMode === 'table'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-muted',
+              )}
+              aria-pressed={viewMode === 'table'}
+              onClick={() => setViewMode('table')}
+            >
+              <Table2 className="h-3.5 w-3.5" />
+              Excel
+            </button>
+          </div>
+        </div>
+      }
+    >
+      {filtered.length === 0 ? null : viewMode === 'table' ? (
+        <div className="overflow-x-auto rounded-md border border-border/70">
+          <table
+            className="w-full min-w-[720px] border-collapse text-left text-[11px]"
+            data-testid="reports-cell-attendance-excel"
+          >
+            <thead className="sticky top-0 z-[1] bg-muted/95 backdrop-blur">
+              <tr className="border-b text-[10px] uppercase tracking-wide text-muted-foreground">
+                <th className="px-2 py-1.5 font-semibold">Branch</th>
+                <th className="px-2 py-1.5 font-semibold">Location</th>
+                <th className="px-2 py-1.5 font-semibold">Date</th>
+                <th className="px-2 py-1.5 font-semibold">Total</th>
+                <th className="px-2 py-1.5 font-semibold">M</th>
+                <th className="px-2 py-1.5 font-semibold">F</th>
+                <th className="px-2 py-1.5 font-semibold">Boys</th>
+                <th className="px-2 py-1.5 font-semibold">Girls</th>
+                <th className="px-2 py-1.5 font-semibold">FT</th>
+                <th className="px-2 py-1.5 font-semibold">Test.</th>
+                <th className="px-2 py-1.5 font-semibold">Recorded by</th>
+                <th className="px-2 py-1.5 font-semibold">PDF</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((r, i) => (
+                <tr
+                  key={r.id}
+                  className={cn(
+                    'border-b border-border/50',
+                    i % 2 === 0 ? 'bg-background' : 'bg-muted/30',
+                  )}
+                >
+                  <td className="px-2 py-1 font-medium">{r.branchName}</td>
+                  <td className="px-2 py-1 text-muted-foreground">{r.location || '—'}</td>
+                  <td className="px-2 py-1 whitespace-nowrap">
+                    {formatAttendanceDate(r.meetingDate)}
+                  </td>
+                  <td className="px-2 py-1 tabular-nums font-semibold">{r.presentCount}</td>
+                  <td className="px-2 py-1 tabular-nums">{r.maleCount}</td>
+                  <td className="px-2 py-1 tabular-nums">{r.femaleCount}</td>
+                  <td className="px-2 py-1 tabular-nums">{r.boysCount}</td>
+                  <td className="px-2 py-1 tabular-nums">{r.girlsCount}</td>
+                  <td className="px-2 py-1 tabular-nums">{r.firstTimersCount}</td>
+                  <td className="px-2 py-1 tabular-nums">{r.testifiersCount}</td>
+                  <td className="px-2 py-1 text-muted-foreground">
+                    {r.recordedBy
+                      ? `${r.recordedBy.firstName} ${r.recordedBy.lastName}`
+                      : '—'}
+                  </td>
+                  <td className="px-2 py-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 gap-1 px-1.5 text-[10px]"
+                      onClick={() => exportCellAttendancePdf(r, [r])}
+                    >
+                      <FileDown className="h-3 w-3" />
+                      PDF
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        filtered.map((r) => (
+          <CellAttendanceReportItemCard
+            key={r.id}
+            report={r}
+            compact
+            history={historyInWindow(
+              all,
+              r.branchId,
+              (x) => x.branchId,
+              (x) => x.meetingDate || x.createdAt,
+            )}
+          />
+        ))
+      )}
+    </InboxScrollCard>
   );
 }
 
@@ -1211,30 +1440,30 @@ export function ReportsInboxPanel({
 
         {/* Working surface */}
         <div className="min-w-0 flex-1 space-y-4 p-4 md:p-5">
-          <div className="sticky top-[calc(3rem+env(safe-area-inset-top))] z-10 -mx-4 border-b border-border bg-background/95 px-4 py-3 backdrop-blur md:-mx-5 md:px-5 xl:top-16">
-            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-              <div />
-              <div className="sm:text-right">
-                <p className="text-xs font-medium text-foreground">
+          <div className="sticky top-[calc(3rem+env(safe-area-inset-top))] z-10 -mx-4 border-b border-border bg-background/95 px-3 py-1.5 backdrop-blur md:-mx-5 md:px-4 xl:top-16">
+            <div className="flex items-center justify-between gap-3">
+              {!isOverview ? (
+                <button
+                  type="button"
+                  className="shrink-0 text-[11px] font-medium text-primary hover:underline"
+                  onClick={() => setKindFilter('all')}
+                >
+                  ← Sources overview
+                </button>
+              ) : (
+                <span className="text-[11px] text-muted-foreground">Sources overview</span>
+              )}
+              <p className="min-w-0 truncate text-right text-[11px] text-muted-foreground">
+                <span className="font-medium text-foreground">
                   {selectedUrgencyLabel} · {selectedSourceLabel}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {isLoading
-                    ? 'Loading…'
-                    : isOverview
-                      ? `${sourceCounts.all} update${sourceCounts.all === 1 ? '' : 's'} across sources`
-                      : `${triageCount} item${triageCount === 1 ? '' : 's'} match`}
-                </p>
-                {!isOverview ? (
-                  <button
-                    type="button"
-                    className="mt-1 text-xs font-medium text-primary hover:underline"
-                    onClick={() => setKindFilter('all')}
-                  >
-                    Back to sources overview
-                  </button>
-                ) : null}
-              </div>
+                </span>
+                <span className="mx-1.5 opacity-40">·</span>
+                {isLoading
+                  ? 'Loading…'
+                  : isOverview
+                    ? `${sourceCounts.all} update${sourceCounts.all === 1 ? '' : 's'}`
+                    : `${triageCount} item${triageCount === 1 ? '' : 's'}`}
+              </p>
             </div>
           </div>
 
@@ -1402,26 +1631,7 @@ export function ReportsInboxPanel({
           ) : null}
 
           {showSource('cell', cellAttendanceReports.length) ? (
-            <InboxScrollCard
-              title="Ministry / Cells attendance"
-              description="Latest report per branch/cell — click a card for 3-month history and PDF export."
-              count={cellAttendanceReports.length}
-              emptyMessage="No Ministry/Cells attendance reports yet. Record attendance from a branch Weekly tab."
-              testId="reports-cell-attendance-inbox"
-            >
-              {cellAttendanceReports.map((r) => (
-                <CellAttendanceReportItemCard
-                  key={r.branchId}
-                  report={r}
-                  history={historyInWindow(
-                    cellAttendanceAll,
-                    r.branchId,
-                    (x) => x.branchId,
-                    (x) => x.meetingDate || x.createdAt,
-                  )}
-                />
-              ))}
-            </InboxScrollCard>
+            <CellAttendanceInbox all={cellAttendanceAll} />
           ) : null}
 
           {showSource('unit', unitAttendanceReports.length) ? (
