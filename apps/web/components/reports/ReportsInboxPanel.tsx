@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -6,12 +6,10 @@ import {
   ChevronDown,
   ChevronUp,
   FileDown,
-  LayoutGrid,
   Loader2,
   Mail,
   MessageSquare,
   Send,
-  Table2,
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -27,6 +25,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import {
+  CellAttendanceInbox,
+  DepartmentReportsInbox,
+  OutreachInbox,
+  WeeklySundayMeetingInbox,
+  type OutreachInboxItem,
+  type ServiceUnitInboxItem,
+  type SundayMeetingAttendanceItem,
+} from '@/components/reports/reports-source-inboxes';
 
 type TriageKind =
   | 'all'
@@ -36,6 +43,7 @@ type TriageKind =
   | 'unit'
   | 'meeting'
   | 'rtp'
+  | 'outreach'
   | 'message';
 
 interface ReplyTarget {
@@ -100,6 +108,9 @@ export interface ReportsInboxData {
     }>;
     cellAttendance?: CellAttendanceReportItem[];
     unitAttendance?: UnitAttendanceReportItem[];
+    sundayMeetingAttendance?: SundayMeetingAttendanceItem[];
+    outreach?: OutreachInboxItem[];
+    serviceUnits?: ServiceUnitInboxItem[];
     meetingSummaries?: Array<{
       id: string;
       title: string;
@@ -169,10 +180,11 @@ const KIND_OPTIONS: Array<{ value: TriageKind; label: string }> = [
   { value: 'rtp', label: 'RTP Requests' },
   { value: 'cell', label: 'Ministry / Cells' },
   { value: 'unit', label: 'Service units' },
+  { value: 'outreach', label: 'Outreach' },
   { value: 'message', label: 'In-app messages' },
 ];
 
-/** Left-rail + overview cards (no “All types”). */
+/** Left-rail + overview cards (no â€œAll typesâ€). */
 const SOURCE_OPTIONS = KIND_OPTIONS.filter(
   (o): o is { value: Exclude<TriageKind, 'all'>; label: string } => o.value !== 'all',
 );
@@ -184,6 +196,7 @@ const SOURCE_CARD_CLASS: Record<Exclude<TriageKind, 'all'>, string> = {
   rtp: 'border-orange-200 bg-orange-100 text-orange-950 hover:bg-orange-200/80 dark:border-orange-800 dark:bg-orange-950/50 dark:text-orange-50',
   cell: 'border-emerald-200 bg-emerald-100 text-emerald-950 hover:bg-emerald-200/80 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-50',
   unit: 'border-teal-200 bg-teal-100 text-teal-950 hover:bg-teal-200/80 dark:border-teal-800 dark:bg-teal-950/50 dark:text-teal-50',
+  outreach: 'border-rose-200 bg-rose-100 text-rose-950 hover:bg-rose-200/80 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-50',
   message: 'border-slate-200 bg-slate-100 text-slate-950 hover:bg-slate-200/80 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-50',
 };
 
@@ -371,397 +384,6 @@ function inDateRange(iso: string, from: string, to: string) {
   if (from && key < from) return false;
   if (to && key > to) return false;
   return true;
-}
-
-function exportCellAttendancePdf(
-  report: CellAttendanceReportItem,
-  rows: CellAttendanceReportItem[],
-) {
-  try {
-    openAttendanceReportPdf({
-      title: report.branchName,
-      subtitle: report.location ?? undefined,
-      kindLabel: 'Ministry / Cells attendance',
-      rows: rows.map((r) => ({
-        dateLabel: formatAttendanceDate(r.meetingDate),
-        presentCount: r.presentCount,
-        maleCount: r.maleCount,
-        femaleCount: r.femaleCount,
-        boysCount: r.boysCount,
-        girlsCount: r.girlsCount,
-        testifiersCount: r.testifiersCount,
-        firstTimersCount: r.firstTimersCount,
-        recordedAt: r.createdAt,
-        recordedBy: r.recordedBy
-          ? `${r.recordedBy.firstName} ${r.recordedBy.lastName}`
-          : undefined,
-      })),
-    });
-  } catch (e) {
-    toast.error(e instanceof Error ? e.message : 'Could not export PDF');
-  }
-}
-
-function CellAttendanceReportItemCard({
-  report,
-  history,
-  compact = false,
-}: {
-  report: CellAttendanceReportItem;
-  history: CellAttendanceReportItem[];
-  compact?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const dateLabel = formatAttendanceDate(report.meetingDate);
-  const details = [
-    { label: 'M', value: report.maleCount },
-    { label: 'F', value: report.femaleCount },
-    { label: 'B', value: report.boysCount },
-    { label: 'G', value: report.girlsCount },
-    { label: 'FT', value: report.firstTimersCount },
-  ];
-
-  return (
-    <>
-      <article
-        role="button"
-        tabIndex={0}
-        onClick={() => setOpen(true)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            setOpen(true);
-          }
-        }}
-        className={cn(
-          'cursor-pointer rounded-md border transition hover:border-primary/40',
-          URGENCY_META.low.card,
-          compact ? 'px-2.5 py-1.5' : 'px-3 py-2',
-        )}
-      >
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <p className="text-sm font-semibold leading-tight">{report.branchName}</p>
-              <p className="text-[11px] text-muted-foreground">
-                {report.location ? `${report.location} · ` : ''}
-                {dateLabel}
-                {report.recordedBy
-                  ? ` · ${report.recordedBy.firstName} ${report.recordedBy.lastName}`
-                  : ''}
-              </p>
-            </div>
-            <div className="mt-1 flex flex-wrap items-center gap-1.5">
-              {details.map((d) => (
-                <span
-                  key={d.label}
-                  className="inline-flex items-center gap-1 rounded border border-border/50 bg-background/70 px-1.5 py-0.5 text-[10px]"
-                >
-                  <span className="text-muted-foreground">{d.label}</span>
-                  <span className="font-semibold tabular-nums">{d.value}</span>
-                </span>
-              ))}
-              {report.testifiersCount > 0 ? (
-                <span className="text-[10px] text-muted-foreground">
-                  Testifiers {report.testifiersCount}
-                </span>
-              ) : null}
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <div className="text-right">
-              <p className="text-base font-bold tabular-nums leading-none">{report.presentCount}</p>
-              <p className="text-[9px] uppercase tracking-wide text-muted-foreground">Total</p>
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-7 gap-1 px-2 text-[11px]"
-              onClick={(e) => {
-                e.stopPropagation();
-                exportCellAttendancePdf(report, [report]);
-              }}
-            >
-              <FileDown className="h-3.5 w-3.5" />
-              PDF
-            </Button>
-          </div>
-        </div>
-      </article>
-
-      {open
-        ? createPortal(
-            <div
-              className="fixed inset-0 z-[120] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4"
-              onClick={() => setOpen(false)}
-            >
-              <div
-                className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-t-2xl bg-background p-4 shadow-xl sm:rounded-2xl sm:p-6"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="mb-4 flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-lg font-semibold">{report.branchName}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Attendance history (last 3 months)
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="gap-1"
-                      onClick={() =>
-                        exportCellAttendancePdf(report, history.length ? history : [report])
-                      }
-                    >
-                      <FileDown className="h-3.5 w-3.5" />
-                      Export PDF
-                    </Button>
-                    <Button type="button" size="icon" variant="ghost" onClick={() => setOpen(false)}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-left text-sm">
-                    <thead>
-                      <tr className="border-b text-muted-foreground">
-                        <th className="pb-2 font-medium">Date</th>
-                        <th className="pb-2 font-medium">Total</th>
-                        <th className="pb-2 font-medium">Male</th>
-                        <th className="pb-2 font-medium">Female</th>
-                        <th className="pb-2 font-medium">Boys</th>
-                        <th className="pb-2 font-medium">Girls</th>
-                        <th className="pb-2 font-medium">First timers</th>
-                        <th className="pb-2 font-medium">Testifiers</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(history.length ? history : [report]).map((row) => (
-                        <tr key={row.id} className="border-b border-border/60">
-                          <td className="py-2">{formatAttendanceDate(row.meetingDate)}</td>
-                          <td className="py-2 tabular-nums">{row.presentCount}</td>
-                          <td className="py-2 tabular-nums">{row.maleCount}</td>
-                          <td className="py-2 tabular-nums">{row.femaleCount}</td>
-                          <td className="py-2 tabular-nums">{row.boysCount}</td>
-                          <td className="py-2 tabular-nums">{row.girlsCount}</td>
-                          <td className="py-2 tabular-nums">{row.firstTimersCount}</td>
-                          <td className="py-2 tabular-nums">{row.testifiersCount}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
-    </>
-  );
-}
-
-function CellAttendanceInbox({ all }: { all: CellAttendanceReportItem[] }) {
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
-
-  const filtered = useMemo(() => {
-    const ranged =
-      dateFrom || dateTo
-        ? all.filter((r) => inDateRange(r.meetingDate || r.createdAt, dateFrom, dateTo))
-        : all;
-    if (dateFrom || dateTo) {
-      return [...ranged].sort(
-        (a, b) =>
-          reportSortTime(b.meetingDate || b.createdAt) -
-          reportSortTime(a.meetingDate || a.createdAt),
-      );
-    }
-    return latestByKey(
-      ranged,
-      (r) => r.branchId,
-      (r) => r.meetingDate || r.createdAt,
-    );
-  }, [all, dateFrom, dateTo]);
-
-  const description =
-    dateFrom || dateTo
-      ? 'Filtered by meeting date — scroll for more · click a row for history.'
-      : 'Latest per branch — use dates to filter · scroll for more · click for history.';
-
-  return (
-    <InboxScrollCard
-      title="Ministry / Cells attendance"
-      description={description}
-      count={filtered.length}
-      emptyMessage={
-        dateFrom || dateTo
-          ? 'No attendance reports in this date range.'
-          : 'No Ministry/Cells attendance reports yet. Record attendance from a branch Weekly tab.'
-      }
-      testId="reports-cell-attendance-inbox"
-      toolbar={
-        <div className="flex flex-wrap items-center gap-2 pt-0.5">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Label htmlFor="cell-att-from" className="sr-only">
-              From date
-            </Label>
-            <Input
-              id="cell-att-from"
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="h-7 w-[8.5rem] px-2 text-[11px]"
-              aria-label="From meeting date"
-            />
-            <span className="text-[10px] text-muted-foreground">to</span>
-            <Label htmlFor="cell-att-to" className="sr-only">
-              To date
-            </Label>
-            <Input
-              id="cell-att-to"
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="h-7 w-[8.5rem] px-2 text-[11px]"
-              aria-label="To meeting date"
-            />
-            {dateFrom || dateTo ? (
-              <button
-                type="button"
-                className="text-[11px] font-medium text-primary hover:underline"
-                onClick={() => {
-                  setDateFrom('');
-                  setDateTo('');
-                }}
-              >
-                Clear
-              </button>
-            ) : null}
-          </div>
-          <div
-            className="ml-auto inline-flex rounded-md border border-border p-0.5"
-            role="group"
-            aria-label="Attendance view mode"
-          >
-            <button
-              type="button"
-              className={cn(
-                'inline-flex h-7 items-center gap-1 rounded-sm px-2 text-[11px] font-medium transition',
-                viewMode === 'cards'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-muted',
-              )}
-              aria-pressed={viewMode === 'cards'}
-              onClick={() => setViewMode('cards')}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              Cards
-            </button>
-            <button
-              type="button"
-              className={cn(
-                'inline-flex h-7 items-center gap-1 rounded-sm px-2 text-[11px] font-medium transition',
-                viewMode === 'table'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-muted',
-              )}
-              aria-pressed={viewMode === 'table'}
-              onClick={() => setViewMode('table')}
-            >
-              <Table2 className="h-3.5 w-3.5" />
-              Excel
-            </button>
-          </div>
-        </div>
-      }
-    >
-      {filtered.length === 0 ? null : viewMode === 'table' ? (
-        <div className="overflow-x-auto rounded-md border border-border/70">
-          <table
-            className="w-full min-w-[720px] border-collapse text-left text-[11px]"
-            data-testid="reports-cell-attendance-excel"
-          >
-            <thead className="sticky top-0 z-[1] bg-muted/95 backdrop-blur">
-              <tr className="border-b text-[10px] uppercase tracking-wide text-muted-foreground">
-                <th className="px-2 py-1.5 font-semibold">Branch</th>
-                <th className="px-2 py-1.5 font-semibold">Location</th>
-                <th className="px-2 py-1.5 font-semibold">Date</th>
-                <th className="px-2 py-1.5 font-semibold">Total</th>
-                <th className="px-2 py-1.5 font-semibold">M</th>
-                <th className="px-2 py-1.5 font-semibold">F</th>
-                <th className="px-2 py-1.5 font-semibold">Boys</th>
-                <th className="px-2 py-1.5 font-semibold">Girls</th>
-                <th className="px-2 py-1.5 font-semibold">FT</th>
-                <th className="px-2 py-1.5 font-semibold">Test.</th>
-                <th className="px-2 py-1.5 font-semibold">Recorded by</th>
-                <th className="px-2 py-1.5 font-semibold">PDF</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((r, i) => (
-                <tr
-                  key={r.id}
-                  className={cn(
-                    'border-b border-border/50',
-                    i % 2 === 0 ? 'bg-background' : 'bg-muted/30',
-                  )}
-                >
-                  <td className="px-2 py-1 font-medium">{r.branchName}</td>
-                  <td className="px-2 py-1 text-muted-foreground">{r.location || '—'}</td>
-                  <td className="px-2 py-1 whitespace-nowrap">
-                    {formatAttendanceDate(r.meetingDate)}
-                  </td>
-                  <td className="px-2 py-1 tabular-nums font-semibold">{r.presentCount}</td>
-                  <td className="px-2 py-1 tabular-nums">{r.maleCount}</td>
-                  <td className="px-2 py-1 tabular-nums">{r.femaleCount}</td>
-                  <td className="px-2 py-1 tabular-nums">{r.boysCount}</td>
-                  <td className="px-2 py-1 tabular-nums">{r.girlsCount}</td>
-                  <td className="px-2 py-1 tabular-nums">{r.firstTimersCount}</td>
-                  <td className="px-2 py-1 tabular-nums">{r.testifiersCount}</td>
-                  <td className="px-2 py-1 text-muted-foreground">
-                    {r.recordedBy
-                      ? `${r.recordedBy.firstName} ${r.recordedBy.lastName}`
-                      : '—'}
-                  </td>
-                  <td className="px-2 py-1">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      className="h-6 gap-1 px-1.5 text-[10px]"
-                      onClick={() => exportCellAttendancePdf(r, [r])}
-                    >
-                      <FileDown className="h-3 w-3" />
-                      PDF
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        filtered.map((r) => (
-          <CellAttendanceReportItemCard
-            key={r.id}
-            report={r}
-            compact
-            history={historyInWindow(
-              all,
-              r.branchId,
-              (x) => x.branchId,
-              (x) => x.meetingDate || x.createdAt,
-            )}
-          />
-        ))
-      )}
-    </InboxScrollCard>
-  );
 }
 
 function UnitAttendanceReportItemCard({
@@ -1098,6 +720,12 @@ export function ReportsInboxPanel({
     return data?.reports.department ?? [];
   }, [data, kindFilter, urgencyFilter]);
 
+  const sundayMeetingAll = useMemo(() => {
+    if (kindFilter !== 'all' && kindFilter !== 'weekly') return [];
+    if (urgencyFilter !== 'all' && urgencyFilter !== 'info' && urgencyFilter !== 'low') return [];
+    return data?.reports.sundayMeetingAttendance ?? [];
+  }, [data, kindFilter, urgencyFilter]);
+
   const weeklyReports = useMemo(() => {
     if (kindFilter !== 'all' && kindFilter !== 'weekly') return [];
     if (urgencyFilter !== 'all' && urgencyFilter !== 'info') return [];
@@ -1121,8 +749,8 @@ export function ReportsInboxPanel({
   );
 
   const unitAttendanceAll = useMemo(() => {
-    if (kindFilter !== 'all' && kindFilter !== 'unit') return [];
-    if (urgencyFilter !== 'all' && urgencyFilter !== 'low') return [];
+    if (kindFilter !== 'all' && kindFilter !== 'unit' && kindFilter !== 'department') return [];
+    if (urgencyFilter !== 'all' && urgencyFilter !== 'low' && urgencyFilter !== 'medium') return [];
     return data?.reports.unitAttendance ?? [];
   }, [data, kindFilter, urgencyFilter]);
 
@@ -1135,6 +763,14 @@ export function ReportsInboxPanel({
       ),
     [unitAttendanceAll],
   );
+
+  const outreachAll = useMemo(() => {
+    if (kindFilter !== 'all' && kindFilter !== 'outreach') return [];
+    if (urgencyFilter !== 'all' && urgencyFilter !== 'info' && urgencyFilter !== 'high') return [];
+    return data?.reports.outreach ?? [];
+  }, [data, kindFilter, urgencyFilter]);
+
+  const serviceUnitsAll = useMemo(() => data?.reports.serviceUnits ?? [], [data]);
 
   const meetingSummaries = useMemo(() => {
     if (kindFilter !== 'all' && kindFilter !== 'meeting') return [];
@@ -1158,12 +794,13 @@ export function ReportsInboxPanel({
   }, [data, kindFilter, urgencyFilter]);
 
   const triageCount =
-    deptReports.length +
-    weeklyReports.length +
+    (kindFilter === 'department' ? serviceUnitsAll.length || deptReports.length : deptReports.length) +
+    (kindFilter === 'weekly' ? sundayMeetingAll.length || weeklyReports.length : weeklyReports.length) +
     meetingSummaries.length +
     rtpRequests.length +
     cellAttendanceReports.length +
     unitAttendanceReports.length +
+    outreachAll.length +
     messages.length;
 
   const urgencyCounts = useMemo(() => {
@@ -1177,8 +814,10 @@ export function ReportsInboxPanel({
     const include = (kind: Exclude<TriageKind, 'all'>) =>
       kindFilter === 'all' || kindFilter === kind;
 
-    if (include('department')) counts.medium += data?.reports.department.length ?? 0;
-    if (include('weekly')) counts.info += data?.reports.weekly.length ?? 0;
+    if (include('department')) counts.medium += data?.reports.serviceUnits?.length || data?.reports.department.length || 0;
+    if (include('weekly')) {
+      counts.info += data?.reports.sundayMeetingAttendance?.length || data?.reports.weekly.length || 0;
+    }
     if (include('meeting')) counts.medium += data?.reports.meetingSummaries?.length ?? 0;
     if (include('rtp')) {
       for (const r of data?.reports.rtpRequests ?? []) {
@@ -1189,6 +828,7 @@ export function ReportsInboxPanel({
     }
     if (include('cell')) counts.low += data?.reports.cellAttendance?.length ?? 0;
     if (include('unit')) counts.low += data?.reports.unitAttendance?.length ?? 0;
+    if (include('outreach')) counts.info += data?.reports.outreach?.length ?? 0;
     if (include('message')) counts.info += data?.messages.length ?? 0;
     return counts;
   }, [data, kindFilter]);
@@ -1204,12 +844,14 @@ export function ReportsInboxPanel({
   );
 
   const sourceCounts = useMemo(() => {
-    const dept = (data?.reports.department ?? []).filter(() =>
-      urgencyFilter === 'all' || urgencyFilter === 'medium',
-    ).length;
-    const weekly = (data?.reports.weekly ?? []).filter(() =>
-      urgencyFilter === 'all' || urgencyFilter === 'info',
-    ).length;
+    const dept =
+      urgencyFilter === 'all' || urgencyFilter === 'medium'
+        ? (data?.reports.serviceUnits?.length || data?.reports.department.length || 0)
+        : 0;
+    const weekly =
+      urgencyFilter === 'all' || urgencyFilter === 'info' || urgencyFilter === 'low'
+        ? (data?.reports.sundayMeetingAttendance?.length || data?.reports.weekly.length || 0)
+        : 0;
     const meeting = (data?.reports.meetingSummaries ?? []).filter(() =>
       urgencyFilter === 'all' || urgencyFilter === 'medium',
     ).length;
@@ -1224,17 +866,21 @@ export function ReportsInboxPanel({
     const unit = (data?.reports.unitAttendance ?? []).filter(() =>
       urgencyFilter === 'all' || urgencyFilter === 'low',
     ).length;
+    const outreach = (data?.reports.outreach ?? []).filter(() =>
+      urgencyFilter === 'all' || urgencyFilter === 'info' || urgencyFilter === 'high',
+    ).length;
     const message = (data?.messages ?? []).filter(() =>
       urgencyFilter === 'all' || urgencyFilter === 'info',
     ).length;
     return {
-      all: dept + weekly + meeting + rtp + cell + unit + message,
+      all: dept + weekly + meeting + rtp + cell + unit + outreach + message,
       department: dept,
       weekly,
       meeting,
       rtp,
       cell,
       unit,
+      outreach,
       message,
     };
   }, [data, urgencyFilter]);
@@ -1448,7 +1094,7 @@ export function ReportsInboxPanel({
                   className="shrink-0 text-[11px] font-medium text-primary hover:underline"
                   onClick={() => setKindFilter('all')}
                 >
-                  ← Sources overview
+                  â† Sources overview
                 </button>
               ) : (
                 <span className="text-[11px] text-muted-foreground">Sources overview</span>
@@ -1459,7 +1105,7 @@ export function ReportsInboxPanel({
                 </span>
                 <span className="mx-1.5 opacity-40">·</span>
                 {isLoading
-                  ? 'Loading…'
+                  ? 'Loadingâ€¦'
                   : isOverview
                     ? `${sourceCounts.all} update${sourceCounts.all === 1 ? '' : 's'}`
                     : `${triageCount} item${triageCount === 1 ? '' : 's'}`}
@@ -1529,7 +1175,7 @@ export function ReportsInboxPanel({
                           value={reply.recipientId}
                           onChange={(e) => setReply((p) => ({ ...p, recipientId: e.target.value }))}
                         >
-                          <option value="">Select recipient…</option>
+                          <option value="">Select recipientâ€¦</option>
                           {(data?.replyTargets ?? []).map((t) => (
                             <option key={t.userId} value={t.userId}>
                               {t.label} — {t.source}
@@ -1567,71 +1213,24 @@ export function ReportsInboxPanel({
             </Card>
           ) : null}
 
-          {showSource('department', deptReports.length) || showSource('weekly', weeklyReports.length) ? (
-            <div className="grid gap-4 xl:grid-cols-2 xl:items-stretch">
-              {showSource('department', deptReports.length) ? (
-                <InboxScrollCard
-                  title="Department reports"
-                  description="Submitted from department modules and leadership workflows."
-                  count={deptReports.length}
-                  emptyMessage="No department reports match your filters."
-                  testId="reports-dept-inbox"
-                >
-                  {deptReports.map((r) => (
-                    <div
-                      key={r.id}
-                      className={cn('rounded-lg border px-3 py-2.5 text-sm', URGENCY_META.medium.card)}
-                    >
-                      <p className="font-medium">{r.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {r.serviceUnit.name} · {r.author.firstName} {r.author.lastName} ·{' '}
-                        {new Date(r.submittedAt).toLocaleString()}
-                      </p>
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">{r.body}</p>
-                      {r.author.userId ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="mt-2"
-                          onClick={() =>
-                            pickReply({
-                              userId: r.author.userId!,
-                              subject: `Re: ${r.title}`,
-                            })
-                          }
-                        >
-                          <MessageSquare className="mr-1 h-3.5 w-3.5" />
-                          Reply to sender
-                        </Button>
-                      ) : (
-                        <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
-                          No linked user account — pick recipient manually below.
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </InboxScrollCard>
-              ) : null}
+          {showSource('department', serviceUnitsAll.length || deptReports.length) ? (
+            <DepartmentReportsInbox
+              units={serviceUnitsAll}
+              unitAttendance={data?.reports.unitAttendance ?? []}
+              departmentReports={data?.reports.department ?? []}
+            />
+          ) : null}
 
-              {showSource('weekly', weeklyReports.length) ? (
-                <InboxScrollCard
-                  title="Weekly reports"
-                  description="Auto-generated department summaries with attendance and activity stats."
-                  count={weeklyReports.length}
-                  emptyMessage="No weekly reports match your filters."
-                  testId="reports-weekly-inbox"
-                >
-                  {weeklyReports.map((r) => (
-                    <WeeklyReportItem key={r.id} report={r} />
-                  ))}
-                </InboxScrollCard>
-              ) : null}
-            </div>
+          {showSource('weekly', sundayMeetingAll.length || weeklyReports.length) ? (
+            <WeeklySundayMeetingInbox all={data?.reports.sundayMeetingAttendance ?? []} />
           ) : null}
 
           {showSource('cell', cellAttendanceReports.length) ? (
             <CellAttendanceInbox all={cellAttendanceAll} />
+          ) : null}
+
+          {showSource('outreach', outreachAll.length) ? (
+            <OutreachInbox all={outreachAll} />
           ) : null}
 
           {showSource('unit', unitAttendanceReports.length) ? (
@@ -1892,7 +1491,7 @@ export function ReportsInboxPanel({
                         value={reply.recipientId}
                         onChange={(e) => setReply((p) => ({ ...p, recipientId: e.target.value }))}
                       >
-                        <option value="">Select recipient…</option>
+                        <option value="">Select recipientâ€¦</option>
                         {(data?.replyTargets ?? []).map((t) => (
                           <option key={t.userId} value={t.userId}>
                             {t.label} — {t.source}
@@ -1936,7 +1535,7 @@ export function ReportsInboxPanel({
                   <div key={m.id} className="rounded-lg border bg-card px-3 py-2.5 text-sm">
                     <p className="font-medium">{m.subject ?? '(no subject)'}</p>
                     <p className="text-xs text-muted-foreground">
-                      {m.sender.firstName} {m.sender.lastName} → {m.recipient.firstName}{' '}
+                      {m.sender.firstName} {m.sender.lastName} â†’ {m.recipient.firstName}{' '}
                       {m.recipient.lastName} · {new Date(m.createdAt).toLocaleString()}
                     </p>
                     <p className="mt-2 line-clamp-3 whitespace-pre-wrap leading-relaxed">{m.body}</p>

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { DepartmentCode } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.module';
 import { MembershipService } from '../membership/membership.service';
 
@@ -235,12 +236,107 @@ export class AdminService {
     const previous = chart.length > 1 ? chart[chart.length - 2].total : 0;
     const changePct =
       previous > 0 ? Math.round(((latest - previous) / previous) * 100) : latest > 0 ? 100 : 0;
+
+    const sundayCodes: DepartmentCode[] = [
+      DepartmentCode.USHERING,
+      DepartmentCode.PROTOCOL,
+      DepartmentCode.YOUTH,
+      DepartmentCode.TEENS,
+      DepartmentCode.CHILDREN,
+    ];
+    const since = new Date();
+    since.setDate(since.getDate() - weeks * 7);
+    const [unitAtt, usheringRows] = await Promise.all([
+      this.prisma.serviceUnitAttendance.findMany({
+        where: {
+          churchId,
+          weekStart: { gte: since },
+          serviceUnit: { departmentCode: { in: sundayCodes } },
+        },
+        include: { serviceUnit: { select: { id: true, name: true, departmentCode: true } } },
+        orderBy: { weekStart: 'asc' },
+      }),
+      this.prisma.usheringWeeklyHeadcount.findMany({
+        where: { churchId, weekStart: { gte: since } },
+        include: { serviceUnit: { select: { id: true, name: true, departmentCode: true } } },
+        orderBy: { weekStart: 'asc' },
+      }),
+    ]);
+
+    const byUnitMap = new Map<
+      string,
+      {
+        serviceUnitId: string;
+        serviceUnitName: string;
+        departmentCode: string | null;
+        weeks: Array<{ period: string; total: number; male: number; female: number; boys: number; girls: number }>;
+      }
+    >();
+
+    const pushWeek = (
+      unitId: string,
+      unitName: string,
+      code: string | null,
+      period: string,
+      total: number,
+      male: number,
+      female: number,
+      boys: number,
+      girls: number,
+    ) => {
+      let entry = byUnitMap.get(unitId);
+      if (!entry) {
+        entry = {
+          serviceUnitId: unitId,
+          serviceUnitName: unitName,
+          departmentCode: code,
+          weeks: [],
+        };
+        byUnitMap.set(unitId, entry);
+      }
+      entry.weeks.push({ period, total, male, female, boys, girls });
+    };
+
+    for (const row of usheringRows) {
+      pushWeek(
+        row.serviceUnitId,
+        row.serviceUnit.name,
+        row.serviceUnit.departmentCode ?? 'USHERING',
+        row.weekStart.toISOString(),
+        row.totalAttendees,
+        row.male,
+        row.female,
+        row.babies,
+        row.children,
+      );
+    }
+    for (const row of unitAtt) {
+      if (byUnitMap.has(row.serviceUnitId)) {
+        const existing = byUnitMap.get(row.serviceUnitId)!;
+        const period = (row.meetingDate ?? row.weekStart).toISOString().slice(0, 10);
+        if (existing.weeks.some((w) => w.period.slice(0, 10) === period)) continue;
+      }
+      const demo = row.maleCount + row.femaleCount + row.boysCount + row.girlsCount;
+      pushWeek(
+        row.serviceUnitId,
+        row.serviceUnit.name,
+        row.serviceUnit.departmentCode,
+        (row.meetingDate ?? row.weekStart).toISOString(),
+        demo > 0 ? demo : row.presentCount,
+        row.maleCount,
+        row.femaleCount,
+        row.boysCount,
+        row.girlsCount,
+      );
+    }
+
     return {
       source: flow.source,
       serviceUnitId: flow.serviceUnitId,
       serviceUnitName: flow.serviceUnitName,
       weeks: chart,
       summary: { average: avg, latest, changePct },
+      sundayMeetingByUnit: Array.from(byUnitMap.values()),
     };
   }
 }

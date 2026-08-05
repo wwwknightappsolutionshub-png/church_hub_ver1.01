@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { ChatChannelType, Prisma } from '@prisma/client';
+import { ChatChannelType, DepartmentCode, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.module';
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
 import { ANNOUNCEMENT_CATEGORIES, MODERATION_KEYWORDS } from './communications.constants';
@@ -312,11 +312,14 @@ export class CommunicationsService {
       weeklyReports,
       cellAttendance,
       unitAttendance,
+      sundayMeetingAttendance,
       meetingSummaries,
       rtpRequests,
       queueItems,
       notifications,
       inApp,
+      outreachContacts,
+      serviceUnits,
     ] =
       await Promise.all([
         this.prisma.deptModuleReport.findMany({
@@ -338,6 +341,7 @@ export class CommunicationsService {
         }),
         this.listCellAttendanceReports(churchId),
         this.listServiceUnitAttendanceReports(churchId),
+        this.listSundayMeetingAttendance(churchId),
         this.listMeetingSummaries(churchId),
         this.listRtpRequests(churchId),
         this.prisma.communicationQueueItem.findMany({
@@ -364,6 +368,8 @@ export class CommunicationsService {
             recipient: { select: { id: true, firstName: true, lastName: true } },
           },
         }),
+        this.listOutreachContactsForInbox(churchId),
+        this.listServiceUnitsForInbox(churchId),
       ]);
 
     const replyTargets = this.buildReplyTargets(deptReports, inApp, queueItems);
@@ -374,8 +380,11 @@ export class CommunicationsService {
         weekly: weeklyReports,
         cellAttendance,
         unitAttendance,
+        sundayMeetingAttendance,
         meetingSummaries,
         rtpRequests,
+        outreach: outreachContacts,
+        serviceUnits,
       },
       queue: queueItems,
       notifications,
@@ -391,12 +400,15 @@ export class CommunicationsService {
       weeklyReports,
       cellAttendance,
       unitAttendance,
+      sundayMeetingAttendance,
       meetingSummaries,
       rtpRequests,
       queueItems,
       notifications,
       inApp,
       staffUsers,
+      outreachContacts,
+      serviceUnits,
     ] = await Promise.all([
         this.prisma.deptModuleReport.findMany({
           where: { churchId },
@@ -417,6 +429,7 @@ export class CommunicationsService {
         }),
         this.listCellAttendanceReports(churchId),
         this.listServiceUnitAttendanceReports(churchId),
+        this.listSundayMeetingAttendance(churchId),
         this.listMeetingSummaries(churchId),
         this.listRtpRequests(churchId),
         this.prisma.communicationQueueItem.findMany({
@@ -452,6 +465,8 @@ export class CommunicationsService {
             roles: { include: { role: { select: { name: true } } } },
           },
         }),
+        this.listOutreachContactsForInbox(churchId),
+        this.listServiceUnitsForInbox(churchId),
       ]);
 
     const replyTargets = this.buildReplyTargets(
@@ -471,14 +486,232 @@ export class CommunicationsService {
         weekly: weeklyReports,
         cellAttendance,
         unitAttendance,
+        sundayMeetingAttendance,
         meetingSummaries,
         rtpRequests,
+        outreach: outreachContacts,
+        serviceUnits,
       },
       queue: queueItems,
       notifications,
       messages: inApp,
       replyTargets,
     };
+  }
+
+  /** Sunday meeting headcounts: Ushering + Protocol/Youth/Teens/Children (for Weekly reports + Analytics). */
+  private static readonly SUNDAY_MEETING_CODES: DepartmentCode[] = [
+    DepartmentCode.USHERING,
+    DepartmentCode.PROTOCOL,
+    DepartmentCode.YOUTH,
+    DepartmentCode.TEENS,
+    DepartmentCode.CHILDREN,
+  ];
+
+  private async listSundayMeetingAttendance(churchId: string) {
+    const codes = CommunicationsService.SUNDAY_MEETING_CODES;
+    const [ushering, unitRows, childrenWeekly] = await Promise.all([
+      this.prisma.usheringWeeklyHeadcount.findMany({
+        where: { churchId },
+        orderBy: { weekStart: 'desc' },
+        take: 120,
+        include: {
+          serviceUnit: { select: { id: true, name: true, departmentCode: true } },
+        },
+      }),
+      this.prisma.serviceUnitAttendance.findMany({
+        where: {
+          churchId,
+          serviceUnit: { departmentCode: { in: codes } },
+        },
+        orderBy: [{ meetingDate: 'desc' }, { weekStart: 'desc' }, { createdAt: 'desc' }],
+        take: 200,
+        include: {
+          serviceUnit: { select: { id: true, name: true, departmentCode: true } },
+          recordedBy: { select: { id: true, firstName: true, lastName: true } },
+        },
+      }),
+      this.prisma.serviceUnitWeeklyReport.findMany({
+        where: {
+          churchId,
+          serviceUnit: { departmentCode: 'CHILDREN' },
+        },
+        orderBy: { weekStart: 'desc' },
+        take: 80,
+        include: {
+          serviceUnit: { select: { id: true, name: true, departmentCode: true } },
+        },
+      }),
+    ]);
+
+    type Row = {
+      id: string;
+      source: 'ushering' | 'unit_attendance' | 'children_weekly';
+      serviceUnitId: string;
+      serviceUnitName: string;
+      departmentCode: string | null;
+      meetingDate: string;
+      weekStart: string;
+      createdAt: string;
+      presentCount: number;
+      maleCount: number;
+      femaleCount: number;
+      boysCount: number;
+      girlsCount: number;
+      babiesCount: number;
+      childrenCount: number;
+      testifiersCount: number;
+      firstTimersCount: number;
+      recordedBy: { id: string; firstName: string; lastName: string } | null;
+    };
+
+    const rows: Row[] = [];
+    const seen = new Set<string>();
+    const weekKey = (unitId: string, weekIso: string) => `${unitId}|${weekIso.slice(0, 10)}`;
+
+    for (const row of ushering) {
+      const meetingDate = row.weekStart;
+      const key = weekKey(row.serviceUnitId, meetingDate.toISOString());
+      seen.add(key);
+      rows.push({
+        id: row.id,
+        source: 'ushering',
+        serviceUnitId: row.serviceUnitId,
+        serviceUnitName: row.serviceUnit.name,
+        departmentCode: row.serviceUnit.departmentCode ?? 'USHERING',
+        meetingDate: meetingDate.toISOString(),
+        weekStart: row.weekStart.toISOString(),
+        createdAt: row.createdAt.toISOString(),
+        presentCount: row.totalAttendees,
+        maleCount: row.male,
+        femaleCount: row.female,
+        boysCount: row.babies,
+        girlsCount: row.children,
+        babiesCount: row.babies,
+        childrenCount: row.children,
+        testifiersCount: 0,
+        firstTimersCount: 0,
+        recordedBy: null,
+      });
+    }
+
+    for (const row of unitRows) {
+      const meetingDate = row.meetingDate ?? row.weekStart;
+      const key = weekKey(row.serviceUnitId, meetingDate.toISOString());
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const demoTotal = row.maleCount + row.femaleCount + row.boysCount + row.girlsCount;
+      rows.push({
+        id: row.id,
+        source: 'unit_attendance',
+        serviceUnitId: row.serviceUnitId,
+        serviceUnitName: row.serviceUnit.name,
+        departmentCode: row.serviceUnit.departmentCode,
+        meetingDate: meetingDate.toISOString(),
+        weekStart: row.weekStart.toISOString(),
+        createdAt: row.createdAt.toISOString(),
+        presentCount: demoTotal > 0 ? demoTotal : row.presentCount,
+        maleCount: row.maleCount,
+        femaleCount: row.femaleCount,
+        boysCount: row.boysCount,
+        girlsCount: row.girlsCount,
+        babiesCount: 0,
+        childrenCount: 0,
+        testifiersCount: row.testifiersCount,
+        firstTimersCount: row.firstTimersCount,
+        recordedBy: row.recordedBy
+          ? {
+              id: row.recordedBy.id,
+              firstName: row.recordedBy.firstName,
+              lastName: row.recordedBy.lastName,
+            }
+          : null,
+      });
+    }
+
+    for (const row of childrenWeekly) {
+      const stats =
+        row.stats && typeof row.stats === 'object' && !Array.isArray(row.stats)
+          ? (row.stats as Record<string, unknown>)
+          : {};
+      if (stats.reportType !== 'head_count') continue;
+      const key = weekKey(row.serviceUnitId, row.weekStart.toISOString());
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const grand =
+        stats.grandTotals && typeof stats.grandTotals === 'object' && !Array.isArray(stats.grandTotals)
+          ? (stats.grandTotals as Record<string, unknown>)
+          : {};
+      const boys = typeof grand.boys === 'number' ? grand.boys : 0;
+      const girls = typeof grand.girls === 'number' ? grand.girls : 0;
+      const total = typeof grand.total === 'number' ? grand.total : boys + girls;
+      rows.push({
+        id: row.id,
+        source: 'children_weekly',
+        serviceUnitId: row.serviceUnitId,
+        serviceUnitName: row.serviceUnit.name,
+        departmentCode: row.serviceUnit.departmentCode ?? 'CHILDREN',
+        meetingDate: row.weekStart.toISOString(),
+        weekStart: row.weekStart.toISOString(),
+        createdAt: row.createdAt.toISOString(),
+        presentCount: total,
+        maleCount: 0,
+        femaleCount: 0,
+        boysCount: boys,
+        girlsCount: girls,
+        babiesCount: 0,
+        childrenCount: boys + girls,
+        testifiersCount: 0,
+        firstTimersCount: 0,
+        recordedBy: null,
+      });
+    }
+
+    return rows.sort(
+      (a, b) => new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime(),
+    );
+  }
+
+  private async listOutreachContactsForInbox(churchId: string) {
+    const rows = await this.prisma.outreachContact.findMany({
+      where: { churchId },
+      orderBy: { capturedAt: 'desc' },
+      take: 150,
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        email: true,
+        convertStage: true,
+        capturedAt: true,
+        locationLabel: true,
+        needsBusPickup: true,
+        evangelist: { select: { firstName: true, lastName: true } },
+      },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      firstName: r.firstName,
+      lastName: r.lastName,
+      phone: r.phone,
+      email: r.email,
+      convertStage: r.convertStage,
+      capturedAt: r.capturedAt.toISOString(),
+      locationLabel: r.locationLabel,
+      needsBusPickup: r.needsBusPickup,
+      evangelist: r.evangelist
+        ? `${r.evangelist.firstName} ${r.evangelist.lastName}`.trim()
+        : null,
+    }));
+  }
+
+  private async listServiceUnitsForInbox(churchId: string) {
+    return this.prisma.serviceUnit.findMany({
+      where: { churchId, isActive: true },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true, departmentCode: true },
+    });
   }
 
   /** Ministry/Cells weekly attendance for pastor & admin report dashboards. */
