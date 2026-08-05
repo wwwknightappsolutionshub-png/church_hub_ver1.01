@@ -53,7 +53,7 @@ export function AnalyticsOutreachFiltersSection() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Journey, month & totals</CardTitle>
           <CardDescription>
-            Filter outreach contacts by journey stage and month. Totals update with your filters.
+            Set dates and filters, then press Apply / Go. Totals are shortcuts that apply immediately.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -61,59 +61,70 @@ export function AnalyticsOutreachFiltersSection() {
             <p className="text-sm text-muted-foreground">Loading outreach contacts…</p>
           ) : (
             <>
-              <div className="flex flex-wrap items-end gap-2">
-                <label className="space-y-1 text-[10px] text-muted-foreground">
-                  From
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <label className="sr-only" htmlFor="analytics-outreach-from">
+                    From
+                  </label>
                   <input
+                    id="analytics-outreach-from"
                     type="date"
-                    className="block h-8 rounded-md border border-input bg-background px-2 text-xs"
+                    className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
                     value={draftFrom}
                     onChange={(e) => setDraftFrom(e.target.value)}
                   />
-                </label>
-                <label className="space-y-1 text-[10px] text-muted-foreground">
-                  To
+                  <span className="text-[10px] text-muted-foreground">to</span>
+                  <label className="sr-only" htmlFor="analytics-outreach-to">
+                    To
+                  </label>
                   <input
+                    id="analytics-outreach-to"
                     type="date"
-                    className="block h-8 rounded-md border border-input bg-background px-2 text-xs"
+                    className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
                     value={draftTo}
                     onChange={(e) => setDraftTo(e.target.value)}
                   />
-                </label>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="h-8 text-[11px]"
-                  disabled={!draftDirty}
-                  onClick={() => {
-                    setDateFrom(draftFrom);
-                    setDateTo(draftTo);
-                  }}
-                >
-                  Apply
-                </Button>
-                {(dateFrom || dateTo || draftFrom || draftTo) && (
-                  <button
+                  <Button
                     type="button"
-                    className="h-8 text-[11px] font-medium text-primary hover:underline"
+                    size="sm"
+                    className="h-7 px-2.5 text-[11px]"
+                    disabled={!draftDirty}
                     onClick={() => {
-                      setDraftFrom('');
-                      setDraftTo('');
-                      setDateFrom('');
-                      setDateTo('');
+                      setDateFrom(draftFrom);
+                      setDateTo(draftTo);
                     }}
                   >
-                    Clear dates
-                  </button>
-                )}
+                    Apply
+                  </Button>
+                  {(dateFrom || dateTo || draftFrom || draftTo) && (
+                    <button
+                      type="button"
+                      className="text-[11px] font-medium text-primary hover:underline"
+                      onClick={() => {
+                        setDraftFrom('');
+                        setDraftTo('');
+                        setDateFrom('');
+                        setDateTo('');
+                      }}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <OutreachAdvancedFiltersPanel
+                  items={dateScoped}
+                  stage={stage}
+                  monthKey={monthKey}
+                  onApply={(nextStage, nextMonth) => {
+                    setStage(nextStage);
+                    setMonthKey(nextMonth);
+                  }}
+                  onReset={() => {
+                    setStage('all');
+                    setMonthKey('all');
+                  }}
+                />
               </div>
-              <OutreachAdvancedFiltersPanel
-                items={dateScoped}
-                stage={stage}
-                monthKey={monthKey}
-                onStage={setStage}
-                onMonthKey={setMonthKey}
-              />
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">
                   Showing {filtered.length} of {all.length} contacts

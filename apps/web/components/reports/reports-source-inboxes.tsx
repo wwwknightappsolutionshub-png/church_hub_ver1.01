@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { openAttendanceReportPdf } from '@/lib/attendance-report-pdf';
 import { toast } from 'sonner';
 import {
@@ -291,81 +291,112 @@ function CellAdvancedFiltersPanel({
   cellName,
   province,
   leader,
-  onCellName,
-  onProvince,
-  onLeader,
+  onApply,
+  onReset,
   className,
 }: {
   cellName: string;
   province: string;
   leader: string;
-  onCellName: (v: string) => void;
-  onProvince: (v: string) => void;
-  onLeader: (v: string) => void;
+  onApply: (next: { cellName: string; province: string; leader: string }) => void;
+  onReset: () => void;
   className?: string;
 }) {
-  const hasFilters = Boolean(cellName || province || leader);
+  const [draftCell, setDraftCell] = useState(cellName);
+  const [draftProvince, setDraftProvince] = useState(province);
+  const [draftLeader, setDraftLeader] = useState(leader);
+
+  useEffect(() => {
+    setDraftCell(cellName);
+    setDraftProvince(province);
+    setDraftLeader(leader);
+  }, [cellName, province, leader]);
+
+  const dirty =
+    draftCell !== cellName || draftProvince !== province || draftLeader !== leader;
+  const hasApplied = Boolean(cellName || province || leader);
+  const hasDraft = Boolean(draftCell || draftProvince || draftLeader);
+
+  const go = () =>
+    onApply({ cellName: draftCell, province: draftProvince, leader: draftLeader });
+
   return (
-    <div className={cn('space-y-2 rounded-md border border-border/70 bg-muted/20 p-2.5', className)}>
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-        Advanced filters
-      </p>
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="space-y-1">
-          <Label htmlFor="cell-filter-name" className="text-[10px] text-muted-foreground">
-            Cell name
-          </Label>
-          <input
-            id="cell-filter-name"
-            type="search"
-            placeholder="e.g. glory"
-            value={cellName}
-            onChange={(e) => onCellName(e.target.value)}
-            className="h-8 w-[9.5rem] rounded-md border border-input bg-background px-2 text-xs"
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="cell-filter-province" className="text-[10px] text-muted-foreground">
-            Province name
-          </Label>
-          <input
-            id="cell-filter-province"
-            type="search"
-            placeholder="e.g. Middlesex"
-            value={province}
-            onChange={(e) => onProvince(e.target.value)}
-            className="h-8 w-[9.5rem] rounded-md border border-input bg-background px-2 text-xs"
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="cell-filter-leader" className="text-[10px] text-muted-foreground">
-            Cell leader
-          </Label>
-          <input
-            id="cell-filter-leader"
-            type="search"
-            placeholder="Leader name"
-            value={leader}
-            onChange={(e) => onLeader(e.target.value)}
-            className="h-8 w-[9.5rem] rounded-md border border-input bg-background px-2 text-xs"
-          />
-        </div>
-        {hasFilters ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="h-8 text-[11px]"
-            onClick={() => {
-              onCellName('');
-              onProvince('');
-              onLeader('');
-            }}
-          >
-            Reset filters
-          </Button>
-        ) : null}
-      </div>
+    <div className={cn('flex min-w-0 flex-wrap items-center gap-1.5', className)}>
+      <span className="hidden h-4 w-px bg-border sm:inline-block" aria-hidden />
+      <Label htmlFor="cell-filter-name" className="sr-only">
+        Cell name
+      </Label>
+      <input
+        id="cell-filter-name"
+        type="search"
+        placeholder="Cell name"
+        value={draftCell}
+        onChange={(e) => setDraftCell(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            go();
+          }
+        }}
+        className="h-7 w-[7.5rem] rounded-md border border-input bg-background px-2 text-[11px]"
+      />
+      <Label htmlFor="cell-filter-province" className="sr-only">
+        Province name
+      </Label>
+      <input
+        id="cell-filter-province"
+        type="search"
+        placeholder="Province"
+        value={draftProvince}
+        onChange={(e) => setDraftProvince(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            go();
+          }
+        }}
+        className="h-7 w-[7.5rem] rounded-md border border-input bg-background px-2 text-[11px]"
+      />
+      <Label htmlFor="cell-filter-leader" className="sr-only">
+        Cell leader
+      </Label>
+      <input
+        id="cell-filter-leader"
+        type="search"
+        placeholder="Cell leader"
+        value={draftLeader}
+        onChange={(e) => setDraftLeader(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            go();
+          }
+        }}
+        className="h-7 w-[7.5rem] rounded-md border border-input bg-background px-2 text-[11px]"
+      />
+      <Button
+        type="button"
+        size="sm"
+        className="h-7 px-2.5 text-[11px]"
+        disabled={!dirty}
+        onClick={go}
+      >
+        Go
+      </Button>
+      {hasApplied || hasDraft ? (
+        <button
+          type="button"
+          className="text-[11px] font-medium text-primary hover:underline"
+          onClick={() => {
+            setDraftCell('');
+            setDraftProvince('');
+            setDraftLeader('');
+            onReset();
+          }}
+        >
+          Reset
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -422,10 +453,16 @@ export function CellAttendanceInbox({ all }: { all: CellAttendanceReportItem[] }
           cellName={cellName}
           province={province}
           leader={leader}
-          onCellName={setCellName}
-          onProvince={setProvince}
-          onLeader={setLeader}
-          className="w-full basis-full"
+          onApply={(next) => {
+            setCellName(next.cellName);
+            setProvince(next.province);
+            setLeader(next.leader);
+          }}
+          onReset={() => {
+            setCellName('');
+            setProvince('');
+            setLeader('');
+          }}
         />
       }
     />
@@ -631,9 +668,14 @@ export function OutreachInbox({ all }: { all: OutreachInboxItem[] }) {
           items={dateScoped}
           stage={stage}
           monthKey={monthKey}
-          onStage={setStage}
-          onMonthKey={setMonthKey}
-          className="w-full basis-full"
+          onApply={(nextStage, nextMonth) => {
+            setStage(nextStage);
+            setMonthKey(nextMonth);
+          }}
+          onReset={() => {
+            setStage('all');
+            setMonthKey('all');
+          }}
         />
       }
     >

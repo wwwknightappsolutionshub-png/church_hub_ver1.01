@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   groupByMonth,
   monthKeyFromIso,
@@ -46,7 +46,6 @@ export function filterOutreachItems<T extends OutreachFilterItem>(
     }
     if (opts.dateFrom || opts.dateTo) {
       const key = item.capturedAt.slice(0, 10);
-      // Prefer local date key via monthKeyFromIso's date portion
       const d = new Date(item.capturedAt);
       if (!Number.isNaN(d.getTime())) {
         const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -90,91 +89,116 @@ export function OutreachAdvancedFiltersPanel({
   items,
   stage,
   monthKey,
-  onStage,
-  onMonthKey,
+  onApply,
+  onReset,
+  showTotals = true,
   className,
 }: {
   items: OutreachFilterItem[];
+  /** Applied filters (drive the list). */
   stage: string;
   monthKey: string;
-  onStage: (v: string) => void;
-  onMonthKey: (v: string) => void;
+  onApply: (stage: string, monthKey: string) => void;
+  onReset: () => void;
+  showTotals?: boolean;
   className?: string;
 }) {
+  const [draftStage, setDraftStage] = useState(stage);
+  const [draftMonthKey, setDraftMonthKey] = useState(monthKey);
+
+  useEffect(() => {
+    setDraftStage(stage);
+    setDraftMonthKey(monthKey);
+  }, [stage, monthKey]);
+
   const months = useMemo(() => availableOutreachMonths(items), [items]);
   const byStage = useMemo(() => outreachTotalsByStage(items), [items]);
   const byMonth = useMemo(() => outreachTotalsByMonth(items), [items]);
 
+  const dirty = draftStage !== stage || draftMonthKey !== monthKey;
+  const hasApplied = stage !== 'all' || monthKey !== 'all';
+  const hasDraft = draftStage !== 'all' || draftMonthKey !== 'all';
+
+  const go = () => onApply(draftStage, draftMonthKey);
+
   return (
-    <div className={cn('space-y-2 rounded-md border border-border/70 bg-muted/20 p-2.5', className)}>
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-        Advanced outreach filters
-      </p>
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="space-y-1">
-          <Label htmlFor="outreach-stage-filter" className="text-[10px] text-muted-foreground">
-            Journey / stage
-          </Label>
-          <select
-            id="outreach-stage-filter"
-            className="h-8 rounded-md border border-input bg-background px-2 text-xs"
-            value={stage}
-            onChange={(e) => onStage(e.target.value)}
-          >
-            <option value="all">All stages</option>
-            {OUTREACH_JOURNEY_STAGES.map((s) => (
-              <option key={s} value={s}>
-                {OUTREACH_STAGE_LABELS[s] ?? s}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="outreach-month-filter" className="text-[10px] text-muted-foreground">
-            Month
-          </Label>
-          <select
-            id="outreach-month-filter"
-            className="h-8 rounded-md border border-input bg-background px-2 text-xs"
-            value={monthKey}
-            onChange={(e) => onMonthKey(e.target.value)}
-          >
-            <option value="all">All months</option>
-            {months.map((m) => (
-              <option key={m.key} value={m.key}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        {(stage !== 'all' || monthKey !== 'all') && (
-          <Button
+    <div className={cn('flex min-w-0 flex-wrap items-center gap-1.5', className)}>
+      <span className="hidden h-4 w-px bg-border sm:inline-block" aria-hidden />
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Label htmlFor="outreach-stage-filter" className="sr-only">
+          Journey / stage
+        </Label>
+        <select
+          id="outreach-stage-filter"
+          aria-label="Journey / stage"
+          className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
+          value={draftStage}
+          onChange={(e) => setDraftStage(e.target.value)}
+        >
+          <option value="all">All stages</option>
+          {OUTREACH_JOURNEY_STAGES.map((s) => (
+            <option key={s} value={s}>
+              {OUTREACH_STAGE_LABELS[s] ?? s}
+            </option>
+          ))}
+        </select>
+        <Label htmlFor="outreach-month-filter" className="sr-only">
+          Month
+        </Label>
+        <select
+          id="outreach-month-filter"
+          aria-label="Month"
+          className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
+          value={draftMonthKey}
+          onChange={(e) => setDraftMonthKey(e.target.value)}
+        >
+          <option value="all">All months</option>
+          {months.map((m) => (
+            <option key={m.key} value={m.key}>
+              {m.label}
+            </option>
+          ))}
+        </select>
+        <Button
+          type="button"
+          size="sm"
+          className="h-7 px-2.5 text-[11px]"
+          disabled={!dirty}
+          onClick={go}
+        >
+          Go
+        </Button>
+        {hasApplied || hasDraft ? (
+          <button
             type="button"
-            size="sm"
-            variant="ghost"
-            className="h-8 text-[11px]"
+            className="text-[11px] font-medium text-primary hover:underline"
             onClick={() => {
-              onStage('all');
-              onMonthKey('all');
+              setDraftStage('all');
+              setDraftMonthKey('all');
+              onReset();
             }}
           >
-            Reset filters
-          </Button>
-        )}
+            Reset
+          </button>
+        ) : null}
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2">
-        <div>
-          <p className="mb-1 text-[10px] font-medium text-muted-foreground">Total by stage</p>
-          <div className="flex flex-wrap gap-1">
+      {showTotals ? (
+        <div className="flex w-full basis-full flex-wrap items-center gap-x-3 gap-y-1 pt-0.5">
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="text-[10px] text-muted-foreground">By stage</span>
             {byStage.length === 0 ? (
-              <span className="text-[11px] text-muted-foreground">No data</span>
+              <span className="text-[10px] text-muted-foreground">—</span>
             ) : (
               byStage.map((s) => (
                 <button
                   key={s.stage}
                   type="button"
-                  onClick={() => onStage(s.stage === stage ? 'all' : s.stage)}
+                  onClick={() => {
+                    const next = draftStage === s.stage ? 'all' : s.stage;
+                    setDraftStage(next);
+                    onApply(next, draftMonthKey);
+                  }}
                   className={cn(
                     'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px]',
                     stage === s.stage
@@ -190,18 +214,20 @@ export function OutreachAdvancedFiltersPanel({
               ))
             )}
           </div>
-        </div>
-        <div>
-          <p className="mb-1 text-[10px] font-medium text-muted-foreground">Total by month</p>
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="text-[10px] text-muted-foreground">By month</span>
             {byMonth.length === 0 ? (
-              <span className="text-[11px] text-muted-foreground">No data</span>
+              <span className="text-[10px] text-muted-foreground">—</span>
             ) : (
               byMonth.map((m) => (
                 <button
                   key={m.key}
                   type="button"
-                  onClick={() => onMonthKey(m.key === monthKey ? 'all' : m.key)}
+                  onClick={() => {
+                    const next = draftMonthKey === m.key ? 'all' : m.key;
+                    setDraftMonthKey(next);
+                    onApply(draftStage, next);
+                  }}
                   className={cn(
                     'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px]',
                     monthKey === m.key
@@ -218,7 +244,7 @@ export function OutreachAdvancedFiltersPanel({
             )}
           </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
