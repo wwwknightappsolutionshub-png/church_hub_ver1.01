@@ -53,7 +53,7 @@ export function AnalyticsOutreachFiltersSection() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Journey, month & totals</CardTitle>
           <CardDescription>
-            Set dates and filters, then press Apply / Go. Totals are shortcuts that apply immediately.
+            Set dates and filters, then press Apply / Go to update the list.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">

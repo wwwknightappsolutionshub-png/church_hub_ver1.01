@@ -213,6 +213,7 @@ function MetricAttendanceInbox({
   setViewMode,
   accentClass,
   toolbarExtra,
+  expandMonthGroups = false,
 }: {
   title: string;
   description?: string;
@@ -228,6 +229,8 @@ function MetricAttendanceInbox({
   setViewMode: (v: 'cards' | 'table') => void;
   accentClass?: string;
   toolbarExtra?: React.ReactNode;
+  /** Open month sections that contain the current (filtered) results. */
+  expandMonthGroups?: boolean;
 }) {
   const groups = useMemo(() => groupByMonth(rows, (r) => r.meetingDate), [rows]);
 
@@ -255,6 +258,7 @@ function MetricAttendanceInbox({
       {viewMode === 'table' ? (
         <MonthGroupedSections
           groups={groups}
+          expandAll={expandMonthGroups}
           renderGroupBody={(items) => (
             <AttendanceExcelTable
               rows={items}
@@ -267,6 +271,7 @@ function MetricAttendanceInbox({
       ) : (
         <MonthGroupedSections
           groups={groups}
+          expandAll={expandMonthGroups}
           renderItem={(row) => (
             <AttendanceMetricCard
               key={row.id}
@@ -429,6 +434,7 @@ export function CellAttendanceInbox({ all }: { all: CellAttendanceReportItem[] }
   }, [all, dateFrom, dateTo, cellName, province, leader]);
 
   const rows = useMemo(() => toMetricRowsFromCells(filtered), [filtered]);
+  const searchActive = Boolean(cellName || province || leader);
 
   return (
     <MetricAttendanceInbox
@@ -448,6 +454,7 @@ export function CellAttendanceInbox({ all }: { all: CellAttendanceReportItem[] }
       viewMode={viewMode}
       setViewMode={setViewMode}
       accentClass="border-l-4 border-l-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/20"
+      expandMonthGroups={searchActive}
       toolbarExtra={
         <CellAdvancedFiltersPanel
           cellName={cellName}

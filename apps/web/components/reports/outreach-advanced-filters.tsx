@@ -6,7 +6,6 @@ import {
   monthKeyFromIso,
   monthLabelFromKey,
 } from '@/components/reports/month-grouped-attendance';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -91,7 +90,6 @@ export function OutreachAdvancedFiltersPanel({
   monthKey,
   onApply,
   onReset,
-  showTotals = true,
   className,
 }: {
   items: OutreachFilterItem[];
@@ -100,7 +98,6 @@ export function OutreachAdvancedFiltersPanel({
   monthKey: string;
   onApply: (stage: string, monthKey: string) => void;
   onReset: () => void;
-  showTotals?: boolean;
   className?: string;
 }) {
   const [draftStage, setDraftStage] = useState(stage);
@@ -112,8 +109,6 @@ export function OutreachAdvancedFiltersPanel({
   }, [stage, monthKey]);
 
   const months = useMemo(() => availableOutreachMonths(items), [items]);
-  const byStage = useMemo(() => outreachTotalsByStage(items), [items]);
-  const byMonth = useMemo(() => outreachTotalsByMonth(items), [items]);
 
   const dirty = draftStage !== stage || draftMonthKey !== monthKey;
   const hasApplied = stage !== 'all' || monthKey !== 'all';
@@ -182,69 +177,6 @@ export function OutreachAdvancedFiltersPanel({
           </button>
         ) : null}
       </div>
-
-      {showTotals ? (
-        <div className="flex w-full basis-full flex-wrap items-center gap-x-3 gap-y-1 pt-0.5">
-          <div className="flex flex-wrap items-center gap-1">
-            <span className="text-[10px] text-muted-foreground">By stage</span>
-            {byStage.length === 0 ? (
-              <span className="text-[10px] text-muted-foreground">—</span>
-            ) : (
-              byStage.map((s) => (
-                <button
-                  key={s.stage}
-                  type="button"
-                  onClick={() => {
-                    const next = draftStage === s.stage ? 'all' : s.stage;
-                    setDraftStage(next);
-                    onApply(next, draftMonthKey);
-                  }}
-                  className={cn(
-                    'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px]',
-                    stage === s.stage
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border bg-background',
-                  )}
-                >
-                  {s.label}
-                  <Badge variant="secondary" className="h-4 px-1 text-[9px] tabular-nums">
-                    {s.count}
-                  </Badge>
-                </button>
-              ))
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-1">
-            <span className="text-[10px] text-muted-foreground">By month</span>
-            {byMonth.length === 0 ? (
-              <span className="text-[10px] text-muted-foreground">—</span>
-            ) : (
-              byMonth.map((m) => (
-                <button
-                  key={m.key}
-                  type="button"
-                  onClick={() => {
-                    const next = draftMonthKey === m.key ? 'all' : m.key;
-                    setDraftMonthKey(next);
-                    onApply(draftStage, next);
-                  }}
-                  className={cn(
-                    'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px]',
-                    monthKey === m.key
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border bg-background',
-                  )}
-                >
-                  {m.label}
-                  <Badge variant="secondary" className="h-4 px-1 text-[9px] tabular-nums">
-                    {m.count}
-                  </Badge>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

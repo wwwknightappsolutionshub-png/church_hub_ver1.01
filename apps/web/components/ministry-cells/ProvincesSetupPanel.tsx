@@ -13,7 +13,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
-export function ProvincesSetupPanel({ onChanged }: { onChanged: () => void }) {
+export function ProvincesSetupPanel({
+  onChanged,
+  selectedProvinceId = null,
+  onSelectProvince,
+}: {
+  onChanged: () => void;
+  selectedProvinceId?: string | null;
+  onSelectProvince?: (province: { id: string; name: string } | null) => void;
+}) {
   const { data: provinces = [], isLoading } = useApiQuery<CellProvinceRow[]>(
     ['ministry-cells', 'provinces'],
     '/ministry-cells/provinces',
@@ -159,31 +167,51 @@ export function ProvincesSetupPanel({ onChanged }: { onChanged: () => void }) {
         </CardHeader>
         <CardContent className="max-h-80 space-y-2 overflow-y-auto px-4 pb-3 pt-0">
           {isLoading && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
-          {provinces.map((p) => (
-            <div
-              key={p.id}
-              className="flex items-start justify-between gap-2 rounded-lg border border-border/60 p-3 text-sm"
-            >
-              <div className="min-w-0">
-                <p className="font-medium">{p.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  Leader: {p.leader.name} · {p.branchCount} cells
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {p.postcodes.join(', ') || 'No postcodes'}
-                </p>
-              </div>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8 shrink-0 text-destructive"
-                onClick={() => void remove(p.id, p.name)}
+          {provinces.map((p) => {
+            const selected = selectedProvinceId === p.id;
+            return (
+              <div
+                key={p.id}
+                className={cn(
+                  'flex items-start justify-between gap-2 rounded-lg border p-3 text-sm transition',
+                  selected
+                    ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
+                    : 'border-border/60',
+                )}
               >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 text-left"
+                  onClick={() =>
+                    onSelectProvince?.(selected ? null : { id: p.id, name: p.name })
+                  }
+                  aria-pressed={selected}
+                >
+                  <p className="font-medium">{p.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Leader: {p.leader.name} · {p.branchCount} cells
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {p.postcodes.join(', ') || 'No postcodes'}
+                  </p>
+                  {onSelectProvince ? (
+                    <p className="mt-1 text-[11px] font-medium text-primary">
+                      {selected ? 'Selected · click to clear' : 'Click to filter cells'}
+                    </p>
+                  ) : null}
+                </button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 shrink-0 text-destructive"
+                  onClick={() => void remove(p.id, p.name)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            );
+          })}
           {!isLoading && provinces.length === 0 && (
             <p className="text-sm text-muted-foreground">No provinces yet.</p>
           )}

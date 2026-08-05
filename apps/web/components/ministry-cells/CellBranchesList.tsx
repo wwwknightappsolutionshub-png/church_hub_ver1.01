@@ -1,8 +1,10 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { MapPin, Search, User } from 'lucide-react';
+import { MapCellProvinceControl } from '@/components/ministry-cells/MapCellProvinceControl';
 import type { BranchRow } from '@/components/ministry-cells/types';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
@@ -58,6 +60,88 @@ function BranchGridCard({
   );
 }
 
+const DEFAULT_COLLAPSED_COUNT = 4;
+
+export function CollapsibleCellCardsSection({
+  title,
+  description,
+  branches,
+  selectedBranchId,
+  onSelectBranch,
+  emptyMessage,
+  defaultCollapsed = true,
+  collapsedCount = DEFAULT_COLLAPSED_COUNT,
+  showMapControls = false,
+  onMapChanged,
+}: {
+  title: string;
+  description?: string;
+  branches: BranchRow[];
+  selectedBranchId: string | null;
+  onSelectBranch: (id: string) => void;
+  emptyMessage: string;
+  defaultCollapsed?: boolean;
+  collapsedCount?: number;
+  showMapControls?: boolean;
+  onMapChanged?: () => void;
+}) {
+  const [expanded, setExpanded] = useState(!defaultCollapsed);
+  const visible = expanded ? branches : branches.slice(0, collapsedCount);
+  const canToggle = branches.length > collapsedCount;
+
+  return (
+    <section className="space-y-2" aria-label={title}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold">{title}</h3>
+          {description ? (
+            <p className="text-[11px] text-muted-foreground">{description}</p>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] tabular-nums text-muted-foreground">
+            {branches.length} cell{branches.length === 1 ? '' : 's'}
+          </span>
+          {canToggle ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 px-2.5 text-[11px]"
+              onClick={() => setExpanded((v) => !v)}
+            >
+              {expanded ? 'Show less' : 'View all'}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-border/60 bg-muted/10 p-2">
+        {branches.length === 0 ? (
+          <p className="px-3 py-8 text-center text-sm text-muted-foreground">{emptyMessage}</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+            {visible.map((b) => (
+              <div key={b.id} className="flex min-w-0 flex-col gap-1.5">
+                <BranchGridCard
+                  branch={b}
+                  selected={selectedBranchId === b.id}
+                  onSelect={() => onSelectBranch(b.id)}
+                />
+                {showMapControls && onMapChanged ? (
+                  <div className="rounded-lg border border-border/50 bg-background/80 px-2 py-1.5">
+                    <MapCellProvinceControl branch={b} onChanged={onMapChanged} />
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export function CellBranchesList({
   branches,
   selectedBranchId,
@@ -65,6 +149,7 @@ export function CellBranchesList({
   canManage,
   search,
   onSearchChange,
+  defaultCollapsed = true,
 }: {
   branches: BranchRow[];
   selectedBranchId: string | null;
@@ -72,6 +157,7 @@ export function CellBranchesList({
   canManage: boolean;
   search: string;
   onSearchChange: (value: string) => void;
+  defaultCollapsed?: boolean;
 }) {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase().replace(/\s+/g, '');
@@ -90,7 +176,6 @@ export function CellBranchesList({
         postcode.includes(q) ||
         province.includes(q) ||
         members ||
-        // allow spaced search against original fields
         name.includes(search.trim().toLowerCase()) ||
         location.includes(search.trim().toLowerCase())
       );
@@ -115,26 +200,14 @@ export function CellBranchesList({
         />
       </div>
 
-      <div
-        className="max-h-[min(70vh,36rem)] overflow-y-auto overscroll-contain rounded-xl border border-border/60 bg-muted/10 p-2"
-        role="listbox"
-        aria-label="Cell branches"
-      >
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-          {filtered.map((b) => (
-            <BranchGridCard
-              key={b.id}
-              branch={b}
-              selected={selectedBranchId === b.id}
-              onSelect={() => onSelectBranch(b.id)}
-            />
-          ))}
-        </div>
-
-        {filtered.length === 0 && (
-          <div className="px-4 py-10 text-center text-sm text-muted-foreground">{emptyMessage}</div>
-        )}
-      </div>
+      <CollapsibleCellCardsSection
+        title="Cells"
+        branches={filtered}
+        selectedBranchId={selectedBranchId}
+        onSelectBranch={onSelectBranch}
+        emptyMessage={emptyMessage}
+        defaultCollapsed={defaultCollapsed}
+      />
     </div>
   );
 }

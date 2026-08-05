@@ -224,7 +224,8 @@ test.describe('Ministry/Cells end-to-end', () => {
     await expect(page.getByText('Branch comparison')).toBeVisible({ timeout: 15_000 });
   });
 
-  test('setup: seed forms, teaching manual, reminders', async ({ page }) => {
+  test.skip('setup: seed forms, teaching manual, reminders', async ({ page }) => {
+    // Church-wide forms / Teaching manual / Reminder scheduler cards removed from Branches tab.
     await page.goto('/dashboard/ministry-cells');
     await expect(page.getByRole('heading', { name: 'Church-wide forms' })).toBeVisible({
       timeout: 15_000,

@@ -93,6 +93,7 @@ export function MonthGroupedSections<T>({
   renderGroupBody,
   emptyMessage,
   defaultOpen = false,
+  expandAll = false,
 }: {
   groups: Array<{ key: string; label: string; items: T[] }>;
   renderItem?: (item: T) => React.ReactNode;
@@ -101,20 +102,26 @@ export function MonthGroupedSections<T>({
   emptyMessage?: string;
   /** When false (default), all month sections start collapsed. */
   defaultOpen?: boolean;
+  /** When true (e.g. active search), open every group that has matching items. */
+  expandAll?: boolean;
 }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     setOpen((prev) => {
-      const next = { ...prev };
+      const next: Record<string, boolean> = {};
       for (const g of groups) {
-        if (next[g.key] === undefined) {
+        if (expandAll) {
+          next[g.key] = true;
+        } else if (prev[g.key] !== undefined) {
+          next[g.key] = prev[g.key];
+        } else {
           next[g.key] = defaultOpen;
         }
       }
       return next;
     });
-  }, [groups, defaultOpen]);
+  }, [groups, defaultOpen, expandAll]);
 
   if (groups.length === 0) {
     return emptyMessage ? (
@@ -125,7 +132,7 @@ export function MonthGroupedSections<T>({
   return (
     <div className="space-y-2">
       {groups.map((g) => {
-        const isOpen = open[g.key] ?? defaultOpen;
+        const isOpen = open[g.key] ?? (expandAll || defaultOpen);
         return (
           <section key={g.key} className="rounded-md border border-border/70">
             <button

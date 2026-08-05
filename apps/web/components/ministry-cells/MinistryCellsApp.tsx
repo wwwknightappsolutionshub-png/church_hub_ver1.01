@@ -11,6 +11,7 @@ import {
   Network,
   Plus,
   RefreshCw,
+  Search,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -33,14 +34,12 @@ import { BranchLeaderSelect } from '@/components/ministry-cells/BranchLeaderSele
 import {
   CellBranchDetailPanel,
 } from '@/components/ministry-cells/CellBranchDetailPanel';
-import { CellBranchesList } from '@/components/ministry-cells/CellBranchesList';
+import { CellBranchesList, CollapsibleCellCardsSection } from '@/components/ministry-cells/CellBranchesList';
 import { MINISTRY_CELLS_DESKTOP_MQ } from '@/components/ministry-cells/layout';
 import { MinistryCellsAnalyticsPanel } from '@/components/ministry-cells/MinistryCellsAnalyticsPanel';
 import { MinistryCellsKpiStrip } from '@/components/ministry-cells/MinistryCellsKpiStrip';
-import { MinistryCellsSetupPanel } from '@/components/ministry-cells/MinistryCellsSetupPanel';
 import { ProvincesSetupPanel } from '@/components/ministry-cells/ProvincesSetupPanel';
 import { ProvinceAttendancePanel } from '@/components/ministry-cells/ProvinceAttendancePanel';
-import { MapCellProvinceControl } from '@/components/ministry-cells/MapCellProvinceControl';
 import type {
   BranchDetail,
   BranchRow,
@@ -66,6 +65,8 @@ export function MinistryCellsApp() {
   const { matches: isDesktopLayout, ready: layoutReady } = useMediaQuery(MINISTRY_CELLS_DESKTOP_MQ);
   const [tab, setTab] = useState<MinistryCellsTab>('branches');
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
+  const [selectedProvinceId, setSelectedProvinceId] = useState<string | null>(null);
+  const [selectedProvinceName, setSelectedProvinceName] = useState<string | null>(null);
   const [branchSearch, setBranchSearch] = useState('');
   const [showCreateBranch, setShowCreateBranch] = useState(false);
   const [createLeaderId, setCreateLeaderId] = useState('');
@@ -269,16 +270,6 @@ export function MinistryCellsApp() {
     }
   };
 
-  const seedForms = async () => {
-    try {
-      const res = await api.post('/ministry-cells/forms/seed-defaults');
-      toast.success(res.data.seeded ? 'Default forms created' : 'Forms already exist');
-      invalidate();
-    } catch {
-      toast.error('Failed to seed forms');
-    }
-  };
-
   const submitReport = async () => {
     if (!selectedBranchId || !reportFormId) return;
     try {
@@ -386,6 +377,38 @@ export function MinistryCellsApp() {
   const showBranchGrid = !showWorkspace || (useDesktopLayout && !showBranchDetail);
   const branchOptions = branches.map((b) => ({ id: b.id, name: b.name }));
 
+  const searchFilteredBranches = useMemo(() => {
+    const q = branchSearch.trim().toLowerCase().replace(/\s+/g, '');
+    if (!q) return branches;
+    return branches.filter((b) => {
+      const name = b.name.toLowerCase();
+      const location = (b.location ?? '').toLowerCase();
+      const leader = (b.leader?.name ?? '').toLowerCase();
+      const postcode = (b.postcode ?? '').toLowerCase().replace(/\s+/g, '');
+      const province = (b.province?.name ?? '').toLowerCase();
+      return (
+        name.includes(q) ||
+        location.includes(q) ||
+        leader.includes(q) ||
+        postcode.includes(q) ||
+        province.includes(q) ||
+        name.includes(branchSearch.trim().toLowerCase()) ||
+        location.includes(branchSearch.trim().toLowerCase())
+      );
+    });
+  }, [branches, branchSearch]);
+
+  const mappedCells = useMemo(() => {
+    const withProvince = searchFilteredBranches.filter((b) => b.provinceId);
+    if (!selectedProvinceId) return withProvince;
+    return withProvince.filter((b) => b.provinceId === selectedProvinceId);
+  }, [searchFilteredBranches, selectedProvinceId]);
+
+  const unmappedCells = useMemo(
+    () => searchFilteredBranches.filter((b) => !b.provinceId),
+    [searchFilteredBranches],
+  );
+
   const workspaceProps = detailProps
     ? {
         ...detailProps,
@@ -483,7 +506,7 @@ export function MinistryCellsApp() {
             </Card>
           )}
 
-          {showBranchGrid && !showWorkspace && (
+          {showBranchGrid && !showWorkspace && !ctx.canManage && (
             <CellBranchesList
               branches={branches}
               selectedBranchId={selectedBranchId}
@@ -510,38 +533,69 @@ export function MinistryCellsApp() {
             <div className="space-y-6 border-t border-border/60 pt-4">
               <div>
                 <h3 className="mb-2 text-sm font-semibold">Provinces & provincial leaders</h3>
-                <ProvincesSetupPanel onChanged={invalidate} />
+                <ProvincesSetupPanel
+                  onChanged={invalidate}
+                  selectedProvinceId={selectedProvinceId}
+                  onSelectProvince={(province) => {
+                    setSelectedProvinceId(province?.id ?? null);
+                    setSelectedProvinceName(province?.name ?? null);
+                  }}
+                />
               </div>
-              <div>
-                <h3 className="mb-2 text-sm font-semibold">Map cells to provinces</h3>
-                <div className="space-y-2">
-                  {branches.map((b) => (
-                    <div
-                      key={b.id}
-                      className="flex flex-col gap-2 rounded-lg border border-border/60 p-3 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div>
-                        <p className="text-sm font-medium">{b.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {b.postcode ?? 'No postcode'}
-                          {b.location ? ` · ${b.location}` : ''}
-                        </p>
-                      </div>
-                      <MapCellProvinceControl branch={b} onChanged={invalidate} />
-                    </div>
-                  ))}
-                  {branches.length === 0 && (
-                    <p className="text-sm text-muted-foreground">Create cells first, then map them.</p>
-                  )}
+
+              {showBranchGrid ? (
+                <div className="space-y-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={branchSearch}
+                      onChange={(e) => setBranchSearch(e.target.value)}
+                      placeholder="Search cell name or postcode…"
+                      className="h-10 rounded-xl border-border/80 bg-background pl-9 shadow-sm"
+                      aria-label="Search cell branches by name or postcode"
+                    />
+                  </div>
+
+                  <CollapsibleCellCardsSection
+                    key={selectedProvinceId ?? 'mapped-all'}
+                    title={
+                      selectedProvinceId
+                        ? `Cells in ${selectedProvinceName ?? 'province'}`
+                        : 'Mapped cells'
+                    }
+                    description={
+                      selectedProvinceId
+                        ? 'Showing cells mapped to the selected province. Clear the province selection to see all mapped cells.'
+                        : 'Select a province above to focus on its cells. Unmapped cells are listed separately below.'
+                    }
+                    branches={mappedCells}
+                    selectedBranchId={selectedBranchId}
+                    onSelectBranch={setSelectedBranchId}
+                    emptyMessage={
+                      selectedProvinceId
+                        ? 'No cells mapped to this province yet.'
+                        : 'No mapped cells yet. Map cells from the Unmapped section below.'
+                    }
+                    defaultCollapsed
+                    showMapControls
+                    onMapChanged={invalidate}
+                  />
+
+                  {!selectedProvinceId ? (
+                    <CollapsibleCellCardsSection
+                      title="Unmapped cells"
+                      description="Cells not yet assigned to a province. Map them using the control under each card."
+                      branches={unmappedCells}
+                      selectedBranchId={selectedBranchId}
+                      onSelectBranch={setSelectedBranchId}
+                      emptyMessage="All cells are mapped to a province."
+                      defaultCollapsed
+                      showMapControls
+                      onMapChanged={invalidate}
+                    />
+                  ) : null}
                 </div>
-              </div>
-              <MinistryCellsSetupPanel
-                forms={forms}
-                teaching={teaching}
-                branchOptions={branches.map((b) => ({ id: b.id, name: b.name }))}
-                onSeedForms={seedForms}
-                onChanged={invalidate}
-              />
+              ) : null}
             </div>
           )}
         </div>
