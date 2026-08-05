@@ -9,6 +9,8 @@ import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
 import { DashboardPageSkeleton } from '@/components/dashboard/DashboardPageSkeleton';
 import { StatCard } from '@/components/dashboard/StatCard';
+import { AnalyticsAttendanceInterpretation } from '@/components/membership/AnalyticsAttendanceInterpretation';
+import { AnalyticsOutreachFiltersSection } from '@/components/membership/AnalyticsOutreachFiltersSection';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -79,6 +81,8 @@ export default function MembershipAnalyticsPage() {
                 icon={BarChart3}
               />
             </div>
+            <AnalyticsAttendanceInterpretation />
+            <AnalyticsOutreachFiltersSection />
             <LazyAnalyticsCharts dash={dash} />
           </>
         )}

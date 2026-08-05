@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight, FileDown, LayoutGrid, Table2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileDown, LayoutGrid, Printer, Table2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -90,13 +90,18 @@ export function groupByMonth<T>(
 export function MonthGroupedSections<T>({
   groups,
   renderItem,
+  renderGroupBody,
   emptyMessage,
+  defaultOpen = false,
 }: {
   groups: Array<{ key: string; label: string; items: T[] }>;
-  renderItem: (item: T) => React.ReactNode;
+  renderItem?: (item: T) => React.ReactNode;
+  /** When set, renders the full group body (e.g. one Excel table per month). */
+  renderGroupBody?: (items: T[], group: { key: string; label: string }) => React.ReactNode;
   emptyMessage?: string;
+  /** When false (default), all month sections start collapsed. */
+  defaultOpen?: boolean;
 }) {
-  const current = currentMonthKey();
   const [open, setOpen] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -104,12 +109,12 @@ export function MonthGroupedSections<T>({
       const next = { ...prev };
       for (const g of groups) {
         if (next[g.key] === undefined) {
-          next[g.key] = g.key === current;
+          next[g.key] = defaultOpen;
         }
       }
       return next;
     });
-  }, [groups, current]);
+  }, [groups, defaultOpen]);
 
   if (groups.length === 0) {
     return emptyMessage ? (
@@ -120,7 +125,7 @@ export function MonthGroupedSections<T>({
   return (
     <div className="space-y-2">
       {groups.map((g) => {
-        const isOpen = open[g.key] ?? g.key === current;
+        const isOpen = open[g.key] ?? defaultOpen;
         return (
           <section key={g.key} className="rounded-md border border-border/70">
             <button
@@ -143,7 +148,9 @@ export function MonthGroupedSections<T>({
             </button>
             {isOpen ? (
               <div className="space-y-1.5 border-t border-border/60 px-2 py-2">
-                {g.items.map((item) => renderItem(item))}
+                {renderGroupBody
+                  ? renderGroupBody(g.items, g)
+                  : g.items.map((item) => renderItem?.(item))}
               </div>
             ) : null}
           </section>
@@ -157,11 +164,13 @@ export function AttendanceMetricCard({
   row,
   accentClass,
   onPdf,
+  onPrint,
   onClick,
 }: {
   row: AttendanceMetricRow;
   accentClass?: string;
   onPdf?: () => void;
+  onPrint?: () => void;
   onClick?: () => void;
 }) {
   const boysLabel = row.metricLabels?.boys ?? 'B';
@@ -228,20 +237,40 @@ export function AttendanceMetricCard({
             <p className="text-base font-bold tabular-nums leading-none">{row.presentCount}</p>
             <p className="text-[9px] uppercase tracking-wide text-muted-foreground">Total</p>
           </div>
-          {onPdf ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-7 gap-1 px-2 text-[11px]"
-              onClick={(e) => {
-                e.stopPropagation();
-                onPdf();
-              }}
-            >
-              <FileDown className="h-3.5 w-3.5" />
-              PDF
-            </Button>
+          {onPdf || onPrint ? (
+            <div className="flex items-center gap-1">
+              {onPdf ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1 px-2 text-[11px]"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPdf();
+                  }}
+                >
+                  <FileDown className="h-3.5 w-3.5" />
+                  PDF
+                </Button>
+              ) : null}
+              {onPrint ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1 px-2 text-[11px]"
+                  aria-label="Print"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPrint();
+                  }}
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  Print
+                </Button>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </div>
@@ -257,8 +286,7 @@ export function AttendanceInboxShell({
   testId,
   dateFrom,
   dateTo,
-  onDateFrom,
-  onDateTo,
+  onApplyDates,
   onClearDates,
   viewMode,
   onViewMode,
@@ -272,8 +300,7 @@ export function AttendanceInboxShell({
   testId?: string;
   dateFrom: string;
   dateTo: string;
-  onDateFrom: (v: string) => void;
-  onDateTo: (v: string) => void;
+  onApplyDates: (from: string, to: string) => void;
   onClearDates: () => void;
   viewMode: 'cards' | 'table';
   onViewMode: (v: 'cards' | 'table') => void;
@@ -282,6 +309,16 @@ export function AttendanceInboxShell({
 }) {
   const fromId = `${testId ?? 'att'}-from`;
   const toId = `${testId ?? 'att'}-to`;
+  const [draftFrom, setDraftFrom] = useState(dateFrom);
+  const [draftTo, setDraftTo] = useState(dateTo);
+
+  useEffect(() => {
+    setDraftFrom(dateFrom);
+    setDraftTo(dateTo);
+  }, [dateFrom, dateTo]);
+
+  const draftDirty = draftFrom !== dateFrom || draftTo !== dateTo;
+
   return (
     <Card className="flex min-h-[16rem] flex-col xl:min-h-[20rem]" data-testid={testId}>
       <CardHeader className="shrink-0 space-y-1.5 p-3 pb-2">
@@ -302,8 +339,8 @@ export function AttendanceInboxShell({
             <Input
               id={fromId}
               type="date"
-              value={dateFrom}
-              onChange={(e) => onDateFrom(e.target.value)}
+              value={draftFrom}
+              onChange={(e) => setDraftFrom(e.target.value)}
               className="h-7 w-[8.5rem] px-2 text-[11px]"
             />
             <span className="text-[10px] text-muted-foreground">to</span>
@@ -313,15 +350,28 @@ export function AttendanceInboxShell({
             <Input
               id={toId}
               type="date"
-              value={dateTo}
-              onChange={(e) => onDateTo(e.target.value)}
+              value={draftTo}
+              onChange={(e) => setDraftTo(e.target.value)}
               className="h-7 w-[8.5rem] px-2 text-[11px]"
             />
-            {dateFrom || dateTo ? (
+            <Button
+              type="button"
+              size="sm"
+              className="h-7 px-2.5 text-[11px]"
+              disabled={!draftDirty}
+              onClick={() => onApplyDates(draftFrom, draftTo)}
+            >
+              Apply
+            </Button>
+            {dateFrom || dateTo || draftFrom || draftTo ? (
               <button
                 type="button"
                 className="text-[11px] font-medium text-primary hover:underline"
-                onClick={onClearDates}
+                onClick={() => {
+                  setDraftFrom('');
+                  setDraftTo('');
+                  onClearDates();
+                }}
               >
                 Clear
               </button>
@@ -381,13 +431,18 @@ export function AttendanceExcelTable({
   rows,
   testId,
   onPdf,
+  onPrint,
+  compact,
 }: {
   rows: AttendanceMetricRow[];
   testId?: string;
   onPdf?: (row: AttendanceMetricRow) => void;
+  onPrint?: (row: AttendanceMetricRow) => void;
+  compact?: boolean;
 }) {
+  const showActions = Boolean(onPdf || onPrint);
   return (
-    <div className="overflow-x-auto rounded-md border border-border/70">
+    <div className={cn('overflow-x-auto rounded-md border border-border/70', compact && 'border-0')}>
       <table
         className="w-full min-w-[720px] border-collapse text-left text-[11px]"
         data-testid={testId}
@@ -404,7 +459,7 @@ export function AttendanceExcelTable({
             <th className="px-2 py-1.5 font-semibold">G</th>
             <th className="px-2 py-1.5 font-semibold">FT</th>
             <th className="px-2 py-1.5 font-semibold">Test.</th>
-            {onPdf ? <th className="px-2 py-1.5 font-semibold">PDF</th> : null}
+            {showActions ? <th className="px-2 py-1.5 font-semibold">Export</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -426,18 +481,35 @@ export function AttendanceExcelTable({
               <td className="px-2 py-1 tabular-nums">{r.girlsCount}</td>
               <td className="px-2 py-1 tabular-nums">{r.firstTimersCount ?? 0}</td>
               <td className="px-2 py-1 tabular-nums">{r.testifiersCount ?? 0}</td>
-              {onPdf ? (
+              {showActions ? (
                 <td className="px-2 py-1">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 gap-1 px-1.5 text-[10px]"
-                    onClick={() => onPdf(r)}
-                  >
-                    <FileDown className="h-3 w-3" />
-                    PDF
-                  </Button>
+                  <div className="inline-flex items-center gap-0.5">
+                    {onPdf ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 gap-1 px-1.5 text-[10px]"
+                        onClick={() => onPdf(r)}
+                      >
+                        <FileDown className="h-3 w-3" />
+                        PDF
+                      </Button>
+                    ) : null}
+                    {onPrint ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 gap-1 px-1.5 text-[10px]"
+                        aria-label="Print"
+                        onClick={() => onPrint(r)}
+                      >
+                        <Printer className="h-3 w-3" />
+                        Print
+                      </Button>
+                    ) : null}
+                  </div>
                 </td>
               ) : null}
             </tr>

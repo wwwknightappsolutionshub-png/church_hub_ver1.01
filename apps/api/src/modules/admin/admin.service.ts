@@ -246,7 +246,7 @@ export class AdminService {
     ];
     const since = new Date();
     since.setDate(since.getDate() - weeks * 7);
-    const [unitAtt, usheringRows] = await Promise.all([
+    const [unitAtt, usheringRows, chopRows] = await Promise.all([
       this.prisma.serviceUnitAttendance.findMany({
         where: {
           churchId,
@@ -258,6 +258,18 @@ export class AdminService {
       }),
       this.prisma.usheringWeeklyHeadcount.findMany({
         where: { churchId, weekStart: { gte: since } },
+        include: { serviceUnit: { select: { id: true, name: true, departmentCode: true } } },
+        orderBy: { weekStart: 'asc' },
+      }),
+      this.prisma.serviceUnitAttendance.findMany({
+        where: {
+          churchId,
+          weekStart: { gte: since },
+          OR: [
+            { serviceUnit: { departmentCode: { notIn: sundayCodes } } },
+            { serviceUnit: { departmentCode: null } },
+          ],
+        },
         include: { serviceUnit: { select: { id: true, name: true, departmentCode: true } } },
         orderBy: { weekStart: 'asc' },
       }),
@@ -330,6 +342,46 @@ export class AdminService {
       );
     }
 
+    const chopByUnitMap = new Map<
+      string,
+      {
+        serviceUnitId: string;
+        serviceUnitName: string;
+        departmentCode: string | null;
+        weeks: Array<{
+          period: string;
+          total: number;
+          male: number;
+          female: number;
+          boys: number;
+          girls: number;
+        }>;
+      }
+    >();
+
+    for (const row of chopRows) {
+      const unitId = row.serviceUnitId;
+      let entry = chopByUnitMap.get(unitId);
+      if (!entry) {
+        entry = {
+          serviceUnitId: unitId,
+          serviceUnitName: row.serviceUnit.name,
+          departmentCode: row.serviceUnit.departmentCode,
+          weeks: [],
+        };
+        chopByUnitMap.set(unitId, entry);
+      }
+      const demo = row.maleCount + row.femaleCount + row.boysCount + row.girlsCount;
+      entry.weeks.push({
+        period: (row.meetingDate ?? row.weekStart).toISOString(),
+        total: demo > 0 ? demo : row.presentCount,
+        male: row.maleCount,
+        female: row.femaleCount,
+        boys: row.boysCount,
+        girls: row.girlsCount,
+      });
+    }
+
     return {
       source: flow.source,
       serviceUnitId: flow.serviceUnitId,
@@ -337,6 +389,7 @@ export class AdminService {
       weeks: chart,
       summary: { average: avg, latest, changePct },
       sundayMeetingByUnit: Array.from(byUnitMap.values()),
+      chopAttendanceByUnit: Array.from(chopByUnitMap.values()),
     };
   }
 }

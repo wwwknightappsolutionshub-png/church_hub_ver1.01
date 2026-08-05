@@ -20,6 +20,8 @@ export type AttendancePdfPayload = {
   rows: AttendancePdfRow[];
   /** When true, omit boys/girls columns (service units). */
   omitChildrenCols?: boolean;
+  /** When false, open the report without auto-opening the print dialog. Default true. */
+  autoPrint?: boolean;
 };
 
 function escapeHtml(value: string) {
@@ -102,7 +104,11 @@ export function openAttendanceReportPdf(payload: AttendancePdfPayload) {
   <div class="actions">
     <button onclick="window.print()">Print / Save as PDF</button>
   </div>
-  <script>window.onload = function () { setTimeout(function () { window.print(); }, 250); };</script>
+  ${
+    payload.autoPrint === false
+      ? ''
+      : '<script>window.onload = function () { setTimeout(function () { window.print(); }, 250); };</script>'
+  }
 </body>
 </html>`);
   w.document.close();

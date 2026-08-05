@@ -13,8 +13,14 @@ import {
   groupByMonth,
   MonthGroupedSections,
 } from '@/components/reports/month-grouped-attendance';
+import {
+  filterOutreachItems,
+  OutreachAdvancedFiltersPanel,
+} from '@/components/reports/outreach-advanced-filters';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
 export type CellAttendanceReportItem = {
@@ -102,12 +108,13 @@ type DeptReportItem = {
   serviceUnit: { id: string; name: string; departmentCode: string | null };
 };
 
-function exportMetricPdf(row: AttendanceMetricRow, kindLabel: string) {
+function exportMetricPdf(row: AttendanceMetricRow, kindLabel: string, autoPrint = false) {
   try {
     openAttendanceReportPdf({
       title: row.title,
       subtitle: row.subtitle,
       kindLabel,
+      autoPrint,
       rows: [
         {
           dateLabel: formatAttendanceDate(row.meetingDate),
@@ -205,9 +212,10 @@ function MetricAttendanceInbox({
   viewMode,
   setViewMode,
   accentClass,
+  toolbarExtra,
 }: {
   title: string;
-  description: string;
+  description?: string;
   emptyMessage: string;
   testId: string;
   kindLabel: string;
@@ -219,6 +227,7 @@ function MetricAttendanceInbox({
   viewMode: 'cards' | 'table';
   setViewMode: (v: 'cards' | 'table') => void;
   accentClass?: string;
+  toolbarExtra?: React.ReactNode;
 }) {
   const groups = useMemo(() => groupByMonth(rows, (r) => r.meetingDate), [rows]);
 
@@ -231,20 +240,29 @@ function MetricAttendanceInbox({
       testId={testId}
       dateFrom={dateFrom}
       dateTo={dateTo}
-      onDateFrom={setDateFrom}
-      onDateTo={setDateTo}
+      onApplyDates={(from, to) => {
+        setDateFrom(from);
+        setDateTo(to);
+      }}
       onClearDates={() => {
         setDateFrom('');
         setDateTo('');
       }}
       viewMode={viewMode}
       onViewMode={setViewMode}
+      toolbarExtra={toolbarExtra}
     >
       {viewMode === 'table' ? (
-        <AttendanceExcelTable
-          rows={rows}
-          testId={`${testId}-excel`}
-          onPdf={(row) => exportMetricPdf(row, kindLabel)}
+        <MonthGroupedSections
+          groups={groups}
+          renderGroupBody={(items) => (
+            <AttendanceExcelTable
+              rows={items}
+              testId={`${testId}-excel`}
+              onPdf={(row) => exportMetricPdf(row, kindLabel, false)}
+              onPrint={(row) => exportMetricPdf(row, kindLabel, true)}
+            />
+          )}
         />
       ) : (
         <MonthGroupedSections
@@ -254,7 +272,8 @@ function MetricAttendanceInbox({
               key={row.id}
               row={row}
               accentClass={accentClass}
-              onPdf={() => exportMetricPdf(row, kindLabel)}
+              onPdf={() => exportMetricPdf(row, kindLabel, false)}
+              onPrint={() => exportMetricPdf(row, kindLabel, true)}
             />
           )}
         />
@@ -263,39 +282,133 @@ function MetricAttendanceInbox({
   );
 }
 
+function matchesCellSearch(haystack: string | null | undefined, needle: string) {
+  if (!needle.trim()) return true;
+  return (haystack ?? '').toLowerCase().includes(needle.trim().toLowerCase());
+}
+
+function CellAdvancedFiltersPanel({
+  cellName,
+  province,
+  leader,
+  onCellName,
+  onProvince,
+  onLeader,
+  className,
+}: {
+  cellName: string;
+  province: string;
+  leader: string;
+  onCellName: (v: string) => void;
+  onProvince: (v: string) => void;
+  onLeader: (v: string) => void;
+  className?: string;
+}) {
+  const hasFilters = Boolean(cellName || province || leader);
+  return (
+    <div className={cn('space-y-2 rounded-md border border-border/70 bg-muted/20 p-2.5', className)}>
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        Advanced filters
+      </p>
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="space-y-1">
+          <Label htmlFor="cell-filter-name" className="text-[10px] text-muted-foreground">
+            Cell name
+          </Label>
+          <input
+            id="cell-filter-name"
+            type="search"
+            placeholder="e.g. glory"
+            value={cellName}
+            onChange={(e) => onCellName(e.target.value)}
+            className="h-8 w-[9.5rem] rounded-md border border-input bg-background px-2 text-xs"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="cell-filter-province" className="text-[10px] text-muted-foreground">
+            Province name
+          </Label>
+          <input
+            id="cell-filter-province"
+            type="search"
+            placeholder="e.g. Middlesex"
+            value={province}
+            onChange={(e) => onProvince(e.target.value)}
+            className="h-8 w-[9.5rem] rounded-md border border-input bg-background px-2 text-xs"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="cell-filter-leader" className="text-[10px] text-muted-foreground">
+            Cell leader
+          </Label>
+          <input
+            id="cell-filter-leader"
+            type="search"
+            placeholder="Leader name"
+            value={leader}
+            onChange={(e) => onLeader(e.target.value)}
+            className="h-8 w-[9.5rem] rounded-md border border-input bg-background px-2 text-xs"
+          />
+        </div>
+        {hasFilters ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-8 text-[11px]"
+            onClick={() => {
+              onCellName('');
+              onProvince('');
+              onLeader('');
+            }}
+          >
+            Reset filters
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function CellAttendanceInbox({ all }: { all: CellAttendanceReportItem[] }) {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  const [cellName, setCellName] = useState('');
+  const [province, setProvince] = useState('');
+  const [leader, setLeader] = useState('');
 
-  const filtered = useMemo(
-    () =>
-      filterAttendanceRows(
-        all,
-        (r) => r.meetingDate || r.createdAt,
-        dateFrom,
-        dateTo,
-        dateFrom || dateTo ? undefined : (r) => r.branchId,
-      ),
-    [all, dateFrom, dateTo],
-  );
+  const filtered = useMemo(() => {
+    const dateFiltered = filterAttendanceRows(
+      all,
+      (r) => r.meetingDate || r.createdAt,
+      dateFrom,
+      dateTo,
+      dateFrom || dateTo ? undefined : (r) => r.branchId,
+    );
+    return dateFiltered.filter((r) => {
+      if (!matchesCellSearch(r.branchName, cellName)) return false;
+      if (!matchesCellSearch(r.location, province)) return false;
+      const leaderName = r.recordedBy
+        ? `${r.recordedBy.firstName} ${r.recordedBy.lastName}`
+        : '';
+      if (!matchesCellSearch(leaderName, leader)) return false;
+      return true;
+    });
+  }, [all, dateFrom, dateTo, cellName, province, leader]);
+
   const rows = useMemo(() => toMetricRowsFromCells(filtered), [filtered]);
 
   return (
     <MetricAttendanceInbox
-      title="Ministry / Cells attendance"
-      description={
-        dateFrom || dateTo
-          ? 'Filtered by meeting date · grouped by month · scroll for more.'
-          : 'Latest per branch · auto-grouped by month · use dates to filter.'
-      }
+      title="Ministry / Cell attendance"
       emptyMessage={
-        dateFrom || dateTo
-          ? 'No attendance reports in this date range.'
-          : 'No Ministry/Cells attendance reports yet. Record attendance from a branch Weekly tab.'
+        dateFrom || dateTo || cellName || province || leader
+          ? 'No attendance reports match your filters.'
+          : 'No Ministry/Cell attendance reports yet. Record attendance from a branch Weekly tab.'
       }
       testId="reports-cell-attendance-inbox"
-      kindLabel="Ministry / Cells attendance"
+      kindLabel="Ministry / Cell attendance"
       rows={rows}
       dateFrom={dateFrom}
       dateTo={dateTo}
@@ -304,6 +417,17 @@ export function CellAttendanceInbox({ all }: { all: CellAttendanceReportItem[] }
       viewMode={viewMode}
       setViewMode={setViewMode}
       accentClass="border-l-4 border-l-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/20"
+      toolbarExtra={
+        <CellAdvancedFiltersPanel
+          cellName={cellName}
+          province={province}
+          leader={leader}
+          onCellName={setCellName}
+          onProvince={setProvince}
+          onLeader={setLeader}
+          className="w-full basis-full"
+        />
+      }
     />
   );
 }
@@ -322,11 +446,10 @@ export function WeeklySundayMeetingInbox({ all }: { all: SundayMeetingAttendance
 
   return (
     <MetricAttendanceInbox
-      title="Weekly reports — Sunday meetings"
-      description="Ushering, Protocol, Youth, Teens & Children · weekly rows grouped by month."
-      emptyMessage="No Sunday meeting attendance yet from Ushering, Protocol, Youth, Teens, or Children."
+      title="Sunday Attendance"
+      emptyMessage="No Sunday attendance recorded yet."
       testId="reports-weekly-sunday-inbox"
-      kindLabel="Sunday meeting attendance"
+      kindLabel="Sunday Attendance"
       rows={rows}
       dateFrom={dateFrom}
       dateTo={dateTo}
@@ -380,21 +503,19 @@ export function DepartmentReportsInbox({
       <Card className="flex min-h-[16rem] flex-col" data-testid="reports-department-units">
         <CardHeader className="space-y-1 p-3 pb-2">
           <div className="flex items-center justify-between gap-2">
-            <CardTitle className="text-sm font-semibold">Department reports</CardTitle>
+            <CardTitle className="text-sm font-semibold">Departmental Report</CardTitle>
             <Badge variant="outline" className="h-5 px-1.5 text-[10px] tabular-nums">
               {units.length}
             </Badge>
           </div>
           <CardDescription className="text-[11px]">
-            Select a unit / department to view attendance in the Ministry / Cells layout.
+            Select any of the church units to view their monthly meeting attendance report
           </CardDescription>
         </CardHeader>
         <CardContent className="max-h-[min(28rem,58vh)] overflow-y-auto p-3 pt-0">
           <div className="grid gap-2 sm:grid-cols-2">
             {units.map((u) => {
               const attCount = unitAttendance.filter((a) => a.serviceUnitId === u.id).length;
-              const reportCount = departmentReports.filter((d) => d.serviceUnit.id === u.id)
-                .length;
               return (
                 <button
                   key={u.id}
@@ -404,7 +525,8 @@ export function DepartmentReportsInbox({
                 >
                   <p className="text-sm font-semibold">{u.name}</p>
                   <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    {u.departmentCode ?? 'Unit'} · {attCount} attendance · {reportCount} reports
+                    {u.departmentCode ?? 'Unit'} · {attCount} meeting attendance
+                    {attCount === 1 ? '' : ' records'}
                   </p>
                 </button>
               );
@@ -431,9 +553,8 @@ export function DepartmentReportsInbox({
         <span className="text-[11px] text-muted-foreground">{selectedUnit.name}</span>
       </div>
       <MetricAttendanceInbox
-        title={`${selectedUnit.name} attendance`}
-        description="Same layout as Ministry / Cells · monthly collapsible sections."
-        emptyMessage="No attendance records for this unit yet."
+        title={`${selectedUnit.name} meeting attendance`}
+        emptyMessage="No meeting attendance sent by unit leaders for this unit yet."
         testId="reports-department-unit-attendance"
         kindLabel={`${selectedUnit.name} attendance`}
         rows={metricRows}
@@ -471,10 +592,17 @@ export function DepartmentReportsInbox({
 export function OutreachInbox({ all }: { all: OutreachInboxItem[] }) {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [stage, setStage] = useState('all');
+  const [monthKey, setMonthKey] = useState('all');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
 
   const filtered = useMemo(
-    () => filterAttendanceRows(all, (r) => r.capturedAt, dateFrom, dateTo),
+    () => filterOutreachItems(all, { stage, monthKey, dateFrom, dateTo }),
+    [all, stage, monthKey, dateFrom, dateTo],
+  );
+
+  const dateScoped = useMemo(
+    () => filterOutreachItems(all, { stage: 'all', monthKey: 'all', dateFrom, dateTo }),
     [all, dateFrom, dateTo],
   );
 
@@ -483,59 +611,75 @@ export function OutreachInbox({ all }: { all: OutreachInboxItem[] }) {
   return (
     <AttendanceInboxShell
       title="Outreach"
-      description="Field captures by month · filter by capture date · Cards or Excel."
       count={filtered.length}
-      emptyMessage="No outreach contacts yet."
+      emptyMessage="No outreach contacts match your filters."
       testId="reports-outreach-inbox"
       dateFrom={dateFrom}
       dateTo={dateTo}
-      onDateFrom={setDateFrom}
-      onDateTo={setDateTo}
+      onApplyDates={(from, to) => {
+        setDateFrom(from);
+        setDateTo(to);
+      }}
       onClearDates={() => {
         setDateFrom('');
         setDateTo('');
       }}
       viewMode={viewMode}
       onViewMode={setViewMode}
+      toolbarExtra={
+        <OutreachAdvancedFiltersPanel
+          items={dateScoped}
+          stage={stage}
+          monthKey={monthKey}
+          onStage={setStage}
+          onMonthKey={setMonthKey}
+          className="w-full basis-full"
+        />
+      }
     >
       {viewMode === 'table' ? (
-        <div className="overflow-x-auto rounded-md border border-border/70">
-          <table className="w-full min-w-[640px] border-collapse text-left text-[11px]">
-            <thead className="sticky top-0 z-[1] bg-muted/95 backdrop-blur">
-              <tr className="border-b text-[10px] uppercase tracking-wide text-muted-foreground">
-                <th className="px-2 py-1.5 font-semibold">Name</th>
-                <th className="px-2 py-1.5 font-semibold">Stage</th>
-                <th className="px-2 py-1.5 font-semibold">Phone</th>
-                <th className="px-2 py-1.5 font-semibold">Evangelist</th>
-                <th className="px-2 py-1.5 font-semibold">Captured</th>
-                <th className="px-2 py-1.5 font-semibold">Bus</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((r, i) => (
-                <tr
-                  key={r.id}
-                  className={cn(
-                    'border-b border-border/50',
-                    i % 2 === 0 ? 'bg-background' : 'bg-muted/30',
-                  )}
-                >
-                  <td className="px-2 py-1 font-medium">
-                    {r.firstName}
-                    {r.lastName ? ` ${r.lastName}` : ''}
-                  </td>
-                  <td className="px-2 py-1">{r.convertStage}</td>
-                  <td className="px-2 py-1">{r.phone || '—'}</td>
-                  <td className="px-2 py-1">{r.evangelist || '—'}</td>
-                  <td className="whitespace-nowrap px-2 py-1">
-                    {formatAttendanceDate(r.capturedAt)}
-                  </td>
-                  <td className="px-2 py-1">{r.needsBusPickup ? 'Yes' : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <MonthGroupedSections
+          groups={groups}
+          renderGroupBody={(items) => (
+            <div className="overflow-x-auto rounded-md border border-border/70">
+              <table className="w-full min-w-[640px] border-collapse text-left text-[11px]">
+                <thead className="sticky top-0 z-[1] bg-muted/95 backdrop-blur">
+                  <tr className="border-b text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <th className="px-2 py-1.5 font-semibold">Name</th>
+                    <th className="px-2 py-1.5 font-semibold">Stage</th>
+                    <th className="px-2 py-1.5 font-semibold">Phone</th>
+                    <th className="px-2 py-1.5 font-semibold">Evangelist</th>
+                    <th className="px-2 py-1.5 font-semibold">Captured</th>
+                    <th className="px-2 py-1.5 font-semibold">Bus</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((r, i) => (
+                    <tr
+                      key={r.id}
+                      className={cn(
+                        'border-b border-border/50',
+                        i % 2 === 0 ? 'bg-background' : 'bg-muted/30',
+                      )}
+                    >
+                      <td className="px-2 py-1 font-medium">
+                        {r.firstName}
+                        {r.lastName ? ` ${r.lastName}` : ''}
+                      </td>
+                      <td className="px-2 py-1">{r.convertStage}</td>
+                      <td className="px-2 py-1">{r.phone || '—'}</td>
+                      <td className="px-2 py-1">{r.evangelist || '—'}</td>
+                      <td className="whitespace-nowrap px-2 py-1">
+                        {formatAttendanceDate(r.capturedAt)}
+                      </td>
+                      <td className="px-2 py-1">{r.needsBusPickup ? 'Yes' : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        />
       ) : (
         <MonthGroupedSections
           groups={groups}

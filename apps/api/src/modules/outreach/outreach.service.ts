@@ -618,7 +618,7 @@ export class OutreachService {
         member: { select: { id: true, firstName: true, lastName: true } },
       },
       orderBy: { capturedAt: 'desc' },
-      take: 100,
+      take: 500,
     });
   }
 

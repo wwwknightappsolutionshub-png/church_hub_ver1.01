@@ -264,7 +264,9 @@ export function AnalyticsChartsSection({ dash }: { dash: MembershipAnalyticsDash
           <Card className="lg:col-span-2">
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Outreach pipeline</CardTitle>
-              <CardDescription>Current leads by stage</CardDescription>
+              <CardDescription>
+                Current leads by stage — use advanced filters above for journey, month, and totals
+              </CardDescription>
             </CardHeader>
             <CardContent className="h-48 sm:h-56">
               <ResponsiveContainer width="100%" height="100%">

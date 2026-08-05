@@ -174,14 +174,14 @@ export interface ReportsInboxData {
 
 const KIND_OPTIONS: Array<{ value: TriageKind; label: string }> = [
   { value: 'all', label: 'All types' },
-  { value: 'department', label: 'Department reports' },
-  { value: 'weekly', label: 'Weekly reports' },
-  { value: 'meeting', label: 'Meeting summaries' },
-  { value: 'rtp', label: 'RTP Requests' },
-  { value: 'cell', label: 'Ministry / Cells' },
-  { value: 'unit', label: 'Service units' },
+  { value: 'weekly', label: 'Sunday Attendance' },
+  { value: 'cell', label: 'Ministry / Cell' },
   { value: 'outreach', label: 'Outreach' },
-  { value: 'message', label: 'In-app messages' },
+  { value: 'department', label: 'Departmental Report' },
+  { value: 'unit', label: 'CHOP Attendance' },
+  { value: 'meeting', label: 'Meeting Summaries' },
+  { value: 'rtp', label: 'RTP Requests' },
+  { value: 'message', label: 'In-app Messages' },
 ];
 
 /** Left-rail + overview cards (no â€œAll typesâ€). */
@@ -407,7 +407,7 @@ function UnitAttendanceReportItemCard({
       openAttendanceReportPdf({
         title: report.serviceUnitName,
         subtitle: report.departmentCode ?? undefined,
-        kindLabel: 'Service unit attendance',
+        kindLabel: 'CHOP Attendance',
         omitChildrenCols: true,
         rows: rows.map((r) => ({
           dateLabel: formatAttendanceDate(r.meetingDate),
@@ -459,7 +459,7 @@ function UnitAttendanceReportItemCard({
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
             <Badge variant="secondary" className="text-[10px]">
-              Service unit
+              CHOP
             </Badge>
             <p className="text-lg font-bold tabular-nums leading-none">{report.presentCount}</p>
             <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
@@ -1213,14 +1213,6 @@ export function ReportsInboxPanel({
             </Card>
           ) : null}
 
-          {showSource('department', serviceUnitsAll.length || deptReports.length) ? (
-            <DepartmentReportsInbox
-              units={serviceUnitsAll}
-              unitAttendance={data?.reports.unitAttendance ?? []}
-              departmentReports={data?.reports.department ?? []}
-            />
-          ) : null}
-
           {showSource('weekly', sundayMeetingAll.length || weeklyReports.length) ? (
             <WeeklySundayMeetingInbox all={data?.reports.sundayMeetingAttendance ?? []} />
           ) : null}
@@ -1233,12 +1225,20 @@ export function ReportsInboxPanel({
             <OutreachInbox all={outreachAll} />
           ) : null}
 
+          {showSource('department', serviceUnitsAll.length || deptReports.length) ? (
+            <DepartmentReportsInbox
+              units={serviceUnitsAll}
+              unitAttendance={data?.reports.unitAttendance ?? []}
+              departmentReports={data?.reports.department ?? []}
+            />
+          ) : null}
+
           {showSource('unit', unitAttendanceReports.length) ? (
             <InboxScrollCard
-              title="Service unit attendance"
-              description="Latest report per service unit — click a card for 3-month history and PDF export."
+              title="CHOP Attendance"
+              description="Church Admin headcount / CHOP attendance — also used by Analytics."
               count={unitAttendanceReports.length}
-              emptyMessage="No service unit attendance reports yet. Record attendance from a unit Attendance tab."
+              emptyMessage="No CHOP attendance reports yet. Church Admin updates this from the Units module."
               testId="reports-unit-attendance-inbox"
             >
               {unitAttendanceReports.map((r) => (
@@ -1258,7 +1258,7 @@ export function ReportsInboxPanel({
 
           {showSource('meeting', meetingSummaries.length) ? (
             <InboxScrollCard
-              title="Meeting summaries"
+              title="Meeting Summaries"
               description="Published service unit meeting summaries."
               count={meetingSummaries.length}
               emptyMessage="No meeting summaries match your filters."
@@ -1524,7 +1524,7 @@ export function ReportsInboxPanel({
 
             {showSource('message', messages.length) ? (
               <InboxScrollCard
-                title="In-app messages"
+                title="In-app Messages"
                 description="Church-wide direct messages between members and leadership."
                 count={messages.length}
                 emptyMessage="No messages match your filters."
