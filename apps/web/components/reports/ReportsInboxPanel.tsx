@@ -1205,14 +1205,6 @@ export function ReportsInboxPanel({
             </div>
           ) : (
             <>
-          {triageCount === 0 ? (
-            <Card>
-              <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                No items match {selectedUrgencyLabel.toLowerCase()} in {selectedSourceLabel}.
-              </CardContent>
-            </Card>
-          ) : null}
-
           {showSource('weekly', sundayMeetingAll.length || weeklyReports.length) ? (
             <WeeklySundayMeetingInbox all={data?.reports.sundayMeetingAttendance ?? []} />
           ) : null}
@@ -1236,7 +1228,6 @@ export function ReportsInboxPanel({
           {showSource('unit', unitAttendanceReports.length) ? (
             <InboxScrollCard
               title="CHOP Attendance"
-              description="Church Admin headcount / CHOP attendance — also used by Analytics."
               count={unitAttendanceReports.length}
               emptyMessage="No CHOP attendance reports yet. Church Admin updates this from the Units module."
               testId="reports-unit-attendance-inbox"

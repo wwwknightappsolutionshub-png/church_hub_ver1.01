@@ -337,6 +337,38 @@ export function MinistryCellsApp() {
         }
       : null;
 
+  const searchFilteredBranches = useMemo(() => {
+    const q = branchSearch.trim().toLowerCase().replace(/\s+/g, '');
+    if (!q) return branches;
+    return branches.filter((b) => {
+      const name = b.name.toLowerCase();
+      const location = (b.location ?? '').toLowerCase();
+      const leader = (b.leader?.name ?? '').toLowerCase();
+      const postcode = (b.postcode ?? '').toLowerCase().replace(/\s+/g, '');
+      const province = (b.province?.name ?? '').toLowerCase();
+      return (
+        name.includes(q) ||
+        location.includes(q) ||
+        leader.includes(q) ||
+        postcode.includes(q) ||
+        province.includes(q) ||
+        name.includes(branchSearch.trim().toLowerCase()) ||
+        location.includes(branchSearch.trim().toLowerCase())
+      );
+    });
+  }, [branches, branchSearch]);
+
+  const mappedCells = useMemo(() => {
+    const withProvince = searchFilteredBranches.filter((b) => b.provinceId);
+    if (!selectedProvinceId) return withProvince;
+    return withProvince.filter((b) => b.provinceId === selectedProvinceId);
+  }, [searchFilteredBranches, selectedProvinceId]);
+
+  const unmappedCells = useMemo(
+    () => searchFilteredBranches.filter((b) => !b.provinceId),
+    [searchFilteredBranches],
+  );
+
   if (loading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
@@ -376,38 +408,6 @@ export function MinistryCellsApp() {
   const showWorkspace = showBranchDetail && (useDesktopLayout || showMobileOverlay);
   const showBranchGrid = !showWorkspace || (useDesktopLayout && !showBranchDetail);
   const branchOptions = branches.map((b) => ({ id: b.id, name: b.name }));
-
-  const searchFilteredBranches = useMemo(() => {
-    const q = branchSearch.trim().toLowerCase().replace(/\s+/g, '');
-    if (!q) return branches;
-    return branches.filter((b) => {
-      const name = b.name.toLowerCase();
-      const location = (b.location ?? '').toLowerCase();
-      const leader = (b.leader?.name ?? '').toLowerCase();
-      const postcode = (b.postcode ?? '').toLowerCase().replace(/\s+/g, '');
-      const province = (b.province?.name ?? '').toLowerCase();
-      return (
-        name.includes(q) ||
-        location.includes(q) ||
-        leader.includes(q) ||
-        postcode.includes(q) ||
-        province.includes(q) ||
-        name.includes(branchSearch.trim().toLowerCase()) ||
-        location.includes(branchSearch.trim().toLowerCase())
-      );
-    });
-  }, [branches, branchSearch]);
-
-  const mappedCells = useMemo(() => {
-    const withProvince = searchFilteredBranches.filter((b) => b.provinceId);
-    if (!selectedProvinceId) return withProvince;
-    return withProvince.filter((b) => b.provinceId === selectedProvinceId);
-  }, [searchFilteredBranches, selectedProvinceId]);
-
-  const unmappedCells = useMemo(
-    () => searchFilteredBranches.filter((b) => !b.provinceId),
-    [searchFilteredBranches],
-  );
 
   const workspaceProps = detailProps
     ? {
