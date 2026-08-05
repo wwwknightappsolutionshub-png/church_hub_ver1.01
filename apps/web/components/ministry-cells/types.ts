@@ -72,7 +72,8 @@ export interface CellProvinceRow {
   branchCount: number;
   createdAt: string;
   updatedAt: string;
-  leader: { id: string; name: string; email: string };
+  assignedAt?: string;
+  leader: { id: string; name: string; email: string; phone?: string | null };
 }
 
 export type MinistryCellsTab = 'branches' | 'analytics' | 'province';

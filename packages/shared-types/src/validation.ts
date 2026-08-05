@@ -475,6 +475,12 @@ export const UpdateCellProvinceSchema = z.object({
     .pipe(z.string().min(1, 'Province leader is required'))
     .optional(),
   postcodes: provinceCoveragePostcodesSchema.optional(),
+  leaderPhone: z
+    .string()
+    .transform((v) => sanitizeText(v, 40))
+    .pipe(z.string().max(40))
+    .nullable()
+    .optional(),
 });
 export type UpdateCellProvinceInput = z.infer<typeof UpdateCellProvinceSchema>;
 

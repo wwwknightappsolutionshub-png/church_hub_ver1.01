@@ -1696,7 +1696,9 @@ export class MinistryCellsService {
   private serializeProvince(
     p: Prisma.CellProvinceGetPayload<{
       include: {
-        leader: { select: { id: true; firstName: true; lastName: true; email: true } };
+        leader: {
+          select: { id: true; firstName: true; lastName: true; email: true; phone: true };
+        };
         postcodes: true;
         _count: { select: { branches: true } };
       };
@@ -1709,10 +1711,12 @@ export class MinistryCellsService {
       branchCount: p._count.branches,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
+      assignedAt: p.createdAt,
       leader: {
         id: p.leader.id,
         name: `${p.leader.firstName} ${p.leader.lastName}`.trim(),
         email: p.leader.email,
+        phone: p.leader.phone,
       },
     };
   }
@@ -1726,7 +1730,7 @@ export class MinistryCellsService {
     const rows = await this.prisma.cellProvince.findMany({
       where,
       include: {
-        leader: { select: { id: true, firstName: true, lastName: true, email: true } },
+        leader: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
         postcodes: { orderBy: { postcodeNormalized: 'asc' } },
         _count: { select: { branches: true } },
       },
@@ -1772,7 +1776,7 @@ export class MinistryCellsService {
         },
       },
       include: {
-        leader: { select: { id: true, firstName: true, lastName: true, email: true } },
+        leader: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
         postcodes: { orderBy: { postcodeNormalized: 'asc' } },
         _count: { select: { branches: true } },
       },
@@ -1785,7 +1789,12 @@ export class MinistryCellsService {
     user: AuthUser,
     churchId: string,
     provinceId: string,
-    body: { name?: string; leaderUserId?: string; postcodes?: string[] },
+    body: {
+      name?: string;
+      leaderUserId?: string;
+      postcodes?: string[];
+      leaderPhone?: string | null;
+    },
   ) {
     await this.access.assertLeadership(user, churchId);
     const existing = await this.prisma.cellProvince.findFirst({
@@ -1835,6 +1844,13 @@ export class MinistryCellsService {
           leaderUserId: body.leaderUserId || undefined,
         },
       });
+      if (body.leaderPhone !== undefined) {
+        const leaderId = body.leaderUserId || existing.leaderUserId;
+        await tx.user.update({
+          where: { id: leaderId },
+          data: { phone: body.leaderPhone?.trim() || null },
+        });
+      }
     });
 
     await this.recomputeBranchProvinces(churchId);
@@ -1842,7 +1858,9 @@ export class MinistryCellsService {
     const updated = await this.prisma.cellProvince.findFirstOrThrow({
       where: { id: provinceId },
       include: {
-        leader: { select: { id: true, firstName: true, lastName: true, email: true } },
+        leader: {
+          select: { id: true, firstName: true, lastName: true, email: true, phone: true },
+        },
         postcodes: { orderBy: { postcodeNormalized: 'asc' } },
         _count: { select: { branches: true } },
       },
@@ -1880,7 +1898,7 @@ export class MinistryCellsService {
         isActive: true,
         roles: { some: { role: { name: 'PROVINCIAL_LEADER' } } },
       },
-      select: { id: true, firstName: true, lastName: true, email: true },
+      select: { id: true, firstName: true, lastName: true, email: true, phone: true },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
     });
     return users
@@ -1889,6 +1907,7 @@ export class MinistryCellsService {
         id: u.id,
         name: `${u.firstName} ${u.lastName}`.trim(),
         email: u.email,
+        phone: u.phone,
       }));
   }
 
@@ -1949,7 +1968,9 @@ export class MinistryCellsService {
     const province = await this.prisma.cellProvince.findFirst({
       where: { id: provinceId, churchId },
       include: {
-        leader: { select: { id: true, firstName: true, lastName: true, email: true } },
+        leader: {
+          select: { id: true, firstName: true, lastName: true, email: true, phone: true },
+        },
         branches: {
           select: { id: true, name: true, postcode: true, location: true },
           orderBy: { name: 'asc' },
@@ -1968,6 +1989,9 @@ export class MinistryCellsService {
             churchId,
             branchId: { in: branchIds },
             weekStart: { gte: from, lte: to },
+          },
+          include: {
+            recordedBy: { select: { id: true, firstName: true, lastName: true } },
           },
           orderBy: { weekStart: 'asc' },
         })
@@ -2025,6 +2049,13 @@ export class MinistryCellsService {
           girlsCount: r.girlsCount,
           testifiersCount: r.testifiersCount,
           firstTimersCount: r.firstTimersCount,
+          recordedBy: r.recordedBy
+            ? {
+                id: r.recordedBy.id,
+                firstName: r.recordedBy.firstName,
+                lastName: r.recordedBy.lastName,
+              }
+            : null,
         })),
       };
     });
@@ -2046,10 +2077,12 @@ export class MinistryCellsService {
       province: {
         id: province.id,
         name: province.name,
+        assignedAt: province.createdAt,
         leader: {
           id: province.leader.id,
           name: `${province.leader.firstName} ${province.leader.lastName}`.trim(),
           email: province.leader.email,
+          phone: province.leader.phone,
         },
       },
       from,
