@@ -5,7 +5,7 @@ describe('FollowUpAutomationService', () => {
     const prisma = {
       followUpAutomationRule: {
         count: jest.fn().mockResolvedValue(0),
-        createMany: jest.fn().mockResolvedValue({ count: 3 }),
+        createMany: jest.fn().mockResolvedValue({ count: 4 }),
         findMany: jest.fn().mockResolvedValue([{ id: 'r1', name: 'Test' }]),
       },
     };

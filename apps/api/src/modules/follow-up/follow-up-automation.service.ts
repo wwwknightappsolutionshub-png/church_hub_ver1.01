@@ -4,6 +4,16 @@ import { PrismaService } from '../../prisma/prisma.module';
 import { NotificationsQueueService } from '../notifications/notifications-queue.service';
 import { DEFAULT_FOLLOW_UP_AUTOMATION_RULES } from './follow-up-automation.constants';
 
+function channelUsesEmail(channel: string) {
+  const c = channel.toUpperCase();
+  return c === 'EMAIL' || c === 'BOTH' || c === 'ALL';
+}
+
+function channelUsesWhatsApp(channel: string) {
+  const c = channel.toUpperCase();
+  return c === 'WHATSAPP' || c === 'SMS' || c === 'BOTH' || c === 'ALL';
+}
+
 @Injectable()
 export class FollowUpAutomationService {
   private readonly logger = new Logger(FollowUpAutomationService.name);
@@ -22,11 +32,48 @@ export class FollowUpAutomationService {
           ...r,
         })),
       });
+    } else {
+      await this.ensureWelcomeDefaults(churchId);
     }
     return this.prisma.followUpAutomationRule.findMany({
       where: { churchId },
       orderBy: [{ trigger: 'asc' }, { delayHours: 'asc' }],
     });
+  }
+
+  /**
+   * Existing churches seeded before email welcome / immediate delay:
+   * force Welcome WhatsApp to 0h and add Welcome Email if missing.
+   */
+  private async ensureWelcomeDefaults(churchId: string) {
+    await this.prisma.followUpAutomationRule.updateMany({
+      where: {
+        churchId,
+        trigger: 'NEW_LEAD',
+        channel: 'WHATSAPP',
+        name: 'Welcome new lead (WhatsApp)',
+      },
+      data: { delayHours: 0, isActive: true },
+    });
+
+    const hasEmailWelcome = await this.prisma.followUpAutomationRule.findFirst({
+      where: {
+        churchId,
+        trigger: 'NEW_LEAD',
+        channel: 'EMAIL',
+      },
+      select: { id: true },
+    });
+    if (!hasEmailWelcome) {
+      const emailDefault = DEFAULT_FOLLOW_UP_AUTOMATION_RULES.find(
+        (r) => r.trigger === 'NEW_LEAD' && r.channel === 'EMAIL',
+      );
+      if (emailDefault) {
+        await this.prisma.followUpAutomationRule.create({
+          data: { churchId, ...emailDefault },
+        });
+      }
+    }
   }
 
   async upsertRule(
@@ -92,6 +139,11 @@ export class FollowUpAutomationService {
       event === 'NEW_LEAD' ? 'NEW_LEAD' : 'STAGE_ENTER';
     const stage = event === 'NEW_LEAD' ? undefined : event.stage;
 
+    // Ensure welcome email rule exists before matching (capture/manual create paths).
+    if (trigger === 'NEW_LEAD') {
+      await this.ensureWelcomeDefaults(churchId);
+    }
+
     const rules = await this.prisma.followUpAutomationRule.findMany({
       where: {
         churchId,
@@ -111,6 +163,18 @@ export class FollowUpAutomationService {
         .replace(/\{\{name\}\}/gi, followUp.contactName)
         .replace(/\{\{church\}\}/gi, followUp.church.name);
 
+      const useEmail = channelUsesEmail(rule.channel);
+      const useWhatsApp = channelUsesWhatsApp(rule.channel);
+      if (useEmail && !followUp.contactEmail && useWhatsApp && !followUp.contactPhone) {
+        continue;
+      }
+      if (useEmail && !useWhatsApp && !followUp.contactEmail) {
+        continue;
+      }
+      if (useWhatsApp && !useEmail && !followUp.contactPhone) {
+        continue;
+      }
+
       const remindAt = new Date(Date.now() + rule.delayHours * 60 * 60 * 1000);
       const reminder = await this.prisma.followUpReminder.create({
         data: {
@@ -128,8 +192,8 @@ export class FollowUpAutomationService {
         body,
         subject: `Follow-up: ${followUp.contactName}`,
         remindAt,
-        contactEmail: followUp.contactEmail,
-        contactPhone: followUp.contactPhone,
+        contactEmail: useEmail ? followUp.contactEmail : null,
+        contactPhone: useWhatsApp ? followUp.contactPhone : null,
         assignedToId: rule.notifyAssignee ? followUp.assignedToId : null,
       });
 
@@ -186,12 +250,18 @@ export class FollowUpAutomationService {
           });
         }
 
-        if (fu.contactPhone && rule.channel === 'WHATSAPP') {
+        const useEmail = channelUsesEmail(rule.channel);
+        const useWhatsApp = channelUsesWhatsApp(rule.channel);
+
+        if (
+          (useWhatsApp && fu.contactPhone) ||
+          (useEmail && fu.contactEmail)
+        ) {
           const reminder = await this.prisma.followUpReminder.create({
             data: {
               followUpId: fu.id,
               remindAt: now,
-              channel: 'WHATSAPP',
+              channel: rule.channel,
               message: body,
             },
           });
@@ -201,8 +271,8 @@ export class FollowUpAutomationService {
             reminderId: reminder.id,
             body,
             remindAt: now,
-            contactPhone: fu.contactPhone,
-            contactEmail: fu.contactEmail,
+            contactPhone: useWhatsApp ? fu.contactPhone : null,
+            contactEmail: useEmail ? fu.contactEmail : null,
             assignedToId: fu.assignedToId,
           });
         }

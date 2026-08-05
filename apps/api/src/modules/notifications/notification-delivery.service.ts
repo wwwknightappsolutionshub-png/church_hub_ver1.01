@@ -42,6 +42,16 @@ export class NotificationDeliveryService {
       return;
     }
 
+    const reminder = await this.prisma.followUpReminder.findUnique({
+      where: { id: params.reminderId },
+      select: { channel: true },
+    });
+    const channel = (reminder?.channel ?? 'WHATSAPP').toUpperCase();
+    const sendEmail =
+      channel === 'EMAIL' || channel === 'BOTH' || channel === 'ALL';
+    const sendWhatsApp =
+      channel === 'WHATSAPP' || channel === 'SMS' || channel === 'BOTH' || channel === 'ALL';
+
     const staffIds = new Set<string>();
     if (params.assignedToId) staffIds.add(params.assignedToId);
 
@@ -77,7 +87,7 @@ export class NotificationDeliveryService {
       this.logger.debug(`In-app/push reminder for ${staffIds.size} staff on ${params.followUpId}`);
     }
 
-    if (params.contactEmail) {
+    if (sendEmail && params.contactEmail) {
       await this.email.send({
         to: params.contactEmail,
         subject: params.subject,
@@ -86,7 +96,7 @@ export class NotificationDeliveryService {
       });
     }
 
-    if (params.contactPhone) {
+    if (sendWhatsApp && params.contactPhone) {
       await this.sms.sendWhatsApp({
         to: params.contactPhone,
         body: params.body,

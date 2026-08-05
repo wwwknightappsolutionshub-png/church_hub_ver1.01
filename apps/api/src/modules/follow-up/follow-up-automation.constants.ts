@@ -12,9 +12,18 @@ export const DEFAULT_FOLLOW_UP_AUTOMATION_RULES: Array<{
   {
     name: 'Welcome new lead (WhatsApp)',
     trigger: 'NEW_LEAD',
-    delayHours: 24,
+    delayHours: 0,
     channel: 'WHATSAPP',
     message: 'Hi {{name}}, thank you for connecting with {{church}}. We would love to stay in touch!',
+    notifyAssignee: true,
+  },
+  {
+    name: 'Welcome new lead (Email)',
+    trigger: 'NEW_LEAD',
+    delayHours: 0,
+    channel: 'EMAIL',
+    message:
+      'Dear {{name}},\n\nThank you for connecting with {{church}}. We are glad you reached out and would love to stay in touch.\n\nBlessings,\n{{church}}',
     notifyAssignee: true,
   },
   {

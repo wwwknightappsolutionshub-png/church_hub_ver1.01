@@ -525,7 +525,14 @@ export class FollowUpService {
       },
     });
 
-    if (followUp.contactEmail || followUp.contactPhone || followUp.assignedToId) {
+    const channel = data.channel.toUpperCase();
+    const useEmail = channel === 'EMAIL' || channel === 'BOTH' || channel === 'ALL';
+    const useWhatsApp =
+      channel === 'WHATSAPP' || channel === 'SMS' || channel === 'BOTH' || channel === 'ALL';
+    const contactEmail = useEmail ? followUp.contactEmail : null;
+    const contactPhone = useWhatsApp ? followUp.contactPhone : null;
+
+    if (contactEmail || contactPhone || followUp.assignedToId) {
       await this.notifications.scheduleFollowUpReminder({
         churchId,
         followUpId,
@@ -533,8 +540,8 @@ export class FollowUpService {
         body: message,
         subject: `Follow-up: ${followUp.contactName}`,
         remindAt,
-        contactEmail: followUp.contactEmail,
-        contactPhone: followUp.contactPhone,
+        contactEmail,
+        contactPhone,
         assignedToId: followUp.assignedToId,
         notifyLeaders: true,
       });

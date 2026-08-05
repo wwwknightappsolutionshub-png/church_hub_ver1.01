@@ -90,8 +90,8 @@ export function FollowUpAutomationPanel() {
               Outreach automation
             </CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
-              Delayed WhatsApp/email reminders and assignee alerts. Processed every minute via
-              notification queue + fail-safe scheduler.
+              New leads get immediate WhatsApp and email welcome (when those details exist).
+              Other rules use the notification queue + fail-safe scheduler.
             </p>
           </div>
           <ChevronDown className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />

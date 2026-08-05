@@ -215,7 +215,9 @@ export class OutreachService {
       );
     });
 
-    if (data.sendWelcome !== false) {
+    // Immediate welcome SMS/WhatsApp is off by default — NEW_LEAD automation
+    // sends WhatsApp + email. Opt in with sendWelcome: true (e.g. manual resend flows).
+    if (data.sendWelcome === true) {
       try {
         await this.sendWelcomeMessage(churchId, contact.id);
       } catch (err) {
@@ -601,7 +603,7 @@ export class OutreachService {
       qrCodeId: qr.id,
       evangelistId,
       referredBy: data.referredBy,
-      sendWelcome: true,
+      sendWelcome: false,
     });
   }
 
