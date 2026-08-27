@@ -62,8 +62,27 @@ const AnalyticsCharts = dynamic(
   { loading: () => <DashboardPageSkeleton cards={4} />, ssr: false },
 );
 
+const AnalyticsGrowthChartsLazy = dynamic(
+  () =>
+    import('@/components/membership/AnalyticsChartsSection').then((m) => m.AnalyticsGrowthCharts),
+  { loading: () => <DashboardPageSkeleton cards={3} />, ssr: false },
+);
+
+const AnalyticsOpsChartsLazy = dynamic(
+  () => import('@/components/membership/AnalyticsChartsSection').then((m) => m.AnalyticsOpsCharts),
+  { loading: () => <DashboardPageSkeleton cards={4} />, ssr: false },
+);
+
 export function LazyAnalyticsCharts({ dash }: { dash: MembershipAnalyticsDashboardDto }) {
   return <AnalyticsCharts dash={dash} />;
+}
+
+export function LazyAnalyticsGrowthCharts({ dash }: { dash: MembershipAnalyticsDashboardDto }) {
+  return <AnalyticsGrowthChartsLazy dash={dash} />;
+}
+
+export function LazyAnalyticsOpsCharts({ dash }: { dash: MembershipAnalyticsDashboardDto }) {
+  return <AnalyticsOpsChartsLazy dash={dash} />;
 }
 
 export const LazyMembershipAutomationHub = dynamic(

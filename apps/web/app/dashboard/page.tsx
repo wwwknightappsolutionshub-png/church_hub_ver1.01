@@ -1,10 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  Area,
-  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
@@ -21,7 +19,7 @@ import { DASHBOARD_QUICK_ACTIONS } from '@/lib/quick-actions';
 import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { DashboardAttendanceChart } from '@/components/dashboard/DashboardAttendanceChart';
 import { DashboardChurchCalendar } from '@/components/dashboard/DashboardChurchCalendar';
-import { QuickActionsList, QuickActionsMenu } from '@/components/dashboard/QuickActionsMenu';
+import { QuickActionsMenu } from '@/components/dashboard/QuickActionsMenu';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
 import { DashboardPageSkeleton } from '@/components/dashboard/DashboardPageSkeleton';
@@ -119,9 +117,6 @@ export default function DashboardPage() {
     count: s._count,
   }));
 
-  const growthData = useMemo(() => metrics.growth, [metrics.growth]);
-  const hasGrowth = growthData.some((g) => g.members > 0 || g.outreach > 0);
-
   return (
     <DashboardModuleShell
       eyebrow="Leadership"
@@ -134,9 +129,7 @@ export default function DashboardPage() {
           <Badge className="border-emerald-400/40 bg-emerald-500/20 text-emerald-50">Live</Badge>
         ) : undefined
       }
-      actions={
-        <QuickActionsMenu actions={DASHBOARD_QUICK_ACTIONS} scrollTargetId="quick-actions" />
-      }
+      actions={<QuickActionsMenu actions={DASHBOARD_QUICK_ACTIONS} />}
     >
       <div className="space-y-6">
         {!metricsLoaded ? (
@@ -193,77 +186,9 @@ export default function DashboardPage() {
               />
             </div>
 
-            <CelebrationColumnsPanel compact />
+            <DashboardChurchCalendar />
 
             {hub ? <UnifiedAdminHub hub={hub} hideCelebrations /> : null}
-
-            <div className="grid gap-4 lg:grid-cols-3">
-              <Card className="border-slate-200/80 shadow-sm lg:col-span-2 dark:border-slate-800">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <div>
-                    <CardTitle className="text-base">Growth overview</CardTitle>
-                    <CardDescription>Members & outreach over 6 months</CardDescription>
-                  </div>
-                  <Badge variant="outline">{metricsError ? '—' : 'Live'}</Badge>
-                </CardHeader>
-                <CardContent className="h-72">
-                  {!hasGrowth ? (
-                    <p className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                      No growth history yet — new members and outreach will appear here.
-                    </p>
-                  ) : (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={growthData}>
-                        <defs>
-                          <linearGradient id="memberGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.35} />
-                            <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis dataKey="month" tick={chartTick} stroke="hsl(var(--muted-foreground))" />
-                        <YAxis tick={chartTick} stroke="hsl(var(--muted-foreground))" />
-                        <Tooltip
-                          contentStyle={{
-                            borderRadius: 8,
-                            border: '1px solid hsl(var(--border))',
-                            fontFamily: 'Montserrat',
-                          }}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="members"
-                          stroke="hsl(var(--primary))"
-                          fill="url(#memberGrad)"
-                          strokeWidth={2}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="outreach"
-                          stroke="hsl(var(--gold))"
-                          fill="transparent"
-                          strokeWidth={2}
-                          strokeDasharray="4 4"
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card
-                id="quick-actions"
-                className="flex flex-col border-[#0b1220]/15 bg-gradient-to-b from-[#0b1220]/[0.03] to-transparent shadow-sm dark:border-slate-700"
-              >
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Quick actions</CardTitle>
-                  <CardDescription>Jump to common ministry tasks</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-1">
-                  <QuickActionsList actions={DASHBOARD_QUICK_ACTIONS} />
-                </CardContent>
-              </Card>
-            </div>
 
             <div className="grid gap-4 lg:grid-cols-3">
               <div className="lg:col-span-2">
@@ -300,7 +225,7 @@ export default function DashboardPage() {
               </Card>
             </div>
 
-            <DashboardChurchCalendar />
+            <CelebrationColumnsPanel compact />
           </>
         )}
       </div>

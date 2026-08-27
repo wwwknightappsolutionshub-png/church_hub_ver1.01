@@ -26,35 +26,39 @@ function BranchGridCard({
       data-testid="branch-picker-item"
       onClick={onSelect}
       className={cn(
-        'group flex flex-col overflow-hidden rounded-xl border bg-card text-left shadow-sm transition',
+        'group flex w-full items-stretch overflow-hidden rounded-xl border bg-card text-left shadow-sm transition',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1',
         'hover:border-primary/40 hover:shadow-md active:scale-[0.99]',
         selected ? 'border-primary ring-2 ring-primary/25' : 'border-border',
       )}
     >
       <div
-        className="h-1 w-full shrink-0"
+        className="w-1 shrink-0 self-stretch"
         style={{
-          background: `linear-gradient(90deg, hsl(${hue} 55% 45%), hsl(${(hue + 40) % 360} 60% 55%))`,
+          background: `linear-gradient(180deg, hsl(${hue} 55% 45%), hsl(${(hue + 40) % 360} 60% 55%))`,
         }}
         aria-hidden
       />
-      <div className="space-y-1 px-2.5 py-2">
-        <p className="truncate font-heading text-sm font-semibold leading-tight text-primary group-hover:underline">
-          {branch.name}
-        </p>
-        <p className="flex items-center gap-1 truncate text-[11px] text-muted-foreground">
-          <MapPin className="h-3 w-3 shrink-0" aria-hidden />
-          <span className="truncate">{branch.location?.trim() || 'No location'}</span>
-        </p>
-        <p className="truncate text-[11px] tabular-nums text-muted-foreground">
-          {branch.postcode?.trim() || 'No postcode'}
-          {branch.province?.name ? ` · ${branch.province.name}` : ''}
-        </p>
-        <p className="flex items-center gap-1 truncate text-[11px] text-muted-foreground">
-          <User className="h-3 w-3 shrink-0" aria-hidden />
-          <span className="truncate">{leader}</span>
-        </p>
+      <div className="flex min-w-0 flex-1 flex-col gap-1 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="min-w-0 space-y-0.5">
+          <p className="truncate font-heading text-sm font-semibold leading-tight text-primary group-hover:underline">
+            {branch.name}
+          </p>
+          <p className="flex items-center gap-1 truncate text-[11px] text-muted-foreground">
+            <MapPin className="h-3 w-3 shrink-0" aria-hidden />
+            <span className="truncate">{branch.location?.trim() || 'No location'}</span>
+          </p>
+        </div>
+        <div className="min-w-0 space-y-0.5 sm:text-right">
+          <p className="truncate text-[11px] tabular-nums text-muted-foreground">
+            {branch.postcode?.trim() || 'No postcode'}
+            {branch.province?.name ? ` · ${branch.province.name}` : ''}
+          </p>
+          <p className="flex items-center gap-1 truncate text-[11px] text-muted-foreground sm:justify-end">
+            <User className="h-3 w-3 shrink-0" aria-hidden />
+            <span className="truncate">{leader}</span>
+          </p>
+        </div>
       </div>
     </button>
   );
@@ -120,9 +124,9 @@ export function CollapsibleCellCardsSection({
         {branches.length === 0 ? (
           <p className="px-3 py-8 text-center text-sm text-muted-foreground">{emptyMessage}</p>
         ) : (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="flex flex-col gap-2">
             {visible.map((b) => (
-              <div key={b.id} className="flex min-w-0 flex-col gap-1.5">
+              <div key={b.id} className="flex w-full min-w-0 flex-col gap-1.5">
                 <BranchGridCard
                   branch={b}
                   selected={selectedBranchId === b.id}
