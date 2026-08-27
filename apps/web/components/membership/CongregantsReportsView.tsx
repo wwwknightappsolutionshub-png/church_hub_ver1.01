@@ -1,11 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import type { MembershipDashboardStatsDto, UsheringWeeklyAttendanceFlowDto } from '@church-hub/shared-types';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
-import { CONGREGANTS_ROUTES } from '@/lib/membership/routes';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 
 export function CongregantsReportsView() {
   const { data: stats } = useApiQuery<MembershipDashboardStatsDto>(
@@ -23,7 +20,7 @@ export function CongregantsReportsView() {
       <div>
         <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Reports</h2>
         <p className="text-sm text-muted-foreground">
-          Registry summaries, attendance performance, and links to executive analytics.
+          Registry summaries and attendance performance.
         </p>
       </div>
 
@@ -88,15 +85,6 @@ export function CongregantsReportsView() {
           </div>
         </CardContent>
       </Card>
-
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" asChild>
-          <Link href="/dashboard/analytics">Executive analytics</Link>
-        </Button>
-        <Button size="sm" variant="outline" asChild>
-          <Link href={CONGREGANTS_ROUTES.import}>Import CSV</Link>
-        </Button>
-      </div>
     </div>
   );
 }

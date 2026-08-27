@@ -373,7 +373,7 @@ function CaptureForm() {
                 ) : null}
               </div>
               <Input
-                placeholder="Who referred you? (name)"
+                placeholder="Minister's Name"
                 value={form.referredBy}
                 onChange={(e) => setForm({ ...form, referredBy: e.target.value })}
                 autoComplete="off"

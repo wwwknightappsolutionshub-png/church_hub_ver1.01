@@ -14,7 +14,7 @@ export default function CongregantsFamilyMapPage() {
   useEffect(() => {
     if (isLoading) return;
     if (!canViewMembershipDirectory) {
-      router.replace(CONGREGANTS_ROUTES.overview);
+      router.replace(CONGREGANTS_ROUTES.members);
     }
   }, [isLoading, canViewMembershipDirectory, router]);
 

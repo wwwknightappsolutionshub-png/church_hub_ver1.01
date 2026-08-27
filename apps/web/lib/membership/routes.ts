@@ -1,7 +1,9 @@
 /** Canonical App Router paths for the Congregants module (URL stays /dashboard/membership). */
 export const CONGREGANTS_ROUTES = {
-  overview: '/dashboard/membership',
+  /** Hub URL redirects to the members list */
+  hub: '/dashboard/membership',
   members: '/dashboard/membership/members',
+  executiveAnalytics: '/dashboard/analytics',
   /** Legacy path — redirects to families with add modal */
   addFamily: '/dashboard/membership/families?add=1',
   families: '/dashboard/membership/families',

@@ -33,7 +33,7 @@ export const MODULE_DESCRIPTIONS = {
   followUp:
     'Move visitors through Fresh Contacts → Contacted → Attended Service → Engrafted In WSF → Joined Group → Enlisted for Baptism, with assignments and reminders.',
   outreach:
-    'Field capture, Team QR/NFC, offline sync, and convert pipeline — feeds new leads into Outreach.',
+    'Outreach Capture, Team QR/NFC, offline sync, and convert pipeline — feeds new leads into Outreach.',
   serviceUnits:
     'Create ministry teams, approve membership requests, post schedules, and view unit attendance dashboards.',
   departments:

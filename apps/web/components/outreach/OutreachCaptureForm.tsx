@@ -312,7 +312,7 @@ function OutreachCaptureFormInner({
           ) : null}
         </div>
         <Input
-          placeholder="Who referred you? (name)"
+          placeholder="Minister's Name"
           className="sm:col-span-2"
           {...register('referredBy')}
           autoComplete="off"
@@ -402,7 +402,7 @@ function OutreachCaptureFormInner({
 
       <Button type="submit" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-        Save capture
+        Save Contact
       </Button>
     </form>
   );

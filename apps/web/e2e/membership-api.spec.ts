@@ -39,6 +39,8 @@ test.describe('Membership API smoke', () => {
       '/membership/church-services',
       '/membership/class-definitions',
       '/membership/analytics',
+      '/membership/analytics/targets',
+      '/membership/analytics/export?months=3',
       '/membership/attendance',
     ]) {
       const res = await request.get(`${API_URL}${path}`, { headers });

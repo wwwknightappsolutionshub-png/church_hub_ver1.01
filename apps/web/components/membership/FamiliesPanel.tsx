@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Grid3X3, Home, LayoutList, Loader2, Search, UserPlus, Users } from 'lucide-react';
 import { LazyFamilyEditorDialog } from '@/lib/membership-lazy';
 import { invalidateMembershipQueries } from '@/lib/membership/invalidate-membership';
+import { CONGREGANTS_ROUTES } from '@/lib/membership/routes';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -109,12 +110,12 @@ export function FamiliesPanel({
             familyId={null}
             onClose={() => {
               setShowEditor(false);
-              router.push('/dashboard/membership');
+              router.push(CONGREGANTS_ROUTES.members);
             }}
             onSaved={() => {
               invalidate();
               setShowEditor(false);
-              router.push('/dashboard/membership');
+              router.push(CONGREGANTS_ROUTES.members);
             }}
           />
         ) : (

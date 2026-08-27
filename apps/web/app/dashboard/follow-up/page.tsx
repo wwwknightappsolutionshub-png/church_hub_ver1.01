@@ -284,12 +284,12 @@ function FollowUpPageContent() {
           <>
             <Button size="sm" onClick={() => setShowNew(true)}>
               <Plus className="mr-1.5 h-4 w-4" />
-              Fresh Contact
+              New Contact
             </Button>
             <Button size="sm" variant="secondary" asChild>
               <Link href="/dashboard/outreach">
                 <Megaphone className="mr-1.5 h-4 w-4" />
-                Field capture
+                Outreach Capture
               </Link>
             </Button>
           </>
@@ -469,11 +469,11 @@ function FollowUpPageContent() {
             <UserPlus className="mx-auto h-12 w-12 text-muted-foreground/50" />
             <p className="mt-4 font-heading text-lg font-semibold text-foreground">Pipeline is empty</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Add a Fresh Contact manually or capture someone from Field Outreach — they appear here
+              Add a New Contact manually or capture someone from Field Outreach — they appear here
               first.
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-2">
-              <Button onClick={() => setShowNew(true)}>Add first Fresh Contact</Button>
+              <Button onClick={() => setShowNew(true)}>Add first New Contact</Button>
               <Button variant="outline" asChild>
                 <Link href="/dashboard/outreach">Go to Field Outreach</Link>
               </Button>

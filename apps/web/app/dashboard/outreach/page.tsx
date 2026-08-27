@@ -105,9 +105,9 @@ export default function OutreachPage() {
           <div className="space-y-6 lg:col-span-2">
             <Card className="shadow-sm">
               <CardHeader>
-                <CardTitle>Fast capture form</CardTitle>
+                <CardTitle>Outreach Capture Form</CardTitle>
                 <CardDescription>
-                  Offline-first capture. Creates a Fresh Contact in Outreach, auto-assigns when possible,
+                  Offline-first capture. Creates a New Contact in Outreach, auto-assigns when possible,
                   and alerts the outreach team (in-app + email). View and progress leads on{' '}
                   <Link href="/dashboard/follow-up" className="font-medium text-primary underline-offset-2 hover:underline">
                     Outreach

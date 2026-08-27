@@ -8,8 +8,9 @@ test.describe('Membership primary flows (Phase 10)', () => {
     await seedAuth(page, request);
   });
 
-  test('congregants hub loads', async ({ page }) => {
+  test('congregants hub loads members list', async ({ page }) => {
     await page.goto('/dashboard/membership');
+    await expect(page).toHaveURL(/\/dashboard\/membership\/members/, { timeout: 20_000 });
     await expect(page.getByRole('heading', { name: /Congregants/i })).toBeVisible({
       timeout: 20_000,
     });

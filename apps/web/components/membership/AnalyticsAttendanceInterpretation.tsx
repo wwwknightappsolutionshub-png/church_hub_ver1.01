@@ -94,7 +94,11 @@ function UnitSeriesPanel({
   );
 }
 
-export function AnalyticsAttendanceInterpretation() {
+export function AnalyticsAttendanceInterpretation({
+  serviceType = 'all',
+}: {
+  serviceType?: 'all' | 'sunday' | 'chop';
+}) {
   const { data, isLoading } = useApiQuery<AttendancePerformance>(
     ['analytics-attendance-performance'],
     '/admin/attendance-performance',
@@ -105,6 +109,9 @@ export function AnalyticsAttendanceInterpretation() {
       <p className="text-sm text-muted-foreground">Loading Sunday & CHOP attendance…</p>
     );
   }
+
+  const showSunday = serviceType === 'all' || serviceType === 'sunday';
+  const showChop = serviceType === 'all' || serviceType === 'chop';
 
   return (
     <section
@@ -132,20 +139,24 @@ export function AnalyticsAttendanceInterpretation() {
           </Badge>
         ) : null}
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <UnitSeriesPanel
-          title="Sunday Attendance"
-          description="Ushering, Protocol, Youth, Teens & Children — interpreted from weekly submissions."
-          units={data?.sundayMeetingByUnit ?? []}
-          empty="No Sunday attendance recorded for this period."
-        />
-        <UnitSeriesPanel
-          title="CHOP Attendance"
-          description="Church Admin headcount by unit — same data shown in Admin Reports."
-          units={data?.chopAttendanceByUnit ?? []}
-          empty="No CHOP attendance recorded yet. Church Admin updates this from the Units module."
-          accent="gold"
-        />
+      <div className={showSunday && showChop ? 'grid gap-4 lg:grid-cols-2' : 'grid gap-4'}>
+        {showSunday ? (
+          <UnitSeriesPanel
+            title="Sunday Attendance"
+            description="Ushering, Protocol, Youth, Teens & Children — interpreted from weekly submissions."
+            units={data?.sundayMeetingByUnit ?? []}
+            empty="No Sunday attendance recorded for this period."
+          />
+        ) : null}
+        {showChop ? (
+          <UnitSeriesPanel
+            title="CHOP Attendance"
+            description="Church Admin headcount by unit — same data shown in Admin Reports."
+            units={data?.chopAttendanceByUnit ?? []}
+            empty="No CHOP attendance recorded yet. Church Admin updates this from the Units module."
+            accent="gold"
+          />
+        ) : null}
       </div>
     </section>
   );

@@ -1,7 +1,8 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Res } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { MemberRoleType, MemberStatus } from '@prisma/client';
 import { AttendanceScope, ClassEnrollmentStatus } from '@prisma/client';
+import type { Response } from 'express';
 import { MembershipService } from './membership.service';
 import { MembershipConfigService } from './membership-config.service';
 import { MembershipActivityService } from './membership-activity.service';
@@ -9,6 +10,7 @@ import { MembershipClassesService } from './membership-classes.service';
 import { MembershipAttendanceService } from './membership-attendance.service';
 import { MembershipTimelineService } from './membership-timeline.service';
 import { MembershipAnalyticsService } from './membership-analytics.service';
+import { parseMembershipAnalyticsQuery } from './membership-analytics-query';
 import { MembershipCelebrationsService } from './membership-celebrations.service';
 import { MembershipFamilyMapService } from './membership-family-map.service';
 import { AuthUser, ChurchId, CurrentUser } from '../auth/current-user.decorator';
@@ -525,22 +527,68 @@ export class MembershipController {
   @Get('analytics')
   @Roles('ADMIN', 'PASTOR', 'LEADER')
   @ApiOperation({
-    summary: 'Membership analytics dashboard (no giving) — trends, attendance, follow-up',
+    summary:
+      'Membership analytics dashboard (no giving) — filters: date range, compare, status, stages, unit, province/cell, service type, demographics',
   })
   getAnalytics(
     @ChurchId() churchId: string,
-    @Query('months') months?: string,
+    @Query() query: Record<string, string | undefined>,
   ) {
-    const periodMonths = Math.min(12, Math.max(3, parseInt(months ?? '6', 10) || 6));
-    return this.membershipAnalytics.getDashboard(churchId, periodMonths);
+    const parsed = parseMembershipAnalyticsQuery(query ?? {});
+    return this.membershipAnalytics.getDashboard(churchId, parsed);
   }
 
   @Get('analytics/growth-trends')
   @Roles('ADMIN', 'PASTOR', 'LEADER')
   @ApiOperation({ summary: 'Growth trend series (module 9)' })
-  async getGrowthTrends(@ChurchId() churchId: string, @Query('months') months?: string) {
-    const periodMonths = Math.min(12, Math.max(3, parseInt(months ?? '6', 10) || 6));
-    const dashboard = await this.membershipAnalytics.getDashboard(churchId, periodMonths);
+  async getGrowthTrends(
+    @ChurchId() churchId: string,
+    @Query() query: Record<string, string | undefined>,
+  ) {
+    const parsed = parseMembershipAnalyticsQuery(query ?? {});
+    const dashboard = await this.membershipAnalytics.getDashboard(churchId, parsed);
     return dashboard.growthTrends;
+  }
+
+  @Get('analytics/targets')
+  @Roles('ADMIN', 'PASTOR', 'LEADER')
+  @ApiOperation({ summary: 'Church analytics targets / benchmarks' })
+  getAnalyticsTargets(@ChurchId() churchId: string) {
+    return this.membershipAnalytics.getTargets(churchId);
+  }
+
+  @Patch('analytics/targets')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({ summary: 'Update church analytics targets (Admin / Pastor)' })
+  updateAnalyticsTargets(
+    @ChurchId() churchId: string,
+    @Body()
+    body: {
+      retentionRate?: number | null;
+      attendanceRate?: number | null;
+      outreachCompletionRate?: number | null;
+      monthlyNewMembers?: number | null;
+    },
+  ) {
+    return this.membershipAnalytics.updateTargets(churchId, body);
+  }
+
+  @Get('analytics/export')
+  @Roles('ADMIN', 'PASTOR', 'LEADER')
+  @ApiOperation({ summary: 'Export filtered analytics as CSV' })
+  async exportAnalytics(
+    @ChurchId() churchId: string,
+    @Query() query: Record<string, string | undefined>,
+    @Res() res: Response,
+  ) {
+    const parsed = parseMembershipAnalyticsQuery(query ?? {});
+    const dashboard = await this.membershipAnalytics.getDashboard(churchId, parsed);
+    const csv = this.membershipAnalytics.buildExportCsv(dashboard);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="membership-analytics-${new Date().toISOString().slice(0, 10)}.csv"`,
+    );
+    res.send(csv);
   }
 }

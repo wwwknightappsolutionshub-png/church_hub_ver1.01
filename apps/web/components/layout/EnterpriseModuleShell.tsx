@@ -76,7 +76,7 @@ export function EnterpriseHero({
         aria-hidden
       />
 
-      <div className="relative mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-5 md:px-8">
+      <div className="relative w-full px-4 py-4 sm:px-6 sm:py-5 md:px-8">
         {showEyebrow ? (
           <p className="inline-flex items-center rounded-full border border-amber-300/35 bg-amber-400/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-100">
             {eyebrow}
@@ -123,7 +123,7 @@ export function EnterpriseTabNav({
       className="sticky top-[calc(3rem+env(safe-area-inset-top))] z-20 border-b border-slate-200/80 bg-white/95 backdrop-blur xl:top-16 dark:border-slate-800 dark:bg-slate-950/95"
       aria-label={ariaLabel ?? 'Module sections'}
     >
-      <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-2 sm:px-6 md:px-8">
+      <div className="flex w-full items-center gap-2 px-4 py-2 sm:px-6 md:px-8">
         <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {tabs.map((t) => (
             <button
@@ -151,7 +151,7 @@ export function EnterpriseTabNav({
 
 export function EnterpriseContent({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn('mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-5 md:px-8', className)}>
+    <div className={cn('w-full px-4 py-4 sm:px-6 sm:py-5 md:px-8', className)}>
       <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5 dark:border-slate-800 dark:bg-card">
         {children}
       </div>

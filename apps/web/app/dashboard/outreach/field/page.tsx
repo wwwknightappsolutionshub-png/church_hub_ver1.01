@@ -31,7 +31,7 @@ export default function OutreachFieldPage() {
             Field Outreach
           </Link>
         </Button>
-        <span className="font-heading text-sm font-semibold">Field capture</span>
+        <span className="font-heading text-sm font-semibold">Outreach Capture</span>
         {!online ? (
           <Badge variant="outline" className="gap-1 text-amber-700">
             <WifiOff className="h-3 w-3" />

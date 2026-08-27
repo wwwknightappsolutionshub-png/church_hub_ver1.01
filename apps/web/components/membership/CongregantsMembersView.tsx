@@ -165,7 +165,7 @@ export function CongregantsMembersView() {
   useEffect(() => {
     if (accessLoading) return;
     if (!canViewMembershipDirectory && !canAddCongregants) {
-      router.replace(CONGREGANTS_ROUTES.overview);
+      router.replace(CONGREGANTS_ROUTES.members);
       return;
     }
     if (addOnly) {
@@ -221,12 +221,12 @@ export function CongregantsMembersView() {
             families={[]}
             onClose={() => {
               setShowCongregantEditor(false);
-              router.push(CONGREGANTS_ROUTES.overview);
+              router.push(CONGREGANTS_ROUTES.members);
             }}
             onSaved={() => {
               invalidateMembership();
               setShowCongregantEditor(false);
-              router.push(CONGREGANTS_ROUTES.overview);
+              router.push(CONGREGANTS_ROUTES.members);
             }}
           />
         ) : (

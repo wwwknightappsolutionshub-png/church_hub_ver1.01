@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { CelebrationEmailTemplateDto } from '@church-hub/shared-types';
 import { api } from '@/lib/api';
@@ -11,9 +11,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-
-const PLACEHOLDERS =
-  '{{firstName}}, {{lastName}}, {{fullName}}, {{occasionName}}, {{occasionDate}}, {{age}}';
 
 export function CommCelebrationTemplatesPanel() {
   const { data: templates, isLoading, refetch } = useApiQuery<CelebrationEmailTemplateDto[]>(
@@ -72,11 +69,7 @@ export function CommCelebrationTemplatesPanel() {
 
   return (
     <div className="space-y-6" data-testid="celebration-templates-panel">
-      <p className="text-sm text-muted-foreground">
-        Customize WYSIWYG email templates for birthday celebrants and special anniversaries. When auto-send
-        is enabled, matching congregants receive emails on the occasion date via the notification queue.
-        Placeholders: {PLACEHOLDERS}
-      </p>
+      <p className="text-sm text-muted-foreground">Edit the template as needed.</p>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
@@ -93,7 +86,16 @@ export function CommCelebrationTemplatesPanel() {
                 onChange={(e) => setBirthdaySubject(e.target.value)}
               />
             </div>
-            <HtmlRichEditor value={birthdayHtml} onChange={setBirthdayHtml} minHeight="min-h-[200px]" />
+            <div className="space-y-2">
+              <Label htmlFor="birthday-body">Email body</Label>
+              <HtmlRichEditor
+                value={birthdayHtml}
+                onChange={setBirthdayHtml}
+                minHeight="min-h-[200px]"
+                placeholder="Edit the template as needed"
+                testId="birthday-template-editor"
+              />
+            </div>
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
@@ -127,7 +129,16 @@ export function CommCelebrationTemplatesPanel() {
                 onChange={(e) => setAnniversarySubject(e.target.value)}
               />
             </div>
-            <HtmlRichEditor value={anniversaryHtml} onChange={setAnniversaryHtml} minHeight="min-h-[200px]" />
+            <div className="space-y-2">
+              <Label htmlFor="anniversary-body">Email body</Label>
+              <HtmlRichEditor
+                value={anniversaryHtml}
+                onChange={setAnniversaryHtml}
+                minHeight="min-h-[200px]"
+                placeholder="Edit the template as needed"
+                testId="anniversary-template-editor"
+              />
+            </div>
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"

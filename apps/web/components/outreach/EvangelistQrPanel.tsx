@@ -45,12 +45,8 @@ export function EvangelistQrPanel() {
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <QrCode className="h-4 w-4 text-primary" />
-          Team QR & NFC
+          Team QR & NFC Capture
         </CardTitle>
-        <CardDescription>
-          One stable church QR for the whole team. Refresh redraws the image — the link stays the
-          same. Opens a simple web form (no app install). Visitors can say who referred them.
-        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {qr?.qrDataUrl ? (

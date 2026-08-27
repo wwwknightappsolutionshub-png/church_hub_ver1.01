@@ -1,31 +1,23 @@
 import { test, expect } from '@playwright/test';
-import { API_URL, authHeaders, seedAuth, skipBrowser, skipUnlessApiOk } from './helpers/auth';
-
-test.describe.configure({ mode: 'serial' });
+import { seedAuth, skipBrowser } from './helpers/auth';
 
 test.describe('Congregants end-to-end', () => {
   test.skip(skipBrowser, 'Set SKIP_PLAYWRIGHT=true to skip browser E2E');
-
-  test.beforeAll(async ({ request }) => {
-    await skipUnlessApiOk(request, '/membership/stats');
-  });
 
   test.beforeEach(async ({ page, request }) => {
     await seedAuth(page, request);
   });
 
-  test('overview loads with Congregants heading and KPI cards', async ({ page }) => {
+  test('hub redirects to members list with nav', async ({ page }) => {
     await page.goto('/dashboard/membership');
-    await expect(page.getByRole('heading', { name: /^Congregants$/i })).toBeVisible({
-      timeout: 20_000,
-    });
+    await expect(page).toHaveURL(/\/dashboard\/membership\/members/, { timeout: 20_000 });
+    await expect(page.getByRole('heading', { name: /^Congregants$/i })).toBeVisible();
     await expect(page.getByTestId('congregants-feature-nav')).toBeVisible();
-    await expect(page.getByTestId('stat-card-members')).toBeVisible();
-    await expect(page.getByPlaceholder('Search members…')).not.toBeVisible();
+    await expect(page.getByTestId('congregant-list')).toBeVisible();
   });
 
   test('feature nav: Members, Families List, Communications', async ({ page }) => {
-    await page.goto('/dashboard/membership');
+    await page.goto('/dashboard/membership/members');
     await expect(page.getByTestId('congregants-nav-members')).toBeVisible({ timeout: 20_000 });
 
     await page.getByTestId('congregants-nav-members').click();
@@ -42,23 +34,15 @@ test.describe('Congregants end-to-end', () => {
     await expect(page.getByTestId('comm-wysiwyg')).toBeVisible();
   });
 
-  test('Import CSV page loads from overview action', async ({ page }) => {
-    await page.goto('/dashboard/membership');
-    await page.getByRole('link', { name: 'Import CSV' }).click();
+  test('Import CSV page loads from nav tab', async ({ page }) => {
+    await page.goto('/dashboard/membership/members');
+    await page.getByTestId('congregants-nav-import').click();
     await expect(page).toHaveURL(/\/dashboard\/membership\/import/);
     await expect(page.getByText(/Import|CSV|upload/i).first()).toBeVisible({ timeout: 15_000 });
   });
 
-  test('status pipeline filters link to members list', async ({ page }) => {
-    await page.goto('/dashboard/membership');
-    await expect(page.getByTestId('status-pipeline')).toBeVisible({ timeout: 20_000 });
-    const pipeline = page.getByTestId('status-pipeline').getByRole('button');
-    await expect(pipeline.first()).toBeVisible();
-    await pipeline.first().click();
-    await expect(page).toHaveURL(/\/dashboard\/membership\/members/);
-  });
-
   test('member search filters the registry table', async ({ page, request }) => {
+    const { API_URL, authHeaders } = await import('./helpers/auth');
     const headers = await authHeaders(request);
     const membersRes = await request.get(`${API_URL}/membership/members`, { headers });
     if (!membersRes.ok()) {

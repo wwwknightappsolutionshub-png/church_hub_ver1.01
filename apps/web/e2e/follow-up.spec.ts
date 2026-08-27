@@ -45,7 +45,7 @@ test.describe('Outreach end-to-end', () => {
 
   test('New lead sheet opens, cancel closes without submitting', async ({ page }) => {
     await page.goto('/dashboard/follow-up');
-    await page.getByRole('button', { name: 'Fresh Contact' }).click();
+    await page.getByRole('button', { name: 'New Contact' }).click();
     await expect(page.getByPlaceholder('Full name *')).toBeVisible({ timeout: 10_000 });
     await page.getByPlaceholder('Full name *').fill('Should not persist');
     await page.getByRole('button', { name: 'Cancel' }).click();
@@ -54,7 +54,7 @@ test.describe('Outreach end-to-end', () => {
 
   test('create lead via New lead form', async ({ page }) => {
     await page.goto('/dashboard/follow-up');
-    await page.getByRole('button', { name: 'Fresh Contact' }).click();
+    await page.getByRole('button', { name: 'New Contact' }).click();
     await page.getByPlaceholder('Full name *').fill(leadName);
     await page.getByRole('textbox', { name: 'Phone', exact: true }).fill('555-0100');
     await page.getByRole('button', { name: 'Add to pipeline' }).click();
@@ -71,9 +71,9 @@ test.describe('Outreach end-to-end', () => {
     await expect(page.getByText(leadName)).toBeVisible();
   });
 
-  test('Fast capture link navigates to outreach', async ({ page }) => {
+  test('Outreach Capture link navigates to outreach', async ({ page }) => {
     await page.goto('/dashboard/follow-up');
-    await page.getByRole('link', { name: /Fast capture/i }).click();
+    await page.getByRole('link', { name: /Outreach Capture/i }).click();
     await expect(page).toHaveURL(/\/dashboard\/outreach/, { timeout: 15_000 });
   });
 

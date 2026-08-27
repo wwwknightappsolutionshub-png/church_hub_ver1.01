@@ -84,7 +84,7 @@ export function ConvertPipelinePanel({ onRefresh }: { onRefresh: () => void }) {
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Convert pipeline</CardTitle>
         <p className="text-xs text-muted-foreground">
-          Field capture → follow-up linkage → membership. {data.convertedTotal} converted
+          Outreach Capture → follow-up linkage → membership. {data.convertedTotal} converted
           {data.needsBusPickup > 0 ? ` · ${data.needsBusPickup} need bus pickup` : ''}.
         </p>
       </CardHeader>

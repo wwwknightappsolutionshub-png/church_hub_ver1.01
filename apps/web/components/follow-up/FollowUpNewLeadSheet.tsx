@@ -32,9 +32,9 @@ export function FollowUpNewLeadSheet({ open, onClose, onSuccess }: FollowUpNewLe
               <UserPlus className="h-5 w-5" />
             </div>
             <div>
-              <p className="font-heading text-lg font-bold text-foreground">Add Fresh Contact</p>
+              <p className="font-heading text-lg font-bold text-foreground">Add New Contact</p>
               <p className="text-xs text-muted-foreground">
-                Same form as Field Capture — saved to Outreach and the follow-up pipeline
+                Same form as Outreach Capture — saved to Outreach and the follow-up pipeline
               </p>
             </div>
           </div>

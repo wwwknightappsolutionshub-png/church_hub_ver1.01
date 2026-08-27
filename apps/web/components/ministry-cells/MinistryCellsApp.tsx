@@ -25,7 +25,6 @@ import { useMediaQuery } from '@/lib/hooks/use-media-query';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import {
-  EnterpriseContent,
   EnterpriseHero,
   EnterpriseShell,
   EnterpriseTabNav,
@@ -654,9 +653,9 @@ export function MinistryCellsPageShell() {
         title="Ministry/Cells"
         description={MODULE_DESCRIPTIONS.ministryCells}
       />
-      <EnterpriseContent className="px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:px-6">
+      <div className="w-full px-4 py-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-5 md:px-8">
         <MinistryCellsApp />
-      </EnterpriseContent>
+      </div>
     </EnterpriseShell>
   );
 }

@@ -5,7 +5,6 @@ import { Loader2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
-import type { WeeklyAttendanceForm } from '@/components/ministry-cells/CellBranchDetailPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,21 +23,28 @@ export type AttendanceRecord = {
   createdAt: string;
 };
 
-const emptyForm = (): WeeklyAttendanceForm => ({
+type WeeklyForm = {
+  meetingDate: string;
+  maleCount: string;
+  femaleCount: string;
+  childrenCount: string;
+  testifiersCount: string;
+  firstTimersCount: string;
+};
+
+const emptyForm = (): WeeklyForm => ({
   meetingDate: new Date().toISOString().slice(0, 10),
   maleCount: '',
   femaleCount: '',
-  boysCount: '',
-  girlsCount: '',
+  childrenCount: '',
   testifiersCount: '',
   firstTimersCount: '',
 });
 
-const FIELDS: { key: keyof WeeklyAttendanceForm; label: string }[] = [
+const FIELDS: { key: keyof WeeklyForm; label: string }[] = [
   { key: 'maleCount', label: 'Male' },
   { key: 'femaleCount', label: 'Female' },
-  { key: 'boysCount', label: 'Boys' },
-  { key: 'girlsCount', label: 'Girls' },
+  { key: 'childrenCount', label: 'Children' },
   { key: 'testifiersCount', label: 'Testifiers' },
   { key: 'firstTimersCount', label: 'First Timers' },
 ];
@@ -46,6 +52,10 @@ const FIELDS: { key: keyof WeeklyAttendanceForm; label: string }[] = [
 function toDateInput(value: string | null | undefined) {
   if (!value) return new Date().toISOString().slice(0, 10);
   return value.slice(0, 10);
+}
+
+function childrenTotal(row: Pick<AttendanceRecord, 'boysCount' | 'girlsCount'>) {
+  return (row.boysCount ?? 0) + (row.girlsCount ?? 0);
 }
 
 export function BranchWeeklyAttendancePanel({
@@ -57,7 +67,7 @@ export function BranchWeeklyAttendancePanel({
   canManage: boolean;
   onChanged: () => void;
 }) {
-  const [form, setForm] = useState<WeeklyAttendanceForm>(emptyForm);
+  const [form, setForm] = useState<WeeklyForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -75,10 +85,9 @@ export function BranchWeeklyAttendancePanel({
   const demoTotal =
     (Number(form.maleCount) || 0) +
     (Number(form.femaleCount) || 0) +
-    (Number(form.boysCount) || 0) +
-    (Number(form.girlsCount) || 0);
+    (Number(form.childrenCount) || 0);
 
-  const patchForm = (patch: Partial<WeeklyAttendanceForm>) =>
+  const patchForm = (patch: Partial<WeeklyForm>) =>
     setForm((prev) => ({ ...prev, ...patch }));
 
   const startEdit = (row: AttendanceRecord) => {
@@ -87,8 +96,7 @@ export function BranchWeeklyAttendancePanel({
       meetingDate: toDateInput(row.meetingDate ?? row.weekStart),
       maleCount: String(row.maleCount ?? 0),
       femaleCount: String(row.femaleCount ?? 0),
-      boysCount: String(row.boysCount ?? 0),
-      girlsCount: String(row.girlsCount ?? 0),
+      childrenCount: String(childrenTotal(row)),
       testifiersCount: String(row.testifiersCount ?? 0),
       firstTimersCount: String(row.firstTimersCount ?? 0),
     });
@@ -107,13 +115,14 @@ export function BranchWeeklyAttendancePanel({
     const day = weekStart.getDay();
     weekStart.setDate(weekStart.getDate() + (day === 0 ? -6 : 1 - day));
     weekStart.setHours(0, 0, 0, 0);
+    const children = Number(form.childrenCount) || 0;
     return {
       weekStart: weekStart.toISOString(),
       meetingDate: meetingDate.toISOString(),
       maleCount: Number(form.maleCount) || 0,
       femaleCount: Number(form.femaleCount) || 0,
-      boysCount: Number(form.boysCount) || 0,
-      girlsCount: Number(form.girlsCount) || 0,
+      boysCount: children,
+      girlsCount: 0,
       testifiersCount: Number(form.testifiersCount) || 0,
       firstTimersCount: Number(form.firstTimersCount) || 0,
     };
@@ -154,7 +163,7 @@ export function BranchWeeklyAttendancePanel({
             disabled={!canManage}
           />
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {FIELDS.map(({ key, label }) => (
             <div key={key}>
               <Label htmlFor={`weekly-${key}`}>{label}</Label>
@@ -202,6 +211,7 @@ export function BranchWeeklyAttendancePanel({
           <ul className="space-y-2">
             {records.map((row) => {
               const dateLabel = toDateInput(row.meetingDate ?? row.weekStart);
+              const children = childrenTotal(row);
               return (
                 <li
                   key={row.id}
@@ -210,8 +220,8 @@ export function BranchWeeklyAttendancePanel({
                   <div>
                     <p className="font-medium">{dateLabel}</p>
                     <p className="text-xs text-muted-foreground">
-                      M {row.maleCount} · F {row.femaleCount} · B {row.boysCount} · G {row.girlsCount} ·
-                      T {row.testifiersCount} · FT {row.firstTimersCount} · Total {row.presentCount}
+                      M {row.maleCount} · F {row.femaleCount} · C {children} · T {row.testifiersCount}{' '}
+                      · FT {row.firstTimersCount} · Total {row.presentCount}
                     </p>
                     <p className="text-[10px] text-muted-foreground">
                       Saved {new Date(row.createdAt).toLocaleString()}

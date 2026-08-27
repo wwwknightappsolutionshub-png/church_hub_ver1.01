@@ -53,7 +53,7 @@ export const MOBILE_ROUTE_TITLES: Record<string, string> = {
   '/dashboard/suggestions': 'Suggestions',
   '/dashboard/devotional-hub': 'Devotional Hub',
   '/dashboard/testimony-hub': 'Testimony Hub',
-  '/dashboard/outreach/field': 'Field capture',
+  '/dashboard/outreach/field': 'Outreach Capture',
   '/dashboard/change-password': 'Change password',
 };
 

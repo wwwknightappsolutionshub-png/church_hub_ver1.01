@@ -2,18 +2,33 @@
 
 import { useState, type ReactNode } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
+import { Download, FileText } from 'lucide-react';
 import type { MembershipAnalyticsDashboardDto } from '@church-hub/shared-types';
 import { useMembershipAnalytics } from '@/lib/hooks/use-membership-analytics';
+import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import {
   LazyAnalyticsGrowthCharts,
   LazyAnalyticsOpsCharts,
 } from '@/lib/membership-lazy';
+import {
+  downloadAnalyticsCsv,
+  openAnalyticsReportPdf,
+} from '@/lib/membership-analytics-export';
+import {
+  DEFAULT_ANALYTICS_FILTERS,
+  appliedFiltersHint,
+  type AnalyticsUiFilters,
+} from '@/lib/membership-analytics-filters';
 import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
+import { isChurchAdminRole, isPastorRole } from '@/lib/session-role';
 import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
 import { enterpriseHeroChipClass } from '@/components/layout/EnterpriseModuleShell';
 import { DashboardPageSkeleton } from '@/components/dashboard/DashboardPageSkeleton';
 import { AnalyticsAttendanceInterpretation } from '@/components/membership/AnalyticsAttendanceInterpretation';
+import { AnalyticsDemographicsPanel } from '@/components/membership/AnalyticsDemographicsPanel';
+import { AnalyticsFiltersBar } from '@/components/membership/AnalyticsFiltersBar';
 import { AnalyticsKpiRail } from '@/components/membership/AnalyticsKpiRail';
+import { AnalyticsTargetsPanel } from '@/components/membership/AnalyticsTargetsPanel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -23,12 +38,19 @@ const ANALYTICS_TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'attendance', label: 'Attendance' },
   { id: 'trends', label: 'Trends' },
+  { id: 'insights', label: 'Insights' },
 ] as const;
 
 type AnalyticsTabId = (typeof ANALYTICS_TABS)[number]['id'];
 
 function pct(rate: number) {
   return `${Math.round(rate * 100)}%`;
+}
+
+function formatDelta(n: number, asRate = false) {
+  const sign = n > 0 ? '+' : '';
+  if (asRate) return `${sign}${Math.round(n * 100)}pp`;
+  return `${sign}${n.toLocaleString()}`;
 }
 
 function AnalyticsTabPanel({
@@ -41,9 +63,7 @@ function AnalyticsTabPanel({
   children: ReactNode;
 }) {
   const reduceMotion = useReducedMotion();
-
   if (!active) return null;
-
   return (
     <motion.div
       key={tabId}
@@ -61,10 +81,19 @@ function AnalyticsTabPanel({
 }
 
 export default function MembershipAnalyticsPage() {
-  const [months, setMonths] = useState(6);
+  const { userRoles, canManageMembers } = useModuleAccess();
+  const canEditTargets = canManageMembers || isPastorRole(userRoles) || isChurchAdminRole(userRoles);
+
+  const [draft, setDraft] = useState<AnalyticsUiFilters>(DEFAULT_ANALYTICS_FILTERS);
+  const [applied, setApplied] = useState<AnalyticsUiFilters>(DEFAULT_ANALYTICS_FILTERS);
   const [activeTab, setActiveTab] = useState<AnalyticsTabId>('overview');
-  const { data, isLoading, isError } = useMembershipAnalytics(months);
+  const { data, isLoading, isError, isFetching } = useMembershipAnalytics(applied);
   const dash = data as MembershipAnalyticsDashboardDto | undefined;
+
+  const periodHint =
+    applied.dateFrom && applied.dateTo
+      ? `${applied.dateFrom} → ${applied.dateTo}`
+      : `${applied.months} mo window`;
 
   return (
     <DashboardModuleShell
@@ -77,23 +106,51 @@ export default function MembershipAnalyticsPage() {
         </Badge>
       }
       actions={
-        <div className="flex gap-1.5" role="group" aria-label="Select period">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Analytics actions">
           {[3, 6, 12].map((m) => (
             <Button
               key={m}
               size="sm"
               variant="outline"
-              onClick={() => setMonths(m)}
-              aria-pressed={months === m}
+              onClick={() => {
+                const next = { ...draft, months: m, dateFrom: '', dateTo: '' };
+                setDraft(next);
+                setApplied(next);
+              }}
+              aria-pressed={applied.months === m && !applied.dateFrom}
               className={cn(
                 enterpriseHeroChipClass,
                 'h-8 rounded-md px-3 text-xs',
-                months === m && 'border-amber-200/60 bg-amber-400/30 text-white',
+                applied.months === m &&
+                  !applied.dateFrom &&
+                  'border-amber-200/60 bg-amber-400/30 text-white',
               )}
             >
               {m} mo
             </Button>
           ))}
+          <Button
+            size="sm"
+            variant="outline"
+            className={cn(enterpriseHeroChipClass, 'h-8 rounded-md px-3 text-xs')}
+            disabled={!dash}
+            data-testid="analytics-export-csv"
+            onClick={() => dash && downloadAnalyticsCsv(dash)}
+          >
+            <Download className="mr-1 h-3.5 w-3.5" />
+            CSV
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className={cn(enterpriseHeroChipClass, 'h-8 rounded-md px-3 text-xs')}
+            disabled={!dash}
+            data-testid="analytics-export-pdf"
+            onClick={() => dash && openAnalyticsReportPdf(dash)}
+          >
+            <FileText className="mr-1 h-3.5 w-3.5" />
+            PDF
+          </Button>
         </div>
       }
       tabs={[...ANALYTICS_TABS]}
@@ -102,7 +159,17 @@ export default function MembershipAnalyticsPage() {
       tabAriaLabel="Analytics sections"
     >
       <div className="membership-hub-root space-y-5">
-        {isLoading && <DashboardPageSkeleton cards={4} />}
+        <AnalyticsFiltersBar
+          draft={draft}
+          onChange={setDraft}
+          onApply={() => setApplied({ ...draft })}
+          onReset={() => {
+            setDraft(DEFAULT_ANALYTICS_FILTERS);
+            setApplied(DEFAULT_ANALYTICS_FILTERS);
+          }}
+        />
+
+        {(isLoading || isFetching) && !dash ? <DashboardPageSkeleton cards={4} /> : null}
 
         {isError && (
           <Card>
@@ -112,7 +179,7 @@ export default function MembershipAnalyticsPage() {
           </Card>
         )}
 
-        {dash && !isLoading && (
+        {dash && (
           <>
             <AnalyticsTabPanel tabId="overview" active={activeTab === 'overview'}>
               <div className="space-y-5">
@@ -121,25 +188,38 @@ export default function MembershipAnalyticsPage() {
                     {
                       label: 'Total members',
                       value: dash.summary.totalMembers.toLocaleString(),
-                      hint: 'Registry headcount',
+                      hint: dash.comparison
+                        ? `${formatDelta(dash.comparison.delta.totalMembers)} vs prior`
+                        : 'Registry headcount',
                     },
                     {
                       label: 'Active / discipled',
                       value: dash.summary.activeMembers.toLocaleString(),
-                      hint: 'Engaged members',
+                      hint: dash.comparison
+                        ? `${formatDelta(dash.comparison.delta.activeMembers)} vs prior`
+                        : 'Engaged members',
                     },
                     {
                       label: 'Outreach contacts',
                       value: dash.summary.outreachContacts.toLocaleString(),
-                      hint: `${months} mo window`,
+                      hint: dash.comparison
+                        ? `${formatDelta(dash.comparison.delta.outreachContacts)} vs prior`
+                        : periodHint,
                     },
                     {
                       label: 'Outreach completion',
                       value: pct(dash.summary.followUpCompletionRate),
-                      hint: `Attendance avg ${pct(dash.summary.averageAttendanceRate)}`,
+                      hint: dash.comparison
+                        ? `${formatDelta(dash.comparison.delta.followUpCompletionRate, true)} · Att ${pct(dash.summary.averageAttendanceRate)}`
+                        : `Attendance avg ${pct(dash.summary.averageAttendanceRate)}`,
                     },
                   ]}
                 />
+                {appliedFiltersHint(dash.appliedFilters) ? (
+                  <p className="text-xs text-muted-foreground" data-testid="analytics-applied-hint">
+                    Filters: {appliedFiltersHint(dash.appliedFilters)}
+                  </p>
+                ) : null}
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                     Growth intelligence
@@ -153,7 +233,7 @@ export default function MembershipAnalyticsPage() {
             </AnalyticsTabPanel>
 
             <AnalyticsTabPanel tabId="attendance" active={activeTab === 'attendance'}>
-              <AnalyticsAttendanceInterpretation />
+              <AnalyticsAttendanceInterpretation serviceType={applied.serviceType} />
             </AnalyticsTabPanel>
 
             <AnalyticsTabPanel tabId="trends" active={activeTab === 'trends'}>
@@ -165,6 +245,13 @@ export default function MembershipAnalyticsPage() {
                   Attendance & pipeline trends
                 </h2>
                 <LazyAnalyticsOpsCharts dash={dash} />
+              </div>
+            </AnalyticsTabPanel>
+
+            <AnalyticsTabPanel tabId="insights" active={activeTab === 'insights'}>
+              <div className="space-y-5">
+                <AnalyticsDemographicsPanel demographics={dash.demographics} />
+                <AnalyticsTargetsPanel dash={dash} canEdit={canEditTargets} />
               </div>
             </AnalyticsTabPanel>
           </>

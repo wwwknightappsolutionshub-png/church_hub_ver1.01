@@ -25,7 +25,7 @@ export default function FamiliesListPage() {
   useEffect(() => {
     if (accessLoading) return;
     if (!canViewMembershipDirectory && !canAddCongregants) {
-      router.replace(CONGREGANTS_ROUTES.overview);
+      router.replace(CONGREGANTS_ROUTES.members);
     }
   }, [accessLoading, canViewMembershipDirectory, canAddCongregants, router]);
 
