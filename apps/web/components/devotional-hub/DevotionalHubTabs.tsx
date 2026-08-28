@@ -26,7 +26,7 @@ export function DevotionalHubTabs({ tab, onTabChange }: DevotionalHubTabsProps) 
       className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95"
       data-testid="devotional-hub-tabs"
     >
-      <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
+      <div className="w-full px-4 py-3 sm:px-6 md:px-8">
         <div className="lg:hidden">
           <Label htmlFor="devotional-hub-tab-select" className="sr-only">
             Devotional section
@@ -106,7 +106,7 @@ export function DevotionalHubTabs({ tab, onTabChange }: DevotionalHubTabsProps) 
       </div>
 
       <div
-        className="border-t border-slate-200/70 bg-emerald-50/50 px-4 py-2.5 text-xs leading-relaxed text-muted-foreground dark:border-slate-800 dark:bg-emerald-950/20 sm:px-6 lg:px-8"
+        className="border-t border-slate-200/70 bg-emerald-50/50 px-4 py-2.5 text-xs leading-relaxed text-muted-foreground dark:border-slate-800 dark:bg-emerald-950/20 sm:px-6 md:px-8"
         data-testid="devotional-hub-tab-description"
       >
         <span className="font-semibold text-foreground">{activeMeta.label} — </span>

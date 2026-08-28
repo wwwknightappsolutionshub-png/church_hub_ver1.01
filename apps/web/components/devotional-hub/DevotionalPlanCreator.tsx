@@ -134,7 +134,7 @@ export function DevotionalPlanCreator() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 p-6 pb-24 md:p-8">
+    <div className="w-full space-y-6 p-6 pb-24 md:p-8">
       <div className="flex items-center gap-2">
         <BookOpen className="h-6 w-6 text-emerald-600" />
         <div>

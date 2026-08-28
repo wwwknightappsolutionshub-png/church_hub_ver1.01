@@ -193,7 +193,7 @@ export function DevotionalGroupDetail({ groupId }: { groupId: string }) {
   const isPending = g.myMembership?.status === 'PENDING';
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-6 pb-24 md:p-8">
+    <div className="w-full space-y-6 p-6 pb-24 md:p-8">
       <Link
         href={DEVOTIONAL_HUB_ROUTES.hub}
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"

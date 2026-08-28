@@ -201,8 +201,7 @@ export function DevotionalHubPanel() {
 
       <DevotionalHubTabs tab={tab} onTabChange={markTab} />
 
-      <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 pb-24 sm:px-6 md:px-8 md:pb-8">
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-6 dark:border-slate-800 dark:bg-card">
+      <div className="w-full space-y-5 p-4 pb-24 md:p-6 md:pb-8">
         {ctx && !ctx.memberId && (
           <Card className="border-amber-200/60 bg-amber-50/30 dark:bg-amber-950/20">
             <CardContent className="py-3 text-sm text-muted-foreground">
@@ -378,7 +377,6 @@ export function DevotionalHubPanel() {
               ))}
           </DevotionalTabPanel>
         ))}
-        </div>
       </div>
     </>
   );

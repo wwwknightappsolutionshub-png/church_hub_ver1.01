@@ -171,7 +171,7 @@ export function DevotionalPlanEditor({ planId }: { planId: string }) {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-6 pb-28 md:p-8">
+    <div className="w-full space-y-6 p-6 pb-28 md:p-8">
       <Link
         href={DEVOTIONAL_HUB_ROUTES.hub}
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
