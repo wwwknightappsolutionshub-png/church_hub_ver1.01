@@ -54,17 +54,6 @@ export function CongregantsFeatureNav() {
       data-testid="congregants-feature-nav"
     >
       <div className="flex w-full gap-1 overflow-x-auto px-4 py-2 sm:px-6 md:px-8 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {canViewMembershipDirectory ? (
-          <Link
-            href={CONGREGANTS_ROUTES.executiveAnalytics}
-            data-testid="congregants-nav-executive-analytics"
-            className={navLinkClass(onExecutiveAnalytics)}
-            aria-current={onExecutiveAnalytics ? 'page' : undefined}
-          >
-            <BarChart3 className="h-4 w-4" aria-hidden />
-            Executive Analytics
-          </Link>
-        ) : null}
         {canManageMembers ? (
           <Link
             href={CONGREGANTS_ROUTES.import}
@@ -92,6 +81,17 @@ export function CongregantsFeatureNav() {
             </Link>
           );
         })}
+        {canViewMembershipDirectory ? (
+          <Link
+            href={CONGREGANTS_ROUTES.executiveAnalytics}
+            data-testid="congregants-nav-executive-analytics"
+            className={navLinkClass(onExecutiveAnalytics)}
+            aria-current={onExecutiveAnalytics ? 'page' : undefined}
+          >
+            <BarChart3 className="h-4 w-4" aria-hidden />
+            Executive Analytics
+          </Link>
+        ) : null}
       </div>
     </nav>
   );

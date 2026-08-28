@@ -70,6 +70,7 @@ test.describe('Membership Analytics filters', () => {
     });
 
     await expect(page.getByText('Insight filters')).toBeVisible();
+    await page.getByTestId('analytics-filters-toggle').click();
     await page.getByTestId('analytics-compare').check();
     await page.getByTestId('analytics-service-type').selectOption('sunday');
     await page.getByTestId('analytics-apply-filters').click();

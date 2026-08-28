@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Search, UserPlus } from 'lucide-react';
@@ -88,7 +88,6 @@ export function CongregantsMembersView() {
   const [statusFilter, setStatusFilter] = useState<string | undefined>(
     () => searchParams.get('status') ?? undefined,
   );
-  const [roleFilter, setRoleFilter] = useState<string | undefined>();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(25);
   const [showWizard, setShowWizard] = useState(false);
@@ -100,14 +99,13 @@ export function CongregantsMembersView() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter, roleFilter, pageSize]);
+  }, [search, statusFilter, pageSize]);
 
   const queryParams = new URLSearchParams();
   queryParams.set('page', String(page));
   queryParams.set('limit', String(pageSize));
   if (search) queryParams.set('search', search);
   if (statusFilter) queryParams.set('status', statusFilter);
-  if (roleFilter) queryParams.set('role', roleFilter);
   const membersUrl = `/membership/members?${queryParams}`;
 
   const {
@@ -116,7 +114,7 @@ export function CongregantsMembersView() {
     isError,
     error: membersError,
   } = useApiQuery<PaginatedMembersDto<MemberListItem> | MemberListItem[]>(
-    ['membership-members', String(page), String(pageSize), search, statusFilter ?? '', roleFilter ?? ''],
+    ['membership-members', String(page), String(pageSize), search, statusFilter ?? ''],
     membersUrl,
     { enabled: canViewMembershipDirectory },
   );
@@ -143,10 +141,6 @@ export function CongregantsMembersView() {
   );
 
   const ministryOptions = catalog?.ministryInterests ?? [];
-  const roleFilters = useMemo(
-    () => ['YOUTH', 'ADULT', 'LEADER', 'DRIVER', 'EVANGELIST'] as const,
-    [],
-  );
 
   const invalidateMembership = () => invalidateMembershipQueries(queryClient);
 
@@ -243,7 +237,7 @@ export function CongregantsMembersView() {
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Members</h2>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Membership Directory</h2>
           <p className="text-sm text-muted-foreground">Search, filter, and manage congregant records.</p>
         </div>
         {canAddCongregants ? (
@@ -254,8 +248,8 @@ export function CongregantsMembersView() {
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative max-w-sm flex-1">
+      <div className="flex justify-end">
+        <div className="relative w-full max-w-sm sm:w-72">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search members…"
@@ -264,25 +258,6 @@ export function CongregantsMembersView() {
             onChange={(e) => setSearch(e.target.value)}
             data-testid="congregant-search"
           />
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant={!roleFilter ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setRoleFilter(undefined)}
-          >
-            All roles
-          </Button>
-          {roleFilters.map((r) => (
-            <Button
-              key={r}
-              variant={roleFilter === r ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setRoleFilter(roleFilter === r ? undefined : r)}
-            >
-              {ROLE_LABELS[r]}
-            </Button>
-          ))}
         </div>
       </div>
 

@@ -53,7 +53,7 @@ test.describe('Ministry/Cells end-to-end', () => {
       timeout: 20_000,
     });
     await expect(page.getByRole('button', { name: 'Branches' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Analytics' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Cell Performance' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Setup' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Add New Cell' })).toBeVisible();
   });
@@ -127,7 +127,7 @@ test.describe('Ministry/Cells end-to-end', () => {
 
     await page.goto('/dashboard/ministry-cells');
     await selectBranch(page, branch.name);
-    await openWorkspaceSection(page, 'Members');
+    await openWorkspaceSection(page, 'Member');
     await expect(page.getByRole('heading', { name: branch.name })).toBeVisible({ timeout: 10_000 });
 
     await page.getByRole('button', { name: 'Add member' }).click();
@@ -161,7 +161,7 @@ test.describe('Ministry/Cells end-to-end', () => {
     const branch = branches.find((b: { name: string }) => b.name.includes('E2E Cell'));
     await page.goto('/dashboard/ministry-cells');
     await selectBranch(page, branch.name);
-    await openWorkspaceSection(page, 'Weekly');
+    await openWorkspaceSection(page, 'Submit Attendance');
     await expect(page.getByRole('heading', { name: branch.name })).toBeVisible({ timeout: 10_000 });
 
     await page.locator('input[type="number"]').first().fill('12');
@@ -219,7 +219,7 @@ test.describe('Ministry/Cells end-to-end', () => {
 
   test('analytics tab loads with filters', async ({ page }) => {
     await page.goto('/dashboard/ministry-cells');
-    await page.getByRole('button', { name: 'Analytics' }).click();
+    await page.getByRole('button', { name: 'Cell Performance' }).click();
     await expect(page.getByText('Performance filters')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('Branch comparison')).toBeVisible({ timeout: 15_000 });
   });
@@ -271,7 +271,7 @@ test.describe('Ministry/Cells end-to-end', () => {
 
   test('branches tab keeps Add New Cell visible', async ({ page }) => {
     await page.goto('/dashboard/ministry-cells');
-    await page.getByRole('button', { name: 'Analytics' }).click();
+    await page.getByRole('button', { name: 'Cell Performance' }).click();
     await page.getByRole('button', { name: 'Branches' }).click();
     await expect(page.getByRole('button', { name: 'Add New Cell' })).toBeVisible();
   });
@@ -299,7 +299,7 @@ test.describe('Ministry/Cells end-to-end', () => {
     await expect(page.locator('#edit-name')).not.toBeVisible();
 
     // Member picker cancel
-    await openWorkspaceSection(page, 'Members');
+    await openWorkspaceSection(page, 'Member');
     await page.getByRole('button', { name: 'Add member' }).click();
     await expect(page.locator('#member-search')).toBeVisible();
     await page.getByRole('button', { name: 'Cancel' }).click();

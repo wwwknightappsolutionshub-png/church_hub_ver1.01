@@ -92,6 +92,9 @@ export function AnalyticsFiltersBar({
       title="Insight filters"
       subtitle="Refine growth, attendance, and pipeline views for leadership review. Press Apply to reload charts."
       accent="slate"
+      collapsible
+      defaultExpanded={false}
+      collapseTestId="analytics-filters-toggle"
       action={
         <div className="flex gap-2">
           <Button type="button" size="sm" variant="outline" onClick={onReset}>

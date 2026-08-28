@@ -116,10 +116,10 @@ export function CellBranchDetailPanel({
 
   const sections: { id: WorkspaceSection; label: string }[] = [
     { id: 'overview', label: 'Overview' },
-    { id: 'members', label: 'Members' },
-    { id: 'weekly', label: 'Weekly' },
+    { id: 'weekly', label: 'Submit Attendance' },
+    { id: 'analytics', label: 'Cell Performance' },
     { id: 'connect', label: 'Connect' },
-    { id: 'analytics', label: 'Analytics' },
+    { id: 'members', label: 'Member' },
   ];
 
   const stats = [

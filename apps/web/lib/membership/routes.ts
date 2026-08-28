@@ -17,7 +17,7 @@ export const CONGREGANTS_ROUTES = {
 } as const;
 
 export const CONGREGANTS_PRIMARY_NAV = [
-  { href: CONGREGANTS_ROUTES.members, label: 'Members', testId: 'congregants-nav-members' },
+  { href: CONGREGANTS_ROUTES.members, label: 'Membership Directory', testId: 'congregants-nav-members' },
   { href: CONGREGANTS_ROUTES.families, label: 'Families List', testId: 'congregants-nav-families' },
   { href: CONGREGANTS_ROUTES.familyMap, label: 'Family Map', testId: 'congregants-nav-family-map' },
   { href: CONGREGANTS_ROUTES.communications, label: 'Communications', testId: 'congregants-nav-communications' },
