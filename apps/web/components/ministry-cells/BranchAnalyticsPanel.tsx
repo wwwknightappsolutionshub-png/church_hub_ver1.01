@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2, TrendingDown, TrendingUp } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import {
   Bar,
   BarChart,
@@ -16,7 +16,6 @@ import {
 } from 'recharts';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
 
 const PIE_COLORS = ['#0f766e', '#1e3a5f', '#b45309', '#64748b'];
 const chartTick = { fontSize: 11, fontFamily: 'Montserrat, sans-serif' };
@@ -73,53 +72,8 @@ export function BranchAnalyticsPanel({ branchId }: { branchId: string }) {
     );
   }
 
-  const growthUp = data.growthPercent >= 0;
-  const summary = [
-    { label: 'Male', value: data.totals.male },
-    { label: 'Female', value: data.totals.female },
-    { label: 'Boys', value: data.totals.boys },
-    { label: 'Girls', value: data.totals.girls },
-    { label: 'First timers', value: data.firstTimersTotal },
-  ];
-
   return (
     <div className="space-y-4">
-      <Card className="shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">4-week performance</CardTitle>
-          <CardDescription>
-            Aggregated attendance demographics and growth vs the prior two weeks.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <div
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold',
-                growthUp ? 'bg-teal-50 text-teal-800' : 'bg-amber-50 text-amber-900',
-              )}
-            >
-              {growthUp ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-              {growthUp ? '+' : ''}
-              {data.growthPercent}% growth
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Total attendance (4 weeks):{' '}
-              <span className="font-semibold text-foreground">{data.totals.total}</span>
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-            {summary.map((s) => (
-              <div key={s.label} className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-center">
-                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{s.label}</p>
-                <p className="text-lg font-bold tabular-nums">{s.value}</p>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="shadow-sm">
           <CardHeader className="pb-2">

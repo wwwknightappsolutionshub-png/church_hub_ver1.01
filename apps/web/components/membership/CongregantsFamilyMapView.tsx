@@ -28,8 +28,8 @@ export function CongregantsFamilyMapView() {
   const pins = data?.pins ?? [];
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-4" data-testid="congregants-family-map">
-      <div className="text-center sm:text-left">
+    <div className="space-y-4" data-testid="congregants-family-map">
+      <div>
         <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Family Map</h2>
         <p className="text-sm text-muted-foreground">
           Household locations pinned from post codes on active family records.
@@ -39,16 +39,16 @@ export function CongregantsFamilyMapView() {
       <Card className="border-slate-200/80 dark:border-slate-800">
         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle className="flex items-center justify-center gap-2 text-base sm:justify-start">
+            <CardTitle className="flex items-center gap-2 text-base">
               <MapPin className="h-4 w-4" />
               Membership map
             </CardTitle>
-            <CardDescription className="text-center sm:text-left">
+            <CardDescription>
               Add a post code on each family record to appear on the map.
             </CardDescription>
           </div>
           {!isLoading && data ? (
-            <div className="flex justify-center gap-2 sm:justify-end">
+            <div className="flex gap-2 sm:justify-end">
               <Badge variant="secondary">{pins.length} pinned</Badge>
               {data.skipped > 0 ? (
                 <Badge variant="outline">{data.skipped} without coordinates</Badge>

@@ -127,7 +127,7 @@ test.describe('Ministry/Cells end-to-end', () => {
 
     await page.goto('/dashboard/ministry-cells');
     await selectBranch(page, branch.name);
-    await openWorkspaceSection(page, 'Member');
+    await openWorkspaceSection(page, 'Membership Directory');
     await expect(page.getByRole('heading', { name: branch.name })).toBeVisible({ timeout: 10_000 });
 
     await page.getByRole('button', { name: 'Add member' }).click();
@@ -299,7 +299,7 @@ test.describe('Ministry/Cells end-to-end', () => {
     await expect(page.locator('#edit-name')).not.toBeVisible();
 
     // Member picker cancel
-    await openWorkspaceSection(page, 'Member');
+    await openWorkspaceSection(page, 'Membership Directory');
     await page.getByRole('button', { name: 'Add member' }).click();
     await expect(page.locator('#member-search')).toBeVisible();
     await page.getByRole('button', { name: 'Cancel' }).click();

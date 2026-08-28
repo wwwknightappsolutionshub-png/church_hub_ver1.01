@@ -385,7 +385,7 @@ function FollowUpPageContent() {
         }
       />
 
-      <EnterpriseContent className="max-w-[1600px]">
+      <EnterpriseContent>
         {view !== 'calendar' && view !== 'archived' && (
         <div className="mb-6 flex flex-wrap items-center gap-3">
           <div className="flex min-w-[200px] flex-1 flex-wrap items-center gap-1.5 rounded-xl border border-dashed border-border bg-muted/20 p-2.5">

@@ -119,7 +119,7 @@ export function CellBranchDetailPanel({
     { id: 'weekly', label: 'Submit Attendance' },
     { id: 'analytics', label: 'Cell Performance' },
     { id: 'connect', label: 'Connect' },
-    { id: 'members', label: 'Member' },
+    { id: 'members', label: 'Membership Directory' },
   ];
 
   const stats = [
