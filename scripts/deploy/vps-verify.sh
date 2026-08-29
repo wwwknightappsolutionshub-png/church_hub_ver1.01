@@ -2,7 +2,7 @@
 # Quick checks that production is serving the expected build (run on VPS or via curl).
 set -euo pipefail
 
-PUBLIC_BASE="${PUBLIC_BASE:-https://church-hub.wazconnect.com}"
+PUBLIC_BASE="${PUBLIC_BASE:-https://church-hub.online}"
 LOCAL_WEB="${LOCAL_WEB:-http://127.0.0.1:3003}"
 LOCAL_API="${LOCAL_API:-http://127.0.0.1:4000}"
 

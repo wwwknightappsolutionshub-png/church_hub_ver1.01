@@ -2,7 +2,7 @@
 # Compare local PM2 login HTML vs public URL (detects Nginx HTML cache).
 set -euo pipefail
 
-PUBLIC_BASE="${PUBLIC_BASE:-https://church-hub.wazconnect.com}"
+PUBLIC_BASE="${PUBLIC_BASE:-https://church-hub.online}"
 LOCAL_WEB="${LOCAL_WEB:-http://127.0.0.1:3003}"
 ROOT="${CHURCHHUB_ROOT:-/www/wwwroot/church-hub.wazconnect.com}"
 
