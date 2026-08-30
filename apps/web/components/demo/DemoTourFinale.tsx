@@ -4,14 +4,13 @@ import { motion, useReducedMotion } from 'framer-motion';
 import Link from 'next/link';
 import { BrandIcon } from '@/components/brand/BrandMark';
 import { Button } from '@/components/ui/button';
-import { useDemoTour } from '@/components/demo/DemoTourContext';
-import { endDemoTour } from '@/lib/demo-tour';
 
-export function DemoTourFinale() {
-  const { showFinale, stopTour } = useDemoTour();
+type Props = {
+  onClose?: () => void;
+};
+
+export function DemoTourFinale({ onClose }: Props) {
   const reduceMotion = useReducedMotion();
-
-  if (!showFinale) return null;
 
   return (
     <div
@@ -47,8 +46,8 @@ export function DemoTourFinale() {
           Thank You For Your Patience.
         </h1>
         <p className="mt-3 max-w-md text-base text-primary-foreground/80">
-          You just walked through Church_Hub leadership tools on a live demo workspace. Ready to
-          launch your own church?
+          You just walked through a preview of Church_Hub leadership tools. Ready to launch your own
+          church workspace?
         </p>
 
         <Button
@@ -57,13 +56,7 @@ export function DemoTourFinale() {
           className="mt-10 min-w-[12rem] text-base font-semibold shadow-lg"
           asChild
         >
-          <Link
-            href="/register"
-            onClick={() => {
-              endDemoTour();
-              stopTour();
-            }}
-          >
+          <Link href="/register" onClick={() => onClose?.()}>
             SignUP NOW
           </Link>
         </Button>

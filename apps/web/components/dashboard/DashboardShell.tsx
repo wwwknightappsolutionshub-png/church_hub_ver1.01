@@ -41,9 +41,6 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ModuleChromeProvider, useModuleChrome } from '@/components/layout/ModuleChromeContext';
-import { DemoTourContentMotion } from '@/components/demo/DemoTourContentMotion';
-import { useDemoTour } from '@/components/demo/DemoTourContext';
-import { isDemoTourActive } from '@/lib/demo-tour';
 
 const platformNavAll: (DashboardNavItem & { permission?: string })[] = [
   { href: '/dashboard/platform', label: 'Tenants', icon: Building2, exact: true, permission: 'platform.tenants:read' },
@@ -76,7 +73,6 @@ function NavLink({
   return (
     <Link
       href={href}
-      data-tour-nav={href}
       onClick={onNavigate}
       title={collapsed ? label : undefined}
       aria-label={label}
@@ -165,7 +161,6 @@ function DesktopSidebar({
   const isChurchAdmin = isChurchAdminRole(userRoles);
   /** Pastors and church admins start with Community collapsed; they can expand it. */
   const [communityOpen, setCommunityOpen] = useState(false);
-  const { active: tourActive } = useDemoTour();
 
   useEffect(() => {
     if (accessLoading) return;
@@ -281,7 +276,7 @@ function DesktopSidebar({
                 ))}
               </>
             )}
-            {staffCommunityNav.length > 0 && !tourActive ? (
+            {staffCommunityNav.length > 0 && (
               <div className={cn(!collapsed && 'mt-4')}>
                 {!collapsed ? (
                   <button
@@ -312,7 +307,7 @@ function DesktopSidebar({
                     ))
                   : null}
               </div>
-            ) : null}
+            )}
           </>
         ) : (
           <>
@@ -376,7 +371,6 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
   /** Desktop nav starts collapsed; user can expand via the panel icon. */
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const { stickyModuleTitle } = useModuleChrome();
-  const { active: tourActive } = useDemoTour();
   const {
     canAccessFollowUp,
     canAccessServiceUnitHub,
@@ -493,12 +487,6 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  useEffect(() => {
-    if (tourActive || isDemoTourActive()) {
-      setSidebarExpanded(true);
-    }
-  }, [tourActive]);
-
   const toggleSidebarExpanded = () => {
     setSidebarExpanded((prev) => {
       const next = !prev;
@@ -583,14 +571,14 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
             tabIndex={-1}
             className={cn(
               'app-main membership-hub-root flex-1 overflow-x-hidden focus:outline-none',
-              showMobileApp && !tourActive && 'pb-[calc(4.25rem+env(safe-area-inset-bottom))] xl:pb-0',
+              showMobileApp && 'pb-[calc(4.25rem+env(safe-area-inset-bottom))] xl:pb-0',
             )}
           >
-            <DemoTourContentMotion>{children}</DemoTourContentMotion>
+            {children}
           </main>
         </div>
 
-        {showMobileApp && !tourActive ? (
+        {showMobileApp && (
           <>
             <MobileTabBar onMoreOpen={() => setMoreOpen(true)} />
             <MobileMoreMenu
@@ -604,7 +592,7 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
               communityCollapsedByDefault={isPastor || isChurchAdmin}
             />
           </>
-        ) : null}
+        )}
       </div>
     </div>
   );

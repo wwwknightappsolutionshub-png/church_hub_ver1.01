@@ -1,16 +1,12 @@
 /**
- * Smoke test for the public product tour entry and dashboard overlay.
+ * Smoke test for the public product tour mockup.
  */
 import { test, expect } from '@playwright/test';
 import { skipBrowser } from './helpers/auth';
 
 test.describe('Demo product tour', () => {
-  test('tour launcher shows intro then reaches dashboard overlay', async ({ page }) => {
+  test('tour launcher shows signup mock then can skip to dashboard preview', async ({ page }) => {
     test.skip(skipBrowser, 'Browser E2E skipped');
-    test.skip(
-      !process.env.PLAYWRIGHT_API_URL && !process.env.CI,
-      'Requires API for demo login',
-    );
 
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/demo/tour');
@@ -18,10 +14,9 @@ test.describe('Demo product tour', () => {
     await expect(page.getByTestId('demo-tour-intro')).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('Create your church workspace')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Skip to dashboard' }).click();
-
-    await expect(page).toHaveURL(/\/dashboard(\?tour=1)?/, { timeout: 30000 });
-    await expect(page.getByTestId('demo-tour-overlay')).toBeVisible({ timeout: 20000 });
-    await expect(page.getByText(/Leadership/)).toBeVisible();
+    await page.getByRole('button', { name: 'Skip to dashboard preview' }).click();
+    await expect(page.getByTestId('demo-tour-mock-dashboard')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Leadership')).toBeVisible();
+    await expect(page.getByText('Community')).toHaveCount(0);
   });
 });

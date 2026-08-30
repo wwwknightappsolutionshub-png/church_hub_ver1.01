@@ -9,16 +9,11 @@ import { toast } from 'sonner';
 import { AuthMobileBrand } from '@/components/auth/AuthMobileBrand';
 import { AuthSideVisual } from '@/components/auth/AuthSideVisual';
 import { BrandMark } from '@/components/brand/BrandMark';
+import { DemoTourMockDashboard } from '@/components/demo/DemoTourMockDashboard';
 import { TourCursor } from '@/components/demo/TourCursor';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { loginWithCredentials } from '@/lib/auth-login';
 import { slugifyChurchName } from '@/lib/church-slug';
-import {
-  activateDemoTour,
-  DEMO_TOUR_EMAIL,
-  DEMO_TOUR_PASSWORD,
-} from '@/lib/demo-tour';
 import { cn } from '@/lib/utils';
 
 const SIGNUP_TOAST =
@@ -44,7 +39,7 @@ const CURSOR_TRAVEL_MS = 650;
 const POST_TOAST_MS = 2800;
 const POST_LOGIN_CLICK_MS = 900;
 
-type Phase = 'register' | 'login' | 'logging-in' | 'error';
+type Phase = 'register' | 'login' | 'dashboard';
 
 type CursorState = { x: number; y: number; clicking: boolean; visible: boolean };
 
@@ -98,7 +93,6 @@ export function DemoTourLauncher() {
   const router = useRouter();
   const reduceMotion = useReducedMotion();
   const [phase, setPhase] = useState<Phase>('register');
-  const [error, setError] = useState<string | null>(null);
   const [desktopOk, setDesktopOk] = useState(true);
   const [forceMobile, setForceMobile] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -123,7 +117,6 @@ export function DemoTourLauncher() {
 
   const registerSubmitRef = useRef<HTMLButtonElement>(null);
   const loginSubmitRef = useRef<HTMLButtonElement>(null);
-  const shellRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
 
   useEffect(() => {
@@ -134,18 +127,13 @@ export function DemoTourLauncher() {
     return () => mq.removeEventListener('change', sync);
   }, []);
 
-  const beginDashboardTour = useCallback(async () => {
-    setPhase('logging-in');
-    setError(null);
+  const goDashboardMock = useCallback(() => {
     setCursor((c) => ({ ...c, visible: false }));
-    const result = await loginWithCredentials(DEMO_TOUR_EMAIL, DEMO_TOUR_PASSWORD);
-    if (!result.ok) {
-      setPhase('error');
-      setError(result.message);
-      return;
-    }
-    activateDemoTour();
-    router.replace('/dashboard?tour=1');
+    setPhase('dashboard');
+  }, []);
+
+  const exitTour = useCallback(() => {
+    router.push('/');
   }, [router]);
 
   const moveCursorTo = useCallback(
@@ -179,7 +167,6 @@ export function DemoTourLauncher() {
       try {
         await sleep(reduceMotion ? 200 : 700, signal);
 
-        // —— Register form fill ——
         setPhase('register');
         await typeInto(REGISTER_DEMO.churchName, setChurchName, !!reduceMotion, signal);
         setChurchSlug(slugifyChurchName(REGISTER_DEMO.churchName));
@@ -206,7 +193,6 @@ export function DemoTourLauncher() {
         toast.success(SIGNUP_TOAST, { duration: 4500 });
         await sleep(POST_TOAST_MS, signal);
 
-        // —— Login form fill ——
         setPhase('login');
         setCursor((c) => ({ ...c, visible: false }));
         setLoginEmail('');
@@ -223,7 +209,7 @@ export function DemoTourLauncher() {
         await sleep(POST_LOGIN_CLICK_MS, signal);
         setBusy(false);
 
-        await beginDashboardTour();
+        goDashboardMock();
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') return;
         console.error(err);
@@ -234,7 +220,7 @@ export function DemoTourLauncher() {
     return () => {
       ac.abort();
     };
-  }, [beginDashboardTour, desktopOk, forceMobile, moveCursorTo, reduceMotion]);
+  }, [desktopOk, forceMobile, goDashboardMock, moveCursorTo, reduceMotion]);
 
   if (!desktopOk && !forceMobile) {
     return (
@@ -242,8 +228,8 @@ export function DemoTourLauncher() {
         <Monitor className="mb-4 h-10 w-10 text-primary" aria-hidden />
         <h1 className="font-heading text-2xl font-bold">Desktop recommended</h1>
         <p className="mt-3 max-w-md text-muted-foreground">
-          The interactive product tour works best on a wide screen so you can see the full
-          leadership sidebar and live dashboard modules.
+          The interactive product tour works best on a wide screen so you can see the full admin
+          sidebar layout.
         </p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
           <Button asChild variant="outline">
@@ -255,43 +241,23 @@ export function DemoTourLauncher() {
     );
   }
 
-  if (phase === 'logging-in') {
-    return (
-      <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-background px-6 text-center">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" aria-hidden />
-        <p className="mt-4 font-medium">Signing in to the demo church workspace…</p>
-        <p className="mt-1 text-sm text-muted-foreground">Read-only tour — no changes will be saved.</p>
-      </div>
-    );
-  }
-
-  if (phase === 'error') {
-    return (
-      <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-background px-6 text-center">
-        <p className="font-medium text-destructive">Could not start demo tour</p>
-        <p className="mt-2 max-w-md text-sm text-muted-foreground">{error}</p>
-        <div className="mt-6 flex gap-3">
-          <Button variant="outline" asChild>
-            <Link href="/">Back to home</Link>
-          </Button>
-          <Button onClick={() => void beginDashboardTour()}>Retry</Button>
-        </div>
-      </div>
-    );
+  if (phase === 'dashboard') {
+    return <DemoTourMockDashboard onExit={exitTour} reduceMotion={reduceMotion} />;
   }
 
   return (
-    <div ref={shellRef} className="relative min-h-[100dvh]" data-testid="demo-tour-intro">
+    <div className="relative min-h-[100dvh]" data-testid="demo-tour-intro">
       <div className="pointer-events-none absolute inset-x-0 top-0 z-50 flex items-center justify-between bg-card/90 px-4 py-2 backdrop-blur xl:px-6">
         <p className="text-xs font-semibold uppercase tracking-wider text-primary">
-          Product tour · {phase === 'register' ? '1 / 2 · Sign up' : '2 / 2 · Sign in'}
+          Product tour · {phase === 'register' ? '1 / 3 · Sign up' : '2 / 3 · Sign in'}
+          <span className="ml-2 font-normal text-muted-foreground">(illustrative mockup)</span>
         </p>
         <div className="pointer-events-auto flex items-center gap-2">
           <Button variant="ghost" size="sm" asChild>
             <Link href="/">Exit</Link>
           </Button>
-          <Button size="sm" onClick={() => void beginDashboardTour()}>
-            Skip to dashboard
+          <Button size="sm" onClick={goDashboardMock}>
+            Skip to dashboard preview
             <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
           </Button>
         </div>
@@ -317,11 +283,7 @@ export function DemoTourLauncher() {
                 Free trial · No credit card required · Email verification required
               </p>
 
-              <form
-                className="mt-8 space-y-4"
-                onSubmit={(e) => e.preventDefault()}
-                aria-hidden
-              >
+              <form className="mt-8 space-y-4" onSubmit={(e) => e.preventDefault()} aria-hidden>
                 <div>
                   <label className="mb-1.5 block text-sm font-medium">Church name</label>
                   <Input
@@ -357,28 +319,19 @@ export function DemoTourLauncher() {
                 <div>
                   <label className="mb-1.5 block text-sm font-medium">Password</label>
                   <Input readOnly type="password" value={regPassword} />
-                  <p className="mt-1.5 text-xs text-muted-foreground">
-                    Please enter a new password — not the temporary password from your email.
-                  </p>
                 </div>
                 <div className="space-y-2 rounded-md border border-border/80 bg-muted/30 p-3">
                   <label className="flex items-start gap-2 text-sm">
                     <input type="checkbox" className="mt-1" checked={acceptedTerms} readOnly />
                     <span>
-                      I agree to the{' '}
-                      <span className="font-medium text-primary">Terms of Service</span>
+                      I agree to the <span className="font-medium text-primary">Terms of Service</span>
                     </span>
                   </label>
                   <label className="flex items-start gap-2 text-sm">
                     <input type="checkbox" className="mt-1" checked={acceptedPrivacy} readOnly />
                     <span>
-                      I have read the{' '}
-                      <span className="font-medium text-primary">Privacy Policy</span>
+                      I have read the <span className="font-medium text-primary">Privacy Policy</span>
                     </span>
-                  </label>
-                  <label className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <input type="checkbox" className="mt-1" checked={false} readOnly />
-                    <span>Send me product tips and onboarding emails (optional)</span>
                   </label>
                 </div>
                 <Button
@@ -400,11 +353,6 @@ export function DemoTourLauncher() {
                   )}
                 </Button>
               </form>
-
-              <p className="mt-6 text-center text-sm text-muted-foreground">
-                Already have an account?{' '}
-                <span className="font-medium text-primary">Sign in</span>
-              </p>
             </div>
           </div>
           <AuthSideVisual variant="register" />
@@ -438,10 +386,7 @@ export function DemoTourLauncher() {
                   />
                 </div>
                 <div>
-                  <div className="mb-1.5 flex items-center justify-between gap-3">
-                    <label className="block text-sm font-medium">Password</label>
-                    <span className="text-sm font-medium text-primary">Forgot password?</span>
-                  </div>
+                  <label className="mb-1.5 block text-sm font-medium">Password</label>
                   <Input readOnly type="password" placeholder="••••••••" value={loginPassword} />
                 </div>
                 <Button
@@ -463,10 +408,6 @@ export function DemoTourLauncher() {
                   )}
                 </Button>
               </form>
-
-              <p className="mt-6 text-center text-sm text-muted-foreground">
-                No account? <span className="font-medium text-primary">Start free trial</span>
-              </p>
             </div>
           </div>
           <AuthSideVisual variant="login" />

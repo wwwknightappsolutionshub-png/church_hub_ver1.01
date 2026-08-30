@@ -4,7 +4,7 @@ import { DemoTourLauncher } from '@/components/demo/DemoTourLauncher';
 export const metadata: Metadata = {
   title: 'Product tour | Church Hub',
   description:
-    'Watch a guided tour of Church Hub — signup, login, and every leadership dashboard module on the live demo church.',
+    'Watch an illustrated walkthrough of Church Hub — signup, login, and leadership admin tools (mockup preview).',
 };
 
 export default function DemoTourPage() {
