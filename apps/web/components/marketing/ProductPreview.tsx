@@ -698,6 +698,12 @@ export function ProductPreview() {
             <p className="text-[10px] text-muted-foreground">↑ 5% this month</p>
           </div>
         </motion.div>
+        <a
+          href="/demo/tour"
+          className="absolute -bottom-3 left-4 rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-primary shadow-elevated transition-colors hover:bg-muted"
+        >
+          Watch full demo →
+        </a>
       </div>
     </div>
   );

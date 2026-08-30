@@ -31,7 +31,7 @@ export function CTASection() {
             className="border-white/30 bg-transparent text-white hover:bg-white/10"
             asChild
           >
-            <Link href="/dashboard">Explore demo dashboard</Link>
+            <Link href="/demo/tour">Watch product tour</Link>
           </Button>
         </div>
         <p className="mt-6 text-sm text-primary-foreground/60">No credit card required · Cancel anytime</p>

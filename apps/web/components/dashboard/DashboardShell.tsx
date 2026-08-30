@@ -41,6 +41,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ModuleChromeProvider, useModuleChrome } from '@/components/layout/ModuleChromeContext';
+import { useDemoTour } from '@/components/demo/DemoTourContext';
+import { isDemoTourActive } from '@/lib/demo-tour';
 
 const platformNavAll: (DashboardNavItem & { permission?: string })[] = [
   { href: '/dashboard/platform', label: 'Tenants', icon: Building2, exact: true, permission: 'platform.tenants:read' },
@@ -73,6 +75,7 @@ function NavLink({
   return (
     <Link
       href={href}
+      data-tour-nav={href}
       onClick={onNavigate}
       title={collapsed ? label : undefined}
       aria-label={label}
@@ -371,6 +374,7 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
   /** Desktop nav starts collapsed; user can expand via the panel icon. */
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const { stickyModuleTitle } = useModuleChrome();
+  const { active: tourActive } = useDemoTour();
   const {
     canAccessFollowUp,
     canAccessServiceUnitHub,
@@ -486,6 +490,12 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
       /* ignore */
     }
   }, []);
+
+  useEffect(() => {
+    if (tourActive || isDemoTourActive()) {
+      setSidebarExpanded(true);
+    }
+  }, [tourActive]);
 
   const toggleSidebarExpanded = () => {
     setSidebarExpanded((prev) => {

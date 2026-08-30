@@ -53,6 +53,8 @@ pnpm dev
 
 **Demo login:** `admin@demo.church` / `ChurchHub123!`
 
+**Product tour:** `/demo/tour` — full-screen guided walkthrough (signup intro → auto demo login → leadership sidebar modules on the live dashboard).
+
 ## Mobile App
 
 ```bash
