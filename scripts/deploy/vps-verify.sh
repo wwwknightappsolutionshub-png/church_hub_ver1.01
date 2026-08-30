@@ -13,6 +13,7 @@ if echo "$HEALTH" | grep -q '"build"'; then
   echo "API build: $(echo "$HEALTH" | sed -n 's/.*"build":"\([^"]*\)".*/\1/p')"
 fi
 curl -sf -o /dev/null -w "GET /login -> %{http_code}\n" "$PUBLIC_BASE/login"
+curl -sf -o /dev/null -w "GET /contact -> %{http_code}\n" "$PUBLIC_BASE/contact"
 curl -sf -o /dev/null -w "GET /images/auth-side-visual.svg -> %{http_code}\n" \
   "$PUBLIC_BASE/images/auth-side-visual.svg"
 curl -sf -o /dev/null -w "GET /opengraph-image -> %{http_code}\n" \

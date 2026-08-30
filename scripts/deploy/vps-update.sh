@@ -245,6 +245,10 @@ if ! wait_http_ok "http://127.0.0.1:${WEB_PORT}/login" "web /login" 30; then
   deploy_failed "church-hub-web not responding on :${WEB_PORT} — deploy aborted (fix before nginx serves 502)" web
 fi
 
+if ! wait_http_ok "http://127.0.0.1:${WEB_PORT}/contact" "web /contact" 15; then
+  deploy_failed "web /contact not reachable on :${WEB_PORT} — contact page missing from build" web
+fi
+
 if ! wait_http_ok "http://127.0.0.1:${WEB_PORT}/images/auth-side-visual.svg" "auth image" 15; then
   deploy_failed "web static assets not reachable on :${WEB_PORT}" web
 fi
