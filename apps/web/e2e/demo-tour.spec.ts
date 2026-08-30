@@ -15,9 +15,10 @@ test.describe('Demo product tour', () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/demo/tour');
 
-    await expect(page.getByText('Create your church workspace')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('demo-tour-intro')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Create your church workspace')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Skip to dashboard tour' }).click();
+    await page.getByRole('button', { name: 'Skip to dashboard' }).click();
 
     await expect(page).toHaveURL(/\/dashboard(\?tour=1)?/, { timeout: 30000 });
     await expect(page.getByTestId('demo-tour-overlay')).toBeVisible({ timeout: 20000 });

@@ -6,6 +6,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { Pause, Play, X } from 'lucide-react';
 import Link from 'next/link';
 import { TourCursor } from '@/components/demo/TourCursor';
+import { DemoTourFinale } from '@/components/demo/DemoTourFinale';
 import { useDemoTour } from '@/components/demo/DemoTourContext';
 import { Button } from '@/components/ui/button';
 import {
@@ -47,7 +48,7 @@ export function DemoTourOverlay() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const reduceMotion = useReducedMotion();
-  const { active, stopTour } = useDemoTour();
+  const { active, stopTour, pulseContent, openFinale, showFinale } = useDemoTour();
   const {
     canManageStaff,
     isChurchStaff,
@@ -84,6 +85,7 @@ export function DemoTourOverlay() {
   const [ready, setReady] = useState(false);
   const stepIndexRef = useRef(0);
   const pathnameRef = useRef(pathname);
+  const finishedRef = useRef(false);
 
   const currentItem = staffNav[stepIndex];
   const totalSteps = staffNav.length;
@@ -106,8 +108,11 @@ export function DemoTourOverlay() {
     const initial = saved > 0 && saved < staffNav.length ? saved : 0;
     setStepIndex(initial);
     stepIndexRef.current = initial;
+    finishedRef.current = false;
     setReady(true);
-  }, [active, accessLoading, staffNav.length]);
+    // Initial dashboard load pulse
+    pulseContent();
+  }, [active, accessLoading, staffNav.length, pulseContent]);
 
   const updateSpotlight = useCallback(
     (href: string) => {
@@ -122,15 +127,28 @@ export function DemoTourOverlay() {
     [reduceMotion],
   );
 
+  const finishTour = useCallback(() => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+    setSpotlight(null);
+    setClicking(false);
+    openFinale();
+  }, [openFinale]);
+
   const advanceStep = useCallback(() => {
-    const next = (stepIndexRef.current + 1) % staffNav.length;
+    const current = stepIndexRef.current;
+    if (current >= staffNav.length - 1) {
+      finishTour();
+      return;
+    }
+    const next = current + 1;
     stepIndexRef.current = next;
     writeDemoTourStep(next);
     setStepIndex(next);
-  }, [staffNav.length]);
+  }, [finishTour, staffNav.length]);
 
   useEffect(() => {
-    if (!active || !ready || paused || !currentItem || accessLoading) return;
+    if (!active || !ready || paused || !currentItem || accessLoading || showFinale) return;
 
     const timers: ReturnType<typeof setTimeout>[] = [];
     const schedule = (fn: () => void, ms: number) => {
@@ -150,13 +168,15 @@ export function DemoTourOverlay() {
 
     const travelMs = reduceMotion ? 0 : TOUR_CURSOR_TRAVEL_MS;
     const clickMs = reduceMotion ? 0 : TOUR_CLICK_MS;
-    const holdMs = reduceMotion ? 1200 : TOUR_VIEW_HOLD_MS;
-    const navWait = onRoute ? 0 : reduceMotion ? 200 : 500;
+    const holdMs = reduceMotion ? 1000 : TOUR_VIEW_HOLD_MS;
+    const navWait = onRoute ? 80 : reduceMotion ? 200 : 550;
 
     schedule(() => {
       if (!reduceMotion) setClicking(true);
       schedule(() => {
         setClicking(false);
+        // Zoom pulse when the module content is shown / refreshed
+        pulseContent();
         schedule(() => advanceStep(), holdMs);
       }, clickMs);
     }, navWait + travelMs);
@@ -174,14 +194,22 @@ export function DemoTourOverlay() {
     stepIndex,
     currentItem,
     accessLoading,
+    showFinale,
     advanceStep,
     reduceMotion,
     router,
     staffNav,
     updateSpotlight,
+    pulseContent,
   ]);
 
-  if (!active || accessLoading || !currentItem) return null;
+  if (!active || accessLoading) return null;
+
+  if (showFinale) {
+    return <DemoTourFinale />;
+  }
+
+  if (!currentItem) return null;
 
   return (
     <>
@@ -190,20 +218,18 @@ export function DemoTourOverlay() {
         data-testid="demo-tour-overlay"
         aria-live="polite"
       >
+        {/* Highlight active admin nav — keep main content undimmed for zoom */}
         {spotlight ? (
           <div
-            className="pointer-events-none absolute rounded-lg ring-2 ring-primary ring-offset-2 ring-offset-transparent transition-all duration-300"
+            className="pointer-events-none absolute rounded-lg bg-primary/15 ring-2 ring-primary transition-all duration-300"
             style={{
               top: spotlight.top,
               left: spotlight.left,
               width: spotlight.width,
               height: spotlight.height,
-              boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.55)',
             }}
           />
-        ) : (
-          <div className="absolute inset-0 bg-black/55" aria-hidden />
-        )}
+        ) : null}
 
         <motion.div
           className="pointer-events-auto absolute bottom-8 left-1/2 z-[110] w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl border border-border bg-card p-5 shadow-elevated"
@@ -214,7 +240,7 @@ export function DemoTourOverlay() {
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-                {stepIndex + 1} / {totalSteps} · Leadership
+                {stepIndex + 1} / {totalSteps} · Admin tools
               </p>
               <h2 className="mt-1 font-heading text-lg font-bold">{currentItem.label}</h2>
               <p className="mt-2 text-sm text-muted-foreground">
@@ -253,7 +279,7 @@ export function DemoTourOverlay() {
               )}
             </Button>
             <Button type="button" variant="secondary" size="sm" asChild>
-              <Link href="/register">Start free trial</Link>
+              <Link href="/register">SignUP NOW</Link>
             </Button>
             <Button type="button" variant="ghost" size="sm" onClick={exitTour}>
               End tour

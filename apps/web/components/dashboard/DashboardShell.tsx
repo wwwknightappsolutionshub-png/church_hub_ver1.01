@@ -41,6 +41,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ModuleChromeProvider, useModuleChrome } from '@/components/layout/ModuleChromeContext';
+import { DemoTourContentMotion } from '@/components/demo/DemoTourContentMotion';
 import { useDemoTour } from '@/components/demo/DemoTourContext';
 import { isDemoTourActive } from '@/lib/demo-tour';
 
@@ -164,6 +165,7 @@ function DesktopSidebar({
   const isChurchAdmin = isChurchAdminRole(userRoles);
   /** Pastors and church admins start with Community collapsed; they can expand it. */
   const [communityOpen, setCommunityOpen] = useState(false);
+  const { active: tourActive } = useDemoTour();
 
   useEffect(() => {
     if (accessLoading) return;
@@ -279,7 +281,7 @@ function DesktopSidebar({
                 ))}
               </>
             )}
-            {staffCommunityNav.length > 0 && (
+            {staffCommunityNav.length > 0 && !tourActive ? (
               <div className={cn(!collapsed && 'mt-4')}>
                 {!collapsed ? (
                   <button
@@ -310,7 +312,7 @@ function DesktopSidebar({
                     ))
                   : null}
               </div>
-            )}
+            ) : null}
           </>
         ) : (
           <>
@@ -581,14 +583,14 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
             tabIndex={-1}
             className={cn(
               'app-main membership-hub-root flex-1 overflow-x-hidden focus:outline-none',
-              showMobileApp && 'pb-[calc(4.25rem+env(safe-area-inset-bottom))] xl:pb-0',
+              showMobileApp && !tourActive && 'pb-[calc(4.25rem+env(safe-area-inset-bottom))] xl:pb-0',
             )}
           >
-            {children}
+            <DemoTourContentMotion>{children}</DemoTourContentMotion>
           </main>
         </div>
 
-        {showMobileApp && (
+        {showMobileApp && !tourActive ? (
           <>
             <MobileTabBar onMoreOpen={() => setMoreOpen(true)} />
             <MobileMoreMenu
@@ -602,7 +604,7 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
               communityCollapsedByDefault={isPastor || isChurchAdmin}
             />
           </>
-        )}
+        ) : null}
       </div>
     </div>
   );

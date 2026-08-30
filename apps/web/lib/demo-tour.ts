@@ -12,7 +12,7 @@ export const DEMO_TOUR_PASSWORD = TEST_LOGIN_PASSWORD;
 export const DEMO_TOUR_QUERY = 'tour';
 
 /** Timing aligned with ProductPreview cursor tour. */
-export const TOUR_VIEW_HOLD_MS = 3800;
+export const TOUR_VIEW_HOLD_MS = 4200;
 export const TOUR_CURSOR_TRAVEL_MS = 700;
 export const TOUR_CLICK_MS = 220;
 

@@ -1,84 +1,130 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useReducedMotion } from 'framer-motion';
 import { ArrowRight, Loader2, Monitor } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
+import { AuthMobileBrand } from '@/components/auth/AuthMobileBrand';
+import { AuthSideVisual } from '@/components/auth/AuthSideVisual';
 import { BrandMark } from '@/components/brand/BrandMark';
+import { TourCursor } from '@/components/demo/TourCursor';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { loginWithCredentials } from '@/lib/auth-login';
+import { slugifyChurchName } from '@/lib/church-slug';
 import {
   activateDemoTour,
   DEMO_TOUR_EMAIL,
-  DEMO_TOUR_INTRO_HOLD_MS,
   DEMO_TOUR_PASSWORD,
-  type DemoTourIntroStep,
 } from '@/lib/demo-tour';
 import { cn } from '@/lib/utils';
 
-const INTRO_STEPS: { id: DemoTourIntroStep; title: string; subtitle: string }[] = [
-  {
-    id: 'register',
-    title: 'Create your church workspace',
-    subtitle: 'Register your congregation, invite leaders, and pick modules in minutes.',
-  },
-  {
-    id: 'login',
-    title: 'Secure sign-in for every role',
-    subtitle: 'Pastors, admins, and members each get the right tools — protected by RBAC.',
-  },
-];
+const SIGNUP_TOAST =
+  'Congratulations on your Signup, check your email "inbox or Spam mail box" for further instructions';
 
-function IntroMockPanel({ step }: { step: DemoTourIntroStep }) {
-  if (step === 'register') {
-    return (
-      <div className="mx-auto w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-elevated">
-        <p className="font-heading text-lg font-bold">Start your free trial</p>
-        <p className="mt-1 text-sm text-muted-foreground">Demo Community Church</p>
-        <div className="mt-5 space-y-3">
-          {['Church name', 'Admin email', 'Password'].map((label) => (
-            <div key={label} className="rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-sm text-muted-foreground">
-              {label}
-            </div>
-          ))}
-        </div>
-        <div className="mt-5 flex h-10 items-center justify-center rounded-lg bg-primary text-sm font-medium text-primary-foreground">
-          Create church workspace
-        </div>
-      </div>
+const REGISTER_DEMO = {
+  churchName: 'Grace Community Church',
+  firstName: 'Amara',
+  lastName: 'Okeke',
+  email: 'amara.okeke@gracecc.org',
+  password: 'GraceLead2026!',
+};
+
+const LOGIN_DEMO = {
+  email: 'pastor.james@northside.faith',
+  password: 'Shepherd#8841',
+};
+
+const TYPE_MS = 28;
+const FIELD_PAUSE_MS = 220;
+const CLICK_MS = 220;
+const CURSOR_TRAVEL_MS = 650;
+const POST_TOAST_MS = 2800;
+const POST_LOGIN_CLICK_MS = 900;
+
+type Phase = 'register' | 'login' | 'logging-in' | 'error';
+
+type CursorState = { x: number; y: number; clicking: boolean; visible: boolean };
+
+function sleep(ms: number, signal?: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'));
+      return;
+    }
+    const id = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(id);
+        reject(new DOMException('Aborted', 'AbortError'));
+      },
+      { once: true },
     );
-  }
+  });
+}
 
-  return (
-    <div className="mx-auto w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-elevated">
-      <p className="font-heading text-lg font-bold">Welcome back</p>
-      <p className="mt-1 text-sm text-muted-foreground">Sign in to Church Hub</p>
-      <div className="mt-5 space-y-3">
-        <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm">
-          {DEMO_TOUR_EMAIL}
-        </div>
-        <div className="rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-sm tracking-widest text-muted-foreground">
-          •••••••••••
-        </div>
-      </div>
-      <div className="mt-5 flex h-10 items-center justify-center rounded-lg bg-primary text-sm font-medium text-primary-foreground">
-        Sign in
-      </div>
-    </div>
-  );
+async function typeInto(
+  full: string,
+  setValue: (v: string) => void,
+  reduceMotion: boolean,
+  signal: AbortSignal,
+) {
+  if (reduceMotion) {
+    setValue(full);
+    return;
+  }
+  let built = '';
+  for (const ch of full) {
+    if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+    built += ch;
+    setValue(built);
+    await sleep(TYPE_MS, signal);
+  }
+}
+
+function measureCenter(el: HTMLElement | null): { x: number; y: number } | null {
+  if (!el) return null;
+  const rect = el.getBoundingClientRect();
+  return {
+    x: rect.left + rect.width / 2 - 6,
+    y: rect.top + rect.height / 2 - 4,
+  };
 }
 
 export function DemoTourLauncher() {
   const router = useRouter();
   const reduceMotion = useReducedMotion();
-  const [introIndex, setIntroIndex] = useState(0);
-  const [phase, setPhase] = useState<'intro' | 'logging-in' | 'error'>('intro');
+  const [phase, setPhase] = useState<Phase>('register');
   const [error, setError] = useState<string | null>(null);
   const [desktopOk, setDesktopOk] = useState(true);
   const [forceMobile, setForceMobile] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [cursor, setCursor] = useState<CursorState>({
+    x: 40,
+    y: 200,
+    clicking: false,
+    visible: false,
+  });
 
-  const currentIntro = INTRO_STEPS[introIndex];
+  const [churchName, setChurchName] = useState('');
+  const [churchSlug, setChurchSlug] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
+
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+
+  const registerSubmitRef = useRef<HTMLButtonElement>(null);
+  const loginSubmitRef = useRef<HTMLButtonElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const startedRef = useRef(false);
 
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 1280px)');
@@ -91,6 +137,7 @@ export function DemoTourLauncher() {
   const beginDashboardTour = useCallback(async () => {
     setPhase('logging-in');
     setError(null);
+    setCursor((c) => ({ ...c, visible: false }));
     const result = await loginWithCredentials(DEMO_TOUR_EMAIL, DEMO_TOUR_PASSWORD);
     if (!result.ok) {
       setPhase('error');
@@ -101,28 +148,93 @@ export function DemoTourLauncher() {
     router.replace('/dashboard?tour=1');
   }, [router]);
 
-  useEffect(() => {
-    if (phase !== 'intro' || (!desktopOk && !forceMobile)) return;
-
-    if (reduceMotion) {
-      if (introIndex >= INTRO_STEPS.length - 1) {
-        void beginDashboardTour();
+  const moveCursorTo = useCallback(
+    async (el: HTMLElement | null, signal: AbortSignal, clicking = false) => {
+      const target = measureCenter(el);
+      if (!target) return;
+      if (reduceMotion) {
+        setCursor({ ...target, clicking, visible: true });
         return;
       }
-      setIntroIndex(INTRO_STEPS.length - 1);
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      if (introIndex < INTRO_STEPS.length - 1) {
-        setIntroIndex((i) => i + 1);
-      } else {
-        void beginDashboardTour();
+      setCursor((c) => ({ ...c, ...target, clicking: false, visible: true }));
+      await sleep(CURSOR_TRAVEL_MS, signal);
+      if (clicking) {
+        setCursor((c) => ({ ...c, clicking: true }));
+        await sleep(CLICK_MS, signal);
+        setCursor((c) => ({ ...c, clicking: false }));
       }
-    }, DEMO_TOUR_INTRO_HOLD_MS);
+    },
+    [reduceMotion],
+  );
 
-    return () => clearTimeout(timer);
-  }, [beginDashboardTour, desktopOk, forceMobile, introIndex, phase, reduceMotion]);
+  useEffect(() => {
+    if (!desktopOk && !forceMobile) return;
+    if (startedRef.current) return;
+    startedRef.current = true;
+
+    const ac = new AbortController();
+    const { signal } = ac;
+
+    const run = async () => {
+      try {
+        await sleep(reduceMotion ? 200 : 700, signal);
+
+        // —— Register form fill ——
+        setPhase('register');
+        await typeInto(REGISTER_DEMO.churchName, setChurchName, !!reduceMotion, signal);
+        setChurchSlug(slugifyChurchName(REGISTER_DEMO.churchName));
+        await sleep(FIELD_PAUSE_MS, signal);
+
+        await typeInto(REGISTER_DEMO.firstName, setFirstName, !!reduceMotion, signal);
+        await sleep(FIELD_PAUSE_MS, signal);
+        await typeInto(REGISTER_DEMO.lastName, setLastName, !!reduceMotion, signal);
+        await sleep(FIELD_PAUSE_MS, signal);
+        await typeInto(REGISTER_DEMO.email, setRegEmail, !!reduceMotion, signal);
+        await sleep(FIELD_PAUSE_MS, signal);
+        await typeInto(REGISTER_DEMO.password, setRegPassword, !!reduceMotion, signal);
+        await sleep(FIELD_PAUSE_MS, signal);
+
+        setAcceptedTerms(true);
+        await sleep(reduceMotion ? 0 : 180, signal);
+        setAcceptedPrivacy(true);
+        await sleep(FIELD_PAUSE_MS, signal);
+
+        await moveCursorTo(registerSubmitRef.current, signal, true);
+        setBusy(true);
+        await sleep(reduceMotion ? 200 : 700, signal);
+        setBusy(false);
+        toast.success(SIGNUP_TOAST, { duration: 4500 });
+        await sleep(POST_TOAST_MS, signal);
+
+        // —— Login form fill ——
+        setPhase('login');
+        setCursor((c) => ({ ...c, visible: false }));
+        setLoginEmail('');
+        setLoginPassword('');
+        await sleep(reduceMotion ? 150 : 500, signal);
+
+        await typeInto(LOGIN_DEMO.email, setLoginEmail, !!reduceMotion, signal);
+        await sleep(FIELD_PAUSE_MS, signal);
+        await typeInto(LOGIN_DEMO.password, setLoginPassword, !!reduceMotion, signal);
+        await sleep(FIELD_PAUSE_MS, signal);
+
+        await moveCursorTo(loginSubmitRef.current, signal, true);
+        setBusy(true);
+        await sleep(POST_LOGIN_CLICK_MS, signal);
+        setBusy(false);
+
+        await beginDashboardTour();
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        console.error(err);
+      }
+    };
+
+    void run();
+    return () => {
+      ac.abort();
+    };
+  }, [beginDashboardTour, desktopOk, forceMobile, moveCursorTo, reduceMotion]);
 
   if (!desktopOk && !forceMobile) {
     return (
@@ -169,65 +281,197 @@ export function DemoTourLauncher() {
   }
 
   return (
-    <div className="relative flex min-h-[100dvh] flex-col bg-[hsl(var(--muted))]">
-      <header className="flex items-center justify-between border-b border-border bg-card px-6 py-4">
-        <BrandMark variant="dark" />
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/">Exit</Link>
-        </Button>
-      </header>
-
-      <div className="flex flex-1 flex-col items-center justify-center px-6 py-12">
+    <div ref={shellRef} className="relative min-h-[100dvh]" data-testid="demo-tour-intro">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-50 flex items-center justify-between bg-card/90 px-4 py-2 backdrop-blur xl:px-6">
         <p className="text-xs font-semibold uppercase tracking-wider text-primary">
-          Step {introIndex + 1} of {INTRO_STEPS.length}
+          Product tour · {phase === 'register' ? '1 / 2 · Sign up' : '2 / 2 · Sign in'}
         </p>
-        <motion.h1
-          key={currentIntro.id}
-          className="mt-3 max-w-xl text-center font-heading text-3xl font-bold"
-          initial={reduceMotion ? false : { opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-        >
-          {currentIntro.title}
-        </motion.h1>
-        <motion.p
-          key={`${currentIntro.id}-sub`}
-          className="mt-3 max-w-lg text-center text-muted-foreground"
-          initial={reduceMotion ? false : { opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1, duration: 0.35 }}
-        >
-          {currentIntro.subtitle}
-        </motion.p>
-
-        <motion.div
-          key={`${currentIntro.id}-panel`}
-          className="mt-10 w-full max-w-lg"
-          initial={reduceMotion ? false : { opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15, duration: 0.45 }}
-        >
-          <IntroMockPanel step={currentIntro.id} />
-        </motion.div>
-
-        <div className="mt-8 flex items-center gap-2">
-          {INTRO_STEPS.map((step, i) => (
-            <span
-              key={step.id}
-              className={cn(
-                'h-1.5 rounded-full transition-all',
-                i === introIndex ? 'w-8 bg-primary' : 'w-1.5 bg-border',
-              )}
-              aria-hidden
-            />
-          ))}
+        <div className="pointer-events-auto flex items-center gap-2">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/">Exit</Link>
+          </Button>
+          <Button size="sm" onClick={() => void beginDashboardTour()}>
+            Skip to dashboard
+            <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+          </Button>
         </div>
-
-        <Button className="mt-8" onClick={() => void beginDashboardTour()}>
-          Skip to dashboard tour
-          <ArrowRight className="ml-2 h-4 w-4" />
-        </Button>
       </div>
+
+      <TourCursor
+        x={cursor.x}
+        y={cursor.y}
+        clicking={cursor.clicking}
+        visible={cursor.visible && !reduceMotion}
+      />
+
+      {phase === 'register' ? (
+        <div className="flex min-h-[100dvh] flex-col pt-12 lg:flex-row" aria-label="Sign up demonstration">
+          <AuthMobileBrand />
+          <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto bg-background p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:p-6 lg:min-h-[100dvh]">
+            <div className="w-full max-w-lg">
+              <div className="mb-8 hidden lg:block">
+                <BrandMark showTagline />
+              </div>
+              <h1 className="text-2xl font-bold">Create your church workspace</h1>
+              <p className="mt-2 text-muted-foreground">
+                Free trial · No credit card required · Email verification required
+              </p>
+
+              <form
+                className="mt-8 space-y-4"
+                onSubmit={(e) => e.preventDefault()}
+                aria-hidden
+              >
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">Church name</label>
+                  <Input
+                    readOnly
+                    value={churchName}
+                    placeholder="Grace Community Church"
+                    className={cn(churchName && 'ring-1 ring-primary/30')}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">Church URL slug</label>
+                  <Input readOnly value={churchSlug} placeholder="grace-community-church" />
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    {churchSlug
+                      ? `Your public page: /c/${churchSlug}`
+                      : 'Filled automatically from the church name — edit anytime'}
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium">First name</label>
+                    <Input readOnly value={firstName} />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium">Last name</label>
+                    <Input readOnly value={lastName} />
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">Admin email</label>
+                  <Input readOnly type="email" value={regEmail} />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">Password</label>
+                  <Input readOnly type="password" value={regPassword} />
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    Please enter a new password — not the temporary password from your email.
+                  </p>
+                </div>
+                <div className="space-y-2 rounded-md border border-border/80 bg-muted/30 p-3">
+                  <label className="flex items-start gap-2 text-sm">
+                    <input type="checkbox" className="mt-1" checked={acceptedTerms} readOnly />
+                    <span>
+                      I agree to the{' '}
+                      <span className="font-medium text-primary">Terms of Service</span>
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-2 text-sm">
+                    <input type="checkbox" className="mt-1" checked={acceptedPrivacy} readOnly />
+                    <span>
+                      I have read the{' '}
+                      <span className="font-medium text-primary">Privacy Policy</span>
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <input type="checkbox" className="mt-1" checked={false} readOnly />
+                    <span>Send me product tips and onboarding emails (optional)</span>
+                  </label>
+                </div>
+                <Button
+                  ref={registerSubmitRef}
+                  type="button"
+                  className="w-full shadow-brand"
+                  disabled={busy}
+                >
+                  {busy ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending code…
+                    </>
+                  ) : (
+                    <>
+                      Continue
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+              </form>
+
+              <p className="mt-6 text-center text-sm text-muted-foreground">
+                Already have an account?{' '}
+                <span className="font-medium text-primary">Sign in</span>
+              </p>
+            </div>
+          </div>
+          <AuthSideVisual variant="register" />
+        </div>
+      ) : (
+        <div className="flex min-h-[100dvh] flex-col pt-12 lg:flex-row" aria-label="Sign in demonstration">
+          <AuthMobileBrand />
+          <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto bg-background p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:p-6 lg:min-h-[100dvh]">
+            <div className="w-full max-w-md">
+              <h1 className="text-2xl font-bold">Welcome back</h1>
+              <p className="mt-2 text-muted-foreground">Sign in to your church workspace</p>
+
+              <div className="mt-6 flex gap-2 rounded-lg border bg-muted/40 p-1">
+                <div className="flex-1 rounded-md bg-background px-3 py-2 text-center text-sm font-medium shadow-sm">
+                  Password
+                </div>
+                <div className="flex-1 rounded-md px-3 py-2 text-center text-sm font-medium text-muted-foreground">
+                  Magic link
+                </div>
+              </div>
+
+              <form className="mt-6 space-y-4" onSubmit={(e) => e.preventDefault()} aria-hidden>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">Email</label>
+                  <Input
+                    readOnly
+                    type="email"
+                    placeholder="you@yourchurch.org"
+                    value={loginEmail}
+                    className={cn(loginEmail && 'ring-1 ring-primary/30')}
+                  />
+                </div>
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between gap-3">
+                    <label className="block text-sm font-medium">Password</label>
+                    <span className="text-sm font-medium text-primary">Forgot password?</span>
+                  </div>
+                  <Input readOnly type="password" placeholder="••••••••" value={loginPassword} />
+                </div>
+                <Button
+                  ref={loginSubmitRef}
+                  type="button"
+                  className="w-full shadow-brand"
+                  disabled={busy}
+                >
+                  {busy ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Signing in…
+                    </>
+                  ) : (
+                    <>
+                      Sign in
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+              </form>
+
+              <p className="mt-6 text-center text-sm text-muted-foreground">
+                No account? <span className="font-medium text-primary">Start free trial</span>
+              </p>
+            </div>
+          </div>
+          <AuthSideVisual variant="login" />
+        </div>
+      )}
     </div>
   );
 }
