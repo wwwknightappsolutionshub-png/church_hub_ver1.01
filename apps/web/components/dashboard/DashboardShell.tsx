@@ -76,16 +76,24 @@ function NavLink({
       onClick={onNavigate}
       title={collapsed ? label : undefined}
       aria-label={label}
+      aria-current={active ? 'page' : undefined}
       className={cn(
-        'flex items-center rounded-lg text-sm font-medium transition-colors',
+        'relative flex items-center rounded-lg text-sm transition-colors',
         collapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5',
         active
-          ? 'bg-sidebar-muted text-sidebar-foreground ring-1 ring-white/15'
-          : 'text-sidebar-foreground/90 hover:bg-sidebar-muted/70 hover:text-sidebar-foreground',
+          ? cn(
+              'bg-sidebar-accent/20 font-semibold text-white shadow-[inset_0_0_0_1px_hsl(var(--sidebar-accent)/0.45)]',
+              'before:absolute before:left-0 before:top-1/2 before:h-6 before:w-1 before:-translate-y-1/2 before:rounded-r-full before:bg-sidebar-accent',
+            )
+          : 'font-medium text-sidebar-foreground/60 hover:bg-white/8 hover:text-sidebar-foreground',
       )}
     >
       <Icon
-        className={cn('h-4 w-4 shrink-0', active ? 'text-secondary' : 'text-sidebar-foreground/80')}
+        className={cn(
+          'h-4 w-4 shrink-0',
+          active ? 'text-sidebar-accent' : 'text-sidebar-foreground/55',
+        )}
+        strokeWidth={active ? 2.5 : 2}
         aria-hidden
       />
       {!collapsed ? <span className="flex-1 truncate">{label}</span> : null}

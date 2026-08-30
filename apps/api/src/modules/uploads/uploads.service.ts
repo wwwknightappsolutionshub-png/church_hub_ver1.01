@@ -115,6 +115,16 @@ export class UploadsService implements OnModuleInit {
     return this.saveFile(['churches', churchId, 'landing', 'hero'], file);
   }
 
+  saveLandingAboutPhoto(churchId: string, file: Express.Multer.File): Promise<UploadResult> {
+    this.assertImage(file);
+    return this.saveFile(['churches', churchId, 'landing', 'about'], file);
+  }
+
+  saveLandingAnnouncementImage(churchId: string, file: Express.Multer.File): Promise<UploadResult> {
+    this.assertImage(file);
+    return this.saveFile(['churches', churchId, 'landing', 'announcements'], file);
+  }
+
   saveLandingMessageMp3(churchId: string, file: Express.Multer.File): Promise<UploadResult> {
     this.assertMime(file, /^audio\//, 'MP3 or audio file required');
     return this.saveFile(['churches', churchId, 'landing', 'message'], file);

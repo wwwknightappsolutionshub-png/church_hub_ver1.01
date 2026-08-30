@@ -38,6 +38,7 @@ import { ChurchLandingMembershipFormTab } from '@/components/church-landing/Chur
 import { ChurchLandingSocialFeedTab } from '@/components/church-landing/ChurchLandingSocialFeedTab';
 import { ChurchLandingCommunitySupportTab } from '@/components/church-landing/ChurchLandingCommunitySupportTab';
 import { HeroSlideImageField } from '@/components/church-landing/HeroSlideImageField';
+import { LandingImageUploadField } from '@/components/church-landing/LandingImageUploadField';
 import { buildDefaultSocialFeed } from '@church-hub/shared-types';
 
 function ListEditor<T extends { id?: string; title: string }>({
@@ -521,22 +522,22 @@ export default function ChurchLandingAdminPage() {
         </TabsContent>
 
         <TabsContent value="about" className="mt-3 space-y-3 rounded-xl border border-border p-3">
-          <div>
-            <Label>Pastor photo URL</Label>
-            <Input
-              value={draft.about.pastorImageUrl ?? ''}
-              onChange={(e) =>
-                setDraft({
-                  ...draft,
-                  about: { ...draft.about, pastorImageUrl: e.target.value || undefined },
-                })
-              }
-              placeholder="https://… image of your senior pastor"
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              Shown in the left column of the About Us section on your public landing page.
-            </p>
-          </div>
+          <LandingImageUploadField
+            label="Pastor photo"
+            imageUrl={draft.about.pastorImageUrl}
+            disabled={saveMutation.isPending}
+            slot="about"
+            previewClassName="aspect-[4/5] w-full max-w-xs object-cover object-top"
+            placeholder="https://… or upload from device"
+            hint="Shown in the About Us section. Upload from your device or paste a URL, then save & publish."
+            testId="landing-about-photo-field"
+            onImageUrlChange={(url) =>
+              setDraft({
+                ...draft,
+                about: { ...draft.about, pastorImageUrl: url.trim() || undefined },
+              })
+            }
+          />
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label>Pastor name</Label>
@@ -656,7 +657,11 @@ export default function ChurchLandingAdminPage() {
           <ChurchLandingCommunitySupportTab draft={draft} onChange={setDraft} />
         </TabsContent>
 
-        <TabsContent value="announcements" className="mt-3 rounded-xl border border-border p-3">
+        <TabsContent value="announcements" className="mt-3 space-y-3 rounded-xl border border-border p-3">
+          <p className="text-sm text-muted-foreground">
+            Upload card images from your device or paste a URL for each announcement, then save &amp;
+            publish.
+          </p>
           <ListEditor
             items={draft.announcements}
             onChange={(announcements) => setDraft({ ...draft, announcements })}
@@ -669,14 +674,15 @@ export default function ChurchLandingAdminPage() {
             })}
             renderItem={(item, _i, update) => (
               <div className="grid gap-3">
-                <div>
-                  <Label>Image URL</Label>
-                  <Input
-                    value={item.imageUrl ?? ''}
-                    onChange={(e) => update({ imageUrl: e.target.value || undefined })}
-                    placeholder="https://… photo for top of card"
-                  />
-                </div>
+                <LandingImageUploadField
+                  label="Card image"
+                  imageUrl={item.imageUrl}
+                  disabled={saveMutation.isPending}
+                  slot="announcement"
+                  previewClassName="aspect-[16/10] w-full object-cover"
+                  testId="landing-announcement-image-field"
+                  onImageUrlChange={(url) => update({ imageUrl: url.trim() || undefined })}
+                />
                 <div>
                   <Label>Title</Label>
                   <Input value={item.title} onChange={(e) => update({ title: e.target.value })} />

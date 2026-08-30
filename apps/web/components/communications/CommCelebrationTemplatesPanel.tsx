@@ -68,16 +68,16 @@ export function CommCelebrationTemplatesPanel() {
   }
 
   return (
-    <div className="space-y-6" data-testid="celebration-templates-panel">
+    <div className="min-w-0 max-w-full space-y-6" data-testid="celebration-templates-panel">
       <p className="text-sm text-muted-foreground">Edit the template as needed.</p>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
+      <div className="grid min-w-0 gap-6 xl:grid-cols-2">
+        <Card className="min-w-0 overflow-hidden">
           <CardHeader>
             <CardTitle className="text-base">Birthday celebrants</CardTitle>
             <CardDescription>Sent automatically on each member&apos;s birthday</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="min-w-0 space-y-3">
             <div className="space-y-2">
               <Label htmlFor="birthday-subject">Subject</Label>
               <Input
@@ -86,7 +86,7 @@ export function CommCelebrationTemplatesPanel() {
                 onChange={(e) => setBirthdaySubject(e.target.value)}
               />
             </div>
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <Label htmlFor="birthday-body">Email body</Label>
               <HtmlRichEditor
                 value={birthdayHtml}
@@ -94,6 +94,7 @@ export function CommCelebrationTemplatesPanel() {
                 minHeight="min-h-[200px]"
                 placeholder="Edit the template as needed"
                 testId="birthday-template-editor"
+                className="min-w-0"
               />
             </div>
             <label className="flex items-center gap-2 text-sm">
@@ -115,12 +116,12 @@ export function CommCelebrationTemplatesPanel() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="min-w-0 overflow-hidden">
           <CardHeader>
             <CardTitle className="text-base">Special anniversaries</CardTitle>
             <CardDescription>Sent on member/family special occasion dates</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="min-w-0 space-y-3">
             <div className="space-y-2">
               <Label htmlFor="anniversary-subject">Subject</Label>
               <Input
@@ -129,7 +130,7 @@ export function CommCelebrationTemplatesPanel() {
                 onChange={(e) => setAnniversarySubject(e.target.value)}
               />
             </div>
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <Label htmlFor="anniversary-body">Email body</Label>
               <HtmlRichEditor
                 value={anniversaryHtml}
@@ -137,6 +138,7 @@ export function CommCelebrationTemplatesPanel() {
                 minHeight="min-h-[200px]"
                 placeholder="Edit the template as needed"
                 testId="anniversary-template-editor"
+                className="min-w-0"
               />
             </div>
             <label className="flex items-center gap-2 text-sm">

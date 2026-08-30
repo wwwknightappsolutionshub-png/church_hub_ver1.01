@@ -351,10 +351,10 @@ export function DemoTourMockDashboard({ onExit, reduceMotion }: Props) {
                 }}
                 data-tour-nav={item.href}
                 className={cn(
-                  'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors',
+                  'relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors',
                   active
-                    ? 'bg-sidebar-muted text-sidebar-foreground ring-1 ring-white/15'
-                    : 'text-sidebar-foreground/90',
+                    ? 'bg-sidebar-accent/20 font-semibold text-white shadow-[inset_0_0_0_1px_hsl(var(--sidebar-accent)/0.45)] before:absolute before:left-0 before:top-1/2 before:h-6 before:w-1 before:-translate-y-1/2 before:rounded-r-full before:bg-sidebar-accent'
+                    : 'font-medium text-sidebar-foreground/60',
                 )}
                 onClick={() => {
                   stepRef.current = index;
@@ -365,8 +365,9 @@ export function DemoTourMockDashboard({ onExit, reduceMotion }: Props) {
                 <Icon
                   className={cn(
                     'h-4 w-4 shrink-0',
-                    active ? 'text-secondary' : 'text-sidebar-foreground/80',
+                    active ? 'text-sidebar-accent' : 'text-sidebar-foreground/55',
                   )}
+                  strokeWidth={active ? 2.5 : 2}
                 />
                 <span className="truncate">{item.label}</span>
               </button>

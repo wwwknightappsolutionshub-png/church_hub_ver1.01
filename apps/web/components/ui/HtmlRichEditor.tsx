@@ -46,7 +46,10 @@ export function HtmlRichEditor({
   };
 
   return (
-    <div className={cn('rounded-md border border-input', className)} data-testid={testId}>
+    <div
+      className={cn('max-w-full overflow-hidden rounded-md border border-input', className)}
+      data-testid={testId}
+    >
       <div className="flex flex-wrap gap-0.5 border-b bg-muted/30 p-1">
         <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => exec('bold')}>
           <Bold className="h-3.5 w-3.5" />
@@ -73,7 +76,10 @@ export function HtmlRichEditor({
         contentEditable
         suppressContentEditableWarning
         className={cn(
-          'px-3 py-2 text-sm leading-relaxed outline-none [&:empty]:before:text-muted-foreground [&:empty]:before:content-[attr(data-placeholder)]',
+          'max-w-full overflow-x-auto px-3 py-2 text-sm leading-relaxed outline-none',
+          '[&_table]:max-w-full [&_table]:w-full',
+          '[&_img]:h-auto [&_img]:max-w-full',
+          '[&:empty]:before:text-muted-foreground [&:empty]:before:content-[attr(data-placeholder)]',
           minHeight,
         )}
         data-placeholder={placeholder}

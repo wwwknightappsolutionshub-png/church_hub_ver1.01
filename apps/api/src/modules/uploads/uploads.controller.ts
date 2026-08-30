@@ -76,6 +76,37 @@ export class UploadsController {
     return this.uploads.saveLandingHero(churchId, file);
   }
 
+  @Post('landing-about-photo')
+  @ApiOperation({ summary: 'Upload landing page pastor / about photo' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 2 * 1024 * 1024, files: 1 },
+    }),
+  )
+  landingAboutPhoto(@ChurchId() churchId: string, @UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('Choose a photo');
+    return this.uploads.saveLandingAboutPhoto(churchId, file);
+  }
+
+  @Post('landing-announcement-image')
+  @ApiOperation({ summary: 'Upload landing page announcement card image' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 2 * 1024 * 1024, files: 1 },
+    }),
+  )
+  landingAnnouncementImage(
+    @ChurchId() churchId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('Choose an image');
+    return this.uploads.saveLandingAnnouncementImage(churchId, file);
+  }
+
   @Post('landing-message-mp3')
   @ApiOperation({ summary: 'Upload landing pastor message audio' })
   @ApiConsumes('multipart/form-data')
