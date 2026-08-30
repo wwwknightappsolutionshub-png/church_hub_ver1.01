@@ -25,9 +25,15 @@ function HeroTypewriter({ text, startDelayMs }: { text: string; startDelayMs: nu
   const reduceMotion = useReducedMotion();
   const [visibleLength, setVisibleLength] = useState(reduceMotion ? text.length : 0);
   const [showCursor, setShowCursor] = useState(!reduceMotion);
+  const done = visibleLength >= text.length;
+
+  // Split so "church management" can use a darker tone than the lead-in.
+  const darkStart = text.indexOf('church management');
+  const lead = darkStart >= 0 ? text.slice(0, darkStart) : text;
+  const dark = darkStart >= 0 ? text.slice(darkStart) : '';
 
   useEffect(() => {
-  if (reduceMotion) {
+    if (reduceMotion) {
       setVisibleLength(text.length);
       setShowCursor(false);
       return;
@@ -55,16 +61,28 @@ function HeroTypewriter({ text, startDelayMs }: { text: string; startDelayMs: nu
     };
   }, [reduceMotion, startDelayMs, text]);
 
+  const leadShown = text.slice(0, Math.min(visibleLength, lead.length));
+  const darkShown =
+    visibleLength > lead.length ? text.slice(lead.length, visibleLength) : '';
+
   return (
     <>
-      <p className="mt-3 font-heading text-2xl font-bold leading-snug text-primary sm:text-3xl lg:text-4xl">
-        {text.slice(0, visibleLength)}
+      <p className="mt-3 font-heading text-2xl font-bold leading-snug text-foreground sm:text-3xl lg:text-4xl">
+        <span className="text-muted-foreground">{leadShown}</span>
+        <span className="text-foreground">{darkShown}</span>
         {showCursor && (
-          <span className="ml-0.5 inline-block w-[2px] h-[0.85em] animate-pulse bg-primary align-[-0.1em]" aria-hidden />
+          <span className="ml-0.5 inline-block h-[0.85em] w-[2px] animate-pulse bg-foreground align-[-0.1em]" aria-hidden />
         )}
       </p>
-      {visibleLength >= text.length ? (
-        <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">{HERO_DESCRIPTION}</p>
+      {done ? (
+        <motion.p
+          className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground"
+          initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.65, ease: 'easeOut' }}
+        >
+          {HERO_DESCRIPTION}
+        </motion.p>
       ) : null}
     </>
   );

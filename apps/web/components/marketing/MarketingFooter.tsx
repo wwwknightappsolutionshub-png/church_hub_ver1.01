@@ -16,10 +16,6 @@ const footerLinks = {
   Company: [
     { label: 'About', href: '/#why-churches' },
     { label: 'Contact', href: '/register' },
-    { label: 'Privacy', href: '/legal/privacy-policy' },
-    { label: 'Terms', href: '/legal/terms-of-service' },
-    { label: 'Cookies', href: '/legal/cookie-policy' },
-    { label: 'DPA', href: '/legal/data-processing-addendum' },
   ],
 };
 
@@ -82,17 +78,6 @@ export function MarketingFooter() {
                       </Link>
                     </li>
                   ))}
-                  {group === 'Company' ? (
-                    <li>
-                      <button
-                        type="button"
-                        className="text-sm text-sidebar-foreground/70 transition-colors hover:text-gold"
-                        onClick={reopenCookiePreferences}
-                      >
-                        Cookie preferences
-                      </button>
-                    </li>
-                  ) : null}
                 </ul>
               </div>
             ))}

@@ -21,7 +21,7 @@ export function CTASection() {
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Button size="lg" variant="secondary" className="shadow-lg" asChild>
             <Link href="/register">
-              Start free 14-day trial
+              Start free trial
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>

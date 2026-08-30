@@ -516,8 +516,9 @@ export function ProductPreview() {
     const shellRect = shell.getBoundingClientRect();
     const itemRect = item.getBoundingClientRect();
     return {
-      x: itemRect.left - shellRect.left + itemRect.width * 0.72,
-      y: itemRect.top - shellRect.top + itemRect.height * 0.55,
+      // Tip of the arrow cursor should land on the selected nav row (label area).
+      x: itemRect.left - shellRect.left + 36,
+      y: itemRect.top - shellRect.top + itemRect.height / 2 - 2,
     };
   }, []);
 
@@ -539,6 +540,12 @@ export function ProductPreview() {
     const readyTimer = setTimeout(() => setTourReady(true), 1200);
     return () => clearTimeout(readyTimer);
   }, [measureNavTarget, reduceMotion, wideLayout]);
+
+  useEffect(() => {
+    if (reduceMotion || !wideLayout) return;
+    const target = measureNavTarget(activeIndex);
+    if (target) setCursor(target);
+  }, [activeIndex, measureNavTarget, reduceMotion, wideLayout]);
 
   useEffect(() => {
     if (reduceMotion || !tourReady || !wideLayout) return;
@@ -614,7 +621,7 @@ export function ProductPreview() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.25 }}
           >
-            app.churchhub.io{activeModule.path}
+            church-hub.online{activeModule.path}
           </motion.div>
         </div>
 

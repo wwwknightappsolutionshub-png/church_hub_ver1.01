@@ -140,7 +140,7 @@ export default function RegisterPage() {
           </h1>
           <p className="mt-2 text-muted-foreground">
             {step === 'details'
-              ? '14-day free trial · No credit card required · Email verification required'
+              ? 'Free trial · No credit card required · Email verification required'
               : `Enter the 6-digit code we sent to ${otpEmail}`}
           </p>
 

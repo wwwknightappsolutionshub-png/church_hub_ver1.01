@@ -18,7 +18,7 @@ const LOGIN_FEATURES = [
 ];
 
 const REGISTER_FEATURES = [
-  '14-day free trial — no card required',
+  'Free trial — no card required',
   'Your branded church home page',
   'Role-based staff & member access',
   'Modules you can enable as you grow',
