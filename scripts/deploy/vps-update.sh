@@ -99,6 +99,15 @@ fi
 mkdir -p "$STANDALONE/apps/web/.next"
 rsync -a "$WEB/.next/static/" "$STANDALONE/apps/web/.next/static/"
 rsync -a "$WEB/public/" "$STANDALONE/apps/web/public/"
+
+# opengraph-image / twitter-image routes require sharp in standalone output
+if ! (cd "$STANDALONE" && node -e "require('sharp')" 2>/dev/null); then
+  echo "==> Installing sharp into standalone bundle"
+  (cd "$STANDALONE" && npm install sharp@0.33.5 --omit=dev --no-package-lock --no-save) || {
+    echo "ERROR: sharp install failed — OG image routes will crash web" >&2
+    exit 1
+  }
+fi
 LOGIN_CHUNK_FILE=$(find "$STANDALONE/apps/web/.next/static/chunks/app/login" -name 'page-*.js' 2>/dev/null | head -1 || true)
 if [[ -z "$LOGIN_CHUNK_FILE" ]]; then
   echo "WARN: login page chunk missing under standalone .next/static" >&2
