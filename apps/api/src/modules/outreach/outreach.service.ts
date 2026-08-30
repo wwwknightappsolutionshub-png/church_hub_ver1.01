@@ -265,6 +265,7 @@ export class OutreachService {
           body: plain,
           html: rendered.bodyHtml,
           churchId,
+          purpose: 'onboarding',
         });
         emailed = true;
       } catch (err) {
@@ -279,6 +280,7 @@ export class OutreachService {
             subject: this.applyTemplate(DEFAULT_WELCOME_EMAIL_SUBJECT, name, churchName),
             body: this.applyTemplate(DEFAULT_WELCOME_EMAIL_BODY, name, churchName),
             churchId,
+            purpose: 'onboarding',
           });
           emailed = true;
         } catch (fallbackErr) {

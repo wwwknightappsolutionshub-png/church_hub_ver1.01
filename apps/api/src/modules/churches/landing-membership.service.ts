@@ -367,6 +367,7 @@ export class LandingMembershipService {
         to: email,
         subject: registrantSubject,
         body: registrantBody,
+        purpose: 'onboarding',
       });
 
       if (userId) {

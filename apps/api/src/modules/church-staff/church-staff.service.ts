@@ -153,6 +153,7 @@ export class ChurchStaffService {
         body: plain,
         html: rendered.bodyHtml,
         churchId,
+        purpose: 'onboarding',
       });
     } catch (err) {
       this.logger.warn(

@@ -135,6 +135,7 @@ export class PlatformProvisioningService {
         subject,
         body,
         html,
+        purpose: 'onboarding',
       });
       welcomeEmailSent = true;
     } catch {

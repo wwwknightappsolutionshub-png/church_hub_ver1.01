@@ -518,7 +518,7 @@ export class ServiceUnitsDepartmentService {
 
   /**
    * Full department digest: one table for all Phase 8 units → one Admin + one Pastor.
-   * Sent via REPORTS SMTP (churchhub@…).
+   * Sent via REPORTS SMTP (reports@…).
    */
   async sendFullDepartmentDigest(churchId: string, weekStartInput?: string) {
     await this.syncPhase8Units(churchId);

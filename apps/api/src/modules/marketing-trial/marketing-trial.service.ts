@@ -118,6 +118,7 @@ export class MarketingTrialService {
         body: mail.text,
         html: mail.html,
         churchId: null,
+        purpose: 'onboarding',
       });
     } catch (err) {
       this.logger.error(

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { CommunicationQueueKind, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.module';
-import { EmailAdapter } from '../notifications/adapters/email.adapter';
+import { EmailAdapter, EmailPurpose } from '../notifications/adapters/email.adapter';
 import { SmsAdapter } from '../notifications/adapters/sms.adapter';
 
 export type CommChannel = 'IN_APP' | 'EMAIL' | 'WHATSAPP';
@@ -129,11 +129,15 @@ export class CommunicationsQueueService {
       item.metadata && typeof item.metadata === 'object' && !Array.isArray(item.metadata)
         ? (item.metadata as Record<string, unknown>)
         : {};
-    const emailPurpose =
-      meta.emailPurpose === 'reports' ||
-      item.kind === 'DEPARTMENT_WEEKLY_REPORT'
+    const metaPurpose = meta.emailPurpose;
+    const emailPurpose: EmailPurpose =
+      metaPurpose === 'reports' || item.kind === 'DEPARTMENT_WEEKLY_REPORT'
         ? 'reports'
-        : 'auth';
+        : metaPurpose === 'onboarding'
+          ? 'onboarding'
+          : metaPurpose === 'auth'
+            ? 'auth'
+            : 'connect';
 
     if (channels.includes('IN_APP')) {
       for (const userId of recipients.userIds) {
