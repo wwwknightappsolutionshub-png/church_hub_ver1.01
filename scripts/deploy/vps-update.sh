@@ -35,10 +35,23 @@ pm2_app_status() {
   " "$name"
 }
 
+wait_pm2_online() {
+  local name="$1" max="${2:-45}" i status
+  for i in $(seq 1 "$max"); do
+    status="$(pm2_app_status "$name")"
+    if [[ "$status" == "online" ]]; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "pm2 $name -> still '$status' after ${max}s" >&2
+  return 1
+}
+
 wait_http_ok() {
-  local url="$1" label="$2" i code
-  for i in $(seq 1 15); do
-    code=$(curl -s -o /dev/null -w "%{http_code}" "$url" 2>/dev/null)
+  local url="$1" label="$2" max="${3:-30}" i code
+  for i in $(seq 1 "$max"); do
+    code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 --max-time 8 "$url" 2>/dev/null || true)
     code=${code:-000}
     if [[ "$code" =~ ^(200|204|301|302|307|308)$ ]]; then
       echo "$label -> $code"
@@ -46,18 +59,33 @@ wait_http_ok() {
     fi
     sleep 2
   done
-  echo "$label -> failed (no 2xx/3xx after 30s, last=$code)" >&2
+  echo "$label -> failed (no 2xx/3xx after $((max * 2))s, last=$code)" >&2
   return 1
 }
 
+rotate_pm2_logs() {
+  local f
+  for f in church-hub-api-error church-hub-api-out church-hub-web-error church-hub-web-out; do
+    : >"$ROOT/logs/${f}.log" 2>/dev/null || true
+  done
+}
+
 deploy_failed() {
-  echo "ERROR: $1" >&2
+  local msg="$1"
+  local focus="${2:-all}"
+  echo "ERROR: $msg" >&2
   pm2 list 2>/dev/null | grep -E 'church-hub-(api|web)' || true
-  if pm2 describe church-hub-api >/dev/null 2>&1; then
-    pm2 logs church-hub-api --lines 20 --nostream 2>/dev/null || true
+  if [[ "$focus" == "api" || "$focus" == "all" ]]; then
+    if pm2 describe church-hub-api >/dev/null 2>&1; then
+      echo "==> church-hub-api logs (current process only)" >&2
+      pm2 logs church-hub-api --lines 25 --nostream 2>/dev/null || true
+    fi
   fi
-  if pm2 describe church-hub-web >/dev/null 2>&1; then
-    pm2 logs church-hub-web --lines 30 --nostream 2>/dev/null || true
+  if [[ "$focus" == "web" || "$focus" == "all" ]]; then
+    if pm2 describe church-hub-web >/dev/null 2>&1; then
+      echo "==> church-hub-web logs (current process only)" >&2
+      pm2 logs church-hub-web --lines 25 --nostream 2>/dev/null || true
+    fi
   fi
   if [[ -f "${STANDALONE:-}/apps/web/server.js" ]]; then
     echo "standalone server.js: present" >&2
@@ -162,7 +190,7 @@ if ! (cd "$STANDALONE" && node -e "require('sharp')" 2>/dev/null); then
   }
 fi
 if ! (cd "$STANDALONE" && node -e "require('sharp')" 2>/dev/null); then
-  deploy_failed "sharp missing in standalone after install — aborting deploy"
+  deploy_failed "sharp missing in standalone after install — aborting deploy" web
 fi
 LOGIN_CHUNK_FILE=$(find "$STANDALONE/apps/web/.next/static/chunks/app/login" -name 'page-*.js' 2>/dev/null | head -1 || true)
 if [[ -z "$LOGIN_CHUNK_FILE" ]]; then
@@ -180,6 +208,9 @@ cd "$ROOT"
 
 export CHURCHHUB_ROOT="$ROOT"
 
+echo "==> Rotate PM2 logs (avoid stale errors from prior deploys)"
+rotate_pm2_logs
+
 if [[ "$(pm2_app_status church-hub-api)" == "online" ]]; then
   echo "==> PM2 reload API"
   pm2 reload "$ECOSYSTEM" --only church-hub-api --update-env
@@ -191,23 +222,31 @@ else
   pm2 start "$ECOSYSTEM" --only church-hub-api --update-env
 fi
 
+if ! wait_pm2_online church-hub-api 45; then
+  deploy_failed "church-hub-api did not reach online status after reload" api
+fi
+
 echo "==> PM2 restart web (always after successful standalone build)"
 pm2 delete church-hub-web 2>/dev/null || true
 pm2 start "$ECOSYSTEM" --only church-hub-web --update-env
 
+if ! wait_pm2_online church-hub-web 30; then
+  deploy_failed "church-hub-web did not reach online status after start" web
+fi
+
 pm2 save
 
 echo "==> Verify (local)"
-if ! wait_http_ok "http://127.0.0.1:${API_PORT}/api/v1/health" "api health"; then
-  deploy_failed "church-hub-api not responding on :${API_PORT}/api/v1/health"
+if ! wait_http_ok "http://127.0.0.1:${API_PORT}/api/v1/health" "api health" 30; then
+  deploy_failed "church-hub-api not responding on :${API_PORT}/api/v1/health" api
 fi
 
-if ! wait_http_ok "http://127.0.0.1:${WEB_PORT}/login" "web /login"; then
-  deploy_failed "church-hub-web not responding on :${WEB_PORT} — deploy aborted (fix before nginx serves 502)"
+if ! wait_http_ok "http://127.0.0.1:${WEB_PORT}/login" "web /login" 30; then
+  deploy_failed "church-hub-web not responding on :${WEB_PORT} — deploy aborted (fix before nginx serves 502)" web
 fi
 
-if ! wait_http_ok "http://127.0.0.1:${WEB_PORT}/images/auth-side-visual.svg" "auth image"; then
-  deploy_failed "web static assets not reachable on :${WEB_PORT}"
+if ! wait_http_ok "http://127.0.0.1:${WEB_PORT}/images/auth-side-visual.svg" "auth image" 15; then
+  deploy_failed "web static assets not reachable on :${WEB_PORT}" web
 fi
 
 echo "Deployed $GIT_COMMIT under PM2. Nginx: / -> ${WEB_PORT}, /api/ -> ${API_PORT}"
