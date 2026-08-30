@@ -92,7 +92,7 @@ export function BrandMark({
               isLight ? 'text-white/70' : 'text-muted-foreground',
             )}
           >
-            Enterprise Ministry Platform
+            Unified - One Body
           </p>
         )}
       </div>

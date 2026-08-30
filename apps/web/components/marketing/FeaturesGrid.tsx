@@ -68,7 +68,7 @@ export function FeaturesGrid() {
         <div className="mx-auto max-w-2xl text-center">
           <Badge variant="secondary" className="mb-4">8 integrated modules</Badge>
           <h2 className="font-heading text-3xl font-bold sm:text-4xl">
-            Every ministry. One platform.
+            One Platform - Needed By Every Denomination
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
             Replace scattered spreadsheets and disconnected apps with a unified system
