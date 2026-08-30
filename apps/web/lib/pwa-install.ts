@@ -1,6 +1,9 @@
 /** Mobile PWA install gate — detect device, standalone mode, and gate completion. */
 
 export const PWA_GATE_STORAGE_KEY = 'church-hub-pwa-gate-v2';
+export const PWA_ACCOUNT_CREATED_KEY = 'church-hub-pwa-account-created';
+export const PWA_EXIT_PROMPT_SHOWN_KEY = 'church-hub-pwa-exit-prompt-shown';
+export const PWA_SHOW_INSTALL_EVENT = 'church-hub:show-pwa-install';
 
 export type PwaGateStep = 'install' | 'notifications' | 'done';
 
@@ -9,6 +12,8 @@ export interface PwaGateState {
   notificationsAddressed: boolean;
   /** Android install prompt accepted while still in browser tab */
   installAccepted?: boolean;
+  /** User dismissed the optional install modal (browser tab only) */
+  installPromptDismissed?: boolean;
 }
 
 const DEFAULT_GATE: PwaGateState = { step: 'install', notificationsAddressed: false };
@@ -18,12 +23,19 @@ export function isPwaInstallGateEnabled(): boolean {
   return process.env.NEXT_PUBLIC_PWA_INSTALL_GATE !== 'false';
 }
 
-/** Coarse phone detection — tablets in landscape may pass; gate targets phone-class viewports. */
-export function isMobilePhoneViewport(): boolean {
+/** Phone + tablet touch viewports — install prompts target these, not desktop. */
+export function isMobileOrTabletViewport(): boolean {
   if (typeof window === 'undefined') return false;
-  const coarse = window.matchMedia('(max-width: 768px)').matches;
-  const touch = window.matchMedia('(pointer: coarse)').matches;
-  return coarse && touch;
+  const tablet = window.matchMedia('(max-width: 1024px)').matches;
+  const touch =
+    window.matchMedia('(pointer: coarse)').matches ||
+    (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0);
+  return tablet && touch;
+}
+
+/** @deprecated Use isMobileOrTabletViewport */
+export function isMobilePhoneViewport(): boolean {
+  return isMobileOrTabletViewport();
 }
 
 export function isIos(): boolean {
@@ -59,6 +71,7 @@ export function completeInstallStep(opts?: { installAccepted?: boolean }): boole
     step: 'notifications',
     notificationsAddressed: false,
     installAccepted: standalone || Boolean(opts?.installAccepted),
+    installPromptDismissed: false,
   });
   return standalone;
 }
@@ -78,6 +91,7 @@ export function readPwaGateState(): PwaGateState {
       step: parsed.step === 'done' || parsed.step === 'notifications' ? parsed.step : 'install',
       notificationsAddressed: Boolean(parsed.notificationsAddressed),
       installAccepted: Boolean(parsed.installAccepted),
+      installPromptDismissed: Boolean(parsed.installPromptDismissed),
     };
   } catch {
     return DEFAULT_GATE;
@@ -105,23 +119,52 @@ export function isPublicWebFormPath(pathname?: string): boolean {
   );
 }
 
-export function shouldShowPwaInstallGate(): boolean {
+/** Marketing pages where exit-intent install prompt is allowed. */
+export function isMarketingPath(pathname?: string): boolean {
+  const path =
+    pathname ??
+    (typeof window !== 'undefined' ? window.location.pathname : '');
+  if (!path) return false;
+  return (
+    path === '/' ||
+    path === '/login' ||
+    path.startsWith('/login/') ||
+    path === '/register' ||
+    path.startsWith('/legal/')
+  );
+}
+
+/** Eligible for optional install modal (not standalone, not dismissed, mobile/tablet). */
+export function isPwaInstallEligible(): boolean {
   if (!isPwaInstallGateEnabled()) return false;
   if (isPublicWebFormPath()) return false;
-  if (!isMobilePhoneViewport()) return false;
+  if (!isMobileOrTabletViewport()) return false;
+  if (isStandalonePwa()) return false;
 
   const state = readPwaGateState();
   if (state.step === 'done' || state.notificationsAddressed) return false;
+  if (state.installPromptDismissed) return false;
+  return true;
+}
 
-  // Step 2 — only after install (standalone shell or Android prompt accepted)
-  if (state.step === 'notifications') {
-    return canShowNotificationsStep();
-  }
+/** Step 2 — only inside installed PWA after install is complete. */
+export function shouldShowPwaNotificationsGate(): boolean {
+  if (!isPwaInstallGateEnabled()) return false;
+  if (isPublicWebFormPath()) return false;
+  if (!isMobileOrTabletViewport()) return false;
 
-  // Step 1 — installed PWA shell skips straight to notifications
+  const state = readPwaGateState();
+  if (state.notificationsAddressed || state.step === 'done') return false;
+
+  if (state.step === 'notifications' && canShowNotificationsStep()) return true;
   if (isStandalonePwa()) return true;
 
-  return true;
+  return false;
+}
+
+/** @deprecated Install gate no longer blocks first visit — use shouldShowPwaNotificationsGate */
+export function shouldShowPwaInstallGate(): boolean {
+  return shouldShowPwaNotificationsGate();
 }
 
 export function resolveInitialGateStep(): PwaGateStep {
@@ -130,6 +173,39 @@ export function resolveInitialGateStep(): PwaGateStep {
   if (state.step === 'notifications' && canShowNotificationsStep()) return 'notifications';
   if (isStandalonePwa()) return 'notifications';
   return 'install';
+}
+
+export function markAccountCreatedShowInstall(): void {
+  if (typeof sessionStorage === 'undefined') return;
+  sessionStorage.setItem(PWA_ACCOUNT_CREATED_KEY, '1');
+}
+
+export function consumeAccountCreatedInstallPrompt(): boolean {
+  if (typeof sessionStorage === 'undefined') return false;
+  if (sessionStorage.getItem(PWA_ACCOUNT_CREATED_KEY) !== '1') return false;
+  sessionStorage.removeItem(PWA_ACCOUNT_CREATED_KEY);
+  return true;
+}
+
+export function canShowExitIntentInstallPrompt(): boolean {
+  if (!isPwaInstallEligible()) return false;
+  if (typeof sessionStorage === 'undefined') return false;
+  return sessionStorage.getItem(PWA_EXIT_PROMPT_SHOWN_KEY) !== '1';
+}
+
+export function markExitIntentInstallPromptShown(): void {
+  if (typeof sessionStorage === 'undefined') return;
+  sessionStorage.setItem(PWA_EXIT_PROMPT_SHOWN_KEY, '1');
+}
+
+export function markInstallPromptDismissed(): void {
+  const state = readPwaGateState();
+  writePwaGateState({ ...state, installPromptDismissed: true });
+}
+
+export function requestPwaInstallPrompt(): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(PWA_SHOW_INSTALL_EVENT));
 }
 
 export async function requestWebPushPermission(): Promise<'granted' | 'denied' | 'unsupported'> {
@@ -141,7 +217,8 @@ export async function requestWebPushPermission(): Promise<'granted' | 'denied' |
 }
 
 export function markNotificationsAddressed(): void {
-  writePwaGateState({ step: 'done', notificationsAddressed: true });
+  const state = readPwaGateState();
+  writePwaGateState({ ...state, step: 'done', notificationsAddressed: true });
 }
 
 export function markInstallCompleteAdvanceToNotifications(installAccepted = false): void {
@@ -149,5 +226,6 @@ export function markInstallCompleteAdvanceToNotifications(installAccepted = fals
     step: 'notifications',
     notificationsAddressed: false,
     installAccepted: installAccepted || isStandalonePwa(),
+    installPromptDismissed: false,
   });
 }

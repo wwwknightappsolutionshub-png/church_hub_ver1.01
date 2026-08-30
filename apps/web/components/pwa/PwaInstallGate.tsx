@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Bell,
@@ -10,17 +11,25 @@ import {
   Share,
   Smartphone,
   Sparkles,
+  X,
 } from 'lucide-react';
 import {
+  canShowExitIntentInstallPrompt,
   completeInstallStep,
+  consumeAccountCreatedInstallPrompt,
   isAndroid,
   isIos,
   isIosSafari,
+  isMarketingPath,
+  isPwaInstallEligible,
   isStandalonePwa,
+  markExitIntentInstallPromptShown,
+  markInstallPromptDismissed,
   markNotificationsAddressed,
+  PWA_SHOW_INSTALL_EVENT,
   requestWebPushPermission,
   resolveInitialGateStep,
-  shouldShowPwaInstallGate,
+  shouldShowPwaNotificationsGate,
   type PwaGateStep,
 } from '@/lib/pwa-install';
 import { Button } from '@/components/ui/button';
@@ -32,6 +41,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export function PwaInstallGate() {
+  const pathname = usePathname();
   const [visible, setVisible] = useState(false);
   const [step, setStep] = useState<PwaGateStep>('install');
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
@@ -40,14 +50,24 @@ export function PwaInstallGate() {
   );
   const [highlightInstallGuide, setHighlightInstallGuide] = useState(false);
   const installGuideRef = useRef<HTMLDivElement>(null);
+  const installPromptOpenRef = useRef(false);
 
-  const refreshVisibility = useCallback(() => {
-    if (!shouldShowPwaInstallGate()) {
-      setVisible(false);
+  const openInstallPrompt = useCallback(() => {
+    if (!isPwaInstallEligible()) return;
+    installPromptOpenRef.current = true;
+    setStep('install');
+    setVisible(true);
+  }, []);
+
+  const syncNotificationsGate = useCallback(() => {
+    if (shouldShowPwaNotificationsGate()) {
+      installPromptOpenRef.current = false;
+      setVisible(true);
+      setStep(resolveInitialGateStep());
       return;
     }
-    setVisible(true);
-    setStep(resolveInitialGateStep());
+    if (installPromptOpenRef.current) return;
+    setVisible(false);
   }, []);
 
   useEffect(() => {
@@ -60,31 +80,58 @@ export function PwaInstallGate() {
   }, [visible]);
 
   useEffect(() => {
-    refreshVisibility();
+    if (shouldShowPwaNotificationsGate()) {
+      syncNotificationsGate();
+    } else if (consumeAccountCreatedInstallPrompt() && isPwaInstallEligible()) {
+      openInstallPrompt();
+    }
 
     const onBip = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
 
+    const onShowInstall = () => openInstallPrompt();
+
     window.addEventListener('beforeinstallprompt', onBip);
-    window.addEventListener('focus', refreshVisibility);
-    window.addEventListener('visibilitychange', refreshVisibility);
+    window.addEventListener(PWA_SHOW_INSTALL_EVENT, onShowInstall);
+    window.addEventListener('focus', syncNotificationsGate);
+    window.addEventListener('visibilitychange', syncNotificationsGate);
 
     const standaloneMq = window.matchMedia('(display-mode: standalone)');
-    const onStandaloneChange = () => refreshVisibility();
+    const onStandaloneChange = () => syncNotificationsGate();
     standaloneMq.addEventListener('change', onStandaloneChange);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', onBip);
-      window.removeEventListener('focus', refreshVisibility);
-      window.removeEventListener('visibilitychange', refreshVisibility);
+      window.removeEventListener(PWA_SHOW_INSTALL_EVENT, onShowInstall);
+      window.removeEventListener('focus', syncNotificationsGate);
+      window.removeEventListener('visibilitychange', syncNotificationsGate);
       standaloneMq.removeEventListener('change', onStandaloneChange);
     };
-  }, [refreshVisibility]);
+  }, [openInstallPrompt, syncNotificationsGate]);
+
+  useEffect(() => {
+    if (!isMarketingPath(pathname)) return;
+    if (!canShowExitIntentInstallPrompt()) return;
+
+    const trap = { churchHubPwaExit: true };
+    history.pushState(trap, '');
+
+    const onPopState = () => {
+      if (!canShowExitIntentInstallPrompt()) return;
+      markExitIntentInstallPromptShown();
+      openInstallPrompt();
+      history.pushState(trap, '');
+    };
+
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [pathname, openInstallPrompt]);
 
   const goToNotificationsStep = useCallback((installAccepted = false) => {
     completeInstallStep(installAccepted ? { installAccepted: true } : undefined);
+    installPromptOpenRef.current = false;
     setStep('notifications');
   }, []);
 
@@ -123,11 +170,18 @@ export function PwaInstallGate() {
     installGuideRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   };
 
+  const dismissInstallPrompt = () => {
+    markInstallPromptDismissed();
+    installPromptOpenRef.current = false;
+    setVisible(false);
+  };
+
   const enableNotifications = async () => {
     const result = await requestWebPushPermission();
     if (result === 'granted') {
       setNotifStatus('granted');
       markNotificationsAddressed();
+      installPromptOpenRef.current = false;
       setVisible(false);
       return;
     }
@@ -137,23 +191,26 @@ export function PwaInstallGate() {
 
   const skipNotifications = () => {
     markNotificationsAddressed();
+    installPromptOpenRef.current = false;
     setVisible(false);
   };
 
   const installFooterHint = (() => {
     if (deferredPrompt && isAndroid()) {
-      return 'Tap Install app to add Church Hub to your phone, then open it from your home screen or app drawer.';
+      return 'Tap Install to add Church Hub to your phone, then open it from your home screen or app drawer.';
     }
     if (isIos()) {
-      return 'Tap Install app for steps, then use Share → Add to Home Screen. Open the new icon to reach step 2.';
+      return 'Tap Install for steps, then use Share → Add to Home Screen.';
     }
     if (isAndroid()) {
-      return 'Tap Install app for steps, or use Chrome menu (⋮) → Install app. Open from your home screen to continue.';
+      return 'Tap Install for steps, or use Chrome menu (⋮) → Install app.';
     }
-    return 'Install Church Hub to your home screen, then open it from the new icon to continue.';
+    return 'Install Church Hub to your home screen for the best mobile experience.';
   })();
 
   if (!visible) return null;
+
+  const isInstallStep = step === 'install';
 
   return (
     <div
@@ -163,7 +220,18 @@ export function PwaInstallGate() {
       aria-labelledby="pwa-gate-title"
       data-testid="pwa-install-gate"
     >
-      <div className="flex max-h-[100dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-gradient-to-b from-slate-900 via-slate-900 to-indigo-950 text-white shadow-2xl sm:max-h-[92dvh] sm:rounded-3xl">
+      <div className="relative flex max-h-[100dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-gradient-to-b from-slate-900 via-slate-900 to-indigo-950 text-white shadow-2xl sm:max-h-[92dvh] sm:rounded-3xl">
+        {isInstallStep ? (
+          <button
+            type="button"
+            className="absolute right-4 top-4 z-10 rounded-full p-1.5 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
+            aria-label="Close install prompt"
+            onClick={dismissInstallPrompt}
+          >
+            <X className="h-5 w-5" />
+          </button>
+        ) : null}
+
         <div className="border-b border-white/10 px-6 pb-4 pt-6">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl shadow-lg ring-2 ring-white/20">
             <Image
@@ -175,21 +243,23 @@ export function PwaInstallGate() {
               priority
             />
           </div>
-          <p className="text-center text-xs font-semibold uppercase tracking-[0.18em] text-indigo-300/90">
-            Step {step === 'install' ? 1 : 2} of 2
-          </p>
+          {isInstallStep ? null : (
+            <p className="text-center text-xs font-semibold uppercase tracking-[0.18em] text-indigo-300/90">
+              Step 2 of 2
+            </p>
+          )}
           <h2 id="pwa-gate-title" className="mt-2 text-center font-heading text-xl font-bold">
-            {step === 'install' ? 'Add Church Hub to your phone' : 'Stay connected with alerts'}
+            {isInstallStep ? 'Install our mobile app' : 'Stay connected with alerts'}
           </h2>
           <p className="mt-2 text-center text-sm leading-relaxed text-slate-300">
-            {step === 'install'
-              ? 'Install the app for a native-like experience — faster access than the browser, with the same path as our mobile app.'
+            {isInstallStep
+              ? 'Get Church Hub on your home screen — faster access, full-screen ministry tools, and the same experience as our native app.'
               : 'Turn on notifications so you never miss announcements, events, prayer updates, and reminders from your church.'}
           </p>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5">
-          {step === 'install' ? (
+          {isInstallStep ? (
             <div className="space-y-4">
               <ul className="space-y-3 text-sm text-slate-200">
                 <li className="flex gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
@@ -235,19 +305,14 @@ export function PwaInstallGate() {
                         Choose <strong>Add to Home Screen</strong>, then tap <strong>Add</strong>.
                       </span>
                     </li>
-                    <li className="flex gap-2">
-                      <span className="font-bold text-indigo-300">3.</span>
-                      <span>
-                        Open Church Hub from your new home-screen icon — step 2 starts automatically.
-                      </span>
-                    </li>
                   </ol>
                 ) : isAndroid() ? (
                   <ol className="mt-3 space-y-2 text-sm text-slate-100">
                     <li className="flex gap-2">
                       <span className="font-bold text-indigo-300">1.</span>
                       <span>
-                        Tap <strong>Install app</strong> below{deferredPrompt ? '' : ', or Chrome menu (⋮) → Install app'}.
+                        Tap <strong>Install</strong> below
+                        {deferredPrompt ? '' : ', or Chrome menu (⋮) → Install app'}.
                       </span>
                     </li>
                     <li className="flex gap-2">
@@ -260,13 +325,9 @@ export function PwaInstallGate() {
                     <li className="flex gap-2">
                       <span className="font-bold text-indigo-300">1.</span>
                       <span>
-                        Tap <strong>Install app</strong> below or use your browser menu →{' '}
+                        Tap <strong>Install</strong> below or use your browser menu →{' '}
                         <strong>Add to Home screen</strong>.
                       </span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className="font-bold text-indigo-300">2.</span>
-                      <span>Launch from the new icon to unlock step 2.</span>
                     </li>
                   </ol>
                 )}
@@ -331,7 +392,7 @@ export function PwaInstallGate() {
           )}
         </div>
 
-        {step === 'install' ? (
+        {isInstallStep ? (
           <div className="space-y-2 border-t border-white/10 px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
             <Button
               type="button"
@@ -340,8 +401,15 @@ export function PwaInstallGate() {
               data-testid="pwa-gate-install-app"
             >
               <Download className="h-5 w-5" />
-              Install app
+              Install
             </Button>
+            <button
+              type="button"
+              className="mx-auto block w-full text-center text-xs text-slate-400 underline-offset-2 hover:text-slate-200 hover:underline"
+              onClick={dismissInstallPrompt}
+            >
+              Not now
+            </button>
             <p className="text-center text-[11px] leading-relaxed text-slate-400">{installFooterHint}</p>
           </div>
         ) : (

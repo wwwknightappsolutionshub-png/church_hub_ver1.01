@@ -15,6 +15,7 @@ import {
   clearTrialRegisterPrefill,
   readTrialRegisterPrefill,
 } from '@/lib/marketing-trial';
+import { markAccountCreatedShowInstall } from '@/lib/pwa-install';
 import { AuthMobileBrand } from '@/components/auth/AuthMobileBrand';
 import { AuthSideVisual } from '@/components/auth/AuthSideVisual';
 import { BrandMark } from '@/components/brand/BrandMark';
@@ -110,6 +111,7 @@ export default function RegisterPage() {
       setAuthTokens(data.accessToken, data.refreshToken);
       clearTrialRegisterPrefill();
       toast.success('Church workspace created!');
+      markAccountCreatedShowInstall();
       router.push('/dashboard');
     } catch (err) {
       toast.error(apiErrorMessage(err, 'Verification failed'));
