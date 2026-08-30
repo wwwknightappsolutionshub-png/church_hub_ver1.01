@@ -40,7 +40,7 @@ wait_http_ok() {
   for i in $(seq 1 15); do
     code=$(curl -s -o /dev/null -w "%{http_code}" "$url" 2>/dev/null)
     code=${code:-000}
-    if [[ "$code" =~ ^(200|301|302|307|308)$ ]]; then
+    if [[ "$code" =~ ^(200|204|301|302|307|308)$ ]]; then
       echo "$label -> $code"
       return 0
     fi
@@ -53,6 +53,9 @@ wait_http_ok() {
 deploy_failed() {
   echo "ERROR: $1" >&2
   pm2 list 2>/dev/null | grep -E 'church-hub-(api|web)' || true
+  if pm2 describe church-hub-api >/dev/null 2>&1; then
+    pm2 logs church-hub-api --lines 20 --nostream 2>/dev/null || true
+  fi
   if pm2 describe church-hub-web >/dev/null 2>&1; then
     pm2 logs church-hub-web --lines 30 --nostream 2>/dev/null || true
   fi
@@ -195,10 +198,9 @@ pm2 start "$ECOSYSTEM" --only church-hub-web --update-env
 pm2 save
 
 echo "==> Verify (local)"
-if ! curl -sf "http://127.0.0.1:${API_PORT}/api/v1/health" >/dev/null; then
-  deploy_failed "API health check failed on :${API_PORT}"
+if ! wait_http_ok "http://127.0.0.1:${API_PORT}/api/v1/health" "api health"; then
+  deploy_failed "church-hub-api not responding on :${API_PORT}/api/v1/health"
 fi
-echo "api health -> ok"
 
 if ! wait_http_ok "http://127.0.0.1:${WEB_PORT}/login" "web /login"; then
   deploy_failed "church-hub-web not responding on :${WEB_PORT} — deploy aborted (fix before nginx serves 502)"
