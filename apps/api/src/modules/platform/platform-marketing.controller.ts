@@ -1,14 +1,20 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { MarketingInboundStatus, MarketingInboundType } from '@prisma/client';
 import { Roles, RequirePlatformPermission } from '../auth/decorators';
+import { AuthUser, CurrentUser } from '../auth/current-user.decorator';
 import { PlatformMarketingService } from './platform-marketing.service';
+import { MarketingInboundService } from '../marketing-inbound/marketing-inbound.service';
 
 @ApiTags('platform-marketing')
 @ApiBearerAuth()
 @Controller('platform/marketing')
 @Roles('PLATFORM_ADMIN')
 export class PlatformMarketingController {
-  constructor(private readonly marketing: PlatformMarketingService) {}
+  constructor(
+    private readonly marketing: PlatformMarketingService,
+    private readonly inbound: MarketingInboundService,
+  ) {}
 
   @Get('templates')
   @RequirePlatformPermission('platform.marketing:read')
@@ -51,5 +57,26 @@ export class PlatformMarketingController {
     @Body() body: { subject?: string; htmlBody?: string; textBody?: string | null; name?: string },
   ) {
     return this.marketing.updateTemplate(slug, body);
+  }
+
+  @Get('submissions')
+  @RequirePlatformPermission('platform.marketing:read')
+  @ApiOperation({ summary: 'List public marketing contact & feedback submissions' })
+  listSubmissions(
+    @Query('type') type?: MarketingInboundType,
+    @Query('status') status?: MarketingInboundStatus,
+  ) {
+    return this.inbound.list({ type, status });
+  }
+
+  @Patch('submissions/:id')
+  @RequirePlatformPermission('platform.marketing:write')
+  @ApiOperation({ summary: 'Update submission status or internal notes' })
+  updateSubmission(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { status?: MarketingInboundStatus; internalNotes?: string | null },
+  ) {
+    return this.inbound.update(user.userId, id, body);
   }
 }

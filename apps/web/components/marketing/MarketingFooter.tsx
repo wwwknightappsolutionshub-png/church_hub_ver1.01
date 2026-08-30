@@ -15,7 +15,7 @@ const footerLinks = {
   ],
   Company: [
     { label: 'About', href: '/#why-churches' },
-    { label: 'Contact', href: '/register' },
+    { label: 'Contact & feedback', href: '/contact' },
   ],
 };
 

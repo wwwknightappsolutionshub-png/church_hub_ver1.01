@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Mail, Save, Sparkles } from 'lucide-react';
+import { Inbox, Loader2, Mail, Save, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-errors';
@@ -11,6 +11,7 @@ import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { PlatformConsoleShell } from '@/components/platform/PlatformConsoleShell';
+import { PlatformMarketingSubmissionsPanel } from '@/components/platform/PlatformMarketingSubmissionsPanel';
 import { HtmlRichEditor } from '@/components/ui/HtmlRichEditor';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -44,6 +45,8 @@ const CATEGORY_LABEL: Record<string, string> = {
 
 export default function PlatformMarketingPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get('tab') === 'submissions' ? 'submissions' : 'templates';
   const qc = useQueryClient();
   const { isPlatformOperator, hasPlatformPermission, isLoading: accessLoading } = useModuleAccess();
   const canAccess = isPlatformOperator && hasPlatformPermission('platform.marketing:read');
@@ -133,6 +136,31 @@ export default function PlatformMarketingPage() {
       title="Marketing"
       description={MODULE_DESCRIPTIONS.platformMarketing}
     >
+      <div className="mb-4 flex flex-wrap gap-2 border-b border-border pb-3">
+        <Button
+          type="button"
+          size="sm"
+          variant={activeTab === 'templates' ? 'default' : 'outline'}
+          onClick={() => router.replace('/dashboard/platform/marketing')}
+        >
+          <Mail className="mr-2 h-4 w-4" />
+          Email templates
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={activeTab === 'submissions' ? 'default' : 'outline'}
+          onClick={() => router.replace('/dashboard/platform/marketing?tab=submissions')}
+        >
+          <Inbox className="mr-2 h-4 w-4" />
+          Contact & feedback
+        </Button>
+      </div>
+
+      {activeTab === 'submissions' ? (
+        <PlatformMarketingSubmissionsPanel canWrite={canWrite} />
+      ) : (
+        <>
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Badge variant="outline" className="font-normal">
           {templates.length} / {EXPECTED_TEMPLATE_COUNT} templates
@@ -258,6 +286,8 @@ export default function PlatformMarketingPage() {
           </CardContent>
         </Card>
       </div>
+        </>
+      )}
     </PlatformConsoleShell>
   );
 }

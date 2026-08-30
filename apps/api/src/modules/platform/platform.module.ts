@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MembershipModule } from '../membership/membership.module';
 import { UploadsModule } from '../uploads/uploads.module';
+import { MarketingInboundModule } from '../marketing-inbound/marketing-inbound.module';
 import { PlatformController } from './platform.controller';
 import { PlatformMarketingController } from './platform-marketing.controller';
 import { PlatformService } from './platform.service';
@@ -31,7 +32,7 @@ import { PlatformWhatsAppConfigModule } from './platform-whatsapp-config.module'
 import { PlatformWhatsAppController } from './platform-whatsapp.controller';
 
 @Module({
-  imports: [MembershipModule, UploadsModule, PlatformWhatsAppConfigModule],
+  imports: [MembershipModule, UploadsModule, PlatformWhatsAppConfigModule, MarketingInboundModule],
   controllers: [
     PlatformController,
     PlatformMarketingController,

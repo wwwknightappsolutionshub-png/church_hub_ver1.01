@@ -383,6 +383,7 @@ model User {
   consentRecords            UserConsentRecord[]
   dsarRequests              PlatformDsarRequest[]
   dsarRequestsHandled       PlatformDsarRequest[] @relation("DsarHandler")
+  marketingSubmissionsHandled PlatformMarketingSubmission[] @relation("MarketingSubmissionHandler")
   cmsPagesUpdated           PlatformCmsPage[]     @relation("PlatformCmsPageUpdater")
   cellBranchesLed           CellBranch[]       @relation("CellBranchLeader")
   cellProvincesLed          CellProvince[]     @relation("CellProvinceLeader")
@@ -5472,6 +5473,41 @@ model PlatformWhatsAppConfig {
   updatedBy User? @relation("PlatformWhatsAppConfigUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
 
   @@map("platform_whatsapp_config")
+}
+
+enum MarketingInboundType {
+  CONTACT
+  FEEDBACK
+}
+
+enum MarketingInboundStatus {
+  NEW
+  READ
+  ARCHIVED
+}
+
+/// Public marketing site contact & feedback submissions (landing page).
+model PlatformMarketingSubmission {
+  id             String                 @id @default(uuid())
+  type           MarketingInboundType
+  status         MarketingInboundStatus @default(NEW)
+  name           String
+  email          String
+  organization   String?
+  subject        String?
+  message        String                 @db.Text
+  rating         Int?
+  internalNotes  String?                @db.Text
+  handledById    String?
+  handledAt      DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  handledBy User? @relation("MarketingSubmissionHandler", fields: [handledById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([type, createdAt])
+  @@map("platform_marketing_submissions")
 }
 
 // ─── Wisdom365+ (licensed daily wisdom journeys) ───────────────

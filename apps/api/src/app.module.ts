@@ -37,6 +37,7 @@ import { Wisdom365Module } from './modules/wisdom365/wisdom365.module';
 import { MinistryCellsModule } from './modules/ministry-cells/ministry-cells.module';
 import { ChurchCalendarModule } from './modules/church-calendar/church-calendar.module';
 import { MarketingTrialModule } from './modules/marketing-trial/marketing-trial.module';
+import { MarketingInboundModule } from './modules/marketing-inbound/marketing-inbound.module';
 import { GeoModule } from './modules/geo/geo.module';
 import { CacheModule } from './common/cache/cache.module';
 import { ObservabilityModule } from './common/observability/observability.module';
@@ -101,6 +102,7 @@ const redisEnabled = process.env.REDIS_ENABLED !== 'false';
     MinistryCellsModule,
     ChurchCalendarModule,
     MarketingTrialModule,
+    MarketingInboundModule,
     GeoModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
