@@ -9,8 +9,14 @@ import {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { DEFAULT_CMS_PAGES } from './platform-cms-defaults';
-import { CreateCmsPageDto, UpsertCmsPageDto } from './dto/platform-cms.dto';
+import {
+  buildCmsSummary,
+  DEFAULT_CMS_CONTENT_REVISION,
+  DEFAULT_CMS_PAGES,
+  parseCmsPublicSummary,
+  parseCmsRevision,
+} from './platform-cms-defaults';
+import { CreateCmsPageDto, SeedCmsDto, UpsertCmsPageDto } from './dto/platform-cms.dto';
 
 function slugify(input: string): string {
   return input
@@ -35,20 +41,27 @@ export class PlatformCmsService {
   }
 
   listPublished() {
-    return this.prisma.platformCmsPage.findMany({
-      where: { status: PlatformCmsPageStatus.PUBLISHED },
-      orderBy: [{ kind: 'asc' }, { title: 'asc' }],
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        summary: true,
-        kind: true,
-        version: true,
-        publishedAt: true,
-        updatedAt: true,
-      },
-    });
+    return this.prisma.platformCmsPage
+      .findMany({
+        where: { status: PlatformCmsPageStatus.PUBLISHED },
+        orderBy: [{ kind: 'asc' }, { title: 'asc' }],
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          summary: true,
+          kind: true,
+          version: true,
+          publishedAt: true,
+          updatedAt: true,
+        },
+      })
+      .then((pages) =>
+        pages.map((p) => ({
+          ...p,
+          summary: parseCmsPublicSummary(p.summary),
+        })),
+      );
   }
 
   async getPublishedBySlug(slug: string) {
@@ -67,7 +80,10 @@ export class PlatformCmsService {
       },
     });
     if (!page) throw new NotFoundException('Page not found');
-    return page;
+    return {
+      ...page,
+      summary: parseCmsPublicSummary(page.summary),
+    };
   }
 
   async getAdminById(id: string) {
@@ -81,33 +97,67 @@ export class PlatformCmsService {
     return page;
   }
 
-  async seedDefaults(userId?: string) {
+  async seedDefaults(userId?: string, options?: SeedCmsDto) {
+    const refreshSystem = options?.refreshSystem !== false;
     const results = [];
+
     for (const def of DEFAULT_CMS_PAGES) {
       const existing = await this.prisma.platformCmsPage.findUnique({
         where: { slug: def.slug },
       });
-      if (existing) {
-        results.push(existing);
+      const summary = buildCmsSummary(def.summary, def.contentRevision);
+
+      if (!existing) {
+        results.push(
+          await this.prisma.platformCmsPage.create({
+            data: {
+              slug: def.slug,
+              title: def.title,
+              summary,
+              htmlBody: def.htmlBody,
+              kind: def.kind,
+              isSystem: true,
+              status: PlatformCmsPageStatus.PUBLISHED,
+              publishedAt: new Date(),
+              version: 1,
+              updatedById: userId ?? null,
+            },
+          }),
+        );
         continue;
       }
-      results.push(
-        await this.prisma.platformCmsPage.create({
-          data: {
-            slug: def.slug,
-            title: def.title,
-            summary: def.summary,
-            htmlBody: def.htmlBody,
-            kind: def.kind,
-            isSystem: true,
-            status: PlatformCmsPageStatus.DRAFT,
-            publishedAt: null,
-            version: 1,
-            updatedById: userId ?? null,
-          },
-        }),
-      );
+
+      if (existing.isSystem && refreshSystem) {
+        const storedRevision = parseCmsRevision(existing.summary);
+        const shouldSync =
+          existing.status === PlatformCmsPageStatus.DRAFT ||
+          storedRevision === null ||
+          storedRevision < def.contentRevision;
+
+        if (shouldSync) {
+          const publishing = existing.status !== PlatformCmsPageStatus.PUBLISHED;
+          results.push(
+            await this.prisma.platformCmsPage.update({
+              where: { id: existing.id },
+              data: {
+                title: def.title,
+                summary,
+                htmlBody: def.htmlBody,
+                kind: def.kind,
+                status: PlatformCmsPageStatus.PUBLISHED,
+                publishedAt: publishing ? new Date() : existing.publishedAt,
+                version: existing.version + 1,
+                updatedById: userId ?? null,
+              },
+            }),
+          );
+          continue;
+        }
+      }
+
+      results.push(existing);
     }
+
     return results;
   }
 
@@ -143,7 +193,16 @@ export class PlatformCmsService {
     };
 
     if (body.title !== undefined) data.title = body.title.trim();
-    if (body.summary !== undefined) data.summary = body.summary?.trim() || null;
+    if (body.summary !== undefined) {
+      const trimmed = body.summary?.trim() || null;
+      if (existing.isSystem && trimmed && !trimmed.startsWith('cms-revision:')) {
+        const rev =
+          parseCmsRevision(existing.summary) ?? DEFAULT_CMS_CONTENT_REVISION;
+        data.summary = buildCmsSummary(trimmed, rev);
+      } else {
+        data.summary = trimmed;
+      }
+    }
     if (body.htmlBody !== undefined) data.htmlBody = body.htmlBody;
     if (body.kind !== undefined) data.kind = body.kind;
 

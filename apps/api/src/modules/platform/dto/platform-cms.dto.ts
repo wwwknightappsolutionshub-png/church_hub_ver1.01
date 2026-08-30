@@ -46,6 +46,13 @@ export class UpsertCmsPageDto {
   kind?: PlatformCmsPageKind;
 }
 
+export class SeedCmsDto {
+  /** When true (default), refresh system legal pages from bundled defaults if revision is newer or still draft. */
+  @IsOptional()
+  @IsBoolean()
+  refreshSystem?: boolean;
+}
+
 export class CreateCmsPageDto {
   @IsString()
   @MinLength(2)

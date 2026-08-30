@@ -35,6 +35,13 @@ type CmsPage = {
 
 const KIND_ORDER = ['PRIVACY', 'TERMS', 'COOKIE', 'DPA', 'CUSTOM'];
 
+function publicSummary(summary: string | null | undefined): string {
+  if (!summary) return '';
+  if (!summary.startsWith('cms-revision:')) return summary;
+  const pipe = summary.indexOf('|');
+  return pipe >= 0 ? summary.slice(pipe + 1) : summary;
+}
+
 export default function PlatformContentPage() {
   const router = useRouter();
   const qc = useQueryClient();
@@ -83,18 +90,21 @@ export default function PlatformContentPage() {
     if (!active) return;
     setSelectedId(active.id);
     setTitle(active.title);
-    setSummary(active.summary ?? '');
+    setSummary(publicSummary(active.summary));
     setHtmlBody(active.htmlBody);
     setStatus(active.status);
   }, [active?.id]);
 
   const seedMutation = useMutation({
     mutationFn: async () => {
-      const { data } = await api.post<CmsPage[]>('/platform/content/seed');
+      const { data } = await api.post<CmsPage[]>('/platform/content/seed', {
+        refreshSystem: true,
+      });
       return data;
     },
-    onSuccess: () => {
-      toast.success('Default legal pages loaded');
+    onSuccess: (data) => {
+      const published = data.filter((p) => p.status === 'PUBLISHED').length;
+      toast.success(`Legal pages synced (${published} live)`);
       qc.invalidateQueries({ queryKey: ['platform-cms-pages'] });
     },
     onError: (e) => toast.error(apiErrorMessage(e, 'Could not seed pages')),
@@ -166,7 +176,7 @@ export default function PlatformContentPage() {
               ) : (
                 <Sparkles className="mr-2 h-4 w-4" />
               )}
-              Seed defaults
+              Seed / sync legal defaults
             </Button>
             <Button size="sm" variant="secondary" onClick={() => setCreating((v) => !v)}>
               <FilePlus2 className="mr-2 h-4 w-4" />
@@ -244,8 +254,8 @@ export default function PlatformContentPage() {
             ))}
             {!pages.length && !isLoading ? (
               <p className="text-sm text-muted-foreground">
-                No pages yet. Click <strong>Seed defaults</strong> to load Privacy, Terms, Cookie, and DPA drafts.
-                Seeded pages start as <strong>Draft</strong> — review with counsel, then set Status to Published.
+                No pages yet. Click <strong>Seed / sync legal defaults</strong> to load and publish
+                Privacy, Terms, Cookie, and DPA pages. Edit anytime with the WYSIWYG editor below.
               </p>
             ) : null}
           </CardContent>

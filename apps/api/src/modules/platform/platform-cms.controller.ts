@@ -13,7 +13,7 @@ import { Request } from 'express';
 import { Public, Roles, RequirePlatformPermission } from '../auth/decorators';
 import { AuthUser, CurrentUser } from '../auth/current-user.decorator';
 import { PlatformCmsService } from './platform-cms.service';
-import { CreateCmsPageDto, UpsertCmsPageDto } from './dto/platform-cms.dto';
+import { CreateCmsPageDto, SeedCmsDto, UpsertCmsPageDto } from './dto/platform-cms.dto';
 
 @ApiTags('platform-content')
 @Controller()
@@ -54,8 +54,8 @@ export class PlatformCmsController {
   @Roles('PLATFORM_ADMIN')
   @RequirePlatformPermission('platform.content:write')
   @Post('platform/content/seed')
-  seed(@CurrentUser() user: AuthUser) {
-    return this.cms.seedDefaults(user.userId);
+  seed(@CurrentUser() user: AuthUser, @Body() body: SeedCmsDto) {
+    return this.cms.seedDefaults(user.userId, body);
   }
 
   @ApiBearerAuth()
