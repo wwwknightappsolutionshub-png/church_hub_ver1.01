@@ -18,5 +18,9 @@ test.describe('Demo product tour', () => {
     await expect(page.getByTestId('demo-tour-mock-dashboard')).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('Leadership')).toBeVisible();
     await expect(page.getByText('Community')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Outreach' }).click();
+    await expect(page.getByTestId('mock-outreach-capture-flow')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Outreach pipeline')).toBeVisible();
   });
 });

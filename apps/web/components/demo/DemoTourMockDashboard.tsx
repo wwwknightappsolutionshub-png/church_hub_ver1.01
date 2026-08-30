@@ -23,10 +23,22 @@ import {
   TOUR_CURSOR_TRAVEL_MS,
   TOUR_VIEW_HOLD_MS,
 } from '@/lib/demo-tour';
+import {
+  MockOutreachEvangelismFlow,
+  outreachEvangelismFlowDurationMs,
+} from '@/components/demo/MockOutreachEvangelismFlow';
 import { cn } from '@/lib/utils';
 import type { DashboardNavItem } from '@/lib/member-nav';
 
-function MockModuleContent({ item }: { item: DashboardNavItem }) {
+function MockModuleContent({
+  item,
+  reduceMotion,
+  onOutreachPhaseLabel,
+}: {
+  item: DashboardNavItem;
+  reduceMotion: boolean | null;
+  onOutreachPhaseLabel?: (label: string) => void;
+}) {
   const href = item.href;
 
   if (href === '/dashboard') {
@@ -112,24 +124,10 @@ function MockModuleContent({ item }: { item: DashboardNavItem }) {
 
   if (href.includes('follow-up') || href.includes('outreach')) {
     return (
-      <div className="space-y-3 p-6">
-        <p className="text-sm font-semibold">{item.label}</p>
-        {[
-          { label: 'New contacts', count: 48, width: '35%' },
-          { label: 'Assigned', count: 32, width: '55%' },
-          { label: 'Discipled', count: 18, width: '78%' },
-        ].map((stage) => (
-          <div key={stage.label} className="rounded-xl border border-border bg-card p-4">
-            <div className="flex justify-between text-sm">
-              <span className="font-medium">{stage.label}</span>
-              <span className="text-muted-foreground">{stage.count}</span>
-            </div>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
-              <div className="h-full rounded-full bg-primary" style={{ width: stage.width }} />
-            </div>
-          </div>
-        ))}
-      </div>
+      <MockOutreachEvangelismFlow
+        reduceMotion={reduceMotion}
+        onPhaseLabel={onOutreachPhaseLabel}
+      />
     );
   }
 
@@ -244,9 +242,14 @@ export function DemoTourMockDashboard({ onExit, reduceMotion }: Props) {
   const [cursor, setCursor] = useState({ x: 80, y: 160 });
   const [clicking, setClicking] = useState(false);
   const [contentKey, setContentKey] = useState(0);
+  const [outreachCaption, setOutreachCaption] = useState<string | null>(null);
   const navRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const shellRef = useRef<HTMLDivElement>(null);
   const stepRef = useRef(0);
+
+  const handleOutreachPhaseLabel = useCallback((label: string) => {
+    setOutreachCaption(label);
+  }, []);
 
   const current = staffNav[stepIndex];
   const total = staffNav.length;
@@ -277,7 +280,16 @@ export function DemoTourMockDashboard({ onExit, reduceMotion }: Props) {
 
     const travelMs = reduceMotion ? 0 : TOUR_CURSOR_TRAVEL_MS;
     const clickMs = reduceMotion ? 0 : TOUR_CLICK_MS;
-    const holdMs = reduceMotion ? 900 : TOUR_VIEW_HOLD_MS;
+    const isOutreach =
+      current.href.includes('follow-up') || current.href.includes('outreach');
+    if (!isOutreach) {
+      setOutreachCaption(null);
+    }
+    const holdMs = isOutreach
+      ? outreachEvangelismFlowDurationMs(!!reduceMotion)
+      : reduceMotion
+        ? 900
+        : TOUR_VIEW_HOLD_MS;
 
     schedule(() => {
       if (!reduceMotion) setClicking(true);
@@ -400,7 +412,11 @@ export function DemoTourMockDashboard({ onExit, reduceMotion }: Props) {
             }
             transition={{ duration: 0.85, times: [0, 0.55, 1], ease: 'easeOut' }}
           >
-            <MockModuleContent item={current} />
+            <MockModuleContent
+              item={current}
+              reduceMotion={reduceMotion}
+              onOutreachPhaseLabel={handleOutreachPhaseLabel}
+            />
           </motion.div>
         </main>
       </div>
@@ -418,7 +434,11 @@ export function DemoTourMockDashboard({ onExit, reduceMotion }: Props) {
               {stepIndex + 1} / {total} · Admin tools
             </p>
             <h2 className="mt-1 font-heading text-lg font-bold">{current.label}</h2>
-            <p className="mt-2 text-sm text-muted-foreground">{tourCaptionForNav(current)}</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {outreachCaption && current.href.includes('follow-up')
+                ? outreachCaption
+                : tourCaptionForNav(current)}
+            </p>
           </div>
           <Button type="button" variant="ghost" size="icon" onClick={onExit} aria-label="Exit tour">
             <X className="h-4 w-4" />
