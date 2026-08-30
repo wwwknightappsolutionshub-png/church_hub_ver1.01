@@ -95,6 +95,8 @@ Optional — patch login/register cache headers:
 
 ## Routine updates
 
+The deploy script **stops web, rebuilds standalone, delete+starts web, and exits with an error** if `:3003/login` is not healthy — do not run extra `pm2 start` afterward.
+
 ```bash
 cd /www/wwwroot/church-hub.wazconnect.com
 git pull
@@ -105,6 +107,8 @@ git pull
 Deploy a specific branch:
 
 ```bash
+cd /www/wwwroot/church-hub.wazconnect.com
+git fetch origin && git reset --hard origin/feat/your-branch
 GIT_BRANCH=feat/your-branch ./scripts/deploy/vps-update.sh
 ```
 
@@ -134,7 +138,7 @@ Demo login (after seed): `admin@demo.church` / `ChurchHub123!`
 
 | Symptom | Fix |
 |---------|-----|
-| 502 Bad Gateway | `pm2 list` — restart `church-hub-api` / `church-hub-web` |
+| 502 Bad Gateway | Re-run `./scripts/deploy/vps-update.sh` (script auto-starts web; exits 1 if build/health fails). Check `pm2 list`, `test -f apps/web/.next/standalone/apps/web/server.js` |
 | API won't start | `pm2 logs church-hub-api` — check `DATABASE_URL` |
 | Web 404 on `/_next/` | Re-run `./scripts/deploy/vps-update.sh`; check Nginx `/_next/` block |
 | Stale login page | Run `nginx-patch-login-no-cache.sh`; hard-refresh browser |
