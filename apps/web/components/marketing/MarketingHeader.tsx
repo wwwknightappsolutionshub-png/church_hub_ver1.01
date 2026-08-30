@@ -7,10 +7,10 @@ import { BrandMark } from '@/components/brand/BrandMark';
 import { Button } from '@/components/ui/button';
 
 const navLinks = [
-  { href: '#why-churches', label: 'Why churches' },
-  { href: '#modules', label: 'Modules' },
-  { href: '#how-it-works', label: 'How it works' },
-  { href: '#security', label: 'Security' },
+  { href: '/#why-churches', label: 'Why churches' },
+  { href: '/#modules', label: 'Modules' },
+  { href: '/#how-it-works', label: 'How it works' },
+  { href: '/#security', label: 'Security' },
 ];
 
 export function MarketingHeader() {
@@ -25,13 +25,13 @@ export function MarketingHeader() {
 
         <nav className="hidden items-center gap-8 lg:flex">
           {navLinks.map((link) => (
-            <a
+            <Link
               key={link.href}
               href={link.href}
               className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               {link.label}
-            </a>
+            </Link>
           ))}
         </nav>
 
@@ -61,14 +61,14 @@ export function MarketingHeader() {
         <div className="border-t border-border bg-background px-6 py-4 lg:hidden">
           <nav className="flex flex-col gap-3">
             {navLinks.map((link) => (
-              <a
+              <Link
                 key={link.href}
                 href={link.href}
                 className="text-sm font-medium"
                 onClick={() => setOpen(false)}
               >
                 {link.label}
-              </a>
+              </Link>
             ))}
             <div className="mt-2 flex flex-col gap-2">
               <Button variant="outline" asChild>

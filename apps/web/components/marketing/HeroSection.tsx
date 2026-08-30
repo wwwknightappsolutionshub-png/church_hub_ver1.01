@@ -15,7 +15,11 @@ const trustItems = [
   'Role-based access control',
 ];
 
-const HERO_SUBHEADING = 'Entire church management simplified';
+const HERO_SUBHEADING = 'For the entire church management';
+const HERO_DESCRIPTION =
+  'Church_Hub unifies managing evangelism drives, membership, discipleship, youth & teens, business networking, and unit reporting — so pastors and leaders shepherd people with clarity, not chaos.';
+
+const TYPEWRITER_CHAR_MS = 62;
 
 function HeroTypewriter({ text, startDelayMs }: { text: string; startDelayMs: number }) {
   const reduceMotion = useReducedMotion();
@@ -23,7 +27,7 @@ function HeroTypewriter({ text, startDelayMs }: { text: string; startDelayMs: nu
   const [showCursor, setShowCursor] = useState(!reduceMotion);
 
   useEffect(() => {
-    if (reduceMotion) {
+  if (reduceMotion) {
       setVisibleLength(text.length);
       setShowCursor(false);
       return;
@@ -42,7 +46,7 @@ function HeroTypewriter({ text, startDelayMs }: { text: string; startDelayMs: nu
           clearInterval(intervalId);
           setShowCursor(false);
         }
-      }, 35);
+      }, TYPEWRITER_CHAR_MS);
     }, startDelayMs);
 
     return () => {
@@ -52,12 +56,17 @@ function HeroTypewriter({ text, startDelayMs }: { text: string; startDelayMs: nu
   }, [reduceMotion, startDelayMs, text]);
 
   return (
-    <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
-      {text.slice(0, visibleLength)}
-      {showCursor && (
-        <span className="ml-0.5 inline-block w-[2px] h-[1em] animate-pulse bg-muted-foreground align-[-0.1em]" aria-hidden />
-      )}
-    </p>
+    <>
+      <p className="mt-3 font-heading text-2xl font-bold leading-snug text-primary sm:text-3xl lg:text-4xl">
+        {text.slice(0, visibleLength)}
+        {showCursor && (
+          <span className="ml-0.5 inline-block w-[2px] h-[0.85em] animate-pulse bg-primary align-[-0.1em]" aria-hidden />
+        )}
+      </p>
+      {visibleLength >= text.length ? (
+        <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">{HERO_DESCRIPTION}</p>
+      ) : null}
+    </>
   );
 }
 
@@ -76,7 +85,7 @@ export function HeroSection() {
           </Badge>
 
           <motion.h1
-            className="font-heading text-4xl font-bold leading-[1.1] text-foreground sm:text-5xl lg:text-6xl"
+            className="font-heading text-4xl font-bold leading-[1.1] text-primary sm:text-5xl lg:text-6xl"
             initial={reduceMotion ? false : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.55, ease: 'easeOut' }}
@@ -89,7 +98,7 @@ export function HeroSection() {
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Button size="lg" className="shadow-brand" asChild>
               <Link href="/register">
-                Start 14-day free trial
+                Start Trial Now
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
