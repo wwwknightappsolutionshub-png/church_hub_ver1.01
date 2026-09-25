@@ -2,22 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
 import { Bus, HeartHandshake, Megaphone, Users } from 'lucide-react';
 import { api } from '@/lib/api';
 import { normalizeDashboardMetrics, type DashboardMetrics } from '@/lib/dashboard-metrics';
 import { personalGreeting } from '@/lib/greeting';
 import { DASHBOARD_QUICK_ACTIONS } from '@/lib/quick-actions';
 import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
-import { DashboardAttendanceChart } from '@/components/dashboard/DashboardAttendanceChart';
 import { DashboardChurchCalendar } from '@/components/dashboard/DashboardChurchCalendar';
 import { QuickActionsMenu } from '@/components/dashboard/QuickActionsMenu';
 import { StatCard } from '@/components/dashboard/StatCard';
@@ -30,11 +20,7 @@ import {
 import { CelebrationColumnsPanel } from '@/components/membership/CelebrationColumnsPanel';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-
-const chartTick = { fontSize: 12, fontFamily: 'Montserrat' };
-const chartTickSm = { fontSize: 11, fontFamily: 'Montserrat' };
 
 const STAT_TONES = [
   'border-l-4 border-l-sky-600',
@@ -43,7 +29,7 @@ const STAT_TONES = [
   'border-l-4 border-l-emerald-600',
 ] as const;
 
-/** Merged church home: Overview metrics/charts + Admin Centre ops (no duplicated KPIs). */
+/** Merged church home: Overview metrics + Admin Centre modules (no duplicated KPIs). */
 export default function DashboardPage() {
   const router = useRouter();
   const {
@@ -111,11 +97,6 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, [isPlatformOperator, accessLoading, isChurchStaff]);
-
-  const chartData = metrics.membership.byStatus.map((s) => ({
-    name: s.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-    count: s._count,
-  }));
 
   return (
     <DashboardModuleShell
@@ -189,41 +170,6 @@ export default function DashboardPage() {
             <DashboardChurchCalendar />
 
             {hub ? <UnifiedAdminHub hub={hub} hideCelebrations /> : null}
-
-            <div className="grid gap-4 lg:grid-cols-3">
-              <div className="lg:col-span-2">
-                <DashboardAttendanceChart />
-              </div>
-              <Card className="border-slate-200/80 shadow-sm dark:border-slate-800">
-                <CardHeader>
-                  <CardTitle className="text-base">Members by status</CardTitle>
-                  <CardDescription>Lifecycle mix in the registry</CardDescription>
-                </CardHeader>
-                <CardContent className="h-64">
-                  {chartData.length === 0 ? (
-                    <p className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                      No membership data yet.
-                    </p>
-                  ) : (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={chartData} barSize={32}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                        <XAxis dataKey="name" tick={chartTickSm} stroke="hsl(var(--muted-foreground))" />
-                        <YAxis tick={chartTick} stroke="hsl(var(--muted-foreground))" />
-                        <Tooltip
-                          contentStyle={{
-                            borderRadius: 8,
-                            border: '1px solid hsl(var(--border))',
-                            fontFamily: 'Montserrat',
-                          }}
-                        />
-                        <Bar dataKey="count" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
 
             <CelebrationColumnsPanel compact />
           </>

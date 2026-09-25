@@ -34,7 +34,7 @@ export function FollowUpNewLeadSheet({ open, onClose, onSuccess }: FollowUpNewLe
             <div>
               <p className="font-heading text-lg font-bold text-foreground">Add New Contact</p>
               <p className="text-xs text-muted-foreground">
-                Same form as Outreach Capture — saved to Outreach and the follow-up pipeline
+                Capture a new guest or lead for follow-up
               </p>
             </div>
           </div>

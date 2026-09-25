@@ -11,11 +11,13 @@ test.describe('Dashboard feature UI', () => {
     await seedAuth(page, request);
   });
 
-  test('dashboard shows attendance chart and church calendar', async ({ page }) => {
+  test('dashboard shows church calendar', async ({ page }) => {
     await page.goto('/dashboard');
-    await expect(page.getByText('Attendance Performance')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('dashboard-church-calendar')).toBeVisible();
+    await expect(page.getByTestId('dashboard-church-calendar')).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('Church Calendar')).toBeVisible();
+    await expect(page.getByText('Attendance Performance')).toHaveCount(0);
+    await expect(page.getByText('Members by status')).toHaveCount(0);
+    await expect(page.getByText('Operations pulse')).toHaveCount(0);
     await expect(page.getByText('Recent Activity')).toHaveCount(0);
   });
 

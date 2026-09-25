@@ -107,12 +107,7 @@ export default function OutreachPage() {
               <CardHeader>
                 <CardTitle>Outreach Capture Form</CardTitle>
                 <CardDescription>
-                  Offline-first capture. Creates a New Contact in Outreach, auto-assigns when possible,
-                  and alerts the outreach team (in-app + email). View and progress leads on{' '}
-                  <Link href="/dashboard/follow-up" className="font-medium text-primary underline-offset-2 hover:underline">
-                    Outreach
-                  </Link>
-                  .
+                  Add a new guest or contact. We&apos;ll notify your outreach team and start follow-up.
                 </CardDescription>
               </CardHeader>
               <CardContent>

@@ -153,7 +153,7 @@ function CaptureFormView({
         <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
           <p className="font-semibold">Outreach Capture Form</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Offline-first capture · auto-assigns to outreach pipeline
+            Add a new guest or contact for outreach follow-up
           </p>
 
           <div className="mt-4 flex items-center gap-2 rounded-lg border border-amber-300/50 bg-amber-50 px-3 py-2 text-sm text-amber-900">
