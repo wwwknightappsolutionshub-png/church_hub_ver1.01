@@ -25,7 +25,11 @@ export function EvangelistQrPanel() {
   const load = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get<QrData>('/outreach/qr/church');
+      const origin =
+        typeof window !== 'undefined' ? window.location.origin : undefined;
+      const { data } = await api.get<QrData>('/outreach/qr/church', {
+        params: origin ? { origin } : undefined,
+      });
       setQr(data);
     } catch {
       toast.error('Could not load church Team QR');

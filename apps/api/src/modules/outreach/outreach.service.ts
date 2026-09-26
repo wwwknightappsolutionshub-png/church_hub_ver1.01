@@ -18,6 +18,10 @@ import {
   outreachPayloadsConflict,
   type OutreachCapturePayload,
 } from './outreach-sync.util';
+import {
+  buildOutreachCaptureUrl,
+  resolveOutreachCaptureBaseUrl,
+} from './outreach-capture-url.util';
 
 @Injectable()
 export class OutreachService {
@@ -420,7 +424,7 @@ export class OutreachService {
     if (!member) throw new NotFoundException('Member not found');
 
     const code = randomBytes(8).toString('hex');
-    const captureUrl = `${baseUrl}/outreach/capture?code=${code}`;
+    const captureUrl = buildOutreachCaptureUrl(baseUrl, code);
 
     const qr = await this.prisma.evangelistQrCode.create({
       data: {
@@ -473,9 +477,11 @@ export class OutreachService {
       });
     }
 
+    const publicBase = resolveOutreachCaptureBaseUrl(baseUrl);
+
     if (!qr) {
       const code = randomBytes(8).toString('hex');
-      const captureUrl = `${baseUrl}/outreach/capture?code=${code}`;
+      const captureUrl = buildOutreachCaptureUrl(publicBase, code);
       qr = await this.prisma.evangelistQrCode.create({
         data: {
           churchId,
@@ -487,7 +493,16 @@ export class OutreachService {
       });
     }
 
-    const captureUrl = qr.nfcUrl ?? `${baseUrl}/outreach/capture?code=${qr.code}`;
+    // Always rebuild from current public origin so QR/NFC never stick to a stale host
+    // (e.g. legacy church-hub.wazconnect.com after migrating to church-hub.online).
+    const captureUrl = buildOutreachCaptureUrl(publicBase, qr.code);
+    if (qr.nfcUrl !== captureUrl) {
+      qr = await this.prisma.evangelistQrCode.update({
+        where: { id: qr.id },
+        data: { nfcUrl: captureUrl },
+      });
+    }
+
     const qrDataUrl = await QRCode.toDataURL(captureUrl, {
       width: 400,
       margin: 2,

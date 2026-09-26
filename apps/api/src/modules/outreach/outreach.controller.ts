@@ -23,6 +23,7 @@ import {
   publicRegisterSchema,
   resolveSyncConflictSchema,
 } from './outreach.schemas';
+import { resolveOutreachCaptureBaseUrl } from './outreach-capture-url.util';
 import type { z } from 'zod';
 
 @ApiTags('outreach')
@@ -35,8 +36,14 @@ export class OutreachController {
     private readonly config: ConfigService,
   ) {}
 
-  private appBaseUrl() {
-    return this.config.get('NEXT_PUBLIC_APP_URL', 'http://localhost:3001');
+  private appBaseUrl(requestOrigin?: string) {
+    const configured =
+      this.config.get<string>('APP_URL') ??
+      this.config.get<string>('NEXT_PUBLIC_APP_URL') ??
+      process.env.APP_URL ??
+      process.env.NEXT_PUBLIC_APP_URL ??
+      'https://church-hub.online';
+    return resolveOutreachCaptureBaseUrl(configured, requestOrigin);
   }
 
   @Get('stats')
@@ -165,16 +172,20 @@ export class OutreachController {
   @ApiBearerAuth()
   @ModuleGate('followUp')
   @ApiOperation({ summary: 'Get or create the stable church-wide Team QR' })
-  myQr(@ChurchId() churchId: string, @CurrentUser() user: AuthUser) {
-    return this.outreachService.getOrCreateMyQr(churchId, user.userId, this.appBaseUrl());
+  myQr(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Query('origin') origin?: string,
+  ) {
+    return this.outreachService.getOrCreateMyQr(churchId, user.userId, this.appBaseUrl(origin));
   }
 
   @Get('qr/church')
   @ApiBearerAuth()
   @ModuleGate('followUp')
   @ApiOperation({ summary: 'Stable church-level Team QR (same as /qr/me)' })
-  churchQr(@ChurchId() churchId: string) {
-    return this.outreachService.getOrCreateChurchQr(churchId, this.appBaseUrl());
+  churchQr(@ChurchId() churchId: string, @Query('origin') origin?: string) {
+    return this.outreachService.getOrCreateChurchQr(churchId, this.appBaseUrl(origin));
   }
 
   @Post('qr/:memberId')
@@ -185,8 +196,12 @@ export class OutreachController {
     summary: 'Deprecated — personal evangelist QR. Prefer GET /outreach/qr/church',
     deprecated: true,
   })
-  generateQr(@ChurchId() churchId: string, @Param('memberId') memberId: string) {
-    return this.outreachService.generateEvangelistQr(churchId, memberId, this.appBaseUrl());
+  generateQr(
+    @ChurchId() churchId: string,
+    @Param('memberId') memberId: string,
+    @Query('origin') origin?: string,
+  ) {
+    return this.outreachService.generateEvangelistQr(churchId, memberId, this.appBaseUrl(origin));
   }
 
   @Public()
