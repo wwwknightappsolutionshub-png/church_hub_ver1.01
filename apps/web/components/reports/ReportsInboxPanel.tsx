@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  ArrowLeft,
   ChevronDown,
   ChevronUp,
   FileDown,
@@ -1091,10 +1092,11 @@ export function ReportsInboxPanel({
               {!isOverview ? (
                 <button
                   type="button"
-                  className="shrink-0 text-[11px] font-medium text-primary hover:underline"
+                  className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-primary hover:underline"
                   onClick={() => setKindFilter('all')}
                 >
-                  â† Sources overview
+                  <ArrowLeft className="h-3 w-3" aria-hidden />
+                  Sources overview
                 </button>
               ) : (
                 <span className="text-[11px] text-muted-foreground">Sources overview</span>
@@ -1526,7 +1528,7 @@ export function ReportsInboxPanel({
                   <div key={m.id} className="rounded-lg border bg-card px-3 py-2.5 text-sm">
                     <p className="font-medium">{m.subject ?? '(no subject)'}</p>
                     <p className="text-xs text-muted-foreground">
-                      {m.sender.firstName} {m.sender.lastName} â†’ {m.recipient.firstName}{' '}
+                      {m.sender.firstName} {m.sender.lastName} {'\u2192'} {m.recipient.firstName}{' '}
                       {m.recipient.lastName} · {new Date(m.createdAt).toLocaleString()}
                     </p>
                     <p className="mt-2 line-clamp-3 whitespace-pre-wrap leading-relaxed">{m.body}</p>
