@@ -123,8 +123,8 @@ export function EnterpriseTabNav({
       className="sticky top-[calc(3rem+env(safe-area-inset-top))] z-20 border-b border-slate-200/80 bg-white/95 backdrop-blur xl:top-16 dark:border-slate-800 dark:bg-slate-950/95"
       aria-label={ariaLabel ?? 'Module sections'}
     >
-      <div className="flex w-full flex-wrap items-center gap-2 px-4 py-2 sm:px-6 md:px-8">
-        <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex w-full flex-col gap-2 px-4 py-2 sm:px-6 md:px-8">
+        <div className="flex min-w-0 gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {tabs.map((t) => (
             <button
               key={t.id}
@@ -142,7 +142,7 @@ export function EnterpriseTabNav({
           ))}
         </div>
         {actions ? (
-          <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">{actions}</div>
+          <div className="flex w-full flex-wrap items-center gap-2">{actions}</div>
         ) : null}
       </div>
     </nav>

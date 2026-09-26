@@ -9,7 +9,6 @@ import {
   Loader2,
   Megaphone,
   Plus,
-  Sparkles,
   UserPlus,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -48,7 +47,6 @@ import {
   EnterpriseShell,
   EnterpriseTabNav,
 } from '@/components/layout/EnterpriseModuleShell';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -405,15 +403,6 @@ function FollowUpPageContent() {
                   </div>
                 ) : null}
               </div>
-            ) : null}
-            {stats ? (
-              <Badge variant="outline" className="hidden h-9 items-center whitespace-nowrap sm:inline-flex">
-                <Sparkles className="mr-1 h-3 w-3" />
-                {stats.pending} in pipeline
-                {(stats.archiveRequested ?? 0) > 0
-                  ? ` · ${stats.archiveRequested} archive requests`
-                  : ''}
-              </Badge>
             ) : null}
           </>
         }
