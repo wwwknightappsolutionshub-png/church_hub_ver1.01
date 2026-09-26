@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { LucideIcon, TrendingDown, TrendingUp } from 'lucide-react';
 
@@ -11,6 +12,8 @@ interface StatCardProps {
   changeLabel?: string;
   icon: LucideIcon;
   className?: string;
+  /** When set, the whole card navigates to this route. */
+  href?: string;
 }
 
 function parseAnimatedValue(value: string | number): {
@@ -61,7 +64,15 @@ function formatAnimatedNumber(
   });
 }
 
-export function StatCard({ label, value, change, changeLabel, icon: Icon, className }: StatCardProps) {
+export function StatCard({
+  label,
+  value,
+  change,
+  changeLabel,
+  icon: Icon,
+  className,
+  href,
+}: StatCardProps) {
   const isPositive = change !== undefined && change >= 0;
   const parsed = useMemo(() => parseAnimatedValue(value), [value]);
   const [display, setDisplay] = useState(() =>
@@ -112,8 +123,8 @@ export function StatCard({ label, value, change, changeLabel, icon: Icon, classN
     return () => cancelAnimationFrame(frame);
   }, [parsed, value]);
 
-  return (
-    <div className={cn('rounded-xl border border-border bg-card p-5 shadow-sm transition-shadow hover:shadow-md', className)}>
+  const body = (
+    <>
       <div className="flex items-start justify-between">
         <div className="rounded-lg bg-primary/10 p-2.5 text-primary">
           <Icon className="h-5 w-5" />
@@ -135,6 +146,22 @@ export function StatCard({ label, value, change, changeLabel, icon: Icon, classN
         <p className="text-sm font-medium text-muted-foreground">{label}</p>
       </div>
       {changeLabel && <p className="mt-0.5 text-xs text-muted-foreground">{changeLabel}</p>}
-    </div>
+    </>
   );
+
+  const cardClass = cn(
+    'rounded-xl border border-border bg-card p-5 shadow-sm transition-shadow hover:shadow-md',
+    href && 'block cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+    className,
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className={cardClass} aria-label={`Open ${label}`}>
+        {body}
+      </Link>
+    );
+  }
+
+  return <div className={cardClass}>{body}</div>;
 }

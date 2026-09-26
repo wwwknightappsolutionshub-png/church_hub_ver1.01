@@ -130,6 +130,7 @@ export default function DashboardPage() {
                     : `${metrics.membership.addedThisMonth} added this month`
                 }
                 icon={Users}
+                href="/dashboard/membership/members"
               />
               <StatCard
                 className={cn(STAT_TONES[1], 'bg-gradient-to-br from-violet-500/5 to-transparent')}
@@ -142,6 +143,7 @@ export default function DashboardPage() {
                     : `${metrics.evangelism.thisMonth} this month`
                 }
                 icon={Megaphone}
+                href="/dashboard/outreach"
               />
               <StatCard
                 className={cn(STAT_TONES[2], 'bg-gradient-to-br from-amber-500/5 to-transparent')}
@@ -153,6 +155,7 @@ export default function DashboardPage() {
                     : `${metrics.followUp.pending} pending`
                 }
                 icon={HeartHandshake}
+                href="/dashboard/follow-up"
               />
               <StatCard
                 className={cn(STAT_TONES[3], 'bg-gradient-to-br from-emerald-500/5 to-transparent')}
