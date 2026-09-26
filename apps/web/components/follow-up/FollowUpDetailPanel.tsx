@@ -461,7 +461,7 @@ export function FollowUpDetailPanel({
                   <p className="text-xs text-muted-foreground">
                     {followUp.stage === 'JOINED_GROUP'
                       ? 'Convert to Members within 7 days. On day 6 leaders are reminded; on day 7 this contact leaves Joined Group automatically.'
-                      : 'Link this lead to an existing member or create a new visitor record.'}
+                      : 'Link this new contact to an existing member or create a new visitor record.'}
                   </p>
                   <select
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
@@ -493,7 +493,7 @@ export function FollowUpDetailPanel({
             </div>
 
             <div className="space-y-3 rounded-lg border border-border p-4">
-              <p className="text-sm font-medium">Assigned Manager</p>
+              <p className="text-sm font-medium">Assign A Follow Up Manager</p>
               <select
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 value={assigneeId}
