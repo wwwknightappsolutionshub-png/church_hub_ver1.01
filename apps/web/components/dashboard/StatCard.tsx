@@ -130,8 +130,10 @@ export function StatCard({ label, value, change, changeLabel, icon: Icon, classN
           </div>
         )}
       </div>
-      <p className="mt-4 text-3xl font-bold tracking-tight tabular-nums">{display}</p>
-      <p className="mt-1 text-sm font-medium text-muted-foreground">{label}</p>
+      <div className="mt-4 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <p className="text-3xl font-bold tracking-tight tabular-nums">{display}</p>
+        <p className="text-sm font-medium text-muted-foreground">{label}</p>
+      </div>
       {changeLabel && <p className="mt-0.5 text-xs text-muted-foreground">{changeLabel}</p>}
     </div>
   );
