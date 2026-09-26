@@ -319,7 +319,7 @@ function FollowUpPageContent() {
       <EnterpriseTabNav
         ariaLabel="Outreach views"
         tabs={[
-          { id: 'pipeline', label: 'Pipeline' },
+          { id: 'pipeline', label: 'Membership Pipeline' },
           { id: 'table', label: 'Outreach Directory' },
           { id: 'calendar', label: 'Calendar' },
           {
@@ -337,6 +337,40 @@ function FollowUpPageContent() {
         }}
         actions={
           <>
+            {view !== 'calendar' && view !== 'archived' ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  className="h-9 rounded-md border border-input bg-background px-2.5 text-sm text-foreground"
+                  value={assigneeFilter}
+                  onChange={(e) => setAssigneeFilter(e.target.value)}
+                  aria-label="Filter by assignee"
+                >
+                  <option value="">All assignees</option>
+                  {(assignees ?? []).map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.firstName} {a.lastName}
+                    </option>
+                  ))}
+                </select>
+                <Input
+                  type="date"
+                  className="h-9 w-auto min-w-[9rem]"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  aria-label="Captured from date"
+                  title="Captured from"
+                />
+                <span className="text-xs text-muted-foreground">to</span>
+                <Input
+                  type="date"
+                  className="h-9 w-auto min-w-[9rem]"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  aria-label="Captured to date"
+                  title="Captured to"
+                />
+              </div>
+            ) : null}
             {view === 'table' && canExport ? (
               <div className="relative" ref={exportMenuRef}>
                 <Button
@@ -387,61 +421,29 @@ function FollowUpPageContent() {
 
       <EnterpriseContent>
         {view !== 'calendar' && view !== 'archived' && (
-        <div className="mb-6 flex flex-wrap items-center gap-3">
-          <div className="flex min-w-[200px] flex-1 flex-wrap items-center gap-1.5 rounded-xl border border-dashed border-border bg-muted/20 p-2.5">
-            {FOLLOW_UP_STAGES.map((stage) => {
-              const n = stageSummaryItems.filter((f) => f.stage === stage).length;
-              const active = stageFilter === stage;
-              return (
-                <button
-                  key={stage}
-                  type="button"
-                  onClick={() => setStageFilter((prev) => (prev === stage ? '' : stage))}
-                  className={cn(
-                    'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition',
-                    STAGE_BADGE_CLASS[stage] ?? 'border-border bg-card text-foreground',
-                    active && 'ring-2 ring-primary/50',
-                  )}
-                  aria-pressed={active}
-                  title={`Filter: ${STAGE_LABELS[stage]}`}
-                >
+        <div className="mb-6 flex w-full flex-wrap gap-1.5 rounded-xl border border-dashed border-border bg-muted/20 p-2.5 sm:flex-nowrap">
+          {FOLLOW_UP_STAGES.map((stage) => {
+            const n = stageSummaryItems.filter((f) => f.stage === stage).length;
+            const active = stageFilter === stage;
+            return (
+              <button
+                key={stage}
+                type="button"
+                onClick={() => setStageFilter((prev) => (prev === stage ? '' : stage))}
+                className={cn(
+                  'inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-center text-xs font-medium transition',
+                  STAGE_BADGE_CLASS[stage] ?? 'border-border bg-card text-foreground',
+                  active && 'ring-2 ring-primary/50',
+                )}
+                aria-pressed={active}
+                title={`Filter: ${STAGE_LABELS[stage]}`}
+              >
+                <span className="truncate">
                   {STAGE_LABELS[stage]}: {n}
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground"
-              value={assigneeFilter}
-              onChange={(e) => setAssigneeFilter(e.target.value)}
-              aria-label="Filter by assignee"
-            >
-              <option value="">All assignees</option>
-              {(assignees ?? []).map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.firstName} {a.lastName}
-                </option>
-              ))}
-            </select>
-            <Input
-              type="date"
-              className="h-10 w-auto min-w-[9.5rem]"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              aria-label="Captured from date"
-              title="Captured from"
-            />
-            <span className="text-xs text-muted-foreground">to</span>
-            <Input
-              type="date"
-              className="h-10 w-auto min-w-[9.5rem]"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              aria-label="Captured to date"
-              title="Captured to"
-            />
-          </div>
+                </span>
+              </button>
+            );
+          })}
         </div>
         )}
 

@@ -34,12 +34,14 @@ test.describe('Outreach end-to-end', () => {
 
   test('Pipeline and Members tabs switch views', async ({ page }) => {
     await page.goto('/dashboard/follow-up');
-    await expect(page.getByRole('button', { name: 'Pipeline' })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole('button', { name: 'Membership Pipeline' })).toBeVisible({
+      timeout: 20_000,
+    });
 
     await page.getByRole('button', { name: 'Members' }).click();
     await expect(page.getByRole('button', { name: 'Members' })).toHaveClass(/bg-slate-900|dark:bg-slate-100/);
 
-    await page.getByRole('button', { name: 'Pipeline' }).click();
+    await page.getByRole('button', { name: 'Membership Pipeline' }).click();
     await expect(page.getByPlaceholder('Search name, phone, email, assignee…')).toBeVisible();
   });
 
