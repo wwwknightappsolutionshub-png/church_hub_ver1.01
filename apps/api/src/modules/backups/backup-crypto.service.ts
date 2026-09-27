@@ -111,22 +111,26 @@ export function isEncryptedBlob(blob: Buffer): boolean {
 }
 
 export function parseEncryptionKey(raw: string): Buffer {
-  const trimmed = raw.trim();
+  // Strip wrapping quotes / accidental spaces from .env editors
+  let trimmed = raw.trim().replace(/^['"]|['"]$/g, '').trim();
+  // Ignore inline comments mistakenly pasted into the value
+  if (trimmed.includes(' #')) trimmed = trimmed.split(' #')[0]!.trim();
+
   if (/^[0-9a-fA-F]{64}$/.test(trimmed)) {
     return Buffer.from(trimmed, 'hex');
   }
-  try {
-    const b64 = Buffer.from(trimmed, 'base64');
-    if (b64.length === 32) return b64;
-  } catch {
-    /* fall through */
+
+  const b64 = Buffer.from(trimmed, 'base64');
+  if (b64.length === 32 && /^[A-Za-z0-9+/]+=*$/.test(trimmed)) {
+    return b64;
   }
-  // Accept raw 32-byte utf8 only if exactly 32 chars (dev convenience)
-  if (Buffer.byteLength(trimmed, 'utf8') === 32) {
+
+  if (Buffer.byteLength(trimmed, 'utf8') === 32 && !/[<>]/.test(trimmed)) {
     return Buffer.from(trimmed, 'utf8');
   }
+
   throw new Error(
-    'BACKUP_ENCRYPTION_KEY must be 32 bytes (64 hex characters or base64-encoded)',
+    `BACKUP_ENCRYPTION_KEY must be exactly 32 bytes: use \`openssl rand -hex 32\` (64 hex chars). Got length=${trimmed.length} (placeholders like replace-with-... are invalid).`,
   );
 }
 
