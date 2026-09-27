@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   BarChart3,
   Building2,
+  Database,
   FileText,
   Mail,
   MessageSquare,
@@ -78,6 +79,12 @@ const PLATFORM_NAV: PlatformNavItem[] = [
     label: 'Privacy',
     icon: Shield,
     permission: 'platform.privacy:read',
+  },
+  {
+    href: '/dashboard/platform/backups',
+    label: 'Backups',
+    icon: Database,
+    permission: 'platform.backups:read',
   },
   {
     href: '/dashboard/platform/wisdom365',

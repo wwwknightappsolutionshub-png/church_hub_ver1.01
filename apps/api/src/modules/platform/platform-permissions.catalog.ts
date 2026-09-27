@@ -21,7 +21,10 @@ export type PlatformPermissionKey =
   | 'platform.privacy:read'
   | 'platform.privacy:write'
   | 'platform.integrations:read'
-  | 'platform.integrations:write';
+  | 'platform.integrations:write'
+  | 'platform.backups:read'
+  | 'platform.backups:write'
+  | 'platform.backups:download';
 
 export type PlatformPermissionDef = {
   key: PlatformPermissionKey;
@@ -200,6 +203,30 @@ export const PLATFORM_PERMISSION_CATALOG: PlatformPermissionDef[] = [
     label: 'Manage integrations',
     group: 'Integrations',
     description: 'Update and rotate WhatsApp API key and session.',
+  },
+  {
+    key: 'platform.backups:read',
+    resource: 'platform.backups',
+    action: 'read',
+    label: 'View backups',
+    group: 'Backups',
+    description: 'See backup status, jobs, schedules, and tenant requests.',
+  },
+  {
+    key: 'platform.backups:write',
+    resource: 'platform.backups',
+    action: 'write',
+    label: 'Manage backups',
+    group: 'Backups',
+    description: 'Run backups, approve requests, and edit schedules.',
+  },
+  {
+    key: 'platform.backups:download',
+    resource: 'platform.backups',
+    action: 'download',
+    label: 'Download backup artifacts',
+    group: 'Backups',
+    description: 'Download full-database or tenant export artifacts.',
   },
 ];
 

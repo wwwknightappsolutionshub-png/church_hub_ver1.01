@@ -39,6 +39,7 @@ import { ChurchCalendarModule } from './modules/church-calendar/church-calendar.
 import { MarketingTrialModule } from './modules/marketing-trial/marketing-trial.module';
 import { MarketingInboundModule } from './modules/marketing-inbound/marketing-inbound.module';
 import { GeoModule } from './modules/geo/geo.module';
+import { BackupsModule } from './modules/backups/backups.module';
 import { CacheModule } from './common/cache/cache.module';
 import { ObservabilityModule } from './common/observability/observability.module';
 import { resolveRedisConnection } from './common/redis/redis-connection';
@@ -94,6 +95,7 @@ const redisEnabled = process.env.REDIS_ENABLED !== 'false';
     CommunicationsModule,
     AdminModule,
     PlatformModule,
+    BackupsModule.forRoot(),
     ChurchStaffModule,
     LoungeModule,
     RealtimeModule,

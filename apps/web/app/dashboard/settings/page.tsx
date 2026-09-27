@@ -12,6 +12,7 @@ import type { ModuleAccess } from '@/lib/hooks/use-module-access';
 import { accountAvatarUrl, userDisplayName } from '@/lib/user-display';
 import { LogoutButton } from '@/components/app/LogoutButton';
 import { ProfilePhotoUpload } from '@/components/settings/ProfilePhotoUpload';
+import { TenantBackupRequestPanel } from '@/components/backups/TenantBackupRequestPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -71,7 +72,7 @@ function formFromSaved(saved: SavedProfile): AccountForm {
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
-  const { user, member, memberId, canAccessMyProfile, isLoading } = useModuleAccess();
+  const { user, member, memberId, canAccessMyProfile, isChurchStaff, isLoading } = useModuleAccess();
   const [busy, setBusy] = useState(false);
   const formHydrated = useRef(false);
   const [form, setForm] = useState<AccountForm>({
@@ -398,6 +399,8 @@ export default function SettingsPage() {
           </Button>
         </CardContent>
       </Card>
+
+      <TenantBackupRequestPanel enabled={!!isChurchStaff} />
 
       <Card>
         <CardHeader>

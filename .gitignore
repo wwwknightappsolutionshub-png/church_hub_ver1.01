@@ -60,3 +60,5 @@ infra/terraform/.terraform/
 # Uploaded files on disk (not the Nest uploads module under src/modules/uploads)
 /uploads/
 uploads-data/
+/storage/backups/
+apps/api/storage/backups/

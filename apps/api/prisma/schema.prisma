@@ -173,6 +173,9 @@ model Church {
   rtpRequests               RtpRequest[]
   platformBroadcasts        PlatformBroadcastDelivery[]
   platformSupportThreads    PlatformSupportThread[]
+  backupJobs                BackupJob[]
+  backupSchedules           BackupSchedule[]
+  backupRequests            BackupRequest[]
 
   @@map("churches")
 }
@@ -404,6 +407,10 @@ model User {
   platformSupportMessages PlatformSupportMessage[] @relation("PlatformSupportMessageSender")
   pushSubscriptions       PushSubscription[]
   platformWhatsAppConfigsUpdated PlatformWhatsAppConfig[] @relation("PlatformWhatsAppConfigUpdater")
+  backupJobsTriggered            BackupJob[]              @relation("BackupJobTriggeredBy")
+  backupRequestsRequested        BackupRequest[]          @relation("BackupRequestRequester")
+  backupRequestsReviewed         BackupRequest[]          @relation("BackupRequestReviewer")
+  backupSchedulesUpdated         BackupSchedule[]         @relation("BackupScheduleUpdater")
 
   @@unique([churchId, email])
   @@map("users")
@@ -5997,4 +6004,151 @@ model CellReminder {
 
   @@index([churchId, remindAt, sentAt])
   @@map("cell_reminders")
+}
+
+// ─── Hybrid backups (full DB + per-tenant export) ─────────────
+
+enum BackupScope {
+  FULL_DB
+  TENANT
+}
+
+enum BackupJobStatus {
+  QUEUED
+  RUNNING
+  SUCCESS
+  PARTIAL
+  FAILED
+  CANCELLED
+}
+
+enum BackupTrigger {
+  SCHEDULED
+  MANUAL_ADMIN
+  TENANT_REQUEST
+}
+
+enum BackupArtifactType {
+  SQL_GZ
+  TENANT_JSON_GZ
+  MEDIA_ZIP
+  MANIFEST_JSON
+}
+
+enum BackupRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum BackupFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+/// Global (churchId null) or per-tenant automated backup schedule.
+model BackupSchedule {
+  id             String          @id @default(uuid())
+  /// Null = platform-wide full DB schedule; set = tenant export schedule.
+  churchId       String?
+  scope          BackupScope
+  enabled        Boolean         @default(true)
+  frequency      BackupFrequency @default(DAILY)
+  /// 0–23 hour in timezone
+  hourUtc        Int             @default(2)
+  /// 0–59
+  minuteUtc      Int             @default(0)
+  /// 0 = Sunday … 6 = Saturday (WEEKLY); day of month 1–28 (MONTHLY)
+  dayOfPeriod    Int?
+  timezone       String          @default("UTC")
+  retentionDays  Int             @default(30)
+  nextRunAt      DateTime?
+  lastRunAt      DateTime?
+  updatedById    String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  church    Church? @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  updatedBy User?   @relation("BackupScheduleUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([churchId, scope])
+  @@index([enabled, nextRunAt])
+  @@map("backup_schedules")
+}
+
+model BackupJob {
+  id              String          @id @default(uuid())
+  scope           BackupScope
+  churchId        String?
+  trigger         BackupTrigger
+  status          BackupJobStatus @default(QUEUED)
+  triggeredById   String?
+  requestId       String?         @unique
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  bytesTotal      BigInt          @default(0)
+  checksumSha256  String?
+  errorSummary    String?         @db.Text
+  warningSummary  String?         @db.Text
+  tablesExported  Int?
+  mediaFilesOk    Int?
+  mediaFilesFail  Int?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  church      Church?          @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  triggeredBy User?            @relation("BackupJobTriggeredBy", fields: [triggeredById], references: [id], onDelete: SetNull)
+  request     BackupRequest?   @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  artifacts   BackupArtifact[]
+
+  @@index([scope, status, createdAt])
+  @@index([churchId, createdAt])
+  @@index([status, createdAt])
+  @@map("backup_jobs")
+}
+
+model BackupArtifact {
+  id               String             @id @default(uuid())
+  jobId            String
+  type             BackupArtifactType
+  /// Relative path under BACKUP_STORAGE_ROOT (never absolute client paths).
+  storageKey       String
+  fileName         String
+  mimeType         String             @default("application/octet-stream")
+  byteSize         BigInt             @default(0)
+  checksumSha256   String?
+  /// HMAC download nonce hash (optional one-time assist); auth still required.
+  downloadTokenHash String?
+  expiresAt        DateTime?
+  createdAt        DateTime           @default(now())
+
+  job BackupJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@map("backup_artifacts")
+}
+
+/// Tenant-initiated backup request; super admin must approve before export runs.
+model BackupRequest {
+  id              String              @id @default(uuid())
+  churchId        String
+  requestedById   String
+  reason          String?             @db.Text
+  status          BackupRequestStatus @default(PENDING)
+  reviewedById    String?
+  reviewNote      String?             @db.Text
+  reviewedAt      DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  church      Church     @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  requestedBy User       @relation("BackupRequestRequester", fields: [requestedById], references: [id], onDelete: Cascade)
+  reviewedBy  User?      @relation("BackupRequestReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  job         BackupJob?
+
+  @@index([status, createdAt])
+  @@index([churchId, createdAt])
+  @@map("backup_requests")
 }
