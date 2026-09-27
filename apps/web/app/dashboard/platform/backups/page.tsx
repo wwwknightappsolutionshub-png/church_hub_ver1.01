@@ -60,6 +60,7 @@ type BackupSchedule = {
 
 type BackupRequest = {
   id: string;
+  churchId: string;
   status: string;
   reason?: string | null;
   createdAt: string;
@@ -341,7 +342,7 @@ export default function PlatformBackupsPage() {
               >
                 <div>
                   <p className="font-medium">
-                    {r.church?.name ?? r.churchId} · <StatusBadge status={r.status} />
+                    {r.church?.name ?? r.church?.id ?? r.churchId} · <StatusBadge status={r.status} />
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {r.requestedBy
