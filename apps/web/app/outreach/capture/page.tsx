@@ -6,9 +6,8 @@ import { CheckCircle2, Loader2, Nfc, QrCode, X } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { BrandMark } from '@/components/brand/BrandMark';
-import { VoiceNotesField } from '@/components/outreach/VoiceNotesField';
+import { SpeakableField } from '@/components/outreach/SpeakableField';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   emailFormatError,
@@ -294,34 +293,37 @@ function CaptureForm() {
           </CardHeader>
           <CardContent>
             <form onSubmit={(e) => void submit(e)} className="space-y-3" noValidate>
-              <Input
+              <SpeakableField
                 placeholder="First name *"
                 value={form.firstName}
-                onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+                onChange={(firstName) => setForm((f) => ({ ...f, firstName }))}
                 required
                 autoComplete="given-name"
+                mode="replace"
               />
-              <Input
+              <SpeakableField
                 placeholder="Last name"
                 value={form.lastName}
-                onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+                onChange={(lastName) => setForm((f) => ({ ...f, lastName }))}
                 autoComplete="family-name"
+                mode="replace"
               />
               <div>
-                <Input
+                <SpeakableField
                   type="tel"
                   inputMode="tel"
                   autoComplete="tel"
                   placeholder="UK phone (e.g. 07123 456789)"
                   value={form.phone}
                   aria-invalid={!!fieldErrors.phone}
-                  className={cn(fieldErrors.phone && 'border-destructive')}
-                  onChange={(e) => {
-                    const phone = filterPhoneTyping(e.target.value);
-                    setForm({ ...form, phone });
+                  controlClassName={cn(fieldErrors.phone && 'border-destructive')}
+                  transformTranscript={(t) => filterPhoneTyping(t.replace(/[^\d+]/g, ''))}
+                  onChange={(phone) => {
+                    const next = filterPhoneTyping(phone);
+                    setForm((f) => ({ ...f, phone: next }));
                     setFieldErrors((prev) => ({
                       ...prev,
-                      phone: phoneFormatError(phone) ?? undefined,
+                      phone: phoneFormatError(next) ?? undefined,
                     }));
                   }}
                   onBlur={() =>
@@ -330,6 +332,7 @@ function CaptureForm() {
                       phone: phoneFormatError(form.phone) ?? undefined,
                     }))
                   }
+                  mode="replace"
                 />
                 {fieldErrors.phone ? (
                   <p className="mt-1 text-xs text-destructive">{fieldErrors.phone}</p>
@@ -340,7 +343,7 @@ function CaptureForm() {
                 )}
               </div>
               <div>
-                <Input
+                <SpeakableField
                   ref={emailInputRef}
                   type="email"
                   inputMode="email"
@@ -348,10 +351,16 @@ function CaptureForm() {
                   placeholder="Email"
                   value={form.email}
                   aria-invalid={!!fieldErrors.email}
-                  className={cn(fieldErrors.email && 'border-destructive')}
-                  onChange={(e) => {
-                    const email = e.target.value;
-                    setForm({ ...form, email });
+                  controlClassName={cn(fieldErrors.email && 'border-destructive')}
+                  transformTranscript={(t) =>
+                    t
+                      .toLowerCase()
+                      .replace(/\s+at\s+/gi, '@')
+                      .replace(/\s+dot\s+/gi, '.')
+                      .replace(/\s+/g, '')
+                  }
+                  onChange={(email) => {
+                    setForm((f) => ({ ...f, email }));
                     setSameOwnerConfirmed(false);
                     setFieldErrors((prev) => ({
                       ...prev,
@@ -359,6 +368,7 @@ function CaptureForm() {
                     }));
                   }}
                   onBlur={() => void runEmailBlurCheck()}
+                  mode="replace"
                 />
                 {fieldErrors.email ? (
                   <p className="mt-1 text-xs text-destructive">{fieldErrors.email}</p>
@@ -373,16 +383,19 @@ function CaptureForm() {
                   </p>
                 ) : null}
               </div>
-              <Input
+              <SpeakableField
                 placeholder="Minister's Name"
                 value={form.referredBy}
-                onChange={(e) => setForm({ ...form, referredBy: e.target.value })}
+                onChange={(referredBy) => setForm((f) => ({ ...f, referredBy }))}
                 autoComplete="off"
+                mode="replace"
               />
-              <VoiceNotesField
+              <SpeakableField
+                as="textarea"
                 value={form.notes}
                 onChange={(notes) => setForm((f) => ({ ...f, notes }))}
                 placeholder="Anything you would like us to know? (optional)"
+                mode="append"
               />
               <p className="text-[10px] text-muted-foreground">
                 By submitting, you agree to be contacted by {info.church.name}. A welcome message
