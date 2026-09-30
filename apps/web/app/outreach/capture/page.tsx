@@ -6,6 +6,7 @@ import { CheckCircle2, Loader2, Nfc, QrCode, X } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { BrandMark } from '@/components/brand/BrandMark';
+import { VoiceNotesField } from '@/components/outreach/VoiceNotesField';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -378,11 +379,10 @@ function CaptureForm() {
                 onChange={(e) => setForm({ ...form, referredBy: e.target.value })}
                 autoComplete="off"
               />
-              <textarea
-                className="flex min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                placeholder="Anything you would like us to know? (optional)"
+              <VoiceNotesField
                 value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                onChange={(notes) => setForm((f) => ({ ...f, notes }))}
+                placeholder="Anything you would like us to know? (optional)"
               />
               <p className="text-[10px] text-muted-foreground">
                 By submitting, you agree to be contacted by {info.church.name}. A welcome message
