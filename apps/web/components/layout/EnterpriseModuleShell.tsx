@@ -124,7 +124,7 @@ export function EnterpriseTabNav({
       aria-label={ariaLabel ?? 'Module sections'}
     >
       <div className="flex w-full flex-wrap items-center gap-2 px-4 py-2 sm:gap-3 sm:px-6 md:px-8">
-        <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-w-0 max-w-full gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {tabs.map((t) => (
             <button
               key={t.id}
@@ -142,7 +142,7 @@ export function EnterpriseTabNav({
           ))}
         </div>
         {actions ? (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
+          <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
         ) : null}
       </div>
     </nav>
