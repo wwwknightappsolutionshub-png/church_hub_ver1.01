@@ -258,34 +258,35 @@ export function FollowUpPipeline({
           ).length;
           return (
             <div key={col.id} className="relative flex min-w-0 flex-col gap-4">
-              {i < PIPELINE_COLUMNS.length - 1 && (
-                <ArrowRight className="absolute -right-3 top-5 z-10 hidden h-5 w-5 text-muted-foreground/40 md:block" />
-              )}
-
-              <div className={cn('rounded-xl border px-4 py-3.5', col.headerClass)}>
-                <div className="flex gap-3">
-                  <div
-                    className={cn(
-                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-card/70',
-                      col.headerClass,
-                    )}
-                  >
-                    <Icon className={cn('h-5 w-5', col.titleClass)} strokeWidth={2} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className={cn('h-2 w-2 rounded-full', col.dotClass)} />
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                        Phase {col.step}
-                      </span>
+              <div className="relative">
+                {i < PIPELINE_COLUMNS.length - 1 && (
+                  <ArrowRight className="absolute -right-3 top-1/2 z-10 hidden h-5 w-5 -translate-y-1/2 text-muted-foreground/40 md:block" />
+                )}
+                <div className={cn('rounded-xl border px-4 py-3.5', col.headerClass)}>
+                  <div className="flex gap-3">
+                    <div
+                      className={cn(
+                        'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-card/70',
+                        col.headerClass,
+                      )}
+                    >
+                      <Icon className={cn('h-5 w-5', col.titleClass)} strokeWidth={2} />
                     </div>
-                    <h3 className={cn('mt-0.5 font-heading text-base font-bold', col.titleClass)}>
-                      {col.title}
-                    </h3>
-                    <p className={cn('text-sm', col.subtitleClass)}>{col.subtitle}</p>
-                    <p className="mt-1 text-xs font-medium text-muted-foreground">
-                      {count} in this phase
-                    </p>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className={cn('h-2 w-2 rounded-full', col.dotClass)} />
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                          Phase {col.step}
+                        </span>
+                      </div>
+                      <h3 className={cn('mt-0.5 font-heading text-base font-bold', col.titleClass)}>
+                        {col.title}
+                      </h3>
+                      <p className={cn('text-sm', col.subtitleClass)}>{col.subtitle}</p>
+                      <p className="mt-1 text-xs font-medium text-muted-foreground">
+                        {count} in this phase
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
