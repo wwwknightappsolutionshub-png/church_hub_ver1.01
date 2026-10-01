@@ -9,6 +9,7 @@ import {
   Loader2,
   Megaphone,
   Plus,
+  SlidersHorizontal,
   UserPlus,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -108,19 +109,28 @@ function FollowUpPageContent() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [exportOpen, setExportOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [archiveBusy, setArchiveBusy] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const filtersMenuRef = useRef<HTMLDivElement>(null);
+  const filtersActive = Boolean(assigneeFilter || dateFrom || dateTo);
 
   useEffect(() => {
-    if (!exportOpen) return;
+    if (!exportOpen && !filtersOpen) return;
     const onPointerDown = (e: MouseEvent | TouchEvent) => {
       const target = e.target as Node | null;
-      if (target && !exportMenuRef.current?.contains(target)) {
+      if (!target) return;
+      if (exportOpen && !exportMenuRef.current?.contains(target)) {
         setExportOpen(false);
+      }
+      if (filtersOpen && !filtersMenuRef.current?.contains(target)) {
+        setFiltersOpen(false);
       }
     };
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setExportOpen(false);
+      if (e.key !== 'Escape') return;
+      setExportOpen(false);
+      setFiltersOpen(false);
     };
     document.addEventListener('mousedown', onPointerDown);
     document.addEventListener('touchstart', onPointerDown);
@@ -130,7 +140,7 @@ function FollowUpPageContent() {
       document.removeEventListener('touchstart', onPointerDown);
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [exportOpen]);
+  }, [exportOpen, filtersOpen]);
 
   const listUrl = assigneeFilter
     ? `/follow-up?assignedToId=${encodeURIComponent(assigneeFilter)}`
@@ -331,42 +341,101 @@ function FollowUpPageContent() {
         active={view}
         onChange={(id) => {
           setExportOpen(false);
+          setFiltersOpen(false);
           setView(id as 'pipeline' | 'table' | 'calendar' | 'archived');
         }}
         actions={
           <>
             {view !== 'calendar' && view !== 'archived' ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <select
-                  className="h-9 rounded-md border border-input bg-background px-2.5 text-sm text-foreground"
-                  value={assigneeFilter}
-                  onChange={(e) => setAssigneeFilter(e.target.value)}
-                  aria-label="Filter by assignee"
+              <div className="relative" ref={filtersMenuRef}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  type="button"
+                  className={cn(
+                    'relative h-9 w-9 shrink-0 px-0',
+                    filtersActive && 'border-primary/50 bg-primary/5',
+                  )}
+                  aria-expanded={filtersOpen}
+                  aria-haspopup="dialog"
+                  aria-label="Assignee and date filters"
+                  title="Filters"
+                  onClick={() => {
+                    setExportOpen(false);
+                    setFiltersOpen((o) => !o);
+                  }}
                 >
-                  <option value="">All assignees</option>
-                  {(assignees ?? []).map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.firstName} {a.lastName}
-                    </option>
-                  ))}
-                </select>
-                <Input
-                  type="date"
-                  className="h-9 w-auto min-w-[9rem]"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  aria-label="Captured from date"
-                  title="Captured from"
-                />
-                <span className="text-xs text-muted-foreground">to</span>
-                <Input
-                  type="date"
-                  className="h-9 w-auto min-w-[9rem]"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  aria-label="Captured to date"
-                  title="Captured to"
-                />
+                  <SlidersHorizontal className="h-4 w-4" />
+                  {filtersActive ? (
+                    <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
+                  ) : null}
+                </Button>
+                {filtersOpen ? (
+                  <div
+                    role="dialog"
+                    aria-label="Assignee and date filters"
+                    className="absolute right-0 z-30 mt-1 w-[min(100vw-2rem,18rem)] rounded-lg border border-border bg-card p-3 shadow-lg"
+                  >
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Filters
+                      </p>
+                      {filtersActive ? (
+                        <button
+                          type="button"
+                          className="text-xs font-medium text-primary hover:underline"
+                          onClick={() => {
+                            setAssigneeFilter('');
+                            setDateFrom('');
+                            setDateTo('');
+                          }}
+                        >
+                          Clear
+                        </button>
+                      ) : null}
+                    </div>
+                    <div className="space-y-2.5">
+                      <label className="block space-y-1">
+                        <span className="text-xs font-medium text-foreground">Assignee</span>
+                        <select
+                          className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm text-foreground"
+                          value={assigneeFilter}
+                          onChange={(e) => setAssigneeFilter(e.target.value)}
+                          aria-label="Filter by assignee"
+                        >
+                          <option value="">All assignees</option>
+                          {(assignees ?? []).map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.firstName} {a.lastName}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className="space-y-1">
+                        <span className="text-xs font-medium text-foreground">Captured date</span>
+                        <div className="flex items-center gap-1.5">
+                          <Input
+                            type="date"
+                            className="h-9 min-w-0 flex-1"
+                            value={dateFrom}
+                            onChange={(e) => setDateFrom(e.target.value)}
+                            aria-label="Captured from date"
+                            title="Captured from"
+                          />
+                          <span className="shrink-0 text-xs text-muted-foreground">to</span>
+                          <Input
+                            type="date"
+                            className="h-9 min-w-0 flex-1"
+                            value={dateTo}
+                            onChange={(e) => setDateTo(e.target.value)}
+                            aria-label="Captured to date"
+                            title="Captured to"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : null}
             {view === 'table' && canExport ? (
@@ -378,7 +447,10 @@ function FollowUpPageContent() {
                   className="h-9 whitespace-nowrap"
                   aria-expanded={exportOpen}
                   aria-haspopup="menu"
-                  onClick={() => setExportOpen((o) => !o)}
+                  onClick={() => {
+                    setFiltersOpen(false);
+                    setExportOpen((o) => !o);
+                  }}
                   disabled={filteredItems.length === 0}
                 >
                   <Download className="mr-1.5 h-4 w-4 shrink-0" />
