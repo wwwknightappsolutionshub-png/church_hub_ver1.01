@@ -15,7 +15,8 @@ const optionalAddressLine = (max: number) =>
     })
     .optional();
 
-export const outreachCaptureSchema = OutreachCaptureBaseSchema.extend({
+/** ZodObject (supports .partial) — API extras on top of shared capture fields. */
+export const outreachCaptureObjectSchema = OutreachCaptureBaseSchema.extend({
   photoConsent: z.boolean().optional(),
   photoUrl: z
     .union([z.string().url().max(2000), z.string().startsWith('data:image/').max(600_000)])
@@ -26,7 +27,12 @@ export const outreachCaptureSchema = OutreachCaptureBaseSchema.extend({
   addressCity: optionalAddressLine(100),
   addressState: optionalAddressLine(100),
   addressCountry: optionalAddressLine(100),
-}).superRefine(refineInternationalAddress);
+});
+
+/** Full capture payload with international address refinement. */
+export const outreachCaptureSchema = outreachCaptureObjectSchema.superRefine(
+  refineInternationalAddress,
+);
 
 export const outreachSyncItemSchema = z.object({
   clientId: z.string().min(8).max(64),
@@ -43,7 +49,8 @@ export const outreachSyncSchema = z.object({
 
 export const resolveSyncConflictSchema = z.object({
   strategy: z.enum(['CLIENT_WINS', 'SERVER_WINS', 'MERGED']),
-  mergedPayload: outreachCaptureSchema.partial().optional(),
+  // .partial() requires ZodObject — not ZodEffects from superRefine
+  mergedPayload: outreachCaptureObjectSchema.partial().optional(),
 });
 
 export const pipelineAdvanceSchema = z.object({
