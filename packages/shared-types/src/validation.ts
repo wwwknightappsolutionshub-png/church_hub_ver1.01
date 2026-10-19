@@ -21,7 +21,7 @@ export function sanitizeEmail(value: unknown): string {
 export function filterPhoneTyping(value: unknown): string {
   return String(value ?? '')
     .replace(/[^\d+\s()-]/g, '')
-    .slice(0, 24);
+    .slice(0, 32);
 }
 
 /** Keep leading +, digits only otherwise (legacy helper — prefer normalizeUkPhoneToE164). */
@@ -63,6 +63,60 @@ export function isValidUkPhone(value: unknown): boolean {
 }
 
 export const UK_PHONE_HINT = 'Enter a valid UK phone (e.g. 07123 456789 or +44 7123 456789)';
+
+/** Outreach / multi-country copy — UK examples still work. */
+export const FLEXIBLE_PHONE_HINT =
+  'Enter a phone number (e.g. 07123 456789, +44 7123 456789, or +234 801 234 5678)';
+
+/**
+ * True when the input is clearly UK-shaped so we can normalize to +44
+ * without mis-classifying other national numbers that start with 0.
+ */
+export function looksLikeUkPhone(value: unknown): boolean {
+  const raw = String(value ?? '').trim();
+  if (!raw || /[a-zA-Z]/.test(raw)) return false;
+  const digits = raw.replace(/[^\d]/g, '');
+  if (!digits) return false;
+  if (digits.startsWith('44') || raw.startsWith('+44') || raw.startsWith('0044')) return true;
+  // UK mobile: 07xxxxxxxxx (10 digits after optional leading 0 → 10 national digits starting 7)
+  if (/^0?7\d{9}$/.test(digits)) return true;
+  // UK geographic / non-geo national: 01/02/03…
+  if (/^0[123]\d{8,9}$/.test(digits)) return true;
+  return false;
+}
+
+/**
+ * Flexible phone normalize for outreach capture:
+ * - UK-shaped → same +44 E.164 as normalizeUkPhoneToE164
+ * - + / 00 international → E.164 (+…, 8–15 digits)
+ * - other national → digits only (7–15), leading 0 preserved
+ */
+export function normalizeFlexiblePhone(value: unknown): string | null {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  if (/[a-zA-Z]/.test(raw)) return null;
+
+  if (looksLikeUkPhone(raw)) {
+    return normalizeUkPhoneToE164(raw);
+  }
+
+  let digits = raw.replace(/[^\d]/g, '');
+  if (!digits) return null;
+  const internationalPrefix = raw.startsWith('+') || digits.startsWith('00');
+  if (digits.startsWith('00')) digits = digits.slice(2);
+
+  if (internationalPrefix) {
+    if (!/^[1-9]\d{7,14}$/.test(digits)) return null;
+    return `+${digits}`;
+  }
+
+  if (!/^\d{7,15}$/.test(digits)) return null;
+  return digits;
+}
+
+export function isValidFlexiblePhone(value: unknown): boolean {
+  return normalizeFlexiblePhone(value) != null;
+}
 
 export function sanitizeSlug(value: unknown): string {
   return sanitizeText(value, 64)
@@ -224,6 +278,58 @@ export const optionalUkPostcodeSchema = z
     return s || undefined;
   })
   .pipe(z.union([ukPostcodeSchema, z.undefined()]));
+
+/** Loose postal / ZIP for multi-country outreach (UK postcodes still accepted). */
+export function sanitizePostalCode(value: unknown): string {
+  return sanitizeText(value, 20)
+    .replace(/[^A-Za-z0-9\s-]/g, '')
+    .slice(0, 20);
+}
+
+/**
+ * Heuristic: value looks like a UK postcode (full, outward, or partial while typing).
+ * All-digit codes (e.g. US ZIP) return false so UK Lookup is not triggered.
+ */
+export function isLikelyUkPostcode(value: unknown): boolean {
+  const key = normalizeUkPostcodeKey(value);
+  if (!key || key.length < 2) return false;
+  if (/^\d+$/.test(key)) return false;
+  if (UK_POSTCODE_REGEX.test(sanitizeUkPostcode(key))) return true;
+  if (UK_OUTWARD_POSTCODE_REGEX.test(key)) return true;
+  return /^[A-Z]{1,2}\d/i.test(key) && key.length <= 7;
+}
+
+export const optionalPostalCodeSchema = z
+  .union([z.string(), z.literal(''), z.undefined(), z.null()])
+  .transform((v) => {
+    const s = sanitizePostalCode(v ?? '');
+    if (!s) return undefined;
+    if (isLikelyUkPostcode(s) && UK_POSTCODE_REGEX.test(sanitizeUkPostcode(s))) {
+      return sanitizeUkPostcode(s);
+    }
+    return s;
+  })
+  .pipe(
+    z.union([
+      z
+        .string()
+        .min(2, 'Enter a valid postal / ZIP code')
+        .max(20)
+        .regex(/^[A-Za-z0-9][A-Za-z0-9\s-]{1,19}$/, 'Enter a valid postal / ZIP code'),
+      z.undefined(),
+    ]),
+  );
+
+/** Required phone for outreach capture — accepts UK and other countries. */
+export const flexiblePhoneSchema = z
+  .string()
+  .trim()
+  .min(1, 'Enter a phone number')
+  .refine((v) => !/[a-zA-Z]/.test(v), {
+    message: 'Phone number cannot contain letters',
+  })
+  .transform((v) => normalizeFlexiblePhone(v) ?? '')
+  .refine((v) => v.length > 0, { message: FLEXIBLE_PHONE_HINT });
 
 export const RegisterStartSchema = z.object({
   churchName: churchNameSchema,

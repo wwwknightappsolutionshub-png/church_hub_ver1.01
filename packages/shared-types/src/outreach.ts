@@ -1,14 +1,24 @@
 import { z } from 'zod';
 import {
+  flexiblePhoneSchema,
   optionalEmailSchema,
   optionalPhoneSchema,
-  optionalUkPostcodeSchema,
+  optionalPostalCodeSchema,
   personNameSchema,
-  phoneSchema,
   sanitizeText,
 } from './validation';
 
-export const OutreachCaptureSchema = z.object({
+const optionalAddressLine = (max: number) =>
+  z
+    .union([z.string(), z.literal(''), z.undefined(), z.null()])
+    .transform((v) => {
+      const s = sanitizeText(v ?? '', max);
+      return s || undefined;
+    })
+    .optional();
+
+/** Shared capture fields (before API-only extras). */
+export const OutreachCaptureBaseSchema = z.object({
   firstName: personNameSchema,
   lastName: z
     .union([z.string(), z.literal(''), z.undefined()])
@@ -17,20 +27,20 @@ export const OutreachCaptureSchema = z.object({
       return s || undefined;
     })
     .optional(),
-  phone: phoneSchema,
+  phone: flexiblePhoneSchema,
   email: optionalEmailSchema,
   evangelistId: z.string().uuid().optional(),
   qrCodeId: z.string().uuid().optional(),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
-  locationLabel: z
-    .union([z.string(), z.literal(''), z.undefined()])
-    .transform((v) => {
-      const s = sanitizeText(v ?? '', 300);
-      return s || undefined;
-    })
-    .optional(),
-  postcode: optionalUkPostcodeSchema,
+  locationLabel: optionalAddressLine(300),
+  postcode: optionalPostalCodeSchema,
+  /** Structured address — required when phone is not UK (+44). */
+  addressStreet: optionalAddressLine(200),
+  addressCity: optionalAddressLine(100),
+  addressState: optionalAddressLine(100),
+  addressCountry: optionalAddressLine(100),
+  addressPostal: optionalPostalCodeSchema,
   photoConsent: z.boolean().default(false),
   photoUrl: z.string().max(600_000).optional(),
   notes: z.string().max(2000).optional(),
@@ -43,17 +53,47 @@ export const OutreachCaptureSchema = z.object({
     })
     .optional(),
   needsBusPickup: z.boolean().optional(),
-  pickupAddress: z
-    .union([z.string(), z.literal(''), z.undefined()])
-    .transform((v) => {
-      const s = sanitizeText(v ?? '', 500);
-      return s || undefined;
-    })
-    .optional(),
+  pickupAddress: optionalAddressLine(500),
   busPickupNotes: z.string().max(1000).optional(),
   clientId: z.string().uuid().optional(),
   capturedAt: z.string().datetime().optional(),
 });
+
+/** Require street/city/country when phone is not UK E.164 (+44…). */
+export function refineInternationalAddress(
+  data: {
+    phone: string;
+    addressStreet?: string;
+    addressCity?: string;
+    addressCountry?: string;
+  },
+  ctx: z.RefinementCtx,
+) {
+  if (data.phone.startsWith('+44')) return;
+  if (!data.addressStreet) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['addressStreet'],
+      message: 'Street address is required for international contacts',
+    });
+  }
+  if (!data.addressCity) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['addressCity'],
+      message: 'City is required for international contacts',
+    });
+  }
+  if (!data.addressCountry) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['addressCountry'],
+      message: 'Country is required for international contacts',
+    });
+  }
+}
+
+export const OutreachCaptureSchema = OutreachCaptureBaseSchema.superRefine(refineInternationalAddress);
 
 /** Public QR/NFC self-registration (no GPS/postcode required). */
 export const PublicOutreachRegisterSchema = z.object({

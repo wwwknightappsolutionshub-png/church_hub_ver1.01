@@ -1,64 +1,32 @@
 import { z } from 'zod';
 import {
-  optionalEmailSchema,
-  optionalUkPostcodeSchema,
-  phoneSchema,
+  OutreachCaptureBaseSchema,
   PublicOutreachRegisterSchema,
+  refineInternationalAddress,
   sanitizeText,
 } from '@church-hub/shared-types';
 
-export const outreachCaptureSchema = z.object({
-  firstName: z
-    .string()
-    .transform((v) => sanitizeText(v, 120))
-    .pipe(z.string().min(1).max(120)),
-  lastName: z
+const optionalAddressLine = (max: number) =>
+  z
     .union([z.string(), z.literal(''), z.undefined()])
     .transform((v) => {
-      const s = sanitizeText(v ?? '', 120);
+      const s = sanitizeText(v ?? '', max);
       return s || undefined;
     })
-    .optional(),
-  phone: phoneSchema,
-  email: optionalEmailSchema,
-  evangelistId: z.string().uuid().optional(),
-  qrCodeId: z.string().uuid().optional(),
-  latitude: z.number().min(-90).max(90).optional(),
-  longitude: z.number().min(-180).max(180).optional(),
-  locationLabel: z
-    .union([z.string(), z.literal(''), z.undefined()])
-    .transform((v) => {
-      const s = sanitizeText(v ?? '', 300);
-      return s || undefined;
-    })
-    .optional(),
-  postcode: optionalUkPostcodeSchema,
+    .optional();
+
+export const outreachCaptureSchema = OutreachCaptureBaseSchema.extend({
   photoConsent: z.boolean().optional(),
   photoUrl: z
     .union([z.string().url().max(2000), z.string().startsWith('data:image/').max(600_000)])
     .optional(),
-  notes: z.string().max(5000).optional(),
-  voiceNotes: z.string().max(5000).optional(),
-  referredBy: z
-    .union([z.string(), z.literal(''), z.undefined()])
-    .transform((v) => {
-      const s = sanitizeText(v ?? '', 200);
-      return s || undefined;
-    })
-    .optional(),
-  needsBusPickup: z.boolean().optional(),
-  pickupAddress: z
-    .union([z.string(), z.literal(''), z.undefined()])
-    .transform((v) => {
-      const s = sanitizeText(v ?? '', 500);
-      return s || undefined;
-    })
-    .optional(),
-  busPickupNotes: z.string().max(1000).optional(),
   clientId: z.string().min(8).max(64).optional(),
-  capturedAt: z.string().datetime().optional(),
   sendWelcome: z.boolean().optional(),
-});
+  addressStreet: optionalAddressLine(200),
+  addressCity: optionalAddressLine(100),
+  addressState: optionalAddressLine(100),
+  addressCountry: optionalAddressLine(100),
+}).superRefine(refineInternationalAddress);
 
 export const outreachSyncItemSchema = z.object({
   clientId: z.string().min(8).max(64),

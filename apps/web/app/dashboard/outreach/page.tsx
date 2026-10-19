@@ -107,7 +107,7 @@ export default function OutreachPage() {
               <CardHeader>
                 <CardTitle>Outreach Capture Form</CardTitle>
                 <CardDescription>
-                  Add a new guest or contact. We&apos;ll notify your outreach team and start follow-up.
+                  Add a new guest or contact.
                 </CardDescription>
               </CardHeader>
               <CardContent>

@@ -3,7 +3,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { OutreachCaptureSchema, UK_PHONE_HINT } from '@church-hub/shared-types';
+import {
+  FLEXIBLE_PHONE_HINT,
+  isLikelyUkPostcode,
+  looksLikeUkPhone,
+  OutreachCaptureSchema,
+  sanitizePostalCode,
+} from '@church-hub/shared-types';
 import { z } from 'zod';
 import { Loader2, WifiOff } from 'lucide-react';
 import { toast } from 'sonner';
@@ -30,6 +36,11 @@ const EMPTY_FORM: Partial<FormData> = {
   email: '',
   postcode: '',
   locationLabel: '',
+  addressStreet: '',
+  addressCity: '',
+  addressState: '',
+  addressCountry: '',
+  addressPostal: '',
   notes: '',
   voiceNotes: '',
   referredBy: '',
@@ -93,6 +104,25 @@ function OutreachCaptureFormInner({
   const needsBusPickup = watch('needsBusPickup');
   const voiceNotes = watch('voiceNotes') ?? '';
   const postcode = watch('postcode') ?? '';
+  const phoneValue = watch('phone') ?? '';
+  const showIntlAddress =
+    phoneValue.trim().replace(/[^\d+]/g, '').length >= 8 && !looksLikeUkPhone(phoneValue);
+
+  useEffect(() => {
+    if (showIntlAddress) {
+      setValue('postcode', '');
+      setValue('locationLabel', '');
+      setValue('latitude', undefined);
+      setValue('longitude', undefined);
+      setPostcodeHints([]);
+      return;
+    }
+    setValue('addressStreet', '');
+    setValue('addressCity', '');
+    setValue('addressState', '');
+    setValue('addressCountry', '');
+    setValue('addressPostal', '');
+  }, [showIntlAddress, setValue]);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,7 +151,7 @@ function OutreachCaptureFormInner({
 
   const applyPostcodeLookup = async (code: string) => {
     const q = code.trim();
-    if (q.length < 5) return;
+    if (q.length < 5 || !isLikelyUkPostcode(q)) return;
     setPostcodeBusy(true);
     try {
       const { data } = await api.get<{
@@ -142,18 +172,20 @@ function OutreachCaptureFormInner({
       setPostcodeHints([]);
       toast.success(`Postcode found — location tagged (${data.latitude.toFixed(4)}, ${data.longitude.toFixed(4)})`);
     } catch {
-      toast.error('Postcode not found');
+      toast.error('UK postcode not found — you can still save with the code as entered');
     } finally {
       setPostcodeBusy(false);
     }
   };
 
   const onPostcodeChange = (value: string) => {
-    setValue('postcode', value.toUpperCase());
+    const cleaned = sanitizePostalCode(value);
+    const next = isLikelyUkPostcode(cleaned) ? cleaned.toUpperCase() : cleaned;
+    setValue('postcode', next);
     if (suggestTimer.current) clearTimeout(suggestTimer.current);
     if (lookupTimer.current) clearTimeout(lookupTimer.current);
-    const q = value.trim();
-    if (q.length < 2) {
+    const q = next.trim();
+    if (q.length < 2 || !isLikelyUkPostcode(q)) {
       setPostcodeHints([]);
       return;
     }
@@ -264,7 +296,7 @@ function OutreachCaptureFormInner({
         />
         <div className="space-y-1">
           <Input
-            placeholder="UK phone (e.g. 07123 456789) *"
+            placeholder="Phone (e.g. 07123 456789 or +234…) *"
             {...register('phone', {
               onChange: (e) => {
                 e.target.value = filterPhoneTyping(e.target.value);
@@ -288,7 +320,7 @@ function OutreachCaptureFormInner({
             </p>
           ) : (
             <p id="outreach-phone-hint" className="text-xs text-muted-foreground">
-              {UK_PHONE_HINT}
+              {FLEXIBLE_PHONE_HINT}
             </p>
           )}
         </div>
@@ -324,55 +356,114 @@ function OutreachCaptureFormInner({
           data-1p-ignore
           data-form-type="other"
         />
-        <div className="relative sm:col-span-2">
-          <div className="flex gap-2">
+        {showIntlAddress ? (
+          <div className="sm:col-span-2 grid gap-3 sm:grid-cols-2 rounded-lg border border-border p-3">
+            <p className="sm:col-span-2 text-xs text-muted-foreground">
+              International contact — enter a structured address.
+            </p>
+            <div className="sm:col-span-2 space-y-1">
+              <Input
+                placeholder="Street address *"
+                {...register('addressStreet')}
+                autoComplete="off"
+                aria-invalid={!!errors.addressStreet}
+                className={cn(errors.addressStreet && 'border-destructive')}
+              />
+              {errors.addressStreet?.message ? (
+                <p className="text-xs text-destructive">{String(errors.addressStreet.message)}</p>
+              ) : null}
+            </div>
+            <div className="space-y-1">
+              <Input
+                placeholder="City *"
+                {...register('addressCity')}
+                autoComplete="off"
+                aria-invalid={!!errors.addressCity}
+                className={cn(errors.addressCity && 'border-destructive')}
+              />
+              {errors.addressCity?.message ? (
+                <p className="text-xs text-destructive">{String(errors.addressCity.message)}</p>
+              ) : null}
+            </div>
+            <Input placeholder="State / region" {...register('addressState')} autoComplete="off" />
+            <div className="space-y-1">
+              <Input
+                placeholder="Country *"
+                {...register('addressCountry')}
+                autoComplete="off"
+                aria-invalid={!!errors.addressCountry}
+                className={cn(errors.addressCountry && 'border-destructive')}
+              />
+              {errors.addressCountry?.message ? (
+                <p className="text-xs text-destructive">{String(errors.addressCountry.message)}</p>
+              ) : null}
+            </div>
             <Input
-              placeholder="UK postcode (e.g. DA1 1AA)"
-              value={postcode}
-              onChange={(e) => onPostcodeChange(e.target.value)}
-              onBlur={() => {
-                if ((postcode ?? '').trim().length >= 5) {
-                  void applyPostcodeLookup(postcode);
-                }
-              }}
+              placeholder="Postal / ZIP code"
+              {...register('addressPostal', {
+                onChange: (e) => {
+                  e.target.value = sanitizePostalCode(e.target.value);
+                },
+              })}
               autoComplete="off"
-              data-lpignore="true"
-              data-1p-ignore
             />
-            <Button
-              type="button"
-              variant="outline"
-              disabled={postcodeBusy || !(postcode ?? '').trim()}
-              onClick={() => void applyPostcodeLookup(postcode)}
-            >
-              {postcodeBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Lookup'}
-            </Button>
           </div>
-          {postcodeHints.length > 0 ? (
-            <ul className="absolute z-20 mt-1 max-h-40 w-full overflow-auto rounded-md border bg-card shadow-md">
-              {postcodeHints.map((hint) => (
-                <li key={hint}>
-                  <button
+        ) : (
+          <>
+            <div className="relative sm:col-span-2 space-y-1">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="UK postcode (e.g. DA1 1AA)"
+                  value={postcode}
+                  onChange={(e) => onPostcodeChange(e.target.value)}
+                  onBlur={() => {
+                    if ((postcode ?? '').trim().length >= 5 && isLikelyUkPostcode(postcode)) {
+                      void applyPostcodeLookup(postcode);
+                    }
+                  }}
+                  autoComplete="off"
+                  data-lpignore="true"
+                  data-1p-ignore
+                />
+                {isLikelyUkPostcode(postcode) ? (
+                  <Button
                     type="button"
-                    className="w-full px-3 py-2 text-left text-sm hover:bg-muted"
-                    onClick={() => {
-                      setValue('postcode', hint);
-                      setPostcodeHints([]);
-                      void applyPostcodeLookup(hint);
-                    }}
+                    variant="outline"
+                    disabled={postcodeBusy || !(postcode ?? '').trim()}
+                    onClick={() => void applyPostcodeLookup(postcode)}
                   >
-                    {hint}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-        <Input
-          placeholder="Location label (e.g. Dartford town centre)"
-          className="sm:col-span-2"
-          {...register('locationLabel')}
-        />
+                    {postcodeBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Lookup'}
+                  </Button>
+                ) : null}
+              </div>
+              {postcodeHints.length > 0 ? (
+                <ul className="absolute z-20 mt-1 max-h-40 w-full overflow-auto rounded-md border bg-card shadow-md">
+                  {postcodeHints.map((hint) => (
+                    <li key={hint}>
+                      <button
+                        type="button"
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                        onClick={() => {
+                          setValue('postcode', hint);
+                          setPostcodeHints([]);
+                          void applyPostcodeLookup(hint);
+                        }}
+                      >
+                        {hint}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <p className="text-xs text-muted-foreground">Optional. UK postcodes can use Lookup.</p>
+            </div>
+            <Input
+              placeholder="Location label (e.g. town centre or landmark)"
+              className="sm:col-span-2"
+              {...register('locationLabel')}
+            />
+          </>
+        )}
         <div className="sm:col-span-2">
           <VoiceNotesField
             value={voiceNotes}
@@ -392,7 +483,7 @@ function OutreachCaptureFormInner({
         {needsBusPickup && (
           <>
             <Input
-              placeholder="Pickup address (or use postcode above)"
+              placeholder="Pickup address (or use postal code above)"
               {...register('pickupAddress')}
             />
             <Input placeholder="Bus notes (e.g. Sunday 9am)" {...register('busPickupNotes')} />

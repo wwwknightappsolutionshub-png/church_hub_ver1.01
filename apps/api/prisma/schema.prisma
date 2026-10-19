@@ -1362,11 +1362,18 @@ model OutreachContact {
   qrCodeId      String?
   firstName     String
   lastName      String?
+  /// AES-GCM envelope (v1:…) when field-level encryption is on; legacy plaintext supported on read.
   phone         String?
   email         String?
   latitude      Float?
   longitude     Float?
   locationLabel String?
+  /// Structured international address (used when phone is not UK-shaped).
+  addressStreet  String?
+  addressCity    String?
+  addressState   String?
+  addressCountry String?
+  addressPostal  String?
   photoConsent  Boolean  @default(false)
   photoUrl      String?
   notes         String?

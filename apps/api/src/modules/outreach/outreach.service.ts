@@ -22,6 +22,10 @@ import {
   buildOutreachCaptureUrl,
   resolveOutreachCaptureBaseUrl,
 } from './outreach-capture-url.util';
+import {
+  decryptOutreachContactFields,
+  encryptOutreachContactFields,
+} from './outreach-pii.crypto';
 
 @Injectable()
 export class OutreachService {
@@ -48,17 +52,50 @@ export class OutreachService {
     longitude: number | null;
     locationLabel: string | null;
   }): OutreachCapturePayload {
+    const plain = decryptOutreachContactFields({
+      phone: contact.phone,
+      email: contact.email,
+      notes: contact.notes,
+      locationLabel: contact.locationLabel,
+    });
     return {
       firstName: contact.firstName,
       lastName: contact.lastName ?? undefined,
-      phone: contact.phone ?? undefined,
-      email: contact.email ?? undefined,
-      notes: contact.notes ?? undefined,
+      phone: plain.phone ?? undefined,
+      email: plain.email ?? undefined,
+      notes: plain.notes ?? undefined,
       evangelistId: contact.evangelistId ?? undefined,
       latitude: contact.latitude ?? undefined,
       longitude: contact.longitude ?? undefined,
-      locationLabel: contact.locationLabel ?? undefined,
+      locationLabel: plain.locationLabel ?? undefined,
     };
+  }
+
+  private composeLocationLabel(data: {
+    phone?: string;
+    postcode?: string;
+    locationLabel?: string;
+    addressStreet?: string;
+    addressCity?: string;
+    addressState?: string;
+    addressPostal?: string;
+    addressCountry?: string;
+  }): string | undefined {
+    const isUk = (data.phone ?? '').startsWith('+44');
+    if (!isUk) {
+      const structured = [
+        data.addressStreet,
+        data.addressCity,
+        data.addressState,
+        data.addressPostal,
+        data.addressCountry,
+      ]
+        .filter(Boolean)
+        .join(', ');
+      if (structured) return structured;
+    }
+    const parts = [data.postcode, data.locationLabel].filter(Boolean);
+    return parts.length ? parts.join(' · ') : data.locationLabel;
   }
 
   private applyTemplate(text: string, name: string, churchName: string) {
@@ -108,6 +145,11 @@ export class OutreachService {
       longitude?: number;
       locationLabel?: string;
       postcode?: string;
+      addressStreet?: string;
+      addressCity?: string;
+      addressState?: string;
+      addressCountry?: string;
+      addressPostal?: string;
       photoConsent?: boolean;
       photoUrl?: string;
       notes?: string;
@@ -160,7 +202,7 @@ export class OutreachService {
             clientId: data.clientId,
           });
         }
-        return dup;
+        return this.decryptContactRow(dup);
       }
     }
 
@@ -171,6 +213,24 @@ export class OutreachService {
       });
     }
 
+    const locationLabel = this.composeLocationLabel(data);
+    const addressPostal = data.addressPostal ?? data.postcode;
+    const encrypted = encryptOutreachContactFields({
+      phone: data.phone,
+      email: data.email,
+      locationLabel,
+      addressStreet: data.addressStreet,
+      addressCity: data.addressCity,
+      addressState: data.addressState,
+      addressCountry: data.addressCountry,
+      addressPostal,
+      pickupAddress: data.pickupAddress,
+      busPickupNotes: data.busPickupNotes,
+      notes: data.notes,
+      voiceNotes: data.voiceNotes,
+      referredBy: data.referredBy?.trim() || null,
+    });
+
     const contact = await this.prisma.outreachContact.create({
       data: {
         churchId,
@@ -179,19 +239,24 @@ export class OutreachService {
         qrCodeId: data.qrCodeId,
         firstName: data.firstName,
         lastName: data.lastName,
-        phone: data.phone,
-        email: data.email,
+        phone: encrypted.phone,
+        email: encrypted.email,
         latitude: data.latitude,
         longitude: data.longitude,
-        locationLabel: [data.postcode, data.locationLabel].filter(Boolean).join(' · ') || data.locationLabel,
+        locationLabel: encrypted.locationLabel,
+        addressStreet: encrypted.addressStreet,
+        addressCity: encrypted.addressCity,
+        addressState: encrypted.addressState,
+        addressCountry: encrypted.addressCountry,
+        addressPostal: encrypted.addressPostal,
         photoConsent: data.photoConsent ?? false,
         photoUrl: data.photoUrl,
-        notes: data.notes,
-        voiceNotes: data.voiceNotes,
-        referredBy: data.referredBy?.trim() || null,
+        notes: encrypted.notes,
+        voiceNotes: encrypted.voiceNotes,
+        referredBy: encrypted.referredBy,
         needsBusPickup: data.needsBusPickup ?? false,
-        pickupAddress: data.pickupAddress,
-        busPickupNotes: data.busPickupNotes,
+        pickupAddress: encrypted.pickupAddress,
+        busPickupNotes: encrypted.busPickupNotes,
         capturedAt: data.capturedAt ? new Date(data.capturedAt) : new Date(),
         syncStatus: 'SYNCED',
         convertStage: 'CAPTURED',
@@ -233,17 +298,26 @@ export class OutreachService {
       }
     }
 
-    return this.prisma.outreachContact.findUnique({
+    const saved = await this.prisma.outreachContact.findUnique({
       where: { id: contact.id },
       include: { evangelist: { select: { firstName: true, lastName: true } } },
     });
+    return saved ? this.decryptContactRow(saved) : saved;
+  }
+
+  private decryptContactRow<T extends Record<string, unknown>>(row: T): T {
+    return {
+      ...row,
+      ...decryptOutreachContactFields(row as Parameters<typeof decryptOutreachContactFields>[0]),
+    };
   }
 
   async sendWelcomeMessage(churchId: string, contactId: string) {
-    const contact = await this.prisma.outreachContact.findFirst({
+    const raw = await this.prisma.outreachContact.findFirst({
       where: { id: contactId, churchId },
     });
-    if (!contact) throw new NotFoundException('Contact not found');
+    if (!raw) throw new NotFoundException('Contact not found');
+    const contact = this.decryptContactRow(raw);
 
     const church = await this.prisma.church.findUnique({ where: { id: churchId } });
     const churchName = church?.name ?? 'Our church';
@@ -317,10 +391,11 @@ export class OutreachService {
       return contact;
     }
 
-    return this.prisma.outreachContact.update({
+    const updated = await this.prisma.outreachContact.update({
       where: { id: contactId },
       data: { welcomeSentAt: new Date() },
     });
+    return this.decryptContactRow(updated);
   }
 
   async queueOfflineCapture(
@@ -625,7 +700,7 @@ export class OutreachService {
   }
 
   async listContacts(churchId: string, evangelistId?: string, convertStage?: string) {
-    return this.prisma.outreachContact.findMany({
+    const rows = await this.prisma.outreachContact.findMany({
       where: {
         churchId,
         ...(evangelistId ? { evangelistId } : {}),
@@ -639,6 +714,7 @@ export class OutreachService {
       orderBy: { capturedAt: 'desc' },
       take: 500,
     });
+    return rows.map((row) => this.decryptContactRow(row));
   }
 
   async listTeamQrCodes(churchId: string) {

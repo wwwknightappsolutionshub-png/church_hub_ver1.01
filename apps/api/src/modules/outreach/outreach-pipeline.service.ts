@@ -7,6 +7,7 @@ import {
   CONVERT_TO_FOLLOW_UP_STAGE,
   OUTREACH_CONVERT_PIPELINE,
 } from './outreach.constants';
+import { decryptOutreachContactFields } from './outreach-pii.crypto';
 
 @Injectable()
 export class OutreachPipelineService {
@@ -15,6 +16,13 @@ export class OutreachPipelineService {
     private readonly bus: BusService,
     private readonly activity: MembershipActivityService,
   ) {}
+
+  private decryptContact<T extends Record<string, unknown>>(row: T): T {
+    return {
+      ...row,
+      ...decryptOutreachContactFields(row as Parameters<typeof decryptOutreachContactFields>[0]),
+    };
+  }
 
   async getPipeline(churchId: string) {
     const grouped = await this.prisma.outreachContact.groupBy({
@@ -50,7 +58,12 @@ export class OutreachPipelineService {
       }),
     ]);
 
-    return { byStage, contacts, needsBusPickup, convertedTotal };
+    return {
+      byStage,
+      contacts: contacts.map((c) => this.decryptContact(c)),
+      needsBusPickup,
+      convertedTotal,
+    };
   }
 
   async advanceStage(churchId: string, contactId: string, stage: OutreachConvertStage) {
@@ -152,7 +165,12 @@ export class OutreachPipelineService {
       ride = await this.createBusPickupRide(churchId, member.id, contact);
     }
 
-    return { member, contact: updatedContact, ride, alreadyConverted: false };
+    return {
+      member,
+      contact: this.decryptContact(updatedContact),
+      ride,
+      alreadyConverted: false,
+    };
   }
 
   private async createBusPickupRide(
@@ -161,6 +179,11 @@ export class OutreachPipelineService {
     contact: {
       pickupAddress: string | null;
       locationLabel: string | null;
+      addressStreet?: string | null;
+      addressCity?: string | null;
+      addressState?: string | null;
+      addressPostal?: string | null;
+      addressCountry?: string | null;
       latitude: number | null;
       longitude: number | null;
       busPickupNotes: string | null;
@@ -172,8 +195,18 @@ export class OutreachPipelineService {
       where: { id: churchId },
       select: { name: true, address: true, city: true },
     });
+    const structured = [
+      contact.addressStreet,
+      contact.addressCity,
+      contact.addressState,
+      contact.addressPostal,
+      contact.addressCountry,
+    ]
+      .filter(Boolean)
+      .join(', ');
     const pickupAddress =
       contact.pickupAddress?.trim() ||
+      structured ||
       contact.locationLabel?.trim() ||
       (contact.latitude != null
         ? `GPS ${contact.latitude.toFixed(5)}, ${contact.longitude?.toFixed(5)}`
@@ -206,6 +239,6 @@ export class OutreachPipelineService {
   private async assertContact(churchId: string, id: string) {
     const row = await this.prisma.outreachContact.findFirst({ where: { id, churchId } });
     if (!row) throw new NotFoundException('Outreach contact not found');
-    return row;
+    return this.decryptContact(row);
   }
 }
