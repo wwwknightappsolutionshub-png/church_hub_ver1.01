@@ -9,6 +9,7 @@ export * from './membership-analytics';
 export * from './pastoral-care';
 export * from './communications-phase7';
 export * from './outreach';
+export * from './outreach-import';
 export * from './outreach-phase6';
 export * from './follow-up';
 export * from './bus';

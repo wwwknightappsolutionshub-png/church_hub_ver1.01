@@ -1,14 +1,15 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Megaphone, Users } from 'lucide-react';
+import { FileUp, Megaphone, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useOfflineSync } from '@/lib/hooks/use-offline-sync';
 import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { DashboardModuleShell } from '@/components/layout/DashboardModuleShell';
 import { OutreachCaptureForm } from '@/components/outreach/OutreachCaptureForm';
+import { OutreachImportWizard } from '@/components/outreach/OutreachImportWizard';
 import { EvangelistQrPanel } from '@/components/outreach/EvangelistQrPanel';
 import { SyncQueuePanel } from '@/components/outreach/SyncQueuePanel';
 import { SyncConflictsPanel } from '@/components/outreach/SyncConflictsPanel';
@@ -27,6 +28,7 @@ interface OutreachStats {
 
 export default function OutreachPage() {
   const queryClient = useQueryClient();
+  const [showImport, setShowImport] = useState(false);
 
   const refreshData = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['outreach'] });
@@ -60,9 +62,20 @@ export default function OutreachPage() {
       description={MODULE_DESCRIPTIONS.outreach}
       badge={<Badge variant="success">Offline-ready</Badge>}
       actions={
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/dashboard/outreach/field">Field mode</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant={showImport ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setShowImport((v) => !v)}
+          >
+            <FileUp className="mr-1.5 h-4 w-4" />
+            {showImport ? 'Hide CSV import' : 'Import CSV'}
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/dashboard/outreach/field">Field mode</Link>
+          </Button>
+        </div>
       }
     >
       <div className="space-y-6">
@@ -99,6 +112,25 @@ export default function OutreachPage() {
               </CardContent>
             </Card>
           </div>
+        )}
+
+        {showImport && (
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle>Bulk import contacts</CardTitle>
+              <CardDescription>
+                Upload a CSV with capture-form fields (phone, minister, notes, address). Admins and
+                pastors only.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <OutreachImportWizard
+                onComplete={() => {
+                  refreshData();
+                }}
+              />
+            </CardContent>
+          </Card>
         )}
 
         <div className="grid gap-6 lg:grid-cols-3">

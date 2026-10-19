@@ -148,6 +148,7 @@ model Church {
   deptFollowUpLogs         DeptFollowUpLog[]
   deptUnitFeedbacks        DeptUnitFeedback[]
   membershipImportJobs     MembershipImportJob[]
+  outreachImportJobs       OutreachImportJob[]
   celebrationEmailTemplates CelebrationEmailTemplate[]
   churchCalendarEvents      ChurchCalendarEvent[]
   automationEmailTemplates  AutomationEmailTemplate[]
@@ -374,6 +375,7 @@ model User {
   memberActivitiesAuthored MemberActivityLog[] @relation("MemberActivityActor")
   attendanceRecorded       AttendanceRecord[]  @relation("AttendanceRecordedBy")
   membershipImportsUploaded MembershipImportJob[] @relation("MembershipImportUploader")
+  outreachImportsUploaded   OutreachImportJob[]    @relation("OutreachImportUploader")
   sermonNotesCreated        SermonNote[]          @relation("SermonNoteCreator")
   deptUnitFeedbacksAuthored DeptUnitFeedback[]    @relation("DeptUnitFeedbackUser")
   wisdom365Subscriptions  Wisdom365Subscription[] @relation("Wisdom365Subscriber")
@@ -816,6 +818,62 @@ model MembershipImportJobRow {
   @@unique([jobId, rowIndex])
   @@index([jobId, action])
   @@map("membership_import_job_rows")
+}
+
+enum OutreachImportJobStatus {
+  UPLOADED
+  PREVIEWED
+  COMMITTED
+  FAILED
+}
+
+enum OutreachImportRowAction {
+  CREATE
+  SKIP
+  ERROR
+}
+
+model OutreachImportJob {
+  id               String                  @id @default(uuid())
+  churchId         String
+  uploadedByUserId String
+  status           OutreachImportJobStatus @default(UPLOADED)
+  sourceFilename   String?
+  columnMapping    Json                    @default("{}")
+  options          Json                    @default("{}")
+  rowCounts        Json                    @default("{}")
+  summary          Json                    @default("{}")
+  errorMessage     String?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  committedAt      DateTime?
+
+  church     Church                 @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  uploadedBy User                   @relation("OutreachImportUploader", fields: [uploadedByUserId], references: [id], onDelete: Cascade)
+  rows       OutreachImportJobRow[]
+
+  @@index([churchId, status, createdAt])
+  @@map("outreach_import_jobs")
+}
+
+model OutreachImportJobRow {
+  id        String                   @id @default(uuid())
+  jobId     String
+  rowIndex  Int
+  raw       Json
+  mapped    Json                     @default("{}")
+  action    OutreachImportRowAction?
+  error     String?
+  contactId String?
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
+
+  job     OutreachImportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  contact OutreachContact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  @@unique([jobId, rowIndex])
+  @@index([jobId, action])
+  @@map("outreach_import_job_rows")
 }
 
 enum CelebrationEmailTemplateKind {
@@ -1398,6 +1456,7 @@ model OutreachContact {
   followUp   FollowUp?         @relation(fields: [followUpId], references: [id], onDelete: SetNull)
   member     Member?           @relation("OutreachConvertedMember", fields: [memberId], references: [id], onDelete: SetNull)
   syncConflicts SyncConflict[]
+  importRows    OutreachImportJobRow[]
 
   @@index([churchId, capturedAt])
   @@index([churchId, convertStage])
