@@ -58,30 +58,28 @@ export class ChurchStaffService {
         lastLoginAt: true,
         createdAt: true,
         roles: { include: { role: { select: { name: true, description: true } } } },
-        member: { select: { id: true, status: true } },
+        member: {
+          select: {
+            id: true,
+            status: true,
+            serviceUnitLeaderships: {
+              where: { isUnitAdmin: true },
+              select: {
+                serviceUnitId: true,
+                serviceUnit: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
       },
     });
 
-    return users.map((u) => ({
-      id: u.id,
-      email: u.email,
-      firstName: u.firstName,
-      lastName: u.lastName,
-      phone: u.phone,
-      isActive: u.isActive,
-      lastLoginAt: u.lastLoginAt,
-      createdAt: u.createdAt,
-      roles: u.roles.map((r) => ({
-        name: r.role.name,
-        description: r.role.description,
-      })),
-      memberId: u.member?.id ?? null,
-      memberStatus: u.member?.status ?? null,
-    }));
+    return users.map((u) => this.toStaffDto(u));
   }
 
   async create(churchId: string, actorUserId: string, dto: CreateChurchStaffDto) {
     await this.assertCanCreate(actorUserId, churchId, dto.roles);
+    this.assertUnitLeaderAssignment(dto.roles, dto.serviceUnitIds, true);
 
     const existing = await this.prisma.user.findFirst({
       where: { email: dto.email.toLowerCase().trim() },
@@ -108,7 +106,19 @@ export class ChurchStaffService {
       },
     });
 
-    await this.ensureMemberProfile(churchId, user.id, user.email, user.firstName, user.lastName);
+    const member = await this.ensureMemberProfile(
+      churchId,
+      user.id,
+      user.email,
+      user.firstName,
+      user.lastName,
+    );
+
+    if (dto.serviceUnitIds !== undefined) {
+      await this.syncUnitAdminLeadership(churchId, member.id, dto.serviceUnitIds);
+    } else if (this.isUnitOnlyLeader(dto.roles)) {
+      throw new BadRequestException('Assign at least one service unit for a unit leader');
+    }
 
     await this.sendStaffWelcomeEmail(churchId, {
       email: user.email,
@@ -175,26 +185,23 @@ export class ChurchStaffService {
         lastLoginAt: true,
         createdAt: true,
         roles: { include: { role: { select: { name: true, description: true } } } },
-        member: { select: { id: true, status: true } },
+        member: {
+          select: {
+            id: true,
+            status: true,
+            serviceUnitLeaderships: {
+              where: { isUnitAdmin: true },
+              select: {
+                serviceUnitId: true,
+                serviceUnit: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
       },
     });
     if (!user) throw new NotFoundException('Staff user not found');
-    return {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      phone: user.phone,
-      isActive: user.isActive,
-      lastLoginAt: user.lastLoginAt,
-      createdAt: user.createdAt,
-      roles: user.roles.map((r) => ({
-        name: r.role.name,
-        description: r.role.description,
-      })),
-      memberId: user.member?.id ?? null,
-      memberStatus: user.member?.status ?? null,
-    };
+    return this.toStaffDto(user);
   }
 
   async update(
@@ -205,11 +212,34 @@ export class ChurchStaffService {
   ) {
     const user = await this.prisma.user.findFirst({
       where: { id, churchId },
-      include: { roles: { include: { role: true } } },
+      include: {
+        roles: { include: { role: true } },
+        member: { select: { id: true } },
+      },
     });
     if (!user) throw new NotFoundException('Staff user not found');
 
     await this.assertCanModify(actorUserId, churchId, user, dto.roles);
+
+    const nextRoles = dto.roles ?? user.roles.map((r) => r.role.name);
+    if (dto.serviceUnitIds !== undefined) {
+      this.assertUnitLeaderAssignment(nextRoles, dto.serviceUnitIds, false);
+    } else if (dto.roles && this.isUnitOnlyLeader(dto.roles)) {
+      const existingAdminCount = user.member
+        ? await this.prisma.serviceUnitLeader.count({
+            where: {
+              memberId: user.member.id,
+              isUnitAdmin: true,
+              serviceUnit: { churchId },
+            },
+          })
+        : 0;
+      if (existingAdminCount === 0) {
+        throw new BadRequestException(
+          'Assign at least one service unit for a unit leader',
+        );
+      }
+    }
 
     if (dto.email && dto.email.toLowerCase() !== user.email) {
       const taken = await this.prisma.user.findFirst({
@@ -253,6 +283,28 @@ export class ChurchStaffService {
           ...(dto.email ? { email: dto.email.toLowerCase().trim() } : {}),
         },
       });
+    }
+
+    const member =
+      user.member ??
+      (await this.ensureMemberProfile(
+        churchId,
+        id,
+        dto.email?.toLowerCase().trim() ?? user.email,
+        dto.firstName?.trim() ?? user.firstName,
+        dto.lastName?.trim() ?? user.lastName,
+      ));
+
+    if (dto.serviceUnitIds !== undefined) {
+      await this.syncUnitAdminLeadership(churchId, member.id, dto.serviceUnitIds);
+    } else if (
+      dto.roles &&
+      !dto.roles.includes('LEADER') &&
+      !dto.roles.includes('ADMIN') &&
+      !dto.roles.includes('PASTOR')
+    ) {
+      // No leadership-capable roles left — clear unit-admin leadership.
+      await this.syncUnitAdminLeadership(churchId, member.id, []);
     }
 
     return this.findOne(churchId, id);
@@ -346,9 +398,9 @@ export class ChurchStaffService {
     lastName: string,
   ) {
     const existing = await this.prisma.member.findUnique({ where: { userId } });
-    if (existing) return;
+    if (existing) return existing;
 
-    await this.prisma.member.create({
+    return this.prisma.member.create({
       data: {
         churchId,
         userId,
@@ -360,5 +412,150 @@ export class ChurchStaffService {
         gamification: { create: {} },
       },
     });
+  }
+
+  private isUnitOnlyLeader(roles: string[]): boolean {
+    return (
+      roles.includes('LEADER') &&
+      !roles.includes('ADMIN') &&
+      !roles.includes('PASTOR')
+    );
+  }
+
+  private assertUnitLeaderAssignment(
+    roles: string[],
+    serviceUnitIds: string[] | undefined,
+    requireOnCreate: boolean,
+  ) {
+    if (!this.isUnitOnlyLeader(roles)) return;
+    if (requireOnCreate && (!serviceUnitIds || serviceUnitIds.length === 0)) {
+      throw new BadRequestException('Assign at least one service unit for a unit leader');
+    }
+    if (serviceUnitIds !== undefined && serviceUnitIds.length === 0) {
+      throw new BadRequestException('Assign at least one service unit for a unit leader');
+    }
+  }
+
+  /**
+   * Replace unit-admin leadership for a member with exactly `serviceUnitIds`
+   * (must all belong to this church). Also ensures ServiceUnitMember rows.
+   */
+  async syncUnitAdminLeadership(
+    churchId: string,
+    memberId: string,
+    serviceUnitIds: string[],
+  ) {
+    const uniqueIds = [...new Set(serviceUnitIds)];
+    if (uniqueIds.length) {
+      const units = await this.prisma.serviceUnit.findMany({
+        where: { churchId, id: { in: uniqueIds } },
+        select: { id: true },
+      });
+      if (units.length !== uniqueIds.length) {
+        throw new BadRequestException(
+          'One or more service units are invalid for this church',
+        );
+      }
+    }
+
+    const existing = await this.prisma.serviceUnitLeader.findMany({
+      where: {
+        memberId,
+        serviceUnit: { churchId },
+        isUnitAdmin: true,
+      },
+      select: { id: true, serviceUnitId: true },
+    });
+
+    const want = new Set(uniqueIds);
+    const toRemove = existing.filter((e) => !want.has(e.serviceUnitId));
+    if (toRemove.length) {
+      await this.prisma.serviceUnitLeader.deleteMany({
+        where: { id: { in: toRemove.map((r) => r.id) } },
+      });
+    }
+
+    for (const serviceUnitId of uniqueIds) {
+      await this.prisma.serviceUnitMember.upsert({
+        where: {
+          serviceUnitId_memberId: { serviceUnitId, memberId },
+        },
+        create: { serviceUnitId, memberId },
+        update: {},
+      });
+      await this.prisma.serviceUnitLeader.upsert({
+        where: {
+          serviceUnitId_memberId: { serviceUnitId, memberId },
+        },
+        create: {
+          serviceUnitId,
+          memberId,
+          role: 'UNIT ADMIN',
+          isModerator: true,
+          isUnitAdmin: true,
+        },
+        update: {
+          role: 'UNIT ADMIN',
+          isModerator: true,
+          isUnitAdmin: true,
+        },
+      });
+    }
+
+    if (uniqueIds.length) {
+      const member = await this.prisma.member.findUnique({
+        where: { id: memberId },
+        select: { roles: true },
+      });
+      if (member && !member.roles.includes('LEADER')) {
+        await this.prisma.member.update({
+          where: { id: memberId },
+          data: { roles: [...member.roles, 'LEADER'] },
+        });
+      }
+    }
+  }
+
+  private toStaffDto(user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    phone: string | null;
+    isActive: boolean;
+    lastLoginAt: Date | null;
+    createdAt: Date;
+    roles: { role: { name: string; description: string | null } }[];
+    member: {
+      id: string;
+      status: string;
+      serviceUnitLeaderships?: {
+        serviceUnitId: string;
+        serviceUnit: { id: string; name: string };
+      }[];
+    } | null;
+  }) {
+    const led = user.member?.serviceUnitLeaderships ?? [];
+    return {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phone: user.phone,
+      isActive: user.isActive,
+      lastLoginAt: user.lastLoginAt,
+      createdAt: user.createdAt,
+      roles: user.roles.map((r) => ({
+        name: r.role.name,
+        description: r.role.description,
+      })),
+      memberId: user.member?.id ?? null,
+      memberStatus: user.member?.status ?? null,
+      serviceUnitIds: led.map((l) => l.serviceUnitId),
+      ledServiceUnits: led.map((l) => ({
+        id: l.serviceUnit.id,
+        name: l.serviceUnit.name,
+      })),
+    };
   }
 }

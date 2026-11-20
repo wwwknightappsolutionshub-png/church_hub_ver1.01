@@ -1,4 +1,5 @@
 import {
+  ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsBoolean,
@@ -6,6 +7,7 @@ import {
   IsIn,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -63,6 +65,13 @@ export class CreateChurchStaffDto {
   @ArrayMinSize(1)
   @IsIn(CHURCH_ASSIGNABLE_ROLES, { each: true })
   roles!: ChurchAssignableRole[];
+
+  /** Units this person leads as unit admin (required for LEADER without ADMIN/PASTOR). */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsUUID('4', { each: true })
+  serviceUnitIds?: string[];
 }
 
 export class UpdateChurchStaffDto {
@@ -107,4 +116,11 @@ export class UpdateChurchStaffDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  /** When provided, replaces unit-admin leadership for this staff member. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsUUID('4', { each: true })
+  serviceUnitIds?: string[];
 }

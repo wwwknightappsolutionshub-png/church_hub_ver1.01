@@ -393,41 +393,76 @@ export const CHURCH_ASSIGNABLE_ROLE_VALUES = [
   'DRIVER',
 ] as const;
 
-export const CreateChurchStaffSchema = z.object({
-  email: emailSchema,
-  password: passwordSchema,
-  firstName: z
-    .string()
-    .transform((v) => sanitizeText(v, 80))
-    .pipe(z.string().min(1, 'Required').max(80)),
-  lastName: z
-    .string()
-    .transform((v) => sanitizeText(v, 80))
-    .pipe(z.string().min(1, 'Required').max(80)),
-  phone: optionalPhoneSchema,
-  roles: z
-    .array(z.enum(CHURCH_ASSIGNABLE_ROLE_VALUES))
-    .min(1, 'Select at least one role'),
-});
+const serviceUnitIdsSchema = z.array(z.string().uuid()).max(50);
+
+export const CreateChurchStaffSchema = z
+  .object({
+    email: emailSchema,
+    password: passwordSchema,
+    firstName: z
+      .string()
+      .transform((v) => sanitizeText(v, 80))
+      .pipe(z.string().min(1, 'Required').max(80)),
+    lastName: z
+      .string()
+      .transform((v) => sanitizeText(v, 80))
+      .pipe(z.string().min(1, 'Required').max(80)),
+    phone: optionalPhoneSchema,
+    roles: z
+      .array(z.enum(CHURCH_ASSIGNABLE_ROLE_VALUES))
+      .min(1, 'Select at least one role'),
+    /** Service units this person leads as unit admin (required when LEADER without ADMIN/PASTOR). */
+    serviceUnitIds: serviceUnitIdsSchema.optional(),
+  })
+  .superRefine((data, ctx) => {
+    const isChurchWide = data.roles.includes('ADMIN') || data.roles.includes('PASTOR');
+    if (data.roles.includes('LEADER') && !isChurchWide) {
+      if (!data.serviceUnitIds?.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['serviceUnitIds'],
+          message: 'Assign at least one service unit for a unit leader',
+        });
+      }
+    }
+  });
 export type CreateChurchStaffInput = z.infer<typeof CreateChurchStaffSchema>;
 
-export const UpdateChurchStaffSchema = z.object({
-  email: emailSchema.optional(),
-  password: passwordSchema.optional(),
-  firstName: z
-    .string()
-    .transform((v) => sanitizeText(v, 80))
-    .pipe(z.string().min(1).max(80))
-    .optional(),
-  lastName: z
-    .string()
-    .transform((v) => sanitizeText(v, 80))
-    .pipe(z.string().min(1).max(80))
-    .optional(),
-  phone: optionalPhoneSchema,
-  roles: z.array(z.enum(CHURCH_ASSIGNABLE_ROLE_VALUES)).min(1).optional(),
-  isActive: z.boolean().optional(),
-});
+export const UpdateChurchStaffSchema = z
+  .object({
+    email: emailSchema.optional(),
+    password: passwordSchema.optional(),
+    firstName: z
+      .string()
+      .transform((v) => sanitizeText(v, 80))
+      .pipe(z.string().min(1).max(80))
+      .optional(),
+    lastName: z
+      .string()
+      .transform((v) => sanitizeText(v, 80))
+      .pipe(z.string().min(1).max(80))
+      .optional(),
+    phone: optionalPhoneSchema,
+    roles: z.array(z.enum(CHURCH_ASSIGNABLE_ROLE_VALUES)).min(1).optional(),
+    isActive: z.boolean().optional(),
+    /** When set, replaces unit-admin leadership for this staff member. */
+    serviceUnitIds: serviceUnitIdsSchema.optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.roles) return;
+    const isChurchWide = data.roles.includes('ADMIN') || data.roles.includes('PASTOR');
+    if (data.roles.includes('LEADER') && !isChurchWide) {
+      // When roles become unit-only LEADER, empty unit list is never valid.
+      // Omitting serviceUnitIds is allowed so existing assignments can be kept.
+      if (data.serviceUnitIds !== undefined && !data.serviceUnitIds.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['serviceUnitIds'],
+          message: 'Assign at least one service unit for a unit leader',
+        });
+      }
+    }
+  });
 export type UpdateChurchStaffInput = z.infer<typeof UpdateChurchStaffSchema>;
 
 export const CreatePlatformChurchSchema = z.object({

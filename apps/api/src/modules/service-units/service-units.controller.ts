@@ -87,16 +87,27 @@ export class ServiceUnitsController {
   }
 
   @Post()
-  @Roles('ADMIN', 'PASTOR', 'LEADER')
-  @ApiOperation({ summary: 'Create a service unit' })
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({ summary: 'Create a service unit (church staff only)' })
   create(@ChurchId() churchId: string, @Body() body: Record<string, unknown>) {
     return this.serviceUnits.createUnit(churchId, body as Parameters<ServiceUnitsService['createUnit']>[1]);
   }
 
   @Patch(':id')
   @Roles('ADMIN', 'PASTOR', 'LEADER')
-  update(@ChurchId() churchId: string, @Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.serviceUnits.updateUnit(churchId, id, body);
+  @ApiOperation({ summary: 'Update a service unit (church staff or unit admin of this unit)' })
+  update(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.serviceUnits.updateUnit(
+      user.userId,
+      churchId,
+      id,
+      body as Parameters<ServiceUnitsService['updateUnit']>[3],
+    );
   }
 
   @Delete(':id')

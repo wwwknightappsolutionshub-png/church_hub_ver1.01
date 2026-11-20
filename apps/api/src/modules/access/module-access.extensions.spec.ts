@@ -55,12 +55,16 @@ describe('ModuleAccessService extensions', () => {
   it('allows department tools for unit leaders who are not church staff', () => {
     const leader: UserMemberContext = {
       ...staffCtx,
-      userRoles: ['MEMBER'],
+      userRoles: ['LEADER'],
       memberRoles: [],
       unitLeaderUnitIds: ['unit-choir'],
-      unitAdminUnitIds: [],
+      unitAdminUnitIds: ['unit-choir'],
     };
+    expect(service.isChurchStaff(leader)).toBe(false);
+    expect(service.canManageStaff(leader)).toBe(false);
     expect(service.canAccessDepartmentTools(leader)).toBe(true);
+    expect(service.canManageServiceUnit(leader, 'unit-choir')).toBe(true);
+    expect(service.canManageServiceUnit(leader, 'unit-other')).toBe(false);
   });
 
   it('denies department tools for regular members', () => {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2, Plus, Shield, Trash2, UserCog } from 'lucide-react';
+import { Loader2, Plus, Shield, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -29,6 +29,11 @@ const ASSIGNABLE_ROLES = [
   'DRIVER',
 ] as const;
 
+interface LedServiceUnit {
+  id: string;
+  name: string;
+}
+
 interface StaffUser {
   id: string;
   email: string;
@@ -37,12 +42,23 @@ interface StaffUser {
   phone: string | null;
   isActive: boolean;
   roles: { name: string; description: string | null }[];
+  serviceUnitIds?: string[];
+  ledServiceUnits?: LedServiceUnit[];
+}
+
+interface ServiceUnitOption {
+  id: string;
+  name: string;
+}
+
+function isUnitOnlyLeader(roles: string[]) {
+  return roles.includes('LEADER') && !roles.includes('ADMIN') && !roles.includes('PASTOR');
 }
 
 export default function ChurchStaffPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { canManageStaff, isPlatformOperator, isLoading: accessLoading, userRoles } =
+  const { canManageStaff, isPlatformOperator, isLoading: accessLoading } =
     useModuleAccess();
   const [showForm, setShowForm] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -53,6 +69,7 @@ export default function ChurchStaffPage() {
     firstName: '',
     lastName: '',
     roles: ['ADMIN'] as string[],
+    serviceUnitIds: [] as string[],
   });
 
   useEffect(() => {
@@ -67,6 +84,12 @@ export default function ChurchStaffPage() {
     { enabled: canManageStaff && !isPlatformOperator },
   );
 
+  const { data: serviceUnits } = useApiQuery<ServiceUnitOption[]>(
+    ['service-units', 'staff-assign'],
+    '/service-units',
+    { enabled: canManageStaff && !isPlatformOperator && showForm },
+  );
+
   const resetForm = () => {
     setForm({
       email: '',
@@ -74,6 +97,7 @@ export default function ChurchStaffPage() {
       firstName: '',
       lastName: '',
       roles: ['ADMIN'],
+      serviceUnitIds: [],
     });
     setEditingId(null);
     setShowForm(false);
@@ -87,6 +111,7 @@ export default function ChurchStaffPage() {
       firstName: u.firstName,
       lastName: u.lastName,
       roles: u.roles.map((r) => r.name),
+      serviceUnitIds: u.serviceUnitIds ?? u.ledServiceUnits?.map((x) => x.id) ?? [],
     });
     setShowForm(true);
   };
@@ -95,6 +120,8 @@ export default function ChurchStaffPage() {
     e.preventDefault();
     setBusy(true);
     try {
+      const includeUnits =
+        form.roles.includes('LEADER') || form.serviceUnitIds.length > 0;
       if (editingId) {
         const payload: Record<string, unknown> = {
           email: form.email,
@@ -103,6 +130,7 @@ export default function ChurchStaffPage() {
           roles: form.roles,
         };
         if (form.password) payload.password = form.password;
+        if (includeUnits) payload.serviceUnitIds = form.serviceUnitIds;
         const parsed = UpdateChurchStaffSchema.safeParse(payload);
         if (!parsed.success) {
           toast.error(parsed.error.issues[0]?.message ?? 'Check the form fields');
@@ -111,7 +139,11 @@ export default function ChurchStaffPage() {
         await api.patch(`/church-staff/${editingId}`, parsed.data);
         toast.success('Staff updated');
       } else {
-        const parsed = CreateChurchStaffSchema.safeParse(form);
+        const payload = {
+          ...form,
+          ...(includeUnits ? { serviceUnitIds: form.serviceUnitIds } : {}),
+        };
+        const parsed = CreateChurchStaffSchema.safeParse(payload);
         if (!parsed.success) {
           toast.error(parsed.error.issues[0]?.message ?? 'Check the form fields');
           return;
@@ -159,12 +191,32 @@ export default function ChurchStaffPage() {
     setForm((f) => {
       const has = f.roles.includes(role);
       if (has && f.roles.length === 1) return f;
+      const roles = has ? f.roles.filter((r) => r !== role) : [...f.roles, role];
+      const next = { ...f, roles };
+      if (!roles.includes('LEADER') && !roles.includes('ADMIN') && !roles.includes('PASTOR')) {
+        next.serviceUnitIds = [];
+      }
+      return next;
+    });
+  };
+
+  const toggleUnit = (unitId: string) => {
+    setForm((f) => {
+      const has = f.serviceUnitIds.includes(unitId);
       return {
         ...f,
-        roles: has ? f.roles.filter((r) => r !== role) : [...f.roles, role],
+        serviceUnitIds: has
+          ? f.serviceUnitIds.filter((id) => id !== unitId)
+          : [...f.serviceUnitIds, unitId],
       };
     });
   };
+
+  const showUnitPicker =
+    form.roles.includes('LEADER') ||
+    form.roles.includes('ADMIN') ||
+    form.roles.includes('PASTOR');
+  const unitsRequired = isUnitOnlyLeader(form.roles);
 
   if (accessLoading || !canManageStaff) {
     return (
@@ -196,8 +248,11 @@ export default function ChurchStaffPage() {
           <CardContent>
             <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm font-medium">Email</label>
+                <label htmlFor="staff-email" className="mb-1 block text-sm font-medium">
+                  Email
+                </label>
                 <Input
+                  id="staff-email"
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
@@ -205,10 +260,11 @@ export default function ChurchStaffPage() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium">
+                <label htmlFor="staff-password" className="mb-1 block text-sm font-medium">
                   Password {editingId ? '(leave blank to keep)' : ''}
                 </label>
                 <Input
+                  id="staff-password"
                   type="password"
                   value={form.password}
                   onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
@@ -217,16 +273,22 @@ export default function ChurchStaffPage() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium">First name</label>
+                <label htmlFor="staff-first-name" className="mb-1 block text-sm font-medium">
+                  First name
+                </label>
                 <Input
+                  id="staff-first-name"
                   value={form.firstName}
                   onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
                   required
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium">Last name</label>
+                <label htmlFor="staff-last-name" className="mb-1 block text-sm font-medium">
+                  Last name
+                </label>
                 <Input
+                  id="staff-last-name"
                   value={form.lastName}
                   onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
                   required
@@ -250,7 +312,42 @@ export default function ChurchStaffPage() {
                     );
                   })}
                 </div>
+                {unitsRequired ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    LEADER without ADMIN/PASTOR is a unit leader only — assign at least one
+                    service unit. They get unit-scoped access, not church-wide staff tools.
+                  </p>
+                ) : null}
               </div>
+              {showUnitPicker ? (
+                <div className="sm:col-span-2">
+                  <label className="mb-2 block text-sm font-medium">
+                    Leads service units
+                    {unitsRequired ? ' (required)' : ' (optional)'}
+                  </label>
+                  {!serviceUnits?.length ? (
+                    <p className="text-sm text-muted-foreground">
+                      No service units yet. Create units in Service Unit Hub first.
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {serviceUnits.map((unit) => (
+                        <Button
+                          key={unit.id}
+                          type="button"
+                          size="sm"
+                          variant={
+                            form.serviceUnitIds.includes(unit.id) ? 'default' : 'outline'
+                          }
+                          onClick={() => toggleUnit(unit.id)}
+                        >
+                          {unit.name}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : null}
               <div className="flex gap-2 sm:col-span-2">
                 <Button type="submit" disabled={busy}>
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
@@ -284,6 +381,7 @@ export default function ChurchStaffPage() {
                     <th className="pb-2 pr-4">Name</th>
                     <th className="pb-2 pr-4">Email</th>
                     <th className="pb-2 pr-4">Roles</th>
+                    <th className="pb-2 pr-4">Units led</th>
                     <th className="pb-2">Actions</th>
                   </tr>
                 </thead>
@@ -306,6 +404,19 @@ export default function ChurchStaffPage() {
                               {r.name}
                             </Badge>
                           ))}
+                        </div>
+                      </td>
+                      <td className="py-3 pr-4">
+                        <div className="flex flex-wrap gap-1">
+                          {(u.ledServiceUnits ?? []).length ? (
+                            u.ledServiceUnits!.map((unit) => (
+                              <Badge key={unit.id} variant="secondary" className="text-[10px]">
+                                {unit.name}
+                              </Badge>
+                            ))
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </div>
                       </td>
                       <td className="py-3">

@@ -136,6 +136,38 @@ describe('B2–B4 shared Zod schemas (API contract)', () => {
     expect(parsed.success).toBe(false);
   });
 
+  it('CreateChurchStaffSchema requires serviceUnitIds for unit-only LEADER', () => {
+    const missing = CreateChurchStaffSchema.safeParse({
+      email: 'leader@demo.church',
+      password: 'ChurchHub123!',
+      firstName: 'Unit',
+      lastName: 'Leader',
+      roles: ['LEADER'],
+    });
+    expect(missing.success).toBe(false);
+
+    const ok = CreateChurchStaffSchema.safeParse({
+      email: 'leader@demo.church',
+      password: 'ChurchHub123!',
+      firstName: 'Unit',
+      lastName: 'Leader',
+      roles: ['LEADER'],
+      serviceUnitIds: ['33333333-3333-4333-8333-333333333333'],
+    });
+    expect(ok.success).toBe(true);
+  });
+
+  it('CreateChurchStaffSchema allows ADMIN without serviceUnitIds', () => {
+    const parsed = CreateChurchStaffSchema.safeParse({
+      email: 'admin@demo.church',
+      password: 'ChurchHub123!',
+      firstName: 'Ann',
+      lastName: 'Admin',
+      roles: ['ADMIN'],
+    });
+    expect(parsed.success).toBe(true);
+  });
+
   it('CreatePlatformChurchSchema rejects empty slug', () => {
     const parsed = CreatePlatformChurchSchema.safeParse({
       name: 'Demo Church',

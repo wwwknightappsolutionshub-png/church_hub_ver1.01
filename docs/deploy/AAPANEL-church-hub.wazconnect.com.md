@@ -3,7 +3,8 @@
 Production uses **PM2 on the host** (same model as your other VPS apps). There is **no Docker** in this project.
 
 **Public URL:** https://church-hub.wazconnect.com  
-**Code path:** `/www/wwwroot/church-hub.wazconnect.com`
+**Code path:** `/www/wwwroot/church-hub.wazconnect.com`  
+**Release tags:** see [docs/releases/](../releases/) (current: `church_hub_ver1.02`)
 
 | Component | How it runs |
 |-----------|-------------|

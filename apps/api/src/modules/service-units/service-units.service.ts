@@ -723,11 +723,12 @@ export class ServiceUnitsService {
   }
 
   async updateUnit(
+    userId: string,
     churchId: string,
     id: string,
     data: Partial<{ name: string; description: string; activities: string; imageUrl: string; isActive: boolean }>,
   ) {
-    await this.getUnit(churchId, id);
+    await this.requireUnitManager(userId, churchId, id);
     return this.prisma.serviceUnit.update({ where: { id }, data });
   }
 

@@ -17,6 +17,8 @@ const PROTECTED_ROUTES: Array<{ method: 'get' | 'post'; path: string }> = [
   { method: 'get', path: '/api/v1/outreach/pipeline' },
   { method: 'get', path: '/api/v1/communications/queue' },
   { method: 'get', path: '/api/v1/service-units/departments' },
+  { method: 'get', path: '/api/v1/church-staff' },
+  { method: 'post', path: '/api/v1/church-staff' },
   { method: 'get', path: '/api/v1/automation/status' },
   { method: 'post', path: '/api/v1/automation/weekly' },
 ];
