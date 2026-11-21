@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { MemberGender, MemberRoleType, MemberStatus, Prisma } from '@prisma/client';
+import { optionalPhoneSchema } from '@church-hub/shared-types';
 import { PrismaService } from '../../prisma/prisma.module';
 import type { PaginatedResult } from '../devotional-hub/dto/pagination.dto';
 import { weekStartUtc } from '../service-units/service-units-department.util';
@@ -11,6 +12,12 @@ import {
 } from './membership.constants';
 import { MembershipActivityService } from './membership-activity.service';
 import { MembershipRegistryService } from './membership-registry.service';
+
+function normalizeOptionalUkPhone(value?: string | null): string | null {
+  if (value == null || !String(value).trim()) return null;
+  const parsed = optionalPhoneSchema.safeParse(value);
+  return parsed.success ? (parsed.data ?? null) : null;
+}
 
 const memberInclude = {
   family: true,
@@ -216,7 +223,9 @@ export class MembershipService {
           state: data.state,
           zip: data.zip,
           country: data.country,
-          homePhone: data.homePhone ?? data.phone,
+          homePhone:
+            normalizeOptionalUkPhone(data.homePhone) ||
+            normalizeOptionalUkPhone(data.phone),
           email: data.email,
         },
       });
@@ -236,10 +245,13 @@ export class MembershipService {
         gender: this.registry.parseGender(data.gender),
         email: data.email?.trim() || null,
         workEmail: data.workEmail?.trim() || null,
-        phone: data.phone?.trim() || data.cellPhone?.trim() || null,
-        homePhone: data.homePhone?.trim() || null,
-        workPhone: data.workPhone?.trim() || null,
-        cellPhone: data.cellPhone?.trim() || null,
+        phone:
+          normalizeOptionalUkPhone(data.phone) ||
+          normalizeOptionalUkPhone(data.cellPhone) ||
+          null,
+        homePhone: normalizeOptionalUkPhone(data.homePhone),
+        workPhone: normalizeOptionalUkPhone(data.workPhone),
+        cellPhone: normalizeOptionalUkPhone(data.cellPhone),
         dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
         hideAge: data.hideAge ?? false,
         membershipDate: data.membershipDate ? new Date(data.membershipDate) : undefined,
@@ -341,33 +353,49 @@ export class MembershipService {
     }>,
     actorUserId?: string,
   ) {
-    await this.getMember(churchId, id);
+    const existing = await this.prisma.member.findFirst({
+      where: { id, churchId },
+      select: {
+        firstName: true,
+        lastName: true,
+        email: true,
+        workEmail: true,
+        homePhone: true,
+        cellPhone: true,
+        workPhone: true,
+        phone: true,
+        address: true,
+        zip: true,
+      },
+    });
+    if (!existing) throw new NotFoundException('Member not found');
+
+    // Format-check only fields present on this request (avoid rejecting legacy bad stored values).
+    this.registry.validateCongregantPayload({
+      firstName: data.firstName ?? existing.firstName,
+      lastName: data.lastName ?? existing.lastName,
+      email: data.email,
+      workEmail: data.workEmail,
+      homePhone: data.homePhone,
+      cellPhone: data.cellPhone,
+      workPhone: data.workPhone,
+      phone: data.phone,
+      requireContactFields: false,
+    });
     if (data.requireContactFields) {
-      const existing = await this.prisma.member.findFirst({
-        where: { id, churchId },
-        select: {
-          firstName: true,
-          lastName: true,
-          email: true,
-          homePhone: true,
-          cellPhone: true,
-          phone: true,
-          address: true,
-          zip: true,
-        },
-      });
       this.registry.validateCongregantPayload({
-        firstName: data.firstName ?? existing?.firstName,
-        lastName: data.lastName ?? existing?.lastName,
-        email: data.email ?? existing?.email ?? undefined,
-        homePhone: data.homePhone ?? existing?.homePhone ?? undefined,
-        cellPhone: data.cellPhone ?? existing?.cellPhone ?? undefined,
-        phone: data.phone ?? existing?.phone ?? undefined,
-        address: data.address ?? existing?.address ?? undefined,
-        zip: data.zip ?? existing?.zip ?? undefined,
+        firstName: data.firstName ?? existing.firstName,
+        lastName: data.lastName ?? existing.lastName,
+        email: data.email ?? existing.email ?? undefined,
+        homePhone: data.homePhone ?? existing.homePhone ?? undefined,
+        cellPhone: data.cellPhone ?? existing.cellPhone ?? undefined,
+        phone: data.phone ?? existing.phone ?? undefined,
+        address: data.address ?? existing.address ?? undefined,
+        zip: data.zip ?? existing.zip ?? undefined,
         requireContactFields: true,
       });
     }
+
     const {
       dateOfBirth,
       membershipDate,
@@ -379,12 +407,20 @@ export class MembershipService {
       serviceUnitIds,
       cellBranchId,
       requireContactFields: _requireContactFields,
+      phone,
+      homePhone,
+      workPhone,
+      cellPhone,
       ...rest
     } = data;
     const updated = await this.prisma.member.update({
       where: { id },
       data: {
         ...rest,
+        ...(phone !== undefined ? { phone: normalizeOptionalUkPhone(phone) } : {}),
+        ...(homePhone !== undefined ? { homePhone: normalizeOptionalUkPhone(homePhone) } : {}),
+        ...(workPhone !== undefined ? { workPhone: normalizeOptionalUkPhone(workPhone) } : {}),
+        ...(cellPhone !== undefined ? { cellPhone: normalizeOptionalUkPhone(cellPhone) } : {}),
         ...(gender !== undefined ? { gender: this.registry.parseGender(gender) } : {}),
         ...(specialOccasionDate !== undefined
           ? { specialOccasionDate: specialOccasionDate ? new Date(specialOccasionDate) : null }
@@ -595,6 +631,14 @@ export class MembershipService {
     },
   ) {
     await this.getFamily(churchId, familyId);
+    if (data.homePhone !== undefined && data.homePhone !== null && String(data.homePhone).trim()) {
+      const parsed = optionalPhoneSchema.safeParse(data.homePhone);
+      if (!parsed.success) {
+        throw new BadRequestException(
+          parsed.error.issues[0]?.message ?? 'Enter a valid UK home phone',
+        );
+      }
+    }
     const { customFields, propertyIds, specialOccasionDate, ...rest } = data;
     const family = await this.prisma.family.update({
       where: { id: familyId },
@@ -607,7 +651,9 @@ export class MembershipService {
         ...(rest.state !== undefined ? { state: rest.state } : {}),
         ...(rest.zip !== undefined ? { zip: rest.zip } : {}),
         ...(rest.country !== undefined ? { country: rest.country } : {}),
-        ...(rest.homePhone !== undefined ? { homePhone: rest.homePhone } : {}),
+        ...(rest.homePhone !== undefined
+          ? { homePhone: normalizeOptionalUkPhone(rest.homePhone) }
+          : {}),
         ...(rest.email !== undefined ? { email: rest.email } : {}),
         ...(rest.homeCell !== undefined ? { homeCell: rest.homeCell?.trim() || null } : {}),
         ...(rest.specialOccasion !== undefined
@@ -650,6 +696,14 @@ export class MembershipService {
       propertyIds?: string[];
     },
   ) {
+    if (data?.homePhone != null && String(data.homePhone).trim()) {
+      const parsed = optionalPhoneSchema.safeParse(data.homePhone);
+      if (!parsed.success) {
+        throw new BadRequestException(
+          parsed.error.issues[0]?.message ?? 'Enter a valid UK home phone',
+        );
+      }
+    }
     const family = await this.prisma.family.create({
       data: {
         churchId,
@@ -661,7 +715,7 @@ export class MembershipService {
         state: data?.state,
         zip: data?.zip,
         country: data?.country,
-        homePhone: data?.homePhone,
+        homePhone: normalizeOptionalUkPhone(data?.homePhone),
         email: data?.email,
         homeCell: data?.homeCell?.trim() || null,
         specialOccasion: data?.specialOccasion?.trim() || null,

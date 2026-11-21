@@ -1,4 +1,5 @@
 import * as ExcelJS from 'exceljs';
+import { optionalFlexiblePhoneSchema } from '@church-hub/shared-types';
 import { parseCsvText } from '../membership/membership-import-csv.util';
 
 export const UNIT_MEMBER_IMPORT_HEADERS = [
@@ -106,12 +107,27 @@ function mapRowsFromTable(
       return;
     }
 
+    let normalizedPhone: string | undefined;
+    if (phone) {
+      const parsed = optionalFlexiblePhoneSchema.safeParse(phone);
+      if (!parsed.success) {
+        failures.push({
+          rowIndex,
+          reason:
+            parsed.error.issues[0]?.message ??
+            `Invalid phone: ${phone.slice(0, 40)}`,
+        });
+        return;
+      }
+      normalizedPhone = parsed.data;
+    }
+
     rows.push({
       rowIndex,
       firstName: firstName.slice(0, 80),
       lastName: lastName.slice(0, 80),
       email: email ? email.slice(0, 200) : undefined,
-      phone: phone ? phone.slice(0, 40) : undefined,
+      phone: normalizedPhone,
     });
   });
 

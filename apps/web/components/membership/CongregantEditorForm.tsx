@@ -16,7 +16,12 @@ import { CustomFieldsFormSection } from '@/components/membership/CustomFieldsFor
 import { MultiStepFormDialog } from '@/components/membership/MultiStepFormDialog';
 import { FieldLabel, WizardSection } from '@/components/membership/WizardFormSection';
 import { addressFieldLabel } from '@/lib/membership/address-labels';
-import { filterPhoneTyping } from '@/lib/contact-validation';
+import {
+  emailFormatError,
+  filterPhoneTyping,
+  parseOptionalUkPhone,
+  phoneFormatError,
+} from '@/lib/contact-validation';
 import { cn } from '@/lib/utils';
 
 const CONGREGANT_STEPS = [
@@ -291,10 +296,14 @@ export function CongregantEditorForm({
       gender: form.gender,
       email: (form.email ?? '').trim(),
       workEmail: form.workEmail,
-      homePhone: form.homePhone,
-      workPhone: form.workPhone,
-      cellPhone: form.cellPhone,
-      phone: form.cellPhone || form.homePhone || form.workPhone,
+      homePhone: parseOptionalUkPhone(form.homePhone ?? '') ?? '',
+      workPhone: parseOptionalUkPhone(form.workPhone ?? '') ?? '',
+      cellPhone: parseOptionalUkPhone(form.cellPhone ?? '') ?? '',
+      phone:
+        parseOptionalUkPhone(form.cellPhone ?? '') ||
+        parseOptionalUkPhone(form.homePhone ?? '') ||
+        parseOptionalUkPhone(form.workPhone ?? '') ||
+        '',
       dateOfBirth: buildDateOfBirth(form.birthMonth, form.birthDay, form.birthYear),
       hideAge: form.hideAge,
       membershipDate: form.membershipDate || undefined,
@@ -337,9 +346,25 @@ export function CongregantEditorForm({
         toast.error('Email is required');
         return false;
       }
+      const emailErr = emailFormatError(form.email ?? '');
+      if (emailErr) {
+        toast.error(emailErr);
+        return false;
+      }
       if (!hasPhone(form)) {
         toast.error('At least one phone number is required');
         return false;
+      }
+      for (const [label, value] of [
+        ['Mobile phone', form.cellPhone],
+        ['Home phone', form.homePhone],
+        ['Work phone', form.workPhone],
+      ] as const) {
+        const phoneErr = phoneFormatError(value ?? '');
+        if (phoneErr) {
+          toast.error(`${label}: ${phoneErr}`);
+          return false;
+        }
       }
       if (!(form.address ?? '').trim()) {
         toast.error('Address is required');

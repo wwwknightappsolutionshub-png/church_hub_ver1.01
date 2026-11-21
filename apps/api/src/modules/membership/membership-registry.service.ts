@@ -13,6 +13,7 @@ import type {
   MembershipEmailLinksDto,
   MembershipRegistryCatalogDto,
 } from '@church-hub/shared-types';
+import { optionalEmailSchema, optionalPhoneSchema } from '@church-hub/shared-types';
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
 
 @Injectable()
@@ -670,8 +671,10 @@ export class MembershipRegistryService {
       firstName?: string;
       lastName?: string;
       email?: string;
+      workEmail?: string;
       homePhone?: string;
       cellPhone?: string;
+      workPhone?: string;
       phone?: string;
       address?: string;
       zip?: string;
@@ -680,6 +683,14 @@ export class MembershipRegistryService {
   ) {
     if (!data.firstName?.trim()) throw new BadRequestException('First name is required');
     if (!data.lastName?.trim()) throw new BadRequestException('Last name is required');
+
+    this.assertOptionalEmail(data.email, 'Email');
+    this.assertOptionalEmail(data.workEmail, 'Work email');
+    this.assertOptionalUkPhone(data.phone, 'Phone');
+    this.assertOptionalUkPhone(data.cellPhone, 'Mobile phone');
+    this.assertOptionalUkPhone(data.homePhone, 'Home phone');
+    this.assertOptionalUkPhone(data.workPhone, 'Work phone');
+
     if (!data.requireContactFields) return;
     if (!data.email?.trim()) throw new BadRequestException('Email is required');
     const hasPhone = Boolean(
@@ -688,6 +699,26 @@ export class MembershipRegistryService {
     if (!hasPhone) throw new BadRequestException('Phone number is required');
     if (!data.address?.trim()) throw new BadRequestException('Address is required');
     if (!data.zip?.trim()) throw new BadRequestException('Post code is required');
+  }
+
+  private assertOptionalEmail(value: string | undefined, label: string) {
+    if (value == null || !String(value).trim()) return;
+    const parsed = optionalEmailSchema.safeParse(value);
+    if (!parsed.success) {
+      throw new BadRequestException(
+        parsed.error.issues[0]?.message ?? `Enter a valid ${label.toLowerCase()}`,
+      );
+    }
+  }
+
+  private assertOptionalUkPhone(value: string | undefined, label: string) {
+    if (value == null || !String(value).trim()) return;
+    const parsed = optionalPhoneSchema.safeParse(value);
+    if (!parsed.success) {
+      throw new BadRequestException(
+        parsed.error.issues[0]?.message ?? `${label}: enter a valid UK phone number`,
+      );
+    }
   }
 
   async syncCongregantServiceGroups(

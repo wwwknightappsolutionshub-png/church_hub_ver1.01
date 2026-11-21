@@ -12,6 +12,7 @@ import {
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
+import { IsOptionalFlexiblePhone } from '../../../common/decorators/is-optional-phone.decorator';
 
 function emptyToUndefined(value: unknown) {
   if (typeof value !== 'string') return value;
@@ -104,8 +105,7 @@ export class ServiceUnitPersonInputDto {
   email?: string;
 
   @IsOptional()
-  @Transform(({ value }) => emptyToUndefined(value))
-  @IsString()
+  @IsOptionalFlexiblePhone()
   @MaxLength(40)
   phone?: string;
 }

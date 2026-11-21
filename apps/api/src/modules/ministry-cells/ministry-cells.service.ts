@@ -11,6 +11,7 @@ import {
   CellPrayerStatus,
   Prisma,
 } from '@prisma/client';
+import { parseOptionalFlexiblePhoneOrThrow } from '../../common/phone.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { AuthUser } from '../auth/current-user.decorator';
 import { MembershipService } from '../membership/membership.service';
@@ -2167,9 +2168,10 @@ export class MinistryCellsService {
       });
       if (body.leaderPhone !== undefined) {
         const leaderId = body.leaderUserId || existing.leaderUserId;
+        const phone = parseOptionalFlexiblePhoneOrThrow(body.leaderPhone, 'Leader phone');
         await tx.user.update({
           where: { id: leaderId },
-          data: { phone: body.leaderPhone?.trim() || null },
+          data: { phone: phone ?? null },
         });
       }
     });

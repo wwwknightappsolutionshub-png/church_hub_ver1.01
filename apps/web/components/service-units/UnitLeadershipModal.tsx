@@ -7,6 +7,12 @@ import { toast } from 'sonner';
 import type { AxiosError } from 'axios';
 import { api } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-errors';
+import {
+  emailFormatError,
+  filterPhoneTyping,
+  flexiblePhoneFormatError,
+  parseOptionalFlexiblePhone,
+} from '@/lib/contact-validation';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { formatMemberName } from '@/lib/service-unit-utils';
 import { Button } from '@/components/ui/button';
@@ -101,8 +107,8 @@ export function UnitLeadershipModal({
   const title = variant === 'add-leader' ? 'Add Leader' : 'Assign Assistants';
   const description =
     variant === 'add-leader'
-      ? 'Assign a volunteer Unit Leader for this unit. This does not create a Church Staff account.'
-      : 'Select up to two unit members to serve as Assistant and Secretary. They can help run the unit but cannot assign a Unit Admin.';
+      ? 'Choose who will lead this unit. They receive a welcome email with a link to set their login password.'
+      : 'Choose unit members as Assistant and Secretary.';
 
   const reset = () => {
     setMode('roster');
@@ -128,29 +134,58 @@ export function UnitLeadershipModal({
     setBusy(true);
     try {
       if (variant === 'add-leader') {
+        if (mode === 'roster' && !memberId) {
+          toast.error('Select a church member');
+          setBusy(false);
+          return;
+        }
+        if (mode === 'form') {
+          if (!form.firstName.trim() || !form.lastName.trim()) {
+            toast.error('First name and last name are required');
+            setBusy(false);
+            return;
+          }
+          if (!form.email.trim()) {
+            toast.error('Email is required so we can send a login invite');
+            setBusy(false);
+            return;
+          }
+          const emailErr = emailFormatError(form.email);
+          if (emailErr) {
+            toast.error(emailErr);
+            setBusy(false);
+            return;
+          }
+          const phoneErr = flexiblePhoneFormatError(form.phone);
+          if (phoneErr) {
+            toast.error(phoneErr);
+            setBusy(false);
+            return;
+          }
+        }
+        if (mode === 'roster') {
+          const selected = rosterOptions.find((m) => m.id === memberId);
+          if (!selected?.email?.trim()) {
+            toast.error(
+              'Selected member needs an email on their profile before they can receive a login invite',
+            );
+            setBusy(false);
+            return;
+          }
+        }
         const payload =
           mode === 'roster'
             ? { memberId, isUnitAdmin: true, role: 'LEADER' }
             : {
                 firstName: form.firstName.trim(),
                 lastName: form.lastName.trim(),
-                email: form.email.trim() || undefined,
-                phone: form.phone.trim() || undefined,
+                email: form.email.trim().toLowerCase(),
+                phone: parseOptionalFlexiblePhone(form.phone),
                 isUnitAdmin: true,
                 role: 'LEADER',
               };
-        if (mode === 'roster' && !memberId) {
-          toast.error('Select a church member');
-          setBusy(false);
-          return;
-        }
-        if (mode === 'form' && (!form.firstName.trim() || !form.lastName.trim())) {
-          toast.error('First name and last name are required');
-          setBusy(false);
-          return;
-        }
         await api.post(`/service-units/${unitId}/leaders`, payload);
-        toast.success('Unit Leader assigned');
+        toast.success('Unit Leader assigned — welcome email sent');
       } else {
         if (takenDeputySlots.has(deputySlot)) {
           toast.error(
@@ -290,6 +325,9 @@ export function UnitLeadershipModal({
                 <Input
                   id="ul-em"
                   type="email"
+                  required
+                  autoComplete="email"
+                  placeholder="Required for login invite"
                   value={form.email}
                   onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                 />
@@ -298,8 +336,14 @@ export function UnitLeadershipModal({
                 <Label htmlFor="ul-ph">Phone Number</Label>
                 <Input
                   id="ul-ph"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  placeholder="e.g. 07123 456789"
                   value={form.phone}
-                  onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, phone: filterPhoneTyping(e.target.value) }))
+                  }
                 />
               </div>
             </div>

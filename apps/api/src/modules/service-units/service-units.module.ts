@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ServiceUnitsController } from './service-units.controller';
 import { ServiceUnitsDepartmentController } from './service-units-department.controller';
 import { ServiceUnitsService } from './service-units.service';
@@ -9,9 +9,18 @@ import { RealtimeModule } from '../realtime/realtime.module';
 import { MembershipModule } from '../membership/membership.module';
 import { CommunicationsModule } from '../communications/communications.module';
 import { AccessModule } from '../access/access.module';
+import { AuthModule } from '../auth/auth.module';
+import { AutomationModule } from '../automation/automation.module';
 
 @Module({
-  imports: [RealtimeModule, MembershipModule, CommunicationsModule, AccessModule],
+  imports: [
+    RealtimeModule,
+    MembershipModule,
+    CommunicationsModule,
+    AccessModule,
+    AuthModule,
+    forwardRef(() => AutomationModule),
+  ],
   controllers: [ServiceUnitsDepartmentController, ServiceUnitsController],
   providers: [
     ServiceUnitsService,

@@ -10,6 +10,7 @@ import {
 import { MultiStepFormDialog } from '@/components/membership/MultiStepFormDialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { filterPhoneTyping, flexiblePhoneFormatError } from '@/lib/contact-validation';
 import { cn } from '@/lib/utils';
 
 export type AccessTypeId =
@@ -237,6 +238,11 @@ export function StaffAccountWizard({
         toast.error('Enter a valid email');
         return false;
       }
+      const phoneErr = flexiblePhoneFormatError(phone);
+      if (phoneErr) {
+        toast.error(phoneErr);
+        return false;
+      }
       if (mode === 'edit' && password.trim() && password.trim().length < 8) {
         toast.error('Password must be at least 8 characters');
         return false;
@@ -363,11 +369,12 @@ export function StaffAccountWizard({
             <Input
               id="staff-wizard-phone"
               type="tel"
+              inputMode="tel"
               className="mt-1.5"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => setPhone(filterPhoneTyping(e.target.value))}
               autoComplete="tel"
-              placeholder="Optional"
+              placeholder="e.g. 07123 456789"
             />
           </div>
           {mode === 'create' ? (

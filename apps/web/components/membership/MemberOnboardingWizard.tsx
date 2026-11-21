@@ -6,6 +6,12 @@ import { Check, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import {
+  emailFormatError,
+  filterPhoneTyping,
+  parseOptionalUkPhone,
+  phoneFormatError,
+} from '@/lib/contact-validation';
+import {
   ONBOARDING_STEP_LABELS,
   ROLE_LABELS,
   SELECTABLE_ROLES,
@@ -154,11 +160,23 @@ export function MemberOnboardingWizard({
       };
 
       if (step === 1) {
+        const emailErr = emailFormatError(form.email);
+        if (emailErr) {
+          toast.error(emailErr);
+          setSaving(false);
+          return;
+        }
+        const phoneErr = phoneFormatError(form.phone);
+        if (phoneErr) {
+          toast.error(phoneErr);
+          setSaving(false);
+          return;
+        }
         payload.data = {
           firstName: form.firstName.trim(),
           lastName: form.lastName.trim(),
           email: form.email || undefined,
-          phone: form.phone || undefined,
+          phone: parseOptionalUkPhone(form.phone),
           dateOfBirth: form.dateOfBirth || undefined,
           address: form.address || undefined,
           city: form.city || undefined,
@@ -278,8 +296,13 @@ export function MemberOnboardingWizard({
               />
               <Input
                 placeholder="Phone"
+                type="tel"
+                inputMode="tel"
+                placeholder="Phone (e.g. 07123 456789)"
                 value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, phone: filterPhoneTyping(e.target.value) })
+                }
               />
               <Input
                 type="date"

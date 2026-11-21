@@ -5,6 +5,7 @@ import {
   isLikelyUkPostcode,
   looksLikeUkPhone,
   normalizeFlexiblePhone,
+  optionalFlexiblePhoneSchema,
   optionalPostalCodeSchema,
   phoneSchema,
 } from '@church-hub/shared-types';
@@ -56,6 +57,15 @@ describe('flexible outreach contact validation', () => {
           true,
         );
       }
+    });
+
+    it('optionalFlexiblePhoneSchema rejects letter junk and accepts empty', () => {
+      expect(optionalFlexiblePhoneSchema.safeParse('').success).toBe(true);
+      expect(optionalFlexiblePhoneSchema.safeParse('').data).toBeUndefined();
+      expect(optionalFlexiblePhoneSchema.safeParse('098937bsadsdh').success).toBe(false);
+      const ok = optionalFlexiblePhoneSchema.safeParse('07123456789');
+      expect(ok.success).toBe(true);
+      if (ok.success) expect(ok.data).toBe('+447123456789');
     });
   });
 

@@ -5,6 +5,7 @@ import { Loader2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { UpdateCellProvinceSchema } from '@church-hub/shared-types';
 import { api } from '@/lib/api';
+import { filterPhoneTyping, flexiblePhoneFormatError } from '@/lib/contact-validation';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { CellDeputyAssignPanel } from '@/components/ministry-cells/CellDeputyAssignPanel';
 import type { CellProvinceRow } from '@/components/ministry-cells/types';
@@ -59,6 +60,11 @@ export function ProvinceEditPanel({
       .split(/[,;\n]+/)
       .map((s) => s.trim())
       .filter(Boolean);
+    const phoneErr = flexiblePhoneFormatError(leaderPhone);
+    if (phoneErr) {
+      toast.error(phoneErr);
+      return;
+    }
     const parsed = UpdateCellProvinceSchema.safeParse({
       name,
       leaderUserId,
@@ -146,9 +152,11 @@ export function ProvinceEditPanel({
             <Label htmlFor="edit-leader-phone">Leader phone</Label>
             <Input
               id="edit-leader-phone"
+              type="tel"
+              inputMode="tel"
               value={leaderPhone}
-              onChange={(e) => setLeaderPhone(e.target.value)}
-              placeholder="+44…"
+              onChange={(e) => setLeaderPhone(filterPhoneTyping(e.target.value))}
+              placeholder="e.g. 07123 456789"
             />
             <p className="text-[11px] text-muted-foreground">
               Leader name and email come from their staff account. Phone can be updated here.

@@ -6,6 +6,12 @@ import { toast } from 'sonner';
 import type { AxiosError } from 'axios';
 import { api } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-errors';
+import {
+  emailFormatError,
+  filterPhoneTyping,
+  flexiblePhoneFormatError,
+  parseOptionalFlexiblePhone,
+} from '@/lib/contact-validation';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { formatMemberName } from '@/lib/service-unit-utils';
 import { MultiStepFormDialog } from '@/components/membership/MultiStepFormDialog';
@@ -167,11 +173,21 @@ export function CreateServiceUnitWizard({
         toast.error('Enter first name and surname, or click Skip leader');
         return false;
       }
+      const emailErr = emailFormatError(leaderForm.email);
+      if (emailErr) {
+        toast.error(emailErr);
+        return false;
+      }
+      const phoneErr = flexiblePhoneFormatError(leaderForm.phone);
+      if (phoneErr) {
+        toast.error(phoneErr);
+        return false;
+      }
       setLeader({
         firstName: leaderForm.firstName.trim(),
         lastName: leaderForm.lastName.trim(),
         email: leaderForm.email.trim(),
-        phone: leaderForm.phone.trim(),
+        phone: parseOptionalFlexiblePhone(leaderForm.phone) ?? '',
       });
     }
     return true;
@@ -210,6 +226,16 @@ export function CreateServiceUnitWizard({
       toast.error('First name and surname are required');
       return;
     }
+    const emailErr = emailFormatError(newPerson.email);
+    if (emailErr) {
+      toast.error(emailErr);
+      return;
+    }
+    const phoneErr = flexiblePhoneFormatError(newPerson.phone);
+    if (phoneErr) {
+      toast.error(phoneErr);
+      return;
+    }
     setMembers((prev) => [
       ...prev,
       {
@@ -218,7 +244,7 @@ export function CreateServiceUnitWizard({
         firstName: newPerson.firstName.trim(),
         lastName: newPerson.lastName.trim(),
         email: newPerson.email.trim() || undefined,
-        phone: newPerson.phone.trim() || undefined,
+        phone: parseOptionalFlexiblePhone(newPerson.phone),
       },
     ]);
     setNewPerson({ firstName: '', lastName: '', email: '', phone: '' });
@@ -544,8 +570,13 @@ export function CreateServiceUnitWizard({
                   <Label htmlFor="np-ph">Phone Number</Label>
                   <Input
                     id="np-ph"
+                    type="tel"
+                    inputMode="tel"
+                    placeholder="e.g. 07123 456789"
                     value={newPerson.phone}
-                    onChange={(e) => setNewPerson((p) => ({ ...p, phone: e.target.value }))}
+                    onChange={(e) =>
+                      setNewPerson((p) => ({ ...p, phone: filterPhoneTyping(e.target.value) }))
+                    }
                   />
                 </div>
               </div>
@@ -656,8 +687,7 @@ export function CreateServiceUnitWizard({
       {step === 2 ? (
         <div className="mx-auto max-w-xl space-y-4">
           <p className="text-sm text-muted-foreground">
-            Assign a Unit Admin to manage this unit. We will find or create them in the membership
-            database from the details below. Use Skip leader if you will assign one later.
+            Optionally add a Unit Admin for this unit, or skip and assign one later.
           </p>
           {leaderSkipped ? (
             <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm">
@@ -706,8 +736,13 @@ export function CreateServiceUnitWizard({
                 <Label htmlFor="ld-ph">Phone Number</Label>
                 <Input
                   id="ld-ph"
+                  type="tel"
+                  inputMode="tel"
+                  placeholder="e.g. 07123 456789"
                   value={leaderForm.phone}
-                  onChange={(e) => setLeaderForm((f) => ({ ...f, phone: e.target.value }))}
+                  onChange={(e) =>
+                    setLeaderForm((f) => ({ ...f, phone: filterPhoneTyping(e.target.value) }))
+                  }
                 />
               </div>
             </div>

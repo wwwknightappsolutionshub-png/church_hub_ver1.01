@@ -17,7 +17,8 @@ describe('service-units-member-import.util', () => {
   });
 
   it('parses valid rows and aliases', () => {
-    const text = 'First Name,Surname,Email,Phone\nAda,Lovelace,ada@example.com,123\n';
+    const text =
+      'First Name,Surname,Email,Phone\nAda,Lovelace,ada@example.com,07123456789\n';
     const { rows, failures } = parseUnitMemberImportCsv(text);
     expect(failures).toHaveLength(0);
     expect(rows).toEqual([
@@ -26,9 +27,17 @@ describe('service-units-member-import.util', () => {
         firstName: 'Ada',
         lastName: 'Lovelace',
         email: 'ada@example.com',
-        phone: '123',
+        phone: '+447123456789',
       },
     ]);
+  });
+
+  it('rejects phones with letters', () => {
+    const text =
+      'First Name,Last Name,Email,Phone\nAda,Lovelace,ada@example.com,098937bsadsdh\n';
+    const { rows, failures } = parseUnitMemberImportCsv(text);
+    expect(rows).toHaveLength(0);
+    expect(failures[0]?.reason).toMatch(/letter|phone/i);
   });
 
   it('rejects missing name columns', () => {
@@ -54,7 +63,7 @@ describe('service-units-member-import.util', () => {
     const wb = new ExcelJS.Workbook();
     const sheet = wb.addWorksheet('Members');
     sheet.addRow(['First Name', 'Last Name', 'Email', 'Phone']);
-    sheet.addRow(['Grace', 'Hopper', 'grace@example.com', '555']);
+    sheet.addRow(['Grace', 'Hopper', 'grace@example.com', '07123456789']);
     const buf = Buffer.from(await wb.xlsx.writeBuffer());
     const { rows, failures } = await parseUnitMemberImportXlsx(buf);
     expect(failures).toHaveLength(0);
@@ -62,7 +71,7 @@ describe('service-units-member-import.util', () => {
       firstName: 'Grace',
       lastName: 'Hopper',
       email: 'grace@example.com',
-      phone: '555',
+      phone: '+447123456789',
     });
   });
 

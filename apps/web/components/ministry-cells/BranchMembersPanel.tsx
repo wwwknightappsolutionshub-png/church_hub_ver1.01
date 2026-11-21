@@ -179,7 +179,7 @@ export function BranchMembersPanel({
           )}
           {noSearchMatch && (
             <p className="text-xs text-muted-foreground">
-              No match in the church membership database. Create them with the global congregant form.
+              No match found. Create a new person to add them to this cell.
             </p>
           )}
           {!isLoading && filtered.length === 0 && !search.trim() && (

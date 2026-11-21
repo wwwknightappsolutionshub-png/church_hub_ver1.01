@@ -930,6 +930,7 @@ model ChurchCalendarEvent {
 
 enum AutomationEmailTemplateCode {
   STAFF_WELCOME
+  UNIT_LEADER_WELCOME
   ABSENTEE_FOLLOWUP
   NEW_MEMBER_WELCOME
   WEEKLY_DIGEST

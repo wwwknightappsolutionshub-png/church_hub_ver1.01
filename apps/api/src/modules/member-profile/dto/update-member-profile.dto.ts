@@ -1,4 +1,5 @@
 import { IsEmail, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsOptionalFlexiblePhone } from '../../../common/decorators/is-optional-phone.decorator';
 
 export class UpdateMemberProfileDto {
   @IsOptional()
@@ -21,7 +22,7 @@ export class UpdateMemberProfileDto {
   email?: string;
 
   @IsOptional()
-  @IsString()
+  @IsOptionalFlexiblePhone()
   @MaxLength(40)
   phone?: string | null;
 

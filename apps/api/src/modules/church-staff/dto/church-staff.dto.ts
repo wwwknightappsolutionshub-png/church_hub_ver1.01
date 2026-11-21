@@ -12,6 +12,7 @@ import {
   MinLength,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { IsOptionalFlexiblePhone } from '../../../common/decorators/is-optional-phone.decorator';
 
 export const CHURCH_ASSIGNABLE_ROLES = [
   'ADMIN',
@@ -58,8 +59,7 @@ export class CreateChurchStaffDto {
   lastName!: string;
 
   @IsOptional()
-  @Transform(({ value }) => trimString(value))
-  @IsString()
+  @IsOptionalFlexiblePhone()
   @MaxLength(40)
   phone?: string;
 
@@ -104,8 +104,7 @@ export class UpdateChurchStaffDto {
   lastName?: string;
 
   @IsOptional()
-  @Transform(({ value }) => trimString(value))
-  @IsString()
+  @IsOptionalFlexiblePhone()
   @MaxLength(40)
   phone?: string;
 

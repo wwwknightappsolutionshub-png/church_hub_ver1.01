@@ -1,4 +1,13 @@
-import { IsIn, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
+import { IsOptionalFlexiblePhone } from '../../../common/decorators/is-optional-phone.decorator';
 
 export class AssignServiceUnitMemberDto {
   @IsOptional()
@@ -18,12 +27,12 @@ export class AssignServiceUnitMemberDto {
   lastName?: string;
 
   @IsOptional()
-  @IsString()
+  @IsEmail()
   @MaxLength(200)
   email?: string;
 
   @IsOptional()
-  @IsString()
+  @IsOptionalFlexiblePhone()
   @MaxLength(40)
   phone?: string;
 
@@ -51,12 +60,12 @@ export class UpdateServiceUnitMemberDto {
   lastName?: string;
 
   @IsOptional()
-  @IsString()
+  @IsEmail()
   @MaxLength(200)
   email?: string;
 
   @IsOptional()
-  @IsString()
+  @IsOptionalFlexiblePhone()
   @MaxLength(40)
   phone?: string;
 

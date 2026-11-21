@@ -110,8 +110,7 @@ export function CellDeputyAssignPanel({
       <div>
         <p className="text-sm font-medium">Assistants &amp; Secretaries</p>
         <p className="text-xs text-muted-foreground">
-          Operational access for this {scope}. They cannot assign the primary leader or other
-          deputies.
+          Assign an Assistant and a Secretary for this {scope}.
         </p>
       </div>
 

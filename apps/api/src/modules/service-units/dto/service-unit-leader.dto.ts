@@ -10,6 +10,7 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { IsOptionalFlexiblePhone } from '../../../common/decorators/is-optional-phone.decorator';
 
 function trimString(value: unknown) {
   return typeof value === 'string' ? value.trim() : value;
@@ -40,15 +41,18 @@ export class AddServiceUnitLeaderDto {
   @MaxLength(80)
   lastName?: string;
 
-  @IsOptional()
+  /** Required for new-person Unit Leader so a login invite can be emailed. */
+  @ValidateIf(
+    (o: AddServiceUnitLeaderDto) =>
+      !o.memberId && (o.isUnitAdmin === true || !o.deputyRole),
+  )
   @Transform(({ value }) => emptyToUndefined(value))
-  @IsEmail()
+  @IsEmail({}, { message: 'Email is required for a Unit Leader login invite' })
   @MaxLength(200)
   email?: string;
 
   @IsOptional()
-  @Transform(({ value }) => emptyToUndefined(value))
-  @IsString()
+  @IsOptionalFlexiblePhone()
   @MaxLength(40)
   phone?: string;
 

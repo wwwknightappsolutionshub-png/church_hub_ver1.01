@@ -11,6 +11,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { IsOptionalUkPhone } from '../../../common/decorators/is-optional-phone.decorator';
 
 const emptyToUndefined = (v: unknown) =>
   v === '' || v === null ? undefined : v;
@@ -37,7 +38,7 @@ export class PublicMembershipRegisterDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsString()
+  @IsOptionalUkPhone()
   @MaxLength(40)
   phone?: string;
 

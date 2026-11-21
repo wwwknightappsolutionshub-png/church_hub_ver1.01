@@ -4,6 +4,12 @@ import { useState } from 'react';
 import { Loader2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import {
+  emailFormatError,
+  filterPhoneTyping,
+  flexiblePhoneFormatError,
+  parseOptionalFlexiblePhone,
+} from '@/lib/contact-validation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -43,11 +49,28 @@ export function ServiceUnitJoinSheet({
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.firstName.trim() || !form.lastName.trim()) return;
+    if (!form.firstName.trim() || !form.lastName.trim()) {
+      toast.error('First name and last name are required');
+      return;
+    }
+    const emailErr = emailFormatError(form.email);
+    if (emailErr) {
+      toast.error(emailErr);
+      return;
+    }
+    const phoneErr = flexiblePhoneFormatError(form.phone);
+    if (phoneErr) {
+      toast.error(phoneErr);
+      return;
+    }
     setBusy(true);
     try {
       await api.post(`/service-units/${unitId}/join-requests`, {
-        ...form,
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        email: form.email.trim() || undefined,
+        phone: parseOptionalFlexiblePhone(form.phone),
+        motivation: form.motivation.trim() || undefined,
         memberId: defaultValues?.memberId,
       });
       toast.success('Request sent for approval');
@@ -103,9 +126,11 @@ export function ServiceUnitJoinSheet({
             onChange={(e) => setForm({ ...form, email: e.target.value })}
           />
           <Input
-            placeholder="Phone"
+            type="tel"
+            inputMode="tel"
+            placeholder="Phone (e.g. 07123 456789)"
             value={form.phone}
-            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            onChange={(e) => setForm({ ...form, phone: filterPhoneTyping(e.target.value) })}
           />
           <textarea
             className="min-h-[88px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"

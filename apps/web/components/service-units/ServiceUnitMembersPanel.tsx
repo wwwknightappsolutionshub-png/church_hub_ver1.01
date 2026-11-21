@@ -7,6 +7,12 @@ import { toast } from 'sonner';
 import type { AxiosError } from 'axios';
 import { api } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-errors';
+import {
+  emailFormatError,
+  filterPhoneTyping,
+  flexiblePhoneFormatError,
+  parseOptionalFlexiblePhone,
+} from '@/lib/contact-validation';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { LazyCongregantEditorForm } from '@/lib/membership-lazy';
 import { formatMemberName } from '@/lib/service-unit-utils';
@@ -152,13 +158,27 @@ export function ServiceUnitMembersPanel({
   };
 
   const saveEdit = async (memberId: string) => {
+    if (!editForm.firstName.trim() || !editForm.lastName.trim()) {
+      toast.error('First name and last name are required');
+      return;
+    }
+    const emailErr = emailFormatError(editForm.email);
+    if (emailErr) {
+      toast.error(emailErr);
+      return;
+    }
+    const phoneErr = flexiblePhoneFormatError(editForm.phone);
+    if (phoneErr) {
+      toast.error(phoneErr);
+      return;
+    }
     setBusy(true);
     try {
       await api.patch(`/service-units/${unitId}/members/${memberId}`, {
         firstName: editForm.firstName.trim(),
         lastName: editForm.lastName.trim(),
         email: editForm.email.trim() || undefined,
-        phone: editForm.phone.trim() || undefined,
+        phone: parseOptionalFlexiblePhone(editForm.phone),
         unitRole: editForm.unitRole,
         designation: editForm.designation.trim() || undefined,
       });
@@ -323,8 +343,7 @@ export function ServiceUnitMembersPanel({
 
             {mode === 'new' ? (
               <p className="text-sm text-muted-foreground">
-                Use the Add New Congregant form to save them to the global membership database and
-                attach them to this unit.
+                Add a new person and attach them to this unit.
               </p>
             ) : null}
 
@@ -438,9 +457,16 @@ export function ServiceUnitMembersPanel({
                             onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
                           />
                           <Input
+                            type="tel"
+                            inputMode="tel"
                             placeholder="Phone"
                             value={editForm.phone}
-                            onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                phone: filterPhoneTyping(e.target.value),
+                              })
+                            }
                           />
                           <RoleFields
                             unitRole={editForm.unitRole}

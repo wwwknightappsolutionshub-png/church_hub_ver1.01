@@ -29,10 +29,29 @@ const SYSTEM_DEFAULTS: Record<
 <p>After setting your password, sign in at your church dashboard to get started.</p>`,
     }),
   },
+  UNIT_LEADER_WELCOME: {
+    name: 'Unit Leader Welcome',
+    subject: 'You are Unit Leader for {{unitName}} — {{churchName}}',
+    sortOrder: 2,
+    bodyHtml: celebrationEmailShell({
+      eyebrow: 'Service Unit Leadership',
+      headline: 'Welcome, {{firstName}}!',
+      subhead: 'You have been appointed Unit Leader',
+      bodyHtml: `<p>Dear {{fullName}},</p>
+<p>You have been assigned as <strong>Unit Leader</strong> for <strong>{{unitName}}</strong> at <strong>{{churchName}}</strong>.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;background:#f8fafc;border-left:4px solid ${BRAND};border-radius:8px;">
+<tr><td style="padding:16px 20px;font-family:system-ui,sans-serif;">
+<p style="margin:0 0 8px;"><strong>Sign-in email:</strong> {{email}}</p>
+<p style="margin:0 0 12px;font-size:13px;color:#64748b;">{{passwordSetupBlurb}}</p>
+{{setPasswordBlock}}
+</td></tr></table>
+<p>After you can sign in, open Service Unit Hub to manage your unit.</p>`,
+    }),
+  },
   ABSENTEE_FOLLOWUP: {
     name: 'Absentee Follow-up',
     subject: 'We missed you at {{churchName}}',
-    sortOrder: 2,
+    sortOrder: 3,
     bodyHtml: celebrationEmailShell({
       eyebrow: 'Pastoral Care',
       headline: 'We missed you, {{firstName}}',
@@ -42,7 +61,7 @@ const SYSTEM_DEFAULTS: Record<
   NEW_MEMBER_WELCOME: {
     name: 'New Member Welcome',
     subject: 'Welcome to the {{churchName}} family',
-    sortOrder: 3,
+    sortOrder: 4,
     bodyHtml: celebrationEmailShell({
       eyebrow: 'Membership',
       headline: 'Welcome, {{firstName}}!',
@@ -52,7 +71,7 @@ const SYSTEM_DEFAULTS: Record<
   WEEKLY_DIGEST: {
     name: 'Weekly Digest',
     subject: '{{churchName}} — weekly ministry update',
-    sortOrder: 4,
+    sortOrder: 5,
     bodyHtml: celebrationEmailShell({
       eyebrow: 'Weekly Update',
       headline: 'This week at {{churchName}}',
@@ -62,7 +81,7 @@ const SYSTEM_DEFAULTS: Record<
   EVENT_REMINDER: {
     name: 'Event Reminder',
     subject: 'Reminder: {{eventTitle}} — {{churchName}}',
-    sortOrder: 5,
+    sortOrder: 6,
     bodyHtml: celebrationEmailShell({
       eyebrow: 'Events',
       headline: '{{eventTitle}}',
@@ -73,7 +92,7 @@ const SYSTEM_DEFAULTS: Record<
   OUTREACH_WELCOME: {
     name: 'Outreach Welcome',
     subject: 'Welcome from {{churchName}}',
-    sortOrder: 6,
+    sortOrder: 7,
     bodyHtml: celebrationEmailShell({
       eyebrow: 'Evangelism',
       headline: 'Welcome, {{firstName}}!',

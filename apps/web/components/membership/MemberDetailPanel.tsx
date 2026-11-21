@@ -15,6 +15,12 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import {
+  emailFormatError,
+  filterPhoneTyping,
+  parseOptionalUkPhone,
+  phoneFormatError,
+} from '@/lib/contact-validation';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { isChurchLeadershipRole } from '@/lib/session-role';
 import {
@@ -122,13 +128,27 @@ export function MemberDetailPanel({
   };
 
   const saveProfile = async () => {
+    if (!form.firstName.trim() || !form.lastName.trim()) {
+      toast.error('First and last name are required');
+      return;
+    }
+    const emailErr = emailFormatError(form.email);
+    if (emailErr) {
+      toast.error(emailErr);
+      return;
+    }
+    const phoneErr = phoneFormatError(form.phone);
+    if (phoneErr) {
+      toast.error(phoneErr);
+      return;
+    }
     setBusy(true);
     try {
       await api.patch(`/membership/members/${member.id}`, {
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         email: form.email || undefined,
-        phone: form.phone || undefined,
+        phone: parseOptionalUkPhone(form.phone),
         notes: form.notes || undefined,
         roles: form.roles,
       });
@@ -317,9 +337,11 @@ export function MemberDetailPanel({
               onChange={(e) => setForm({ ...form, email: e.target.value })}
             />
             <Input
-              placeholder="Phone"
+              type="tel"
+              inputMode="tel"
+              placeholder="Phone (e.g. 07123 456789)"
               value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              onChange={(e) => setForm({ ...form, phone: filterPhoneTyping(e.target.value) })}
             />
             <textarea
               className="flex min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"

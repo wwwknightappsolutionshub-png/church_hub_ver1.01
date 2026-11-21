@@ -6,6 +6,12 @@ import { CalendarHeart, Home, Loader2, MapPin, Phone, Sparkles } from 'lucide-re
 import { toast } from 'sonner';
 import type { MembershipRegistryCatalogDto } from '@church-hub/shared-types';
 import { api } from '@/lib/api';
+import {
+  emailFormatError,
+  filterPhoneTyping,
+  parseOptionalUkPhone,
+  phoneFormatError,
+} from '@/lib/contact-validation';
 import { Input } from '@/components/ui/input';
 import { CustomFieldsFormSection } from '@/components/membership/CustomFieldsFormSection';
 import { MultiStepFormDialog } from '@/components/membership/MultiStepFormDialog';
@@ -138,8 +144,8 @@ export function FamilyEditorDialog({
       state,
       zip,
       country,
-      homePhone,
-      email,
+      homePhone: parseOptionalUkPhone(homePhone),
+      email: email.trim() || undefined,
       propertyIds,
       customFields,
     }),
@@ -165,6 +171,18 @@ export function FamilyEditorDialog({
     if (!name.trim()) {
       toast.error('Family name is required');
       setStep(0);
+      return;
+    }
+    const emailErr = emailFormatError(email);
+    if (emailErr) {
+      toast.error(emailErr);
+      setStep(1);
+      return;
+    }
+    const phoneErr = phoneFormatError(homePhone);
+    if (phoneErr) {
+      toast.error(phoneErr);
+      setStep(1);
       return;
     }
     setSaving(true);
@@ -282,7 +300,13 @@ export function FamilyEditorDialog({
             <div className="grid gap-3 sm:grid-cols-2">
               <label>
                 <FieldLabel>Home phone</FieldLabel>
-                <Input type="tel" value={homePhone} onChange={(e) => setHomePhone(e.target.value)} />
+                <Input
+                  type="tel"
+                  inputMode="tel"
+                  placeholder="e.g. 07123 456789"
+                  value={homePhone}
+                  onChange={(e) => setHomePhone(filterPhoneTyping(e.target.value))}
+                />
               </label>
               <label>
                 <FieldLabel>Email</FieldLabel>

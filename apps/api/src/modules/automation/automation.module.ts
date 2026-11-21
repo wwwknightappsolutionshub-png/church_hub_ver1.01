@@ -17,7 +17,7 @@ import { ServiceUnitsModule } from '../service-units/service-units.module';
     FollowUpModule,
     MembershipModule,
     forwardRef(() => OutreachModule),
-    ServiceUnitsModule,
+    forwardRef(() => ServiceUnitsModule),
   ],
   controllers: [MembershipAutomationController, AutomationEmailTemplatesController],
   providers: [

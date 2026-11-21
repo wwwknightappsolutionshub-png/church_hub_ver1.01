@@ -28,6 +28,7 @@ import {
   CreateServiceUnitWithSetupDto,
   UpdateServiceUnitDto,
 } from './dto/create-service-unit.dto';
+import { SubmitServiceUnitJoinRequestDto } from './dto/join-request.dto';
 
 @ApiTags('service-units')
 @ApiBearerAuth()
@@ -211,15 +212,7 @@ export class ServiceUnitsController {
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
-    @Body()
-    body: {
-      firstName: string;
-      lastName: string;
-      email?: string;
-      phone?: string;
-      motivation?: string;
-      memberId?: string;
-    },
+    @Body() body: SubmitServiceUnitJoinRequestDto,
   ) {
     return this.serviceUnits.submitJoinRequest(user.userId, churchId, id, body);
   }

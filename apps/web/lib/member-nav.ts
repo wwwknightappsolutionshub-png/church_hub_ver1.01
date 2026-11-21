@@ -86,6 +86,7 @@ export const STAFF_LEADERSHIP_NAV: DashboardNavItem[] = [
     icon: Network,
     requiresChurchLeadership: true,
   },
+  { href: '/dashboard/service-units', label: 'Service Unit Hub', icon: Layers },
   { href: '/dashboard/membership/members', label: 'Congregants', icon: Users },
   {
     href: '/dashboard/community-support',
@@ -170,7 +171,6 @@ export const STAFF_COMMUNITY_NAV: DashboardNavItem[] = [
   { href: '/dashboard/testimony-hub', label: 'Testimony Hub', icon: Star },
   { href: '/dashboard/suggestions', label: 'Suggestions', icon: Lightbulb },
   { href: '/dashboard/devotional-hub', label: 'Devotional Hub', icon: BookOpen },
-  { href: '/dashboard/service-units', label: 'Service Unit Hub', icon: Layers },
   // Departments remains functional via /dashboard/departments and Service Unit workspaces; not listed in nav.
   { href: '/dashboard/outreach', label: 'Field Outreach', icon: Megaphone },
   { href: '/dashboard/follow-up', label: 'Outreach', icon: HeartHandshake },

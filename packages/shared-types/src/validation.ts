@@ -331,6 +331,32 @@ export const flexiblePhoneSchema = z
   .transform((v) => normalizeFlexiblePhone(v) ?? '')
   .refine((v) => v.length > 0, { message: FLEXIBLE_PHONE_HINT });
 
+/** Optional multi-country phone — empty/null → undefined; otherwise same rules as flexiblePhoneSchema. */
+export const optionalFlexiblePhoneSchema = z
+  .union([z.string(), z.literal(''), z.undefined(), z.null()])
+  .superRefine((v, ctx) => {
+    const raw = String(v ?? '').trim();
+    if (!raw) return;
+    if (/[a-zA-Z]/.test(raw)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Phone number cannot contain letters',
+      });
+      return;
+    }
+    if (!normalizeFlexiblePhone(raw)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: FLEXIBLE_PHONE_HINT,
+      });
+    }
+  })
+  .transform((v) => {
+    const raw = String(v ?? '').trim();
+    if (!raw) return undefined;
+    return normalizeFlexiblePhone(raw) ?? undefined;
+  });
+
 export const RegisterStartSchema = z.object({
   churchName: churchNameSchema,
   churchSlug: z
@@ -411,7 +437,7 @@ export const CreateChurchStaffSchema = z
       .string()
       .transform((v) => sanitizeText(v, 80))
       .pipe(z.string().min(1, 'Required').max(80)),
-    phone: optionalPhoneSchema,
+    phone: optionalFlexiblePhoneSchema,
     roles: z
       .array(z.enum(CHURCH_ASSIGNABLE_ROLE_VALUES))
       .min(1, 'Select at least one role'),
@@ -446,7 +472,7 @@ export const UpdateChurchStaffSchema = z
       .transform((v) => sanitizeText(v, 80))
       .pipe(z.string().min(1).max(80))
       .optional(),
-    phone: optionalPhoneSchema,
+    phone: optionalFlexiblePhoneSchema,
     roles: z.array(z.enum(CHURCH_ASSIGNABLE_ROLE_VALUES)).min(1).optional(),
     isActive: z.boolean().optional(),
     /** When set, replaces unit-admin leadership for this staff member (max one unit). */
@@ -620,12 +646,8 @@ export const UpdateCellProvinceSchema = z.object({
     .pipe(z.string().min(1, 'Province leader is required'))
     .optional(),
   postcodes: provinceCoveragePostcodesSchema.optional(),
-  leaderPhone: z
-    .string()
-    .transform((v) => sanitizeText(v, 40))
-    .pipe(z.string().max(40))
-    .nullable()
-    .optional(),
+  /** null clears; empty → undefined; otherwise flexible phone. */
+  leaderPhone: z.union([z.null(), optionalFlexiblePhoneSchema]).optional(),
 });
 export type UpdateCellProvinceInput = z.infer<typeof UpdateCellProvinceSchema>;
 

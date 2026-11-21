@@ -1,5 +1,14 @@
-import { BadRequestException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import type { ChoirAttendanceEventType, Prisma } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
+import { randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.module';
 import { SERVICE_UNIT_CATALOG } from '../../../prisma/service-unit-catalog';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -8,6 +17,8 @@ import { EmailAdapter } from '../notifications/adapters/email.adapter';
 import { MembershipService } from '../membership/membership.service';
 import { MembershipRegistryService } from '../membership/membership-registry.service';
 import { CommunicationsQueueService } from '../communications/communications-queue.service';
+import { AuthService } from '../auth/auth.service';
+import { AutomationEmailTemplatesService } from '../automation/automation-email-templates.service';
 import type { AssignServiceUnitMemberDto, UpdateServiceUnitMemberDto } from './dto/assign-service-unit-member.dto';
 import type {
   CreateServiceUnitDto,
@@ -56,6 +67,8 @@ const unitInclude = {
 
 @Injectable()
 export class ServiceUnitsService {
+  private readonly logger = new Logger(ServiceUnitsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtime: RealtimeGateway,
@@ -64,6 +77,8 @@ export class ServiceUnitsService {
     private readonly membership: MembershipService,
     private readonly registry: MembershipRegistryService,
     private readonly commQueue: CommunicationsQueueService,
+    private readonly auth: AuthService,
+    private readonly emailTemplates: AutomationEmailTemplatesService,
   ) {}
 
   private async ensureCatalogUnits(churchId: string) {
@@ -1963,7 +1978,18 @@ export class ServiceUnitsService {
     }
 
     if (body.unitRole) {
+      const priorLeader =
+        body.unitRole === 'UNIT_ADMIN'
+          ? await this.prisma.serviceUnitLeader.findUnique({
+              where: { serviceUnitId_memberId: { serviceUnitId, memberId } },
+              select: { isUnitAdmin: true },
+            })
+          : null;
+      const newlyUnitAdmin = body.unitRole === 'UNIT_ADMIN' && !priorLeader?.isUnitAdmin;
       await this.applyUnitRole(churchId, serviceUnitId, memberId, body.unitRole, body.designation);
+      if (newlyUnitAdmin) {
+        await this.provisionUnitLeaderLoginAndWelcome(churchId, serviceUnitId, memberId);
+      }
     } else if (body.designation !== undefined) {
       const leader = await this.prisma.serviceUnitLeader.findUnique({
         where: { serviceUnitId_memberId: { serviceUnitId, memberId } },
@@ -2052,7 +2078,21 @@ export class ServiceUnitsService {
     }
 
     const unitRole = body.unitRole ?? 'MEMBER';
+    const priorLeader =
+      unitRole === 'UNIT_ADMIN'
+        ? await this.prisma.serviceUnitLeader.findUnique({
+            where: { serviceUnitId_memberId: { serviceUnitId, memberId } },
+            select: { isUnitAdmin: true },
+          })
+        : null;
+    const newlyUnitAdmin = unitRole === 'UNIT_ADMIN' && !priorLeader?.isUnitAdmin;
+
     await this.applyUnitRole(churchId, serviceUnitId, memberId, unitRole, body.designation);
+
+    if (newlyUnitAdmin) {
+      await this.provisionUnitLeaderLoginAndWelcome(churchId, serviceUnitId, memberId);
+    }
+
     return this.getUnitMemberRow(churchId, serviceUnitId, memberId);
   }
 
@@ -2198,6 +2238,12 @@ export class ServiceUnitsService {
       throw new ForbiddenException('Unit Admin or church staff required to manage leaders');
     }
 
+    if (makeUnitAdmin && !data.memberId?.trim() && !data.email?.trim()) {
+      throw new BadRequestException(
+        'Email is required when assigning a new Unit Leader so they can receive a login invite',
+      );
+    }
+
     const memberId = await this.resolveLeaderMemberId(churchId, data);
 
     if (makeUnitAdmin) {
@@ -2212,6 +2258,12 @@ export class ServiceUnitsService {
       deputyRole ?? (data.role?.trim() || (makeUnitAdmin ? 'LEADER' : 'LEADER'));
     const moderator = data.isModerator ?? (makeUnitAdmin || !!deputyRole);
 
+    const priorLeader = await this.prisma.serviceUnitLeader.findUnique({
+      where: { serviceUnitId_memberId: { serviceUnitId, memberId } },
+      select: { isUnitAdmin: true },
+    });
+    const newlyUnitAdmin = makeUnitAdmin && !priorLeader?.isUnitAdmin;
+
     await this.prisma.serviceUnitMember.upsert({
       where: {
         serviceUnitId_memberId: { serviceUnitId, memberId },
@@ -2219,7 +2271,7 @@ export class ServiceUnitsService {
       create: { serviceUnitId, memberId },
       update: {},
     });
-    return this.prisma.serviceUnitLeader.upsert({
+    const leader = await this.prisma.serviceUnitLeader.upsert({
       where: {
         serviceUnitId_memberId: { serviceUnitId, memberId },
       },
@@ -2239,6 +2291,191 @@ export class ServiceUnitsService {
         member: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
       },
     });
+
+    if (newlyUnitAdmin) {
+      await this.provisionUnitLeaderLoginAndWelcome(churchId, serviceUnitId, memberId);
+    }
+
+    return leader;
+  }
+
+  /**
+   * Ensure the Unit Leader has a login User + send welcome with set-password link
+   * (same pattern as church staff onboarding).
+   */
+  private async provisionUnitLeaderLoginAndWelcome(
+    churchId: string,
+    serviceUnitId: string,
+    memberId: string,
+  ) {
+    const member = await this.prisma.member.findFirst({
+      where: { id: memberId, churchId },
+      select: {
+        id: true,
+        userId: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+      },
+    });
+    if (!member) throw new NotFoundException('Member not found');
+
+    const email = member.email?.trim().toLowerCase();
+    if (!email) {
+      throw new BadRequestException(
+        'Email is required to assign a Unit Leader so they can receive a login invite',
+      );
+    }
+
+    const unit = await this.prisma.serviceUnit.findFirst({
+      where: { id: serviceUnitId, churchId },
+      select: { name: true },
+    });
+    if (!unit) throw new NotFoundException('Service unit not found');
+
+    let userId = member.userId ?? undefined;
+    let createdUser = false;
+    let needsPasswordSetup = false;
+
+    if (!userId) {
+      const existingUser = await this.prisma.user.findFirst({
+        where: { email, churchId },
+        select: {
+          id: true,
+          mustChangePassword: true,
+          lastLoginAt: true,
+          member: { select: { id: true } },
+        },
+      });
+      if (existingUser) {
+        if (existingUser.member && existingUser.member.id !== member.id) {
+          throw new ConflictException(
+            'That email already belongs to another login account in this church',
+          );
+        }
+        userId = existingUser.id;
+        if (!existingUser.member) {
+          await this.prisma.member.update({
+            where: { id: member.id },
+            data: { userId },
+          });
+        }
+        needsPasswordSetup =
+          existingUser.mustChangePassword || existingUser.lastLoginAt == null;
+      } else {
+        const memberRole = await this.prisma.role.upsert({
+          where: { name: 'MEMBER' },
+          update: {},
+          create: { name: 'MEMBER', description: 'Church member' },
+        });
+        const passwordHash = await bcrypt.hash(randomBytes(24).toString('base64url'), 12);
+        const user = await this.prisma.user.create({
+          data: {
+            churchId,
+            email,
+            passwordHash,
+            firstName: member.firstName,
+            lastName: member.lastName,
+            phone: member.phone ?? undefined,
+            mustChangePassword: true,
+            roles: { create: [{ roleId: memberRole.id }] },
+          },
+          select: { id: true },
+        });
+        userId = user.id;
+        createdUser = true;
+        needsPasswordSetup = true;
+        await this.prisma.member.update({
+          where: { id: member.id },
+          data: { userId },
+        });
+      }
+    } else {
+      const user = await this.prisma.user.findFirst({
+        where: { id: userId, churchId },
+        select: { mustChangePassword: true, lastLoginAt: true, email: true },
+      });
+      if (!user) {
+        throw new BadRequestException('Linked login account was not found');
+      }
+      needsPasswordSetup = user.mustChangePassword || user.lastLoginAt == null;
+    }
+
+    let setPasswordUrl = '';
+    if (needsPasswordSetup || createdUser) {
+      try {
+        setPasswordUrl = await this.auth.createPasswordSetupLink(userId);
+      } catch (err) {
+        this.logger.warn(
+          `Password setup link failed for unit leader ${email}: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+
+    await this.sendUnitLeaderWelcomeEmail(churchId, {
+      email,
+      firstName: member.firstName,
+      lastName: member.lastName,
+      unitName: unit.name,
+      setPasswordUrl,
+    });
+  }
+
+  private async sendUnitLeaderWelcomeEmail(
+    churchId: string,
+    data: {
+      email: string;
+      firstName: string;
+      lastName: string;
+      unitName: string;
+      setPasswordUrl: string;
+    },
+  ) {
+    try {
+      const church = await this.prisma.church.findUnique({
+        where: { id: churchId },
+        select: { name: true },
+      });
+      const hasLink = Boolean(data.setPasswordUrl);
+      const setPasswordBlock = hasLink
+        ? `<p style="margin:0;"><a href="${data.setPasswordUrl}" style="display:inline-block;background:#1e3a5f;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600;">Set your password</a></p>
+<p style="margin:12px 0 0;font-size:12px;color:#94a3b8;word-break:break-all;">Or copy this link:<br/>${data.setPasswordUrl}</p>`
+        : `<p style="margin:0;font-size:13px;color:#64748b;">Sign in with your existing ChurchHub password.</p>`;
+
+      const rendered = await this.emailTemplates.render(churchId, 'UNIT_LEADER_WELCOME', {
+        churchName: church?.name ?? 'Your church',
+        unitName: data.unitName,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        fullName: `${data.firstName} ${data.lastName}`.trim(),
+        email: data.email,
+        setPasswordUrl:
+          data.setPasswordUrl ||
+          'Contact your church admin if you need a password reset.',
+        passwordSetupBlurb: hasLink
+          ? 'For security, we do not send passwords by email. Use the secure link below to choose your password (expires in 48 hours).'
+          : 'Your ChurchHub login is ready — use the password you already set.',
+        setPasswordBlock,
+      });
+      const plain = rendered.bodyHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      await this.email.send({
+        to: data.email,
+        subject: rendered.subject,
+        body: plain,
+        html: rendered.bodyHtml,
+        churchId,
+        purpose: 'onboarding',
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Unit leader welcome email failed for ${data.email}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
   }
 
   private async resolveLeaderMemberId(

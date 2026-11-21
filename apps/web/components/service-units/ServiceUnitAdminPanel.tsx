@@ -177,8 +177,7 @@ export function ServiceUnitAdminPanel({
         <CardHeader>
           <CardTitle className="text-base">Unit leadership</CardTitle>
           <CardDescription>
-            Leadership is managed from the Overview tab. Unit Leaders are volunteers (not Church
-            Staff). Assistants and Secretaries help run the unit but cannot assign a Unit Admin.
+            Leadership is managed from the Overview tab.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -188,14 +187,10 @@ export function ServiceUnitAdminPanel({
               <strong>Overview</strong>
               {onOpenAddLeader || onOpenAssignAssistants
                 ? ' (Add Leader / Assign Assistants).'
-                : '.'}{' '}
-              This Admin tab is for join requests, welcome email, and other unit settings.
+                : '.'}
             </p>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              You can view leadership below. Assigning leaders or assistants requires Unit Admin or
-              church staff access from Overview.
-            </p>
+            <p className="text-sm text-muted-foreground">Current leadership for this unit.</p>
           )}
 
           <ul className="divide-y rounded-md border">

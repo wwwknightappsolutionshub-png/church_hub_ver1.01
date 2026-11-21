@@ -7,6 +7,11 @@ import { AxiosError } from 'axios';
 import { Loader2, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, clearAuthTokens } from '@/lib/api';
+import {
+  filterPhoneTyping,
+  flexiblePhoneFormatError,
+  parseOptionalFlexiblePhone,
+} from '@/lib/contact-validation';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import type { ModuleAccess } from '@/lib/hooks/use-module-access';
 import { accountAvatarUrl, userDisplayName } from '@/lib/user-display';
@@ -165,12 +170,17 @@ export default function SettingsPage() {
       toast.error('First and last name are required');
       return;
     }
+    const phoneErr = flexiblePhoneFormatError(form.phone);
+    if (phoneErr) {
+      toast.error(phoneErr);
+      return;
+    }
 
     const payload = {
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
       nickname: form.nickname.trim() || null,
-      phone: form.phone.trim() || null,
+      phone: parseOptionalFlexiblePhone(form.phone) ?? null,
       avatarUrl: form.avatarUrl.trim() || null,
     };
 
@@ -285,9 +295,12 @@ export default function SettingsPage() {
               </label>
               <Input
                 type="tel"
-                placeholder="Optional"
+                inputMode="tel"
+                placeholder="e.g. 07123 456789"
                 value={form.phone}
-                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, phone: filterPhoneTyping(e.target.value) }))
+                }
               />
             </div>
             <div>
