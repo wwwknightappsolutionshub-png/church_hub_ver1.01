@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import type { ChoirAttendanceEventType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.module';
 import { SERVICE_UNIT_CATALOG } from '../../../prisma/service-unit-catalog';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -1166,7 +1166,7 @@ export class ServiceUnitsService {
         return db.deptChoirAttendance.findFirst({
           where: {
             serviceUnitId: toUnitId,
-            eventType,
+            eventType: eventType as ChoirAttendanceEventType,
             eventDate: new Date(eventDate),
             memberId,
           },
