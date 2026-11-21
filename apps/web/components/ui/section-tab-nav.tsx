@@ -1,6 +1,7 @@
 'use client';
 
-import type { ComponentType, ReactNode } from 'react';
+import type { ReactNode } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -10,7 +11,7 @@ export type SectionTabItem = {
   label: string;
   /** Optional shorter label for dense layouts. */
   shortLabel?: string;
-  icon?: ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
+  icon?: LucideIcon;
   href?: string;
   badge?: number | string;
   disabled?: boolean;
