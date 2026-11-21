@@ -44,6 +44,8 @@ export default function MagicLoginPage() {
         isChurchStaff?: boolean;
         churchSlug?: string | null;
         userRoles?: string[];
+        unitAdminUnitIds?: string[];
+        unitDeputyUnitIds?: string[];
         mustChangePassword?: boolean;
       }>('/auth/me');
       if (data.mustChangePassword) {

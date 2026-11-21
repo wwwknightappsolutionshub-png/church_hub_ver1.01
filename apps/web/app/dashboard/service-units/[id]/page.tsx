@@ -14,6 +14,7 @@ import {
   Pin,
   Shield,
   Trash2,
+  UserPlus,
   Users,
   FileSpreadsheet,
 } from 'lucide-react';
@@ -37,6 +38,7 @@ import { ServiceUnitAdminPanel } from '@/components/service-units/ServiceUnitAdm
 import { ServiceUnitMembersPanel } from '@/components/service-units/ServiceUnitMembersPanel';
 import { ServiceUnitWeeklyAttendancePanel } from '@/components/service-units/ServiceUnitWeeklyAttendancePanel';
 import { ServiceUnitRtpPanel } from '@/components/service-units/ServiceUnitRtpPanel';
+import { UnitLeadershipModal } from '@/components/service-units/UnitLeadershipModal';
 import {
   DepartmentToolsRouter,
 } from '@/components/departments/DepartmentToolsRouter';
@@ -134,11 +136,15 @@ export default function ServiceUnitDetailPage() {
     user,
     member,
     unitAdminUnitIds,
+    unitDeputyUnitIds,
     unitMembershipIds,
     isChurchStaff,
   } = useModuleAccess();
   const [accessDenied, setAccessDenied] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
+  const [leadershipModal, setLeadershipModal] = useState<'add-leader' | 'assign-assistants' | null>(
+    null,
+  );
   const unit = useApiQuery<ServiceUnitDetail>(['service-unit', id], `/service-units/${id}`, {
     retry: false,
   });
@@ -168,10 +174,25 @@ export default function ServiceUnitDetailPage() {
     [unit.data?.departmentCode, unit.data?.name],
   );
 
+  const isUnitAdminOfThis =
+    unitAdminUnitIds.includes(id) || !!unit.data?.access?.canManageLeaders;
+  const isDeputyOnly =
+    !isChurchStaff &&
+    !unitAdminUnitIds.includes(id) &&
+    unitDeputyUnitIds.includes(id);
+
   const canManage =
     isChurchStaff ||
     unit.data?.access?.canManage ||
-    unitAdminUnitIds.includes(id);
+    unitAdminUnitIds.includes(id) ||
+    unitDeputyUnitIds.includes(id);
+
+  /** Church staff: Add Leader. Unit Admin: Assign Assistants. Deputies: neither. */
+  const canAddLeader = isChurchStaff && !isDeputyOnly;
+  const canAssignAssistants =
+    !isChurchStaff && isUnitAdminOfThis && unitAdminUnitIds.includes(id) && !isDeputyOnly;
+  const canManageLeaders =
+    !!unit.data?.access?.canManageLeaders || canAddLeader || canAssignAssistants;
 
   const canViewDepartmentTab =
     isChurchStaff ||
@@ -307,7 +328,7 @@ export default function ServiceUnitDetailPage() {
     e.preventDefault();
     if (!currentMemberId) return;
     try {
-      await api.post(`/service-units/${id}/posts`, { ...postForm, authorId: currentMemberId });
+      await api.post(`/service-units/${id}/posts`, { ...postForm });
       toast.success('Discussion started');
       setPostForm({ title: '', body: '' });
       refresh();
@@ -320,7 +341,7 @@ export default function ServiceUnitDetailPage() {
     const body = replyForms[postId]?.trim();
     if (!body || !currentMemberId) return;
     try {
-      await api.post(`/service-units/${id}/posts/${postId}/replies`, { body, authorId: currentMemberId });
+      await api.post(`/service-units/${id}/posts/${postId}/replies`, { body });
       setReplyForms((f) => ({ ...f, [postId]: '' }));
       refresh();
     } catch {
@@ -376,7 +397,6 @@ export default function ServiceUnitDetailPage() {
     try {
       await api.patch(`/service-units/${id}/posts/${post.id}`, {
         isLocked: !post.isLocked,
-        moderatorMemberId: currentMemberId,
       });
       refresh();
     } catch {
@@ -563,9 +583,31 @@ export default function ServiceUnitDetailPage() {
                     </div>
                   </form>
                 ) : (
-                  <Button type="button" size="sm" variant="outline" onClick={() => setEditingUnit(true)}>
-                    Edit unit details
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" size="sm" variant="outline" onClick={() => setEditingUnit(true)}>
+                      Edit unit details
+                    </Button>
+                    {canAddLeader ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => setLeadershipModal('add-leader')}
+                      >
+                        <UserPlus className="mr-1.5 h-4 w-4" />
+                        Add Leader
+                      </Button>
+                    ) : null}
+                    {canAssignAssistants ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => setLeadershipModal('assign-assistants')}
+                      >
+                        <UserPlus className="mr-1.5 h-4 w-4" />
+                        Assign Assistants
+                      </Button>
+                    ) : null}
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -835,7 +877,12 @@ export default function ServiceUnitDetailPage() {
       )}
 
       {tab === 'leaders' && (
-        <ServiceUnitMembersPanel unitId={id} canManage={canManage} isOnline={isOnline} />
+        <ServiceUnitMembersPanel
+          unitId={id}
+          canManage={canManage}
+          isOnline={isOnline}
+          allowAssignUnitAdmin={isChurchStaff}
+        />
       )}
 
       {tab === 'weekly' && unit.data && (
@@ -856,8 +903,24 @@ export default function ServiceUnitDetailPage() {
           unitName={unit.data.name}
           departmentCode={unit.data.departmentCode}
           isChurchStaff={unit.data.access?.isChurchStaff}
+          canManageLeaders={canManageLeaders}
+          onOpenAddLeader={
+            canAddLeader ? () => setLeadershipModal('add-leader') : undefined
+          }
+          onOpenAssignAssistants={
+            canAssignAssistants ? () => setLeadershipModal('assign-assistants') : undefined
+          }
         />
       )}
+
+      {leadershipModal ? (
+        <UnitLeadershipModal
+          open
+          unitId={id}
+          variant={leadershipModal}
+          onClose={() => setLeadershipModal(null)}
+        />
+      ) : null}
 
       {tab === 'forum' && (
         <div className="space-y-6">

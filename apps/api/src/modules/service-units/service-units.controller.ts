@@ -8,8 +8,14 @@ import {
   Patch,
   Post,
   Query,
+  Res,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { ApiTags, ApiBearerAuth, ApiConsumes, ApiOperation } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { ServiceUnitsService } from './service-units.service';
 import { ServiceUnitsDepartmentService } from './service-units-department.service';
 import { ChurchId, CurrentUser, AuthUser } from '../auth/current-user.decorator';
@@ -17,6 +23,11 @@ import { ModuleGate, Roles } from '../auth/decorators';
 import { ModuleAccessService } from '../access/module-access.service';
 import { AssignServiceUnitMemberDto, UpdateServiceUnitMemberDto } from './dto/assign-service-unit-member.dto';
 import { AddServiceUnitLeaderDto } from './dto/service-unit-leader.dto';
+import {
+  CreateServiceUnitDto,
+  CreateServiceUnitWithSetupDto,
+  UpdateServiceUnitDto,
+} from './dto/create-service-unit.dto';
 
 @ApiTags('service-units')
 @ApiBearerAuth()
@@ -73,6 +84,39 @@ export class ServiceUnitsController {
     return this.serviceUnits.getRegistryCatalog(churchId);
   }
 
+  @Get('member-import-template.csv')
+  @ApiOperation({
+    summary: 'Download CSV template for importing unit members (Excel-compatible)',
+  })
+  downloadMemberImportTemplate(@Res() res: Response) {
+    const csv = this.serviceUnits.getMemberImportTemplateCsv();
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="service-unit-members-import-template.csv"',
+    );
+    res.send(csv);
+  }
+
+  @Post('members/import/preview')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Parse unit-member CSV or .xlsx for create-unit wizard staging (no DB writes)',
+  })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 2 * 1024 * 1024 },
+    }),
+  )
+  async previewMemberImport(@UploadedFile() file: Express.Multer.File) {
+    return this.serviceUnits.previewMemberImportCsv({
+      buffer: file?.buffer,
+      originalname: file?.originalname,
+    });
+  }
+
   @Get(':id/access')
   @ApiOperation({ summary: 'Check current user access to a service unit' })
   checkAccess(
@@ -106,8 +150,22 @@ export class ServiceUnitsController {
   @Post()
   @Roles('ADMIN', 'PASTOR')
   @ApiOperation({ summary: 'Create a service unit (church staff only)' })
-  create(@ChurchId() churchId: string, @Body() body: Record<string, unknown>) {
-    return this.serviceUnits.createUnit(churchId, body as Parameters<ServiceUnitsService['createUnit']>[1]);
+  create(@ChurchId() churchId: string, @Body() body: CreateServiceUnitDto) {
+    return this.serviceUnits.createUnit(churchId, body);
+  }
+
+  @Post('with-setup')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({
+    summary:
+      'Create a service unit with optional members and one unit admin (church staff only)',
+  })
+  createWithSetup(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Body() body: CreateServiceUnitWithSetupDto,
+  ) {
+    return this.serviceUnits.createUnitWithSetup(user.userId, churchId, body);
   }
 
   @Patch(':id')
@@ -117,14 +175,9 @@ export class ServiceUnitsController {
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
-    @Body() body: Record<string, unknown>,
+    @Body() body: UpdateServiceUnitDto,
   ) {
-    return this.serviceUnits.updateUnit(
-      user.userId,
-      churchId,
-      id,
-      body as Parameters<ServiceUnitsService['updateUnit']>[3],
-    );
+    return this.serviceUnits.updateUnit(user.userId, churchId, id, body);
   }
 
   @Delete(':id')
@@ -203,6 +256,30 @@ export class ServiceUnitsController {
     @Body() body: AssignServiceUnitMemberDto,
   ) {
     return this.serviceUnits.addMember(user.userId, churchId, id, body);
+  }
+
+  @Post(':id/members/import')
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary:
+      'Import unit members from CSV (Excel Save As CSV). Church staff or unit admin.',
+  })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 2 * 1024 * 1024 },
+    }),
+  )
+  importMembers(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.serviceUnits.importMembersFromCsv(user.userId, churchId, id, {
+      buffer: file?.buffer,
+      originalname: file?.originalname,
+    });
   }
 
   @Post(':id/members/create')
@@ -403,58 +480,66 @@ export class ServiceUnitsController {
   }
 
   @Get(':id/posts')
-  listPosts(@ChurchId() churchId: string, @Param('id') id: string) {
-    return this.serviceUnits.listPosts(churchId, id);
+  listPosts(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.serviceUnits.listPosts(user.userId, churchId, id);
   }
 
   @Post(':id/posts')
   createPost(
     @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
-    @Body() body: { authorId: string; title?: string; body: string },
+    @Body() body: { title?: string; body: string },
   ) {
-    return this.serviceUnits.createPost(churchId, id, body);
+    return this.serviceUnits.createPost(user.userId, churchId, id, body);
   }
 
   @Patch(':id/posts/:postId')
   updatePost(
     @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Param('postId') postId: string,
-    @Body() body: { title?: string; body?: string; isPinned?: boolean; isLocked?: boolean; moderatorMemberId?: string },
+    @Body() body: { title?: string; body?: string; isPinned?: boolean; isLocked?: boolean },
   ) {
-    const { moderatorMemberId, ...data } = body;
-    return this.serviceUnits.updatePost(churchId, id, postId, data, moderatorMemberId);
+    return this.serviceUnits.updatePost(user.userId, churchId, id, postId, body);
   }
 
   @Delete(':id/posts/:postId')
   @Roles('ADMIN', 'PASTOR', 'LEADER')
   deletePost(
     @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Param('postId') postId: string,
   ) {
-    return this.serviceUnits.deletePost(churchId, id, postId);
+    return this.serviceUnits.deletePost(user.userId, churchId, id, postId);
   }
 
   @Post(':id/posts/:postId/replies')
   createReply(
     @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Param('postId') postId: string,
-    @Body() body: { authorId: string; body: string },
+    @Body() body: { body: string },
   ) {
-    return this.serviceUnits.createReply(churchId, id, postId, body);
+    return this.serviceUnits.createReply(user.userId, churchId, id, postId, body);
   }
 
   @Delete(':id/replies/:replyId')
   @Roles('ADMIN', 'PASTOR', 'LEADER')
   deleteReply(
     @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Param('replyId') replyId: string,
   ) {
-    return this.serviceUnits.deleteReply(churchId, id, replyId);
+    return this.serviceUnits.deleteReply(user.userId, churchId, id, replyId);
   }
 
   @Get(':id/presence')

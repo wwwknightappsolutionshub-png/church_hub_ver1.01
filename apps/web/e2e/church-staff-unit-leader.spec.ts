@@ -86,6 +86,7 @@ test.describe('Church Staff unit leader (UI)', () => {
 
     await page.goto('/dashboard/staff');
     await expect(page).not.toHaveURL(/\/dashboard\/staff$/, { timeout: 20_000 });
-    await expect(page).toHaveURL(/\/dashboard(\/lounge)?/, { timeout: 20_000 });
+    // Unit leaders land on Service Unit Hub (not Lounge).
+    await expect(page).toHaveURL(/\/dashboard\/service-units/, { timeout: 20_000 });
   });
 });

@@ -31,6 +31,7 @@ export interface ModuleAccess extends AuthMeResponse {
   userRoles?: string[];
   unitMembershipIds?: string[];
   unitAdminUnitIds?: string[];
+  unitDeputyUnitIds?: string[];
   unitLeaderUnitIds?: string[];
   enabledModules?: ChurchTenantModulesMap;
   mustChangePassword?: boolean;
@@ -83,6 +84,7 @@ export function useModuleAccess() {
     userRoles,
     unitMembershipIds: data?.unitMembershipIds ?? [],
     unitAdminUnitIds: data?.unitAdminUnitIds ?? [],
+    unitDeputyUnitIds: data?.unitDeputyUnitIds ?? [],
     unitLeaderUnitIds: data?.unitLeaderUnitIds ?? [],
     enabledModules: data?.enabledModules,
     mustChangePassword: data?.mustChangePassword ?? false,

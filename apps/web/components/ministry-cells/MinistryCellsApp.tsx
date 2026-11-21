@@ -37,6 +37,7 @@ import { CellBranchesList, CollapsibleCellCardsSection } from '@/components/mini
 import { MINISTRY_CELLS_DESKTOP_MQ } from '@/components/ministry-cells/layout';
 import { MinistryCellsAnalyticsPanel } from '@/components/ministry-cells/MinistryCellsAnalyticsPanel';
 import { MinistryCellsKpiStrip } from '@/components/ministry-cells/MinistryCellsKpiStrip';
+import { CellDeputyAssignPanel } from '@/components/ministry-cells/CellDeputyAssignPanel';
 import { ProvincesSetupPanel } from '@/components/ministry-cells/ProvincesSetupPanel';
 import { ProvinceAttendancePanel } from '@/components/ministry-cells/ProvinceAttendancePanel';
 import type {
@@ -601,7 +602,16 @@ export function MinistryCellsApp() {
       )}
 
       {tab === 'province' && ctx.role === 'provincialLeader' && ctx.leaderProvinceId && (
-        <ProvinceAttendancePanel provinceId={ctx.leaderProvinceId} />
+        <div className="space-y-4">
+          {!ctx.isDeputy ? (
+            <CellDeputyAssignPanel
+              scope="province"
+              scopeId={ctx.leaderProvinceId}
+              canAssign={!!ctx.canAssignDeputies}
+            />
+          ) : null}
+          <ProvinceAttendancePanel provinceId={ctx.leaderProvinceId} />
+        </div>
       )}
 
       {tab === 'analytics' && ctx.canViewAnalytics && ctx.role !== 'provincialLeader' && (

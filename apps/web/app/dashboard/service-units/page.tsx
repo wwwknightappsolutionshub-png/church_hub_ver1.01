@@ -9,6 +9,7 @@ import { api } from '@/lib/api';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { ServiceUnitJoinSheet } from '@/components/service-units/ServiceUnitJoinSheet';
+import { CreateServiceUnitWizard } from '@/components/service-units/CreateServiceUnitWizard';
 import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import {
   EnterpriseContent,
@@ -44,12 +45,10 @@ export default function ServiceUnitsPage() {
   const queryClient = useQueryClient();
   const { user, member, isChurchStaff, unitMembershipIds } = useModuleAccess();
   const units = useApiQuery<ServiceUnitListItem[]>(['service-units'], '/service-units');
-  const [showForm, setShowForm] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [showCreateWizard, setShowCreateWizard] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [checkingId, setCheckingId] = useState<string | null>(null);
   const [joinTarget, setJoinTarget] = useState<{ id: string; name: string } | null>(null);
-  const [form, setForm] = useState({ name: '', description: '', activities: '' });
   const [search, setSearch] = useState('');
   const [suggestions, setSuggestions] = useState<UnitSuggestion[]>([]);
   const [suggestOpen, setSuggestOpen] = useState(false);
@@ -135,23 +134,6 @@ export default function ServiceUnitsPage() {
     }
   };
 
-  const createUnit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.name.trim()) return;
-    setSaving(true);
-    try {
-      await api.post('/service-units', form);
-      toast.success('Service unit created');
-      setForm({ name: '', description: '', activities: '' });
-      setShowForm(false);
-      queryClient.invalidateQueries({ queryKey: ['service-units'] });
-    } catch {
-      toast.error('Could not create service unit');
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const deleteUnit = async (unit: ServiceUnitListItem) => {
     if (!isChurchStaff) return;
     if (unit.name.trim().toLowerCase() === UNCATEGORIZED.toLowerCase()) {
@@ -192,13 +174,61 @@ export default function ServiceUnitsPage() {
         title="Service Unit Hub"
         description={MODULE_DESCRIPTIONS.serviceUnits}
         badge={
-          <Badge className="border-slate-600 bg-slate-800 text-slate-100">
-            {(units.data ?? []).length} units
-          </Badge>
+          <>
+            <div ref={suggestRef} className="relative w-full min-w-[12rem] max-w-xs sm:w-64">
+              <label htmlFor="service-unit-search" className="sr-only">
+                Search service units
+              </label>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
+                <Input
+                  id="service-unit-search"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setSuggestOpen(true);
+                  }}
+                  onFocus={() => setSuggestOpen(true)}
+                  placeholder="Search units by name…"
+                  className="h-9 border-white/25 bg-white/10 pl-9 text-white placeholder:text-slate-300 focus-visible:border-white/40 focus-visible:ring-white/30"
+                  autoComplete="off"
+                />
+                {suggestLoading ? (
+                  <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-slate-300" />
+                ) : null}
+              </div>
+              {isChurchStaff && suggestOpen && suggestions.length > 0 ? (
+                <ul
+                  className="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-md border border-border bg-background py-1 text-foreground shadow-md"
+                  role="listbox"
+                  aria-label="Unit name suggestions"
+                >
+                  {suggestions.map((s) => (
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        role="option"
+                        className="flex w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                        onClick={() => {
+                          setSearch(s.name);
+                          setSuggestOpen(false);
+                        }}
+                      >
+                        {s.name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+            <Badge className="border-slate-600 bg-slate-800 text-slate-100">
+              {(units.data ?? []).length} units
+            </Badge>
+          </>
         }
         actions={
           isChurchStaff ? (
-            <Button size="sm" onClick={() => setShowForm((v) => !v)}>
+            <Button size="sm" onClick={() => setShowCreateWizard(true)}>
               <Plus className="mr-1.5 h-4 w-4" />
               New unit
             </Button>
@@ -206,90 +236,6 @@ export default function ServiceUnitsPage() {
         }
       />
       <EnterpriseContent className="space-y-6">
-        <div ref={suggestRef} className="relative max-w-xl">
-          <label htmlFor="service-unit-search" className="sr-only">
-            Search service units
-          </label>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="service-unit-search"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setSuggestOpen(true);
-              }}
-              onFocus={() => setSuggestOpen(true)}
-              placeholder="Search units by name…"
-              className="pl-9"
-              autoComplete="off"
-            />
-            {suggestLoading ? (
-              <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
-            ) : null}
-          </div>
-          {isChurchStaff && suggestOpen && suggestions.length > 0 ? (
-            <ul
-              className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-border bg-background py-1 shadow-md"
-              role="listbox"
-              aria-label="Unit name suggestions"
-            >
-              {suggestions.map((s) => (
-                <li key={s.id}>
-                  <button
-                    type="button"
-                    role="option"
-                    className="flex w-full px-3 py-2 text-left text-sm hover:bg-muted"
-                    onClick={() => {
-                      setSearch(s.name);
-                      setSuggestOpen(false);
-                    }}
-                  >
-                    {s.name}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-
-        {showForm && isChurchStaff && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Create service unit</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={createUnit} className="grid gap-3 md:grid-cols-2">
-                <Input
-                  placeholder="Unit name"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  required
-                />
-                <Input
-                  placeholder="Short description"
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                />
-                <Input
-                  className="md:col-span-2"
-                  placeholder="Activities summary"
-                  value={form.activities}
-                  onChange={(e) => setForm({ ...form, activities: e.target.value })}
-                />
-                <div className="flex gap-2 md:col-span-2">
-                  <Button type="submit" disabled={saving}>
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save unit'}
-                  </Button>
-                  <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        )}
-
         {units.isLoading && (
           <div className="flex justify-center py-16">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -402,6 +348,16 @@ export default function ServiceUnitsPage() {
           onSubmitted={() => queryClient.invalidateQueries({ queryKey: ['service-units'] })}
         />
       )}
+
+      {isChurchStaff ? (
+        <CreateServiceUnitWizard
+          open={showCreateWizard}
+          onClose={() => setShowCreateWizard(false)}
+          onCreated={() => {
+            queryClient.invalidateQueries({ queryKey: ['service-units'] });
+          }}
+        />
+      ) : null}
     </EnterpriseShell>
   );
 }

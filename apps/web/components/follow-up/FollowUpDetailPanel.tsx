@@ -415,14 +415,14 @@ export function FollowUpDetailPanel({
           </div>
         </div>
 
-        <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-border bg-muted/30 px-3 py-2">
+        <div className="flex shrink-0 flex-wrap gap-1.5 border-b border-border bg-muted/30 px-3 py-2">
           {tabs.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
               className={cn(
-                'shrink-0 rounded-lg px-3 py-2 text-xs font-semibold transition-colors',
+                'rounded-lg px-3 py-2 text-xs font-semibold transition-colors',
                 tab === t.id
                   ? 'bg-primary text-primary-foreground shadow-sm'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground',

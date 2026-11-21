@@ -24,9 +24,20 @@ export interface MinistryCellsContext {
   role: 'admin' | 'pastor' | 'provincialLeader' | 'cellLeader' | 'none';
   leaderBranchId: string | null;
   leaderProvinceId: string | null;
+  isDeputy?: boolean;
+  deputyRole?: 'ASSISTANT' | 'SECRETARY' | null;
+  deputyBranchIds?: string[];
+  deputyProvinceIds?: string[];
   canManage: boolean;
+  canAssignDeputies?: boolean;
   canViewAnalytics: boolean;
 }
+
+export type CellDeputyRow = {
+  id: string;
+  role: 'ASSISTANT' | 'SECRETARY';
+  user: { id: string; name: string; email: string };
+};
 
 export interface BranchDetail {
   id: string;
@@ -38,6 +49,7 @@ export interface BranchDetail {
   createdAt?: string;
   memberCount: number;
   leader: { id: string; name: string; email: string } | null;
+  deputies?: CellDeputyRow[];
   members: {
     id: string;
     firstName: string;
@@ -74,6 +86,7 @@ export interface CellProvinceRow {
   updatedAt: string;
   assignedAt?: string;
   leader: { id: string; name: string; email: string; phone?: string | null };
+  deputies?: CellDeputyRow[];
 }
 
 export type MinistryCellsTab = 'branches' | 'analytics' | 'province';

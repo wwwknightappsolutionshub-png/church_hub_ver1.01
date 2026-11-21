@@ -17,6 +17,7 @@ import {
   toPermissionKey,
   type PlatformPermissionKey,
 } from '../platform/platform-permissions.catalog';
+import { isUnitDeputyRole } from '../service-units/service-unit-leader-roles';
 
 export interface UserMemberContext {
   userId: string;
@@ -27,6 +28,8 @@ export interface UserMemberContext {
   memberRoles: MemberRoleType[];
   unitMembershipIds: string[];
   unitAdminUnitIds: string[];
+  /** Units where the member is Assistant or Secretary (not Unit Admin). */
+  unitDeputyUnitIds: string[];
   unitLeaderUnitIds: string[];
 }
 
@@ -43,7 +46,7 @@ export class ModuleAccessService {
           include: {
             serviceUnitMemberships: { select: { serviceUnitId: true } },
             serviceUnitLeaderships: {
-              select: { serviceUnitId: true, isUnitAdmin: true },
+              select: { serviceUnitId: true, isUnitAdmin: true, role: true },
             },
           },
         },
@@ -61,6 +64,9 @@ export class ModuleAccessService {
     const unitAdminUnitIds = leaderships
       .filter((l) => l.isUnitAdmin)
       .map((l) => l.serviceUnitId);
+    const unitDeputyUnitIds = leaderships
+      .filter((l) => !l.isUnitAdmin && isUnitDeputyRole(l.role))
+      .map((l) => l.serviceUnitId);
 
     return {
       userId,
@@ -71,6 +77,7 @@ export class ModuleAccessService {
       memberRoles,
       unitMembershipIds: [...new Set([...unitMembershipIds, ...unitLeaderUnitIds])],
       unitAdminUnitIds,
+      unitDeputyUnitIds,
       unitLeaderUnitIds,
     };
   }
@@ -101,7 +108,11 @@ export class ModuleAccessService {
   canAccessServiceUnitHub(ctx: UserMemberContext): boolean {
     if (this.isChurchStaff(ctx)) return true;
     if (!ctx.memberId || !ctx.memberStatus) return false;
-    if (ctx.unitMembershipIds.length > 0 || ctx.unitAdminUnitIds.length > 0) {
+    if (
+      ctx.unitMembershipIds.length > 0 ||
+      ctx.unitAdminUnitIds.length > 0 ||
+      ctx.unitDeputyUnitIds.length > 0
+    ) {
       return true;
     }
     if (ctx.memberStatus === 'VISITOR') return false;
@@ -149,13 +160,32 @@ export class ModuleAccessService {
     return ctx.unitMembershipIds.includes(serviceUnitId);
   }
 
+  /**
+   * Operate the unit (members, meetings, attendance, etc.).
+   * Includes volunteer Unit Admin and Assistant/Secretary deputies.
+   */
   canManageServiceUnit(ctx: UserMemberContext, serviceUnitId: string): boolean {
+    if (this.isChurchStaff(ctx)) return true;
+    return (
+      ctx.unitAdminUnitIds.includes(serviceUnitId) ||
+      ctx.unitDeputyUnitIds.includes(serviceUnitId)
+    );
+  }
+
+  /** Church staff or Unit Admin only — not Assistant/Secretary. */
+  canManageUnitLeaders(ctx: UserMemberContext, serviceUnitId: string): boolean {
     if (this.isChurchStaff(ctx)) return true;
     return ctx.unitAdminUnitIds.includes(serviceUnitId);
   }
 
-  canManageUnitLeaders(ctx: UserMemberContext, serviceUnitId: string): boolean {
-    return this.canManageServiceUnit(ctx, serviceUnitId);
+  /** Assign volunteer Unit Admin (isUnitAdmin) — church ADMIN/PASTOR only. */
+  canAssignUnitAdmin(ctx: UserMemberContext): boolean {
+    return this.isChurchStaff(ctx);
+  }
+
+  /** Assign Assistant/Secretary — church staff or Unit Admin of this unit. */
+  canAssignUnitDeputies(ctx: UserMemberContext, serviceUnitId: string): boolean {
+    return this.canManageUnitLeaders(ctx, serviceUnitId);
   }
 
   canManageStaff(ctx: UserMemberContext): boolean {
@@ -167,7 +197,7 @@ export class ModuleAccessService {
     return ctx.userRoles.includes('PASTOR');
   }
 
-  /** Church admin, pastor, assigned provincial leader, or assigned cell branch leader. */
+  /** Church admin, pastor, assigned provincial/cell leader, or WSF Assistant/Secretary. */
   async canAccessMinistryCells(ctx: UserMemberContext): Promise<boolean> {
     if (this.isChurchStaff(ctx)) return true;
     if (ctx.userRoles.includes('PROVINCIAL_LEADER')) {
@@ -181,7 +211,12 @@ export class ModuleAccessService {
       where: { churchId: ctx.churchId, leaderUserId: ctx.userId },
       select: { id: true },
     });
-    return !!branch;
+    if (branch) return true;
+    const deputy = await this.prisma.cellLeadershipDeputy.findFirst({
+      where: { churchId: ctx.churchId, userId: ctx.userId },
+      select: { id: true },
+    });
+    return !!deputy;
   }
 
   private async userRoleNames(userId: string): Promise<string[]> {
@@ -253,6 +288,7 @@ export class ModuleAccessService {
       canAccessMinistryCells: false,
       unitMembershipIds: [] as string[],
       unitAdminUnitIds: [] as string[],
+      unitDeputyUnitIds: [] as string[],
       unitLeaderUnitIds: [] as string[],
     };
   }
@@ -288,6 +324,7 @@ export class ModuleAccessService {
         canAccessMinistryCells: false,
         unitMembershipIds: [] as string[],
         unitAdminUnitIds: [] as string[],
+        unitDeputyUnitIds: [] as string[],
         unitLeaderUnitIds: [] as string[],
       };
     }
@@ -313,6 +350,7 @@ export class ModuleAccessService {
         canAccessMinistryCells: false,
         unitMembershipIds: [] as string[],
         unitAdminUnitIds: [] as string[],
+        unitDeputyUnitIds: [] as string[],
         unitLeaderUnitIds: [] as string[],
       };
     }
@@ -336,6 +374,7 @@ export class ModuleAccessService {
       canAccessMinistryCells: await this.canAccessMinistryCells(ctx),
       unitMembershipIds: ctx.unitMembershipIds,
       unitAdminUnitIds: ctx.unitAdminUnitIds,
+      unitDeputyUnitIds: ctx.unitDeputyUnitIds,
       unitLeaderUnitIds: ctx.unitLeaderUnitIds,
     };
   }

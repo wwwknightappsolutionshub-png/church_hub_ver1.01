@@ -26,12 +26,17 @@ import {
   type MinistryCellsRole,
 } from './ministry-cells-access.service';
 import {
+  isCellDeputyRole,
+  type CellDeputyRole,
+} from './cell-leadership-deputies';
+import {
   cellPostcodeMatchesCoverage,
   coverageKeyForCell,
   findMatchingProvinceId,
   normalizeCoveragePostcodes,
   requireCellPostcode,
 } from './cell-province.util';
+import type { AssignCellDeputyDto } from './dto/cell-deputy.dto';
 
 const branchInclude = {
   leader: { select: { id: true, firstName: true, lastName: true, email: true } },
@@ -80,11 +85,18 @@ export class MinistryCellsService {
   async getContext(user: AuthUser, churchId: string) {
     await this.access.assertModuleEnabled(churchId);
     const ctx = await this.access.resolveRole(user, churchId);
+    const canManage = ctx.role === 'admin' || ctx.role === 'pastor';
     return {
       role: ctx.role,
       leaderBranchId: ctx.leaderBranchId,
       leaderProvinceId: ctx.leaderProvinceId,
-      canManage: ctx.role === 'admin' || ctx.role === 'pastor',
+      isDeputy: ctx.isDeputy,
+      deputyRole: ctx.deputyRole,
+      deputyBranchIds: ctx.deputyBranchIds,
+      deputyProvinceIds: ctx.deputyProvinceIds,
+      canManage,
+      /** Primary leaders (not deputies) or church staff can assign Assistant/Secretary. */
+      canAssignDeputies: canManage || (!ctx.isDeputy && (ctx.role === 'cellLeader' || ctx.role === 'provincialLeader')),
       canViewAnalytics:
         ctx.role === 'admin' || ctx.role === 'pastor' || ctx.role === 'provincialLeader',
     };
@@ -95,12 +107,22 @@ export class MinistryCellsService {
     role: MinistryCellsRole,
     leaderBranchId: string | null,
     leaderProvinceId: string | null,
+    deputyBranchIds: string[] = [],
+    deputyProvinceIds: string[] = [],
   ) {
-    if (role === 'cellLeader' && leaderBranchId) {
-      return { churchId, id: leaderBranchId };
+    if (role === 'cellLeader') {
+      const ids = Array.from(
+        new Set([...(leaderBranchId ? [leaderBranchId] : []), ...deputyBranchIds]),
+      );
+      if (ids.length === 1) return { churchId, id: ids[0] };
+      if (ids.length > 1) return { churchId, id: { in: ids } };
     }
-    if (role === 'provincialLeader' && leaderProvinceId) {
-      return { churchId, provinceId: leaderProvinceId };
+    if (role === 'provincialLeader') {
+      const ids = Array.from(
+        new Set([...(leaderProvinceId ? [leaderProvinceId] : []), ...deputyProvinceIds]),
+      );
+      if (ids.length === 1) return { churchId, provinceId: ids[0] };
+      if (ids.length > 1) return { churchId, provinceId: { in: ids } };
     }
     return { churchId };
   }
@@ -113,6 +135,8 @@ export class MinistryCellsService {
         ctx.role,
         ctx.leaderBranchId,
         ctx.leaderProvinceId,
+        ctx.deputyBranchIds,
+        ctx.deputyProvinceIds,
       ),
       include: branchListInclude,
       orderBy: { name: 'asc' },
@@ -306,6 +330,7 @@ export class MinistryCellsService {
             email: branch.leader.email,
           }
         : null,
+      deputies: await this.listDeputiesForScope(churchId, { branchId }),
       members: branch.members.map((m) => ({
         id: m.member.id,
         firstName: m.member.firstName,
@@ -323,6 +348,291 @@ export class MinistryCellsService {
       openIncidents,
       openPrayers,
     };
+  }
+
+  async listBranchDeputies(user: AuthUser, churchId: string, branchId: string) {
+    await this.access.assertBranchAccess(user, churchId, branchId);
+    await this.getBranchOrThrow(churchId, branchId);
+    return this.listDeputiesForScope(churchId, { branchId });
+  }
+
+  async listProvinceDeputies(user: AuthUser, churchId: string, provinceId: string) {
+    await this.access.assertProvinceLeadership(user, churchId, provinceId);
+    return this.listDeputiesForScope(churchId, { provinceId });
+  }
+
+  /** Active church users for Assistant/Secretary pickers — assigners only. */
+  async listDeputyCandidates(
+    user: AuthUser,
+    churchId: string,
+    scope: { branchId?: string; provinceId?: string },
+  ) {
+    await this.access.assertCanAssignDeputies(user, churchId, scope);
+    if (scope.branchId) await this.getBranchOrThrow(churchId, scope.branchId);
+    if (scope.provinceId) {
+      const province = await this.prisma.cellProvince.findFirst({
+        where: { id: scope.provinceId, churchId },
+        select: { id: true },
+      });
+      if (!province) throw new NotFoundException('Province not found');
+    }
+    const users = await this.prisma.user.findMany({
+      where: { churchId, isActive: true },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+      },
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      take: 500,
+    });
+    return users.map((u) => ({
+      id: u.id,
+      name: `${u.firstName} ${u.lastName}`.trim(),
+      email: u.email,
+    }));
+  }
+
+  async assignBranchDeputy(
+    user: AuthUser,
+    churchId: string,
+    branchId: string,
+    body: AssignCellDeputyDto,
+  ) {
+    await this.access.assertCanAssignDeputies(user, churchId, { branchId });
+    const branch = await this.getBranchOrThrow(churchId, branchId);
+    return this.upsertDeputy(churchId, {
+      scope: 'BRANCH',
+      branchId,
+      provinceId: null,
+      role: body.role,
+      body,
+      primaryLeaderUserId: branch.leaderUserId,
+    });
+  }
+
+  async assignProvinceDeputy(
+    user: AuthUser,
+    churchId: string,
+    provinceId: string,
+    body: AssignCellDeputyDto,
+  ) {
+    await this.access.assertCanAssignDeputies(user, churchId, { provinceId });
+    const province = await this.prisma.cellProvince.findFirst({
+      where: { id: provinceId, churchId },
+      select: { id: true, leaderUserId: true },
+    });
+    if (!province) throw new NotFoundException('Province not found');
+    return this.upsertDeputy(churchId, {
+      scope: 'PROVINCE',
+      branchId: null,
+      provinceId,
+      role: body.role,
+      body,
+      primaryLeaderUserId: province.leaderUserId,
+    });
+  }
+
+  async removeBranchDeputy(
+    user: AuthUser,
+    churchId: string,
+    branchId: string,
+    deputyId: string,
+  ) {
+    await this.access.assertCanAssignDeputies(user, churchId, { branchId });
+    return this.removeDeputy(churchId, deputyId, { branchId });
+  }
+
+  async removeProvinceDeputy(
+    user: AuthUser,
+    churchId: string,
+    provinceId: string,
+    deputyId: string,
+  ) {
+    await this.access.assertCanAssignDeputies(user, churchId, { provinceId });
+    return this.removeDeputy(churchId, deputyId, { provinceId });
+  }
+
+  private async listDeputiesForScope(
+    churchId: string,
+    scope: { branchId?: string; provinceId?: string },
+  ) {
+    const rows = await this.prisma.cellLeadershipDeputy.findMany({
+      where: {
+        churchId,
+        ...(scope.branchId
+          ? { scope: 'BRANCH', branchId: scope.branchId }
+          : { scope: 'PROVINCE', provinceId: scope.provinceId }),
+      },
+      include: {
+        user: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
+      },
+      orderBy: { role: 'asc' },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      role: r.role as CellDeputyRole,
+      assignedAt: r.assignedAt,
+      user: {
+        id: r.user.id,
+        name: `${r.user.firstName} ${r.user.lastName}`.trim(),
+        email: r.user.email,
+      },
+    }));
+  }
+
+  private async upsertDeputy(
+    churchId: string,
+    args: {
+      scope: 'BRANCH' | 'PROVINCE';
+      branchId: string | null;
+      provinceId: string | null;
+      role: CellDeputyRole;
+      body: AssignCellDeputyDto;
+      primaryLeaderUserId: string | null;
+    },
+  ) {
+    if (!isCellDeputyRole(args.role)) {
+      throw new BadRequestException('role must be ASSISTANT or SECRETARY');
+    }
+    const userId = await this.resolveDeputyUserId(churchId, args.body);
+    if (args.primaryLeaderUserId && args.primaryLeaderUserId === userId) {
+      throw new BadRequestException(
+        'The primary leader cannot also be assigned as Assistant or Secretary',
+      );
+    }
+
+    const existingSlot = await this.prisma.cellLeadershipDeputy.findFirst({
+      where:
+        args.scope === 'BRANCH'
+          ? { churchId, branchId: args.branchId!, role: args.role }
+          : { churchId, provinceId: args.provinceId!, role: args.role },
+      select: { id: true, userId: true },
+    });
+    if (existingSlot && existingSlot.userId !== userId) {
+      throw new BadRequestException(
+        `This ${args.scope === 'BRANCH' ? 'cell' : 'province'} already has a ${
+          args.role === 'ASSISTANT' ? 'Assistant' : 'Secretary'
+        }. Remove them first.`,
+      );
+    }
+
+    const existingUser = await this.prisma.cellLeadershipDeputy.findFirst({
+      where: {
+        churchId,
+        userId,
+        ...(args.scope === 'BRANCH'
+          ? { branchId: args.branchId! }
+          : { provinceId: args.provinceId! }),
+      },
+      select: { id: true, role: true },
+    });
+    if (existingUser && existingUser.role !== args.role) {
+      throw new BadRequestException(
+        'This person already holds the other deputy role for this scope. Remove them first.',
+      );
+    }
+
+    const row = existingSlot
+      ? await this.prisma.cellLeadershipDeputy.update({
+          where: { id: existingSlot.id },
+          data: { userId, role: args.role },
+          include: {
+            user: {
+              select: { id: true, firstName: true, lastName: true, email: true },
+            },
+          },
+        })
+      : await this.prisma.cellLeadershipDeputy.create({
+          data: {
+            churchId,
+            scope: args.scope,
+            branchId: args.branchId,
+            provinceId: args.provinceId,
+            userId,
+            role: args.role,
+          },
+          include: {
+            user: {
+              select: { id: true, firstName: true, lastName: true, email: true },
+            },
+          },
+        });
+
+    return {
+      id: row.id,
+      role: row.role as CellDeputyRole,
+      assignedAt: row.assignedAt,
+      user: {
+        id: row.user.id,
+        name: `${row.user.firstName} ${row.user.lastName}`.trim(),
+        email: row.user.email,
+      },
+    };
+  }
+
+  private async removeDeputy(
+    churchId: string,
+    deputyId: string,
+    scope: { branchId?: string; provinceId?: string },
+  ) {
+    const existing = await this.prisma.cellLeadershipDeputy.findFirst({
+      where: {
+        id: deputyId,
+        churchId,
+        ...(scope.branchId
+          ? { branchId: scope.branchId }
+          : { provinceId: scope.provinceId }),
+      },
+    });
+    if (!existing) throw new NotFoundException('Deputy assignment not found');
+    await this.prisma.cellLeadershipDeputy.delete({ where: { id: deputyId } });
+    return { ok: true };
+  }
+
+  private async resolveDeputyUserId(
+    churchId: string,
+    body: AssignCellDeputyDto,
+  ): Promise<string> {
+    if (body.userId?.trim()) {
+      const user = await this.prisma.user.findFirst({
+        where: { id: body.userId.trim(), churchId, isActive: true },
+        select: { id: true },
+      });
+      if (!user) throw new NotFoundException('User not found in this church');
+      return user.id;
+    }
+
+    const email = body.email?.trim().toLowerCase();
+    if (email) {
+      const byEmail = await this.prisma.user.findFirst({
+        where: { churchId, email, isActive: true },
+        select: { id: true },
+      });
+      if (byEmail) return byEmail.id;
+    }
+
+    const firstName = body.firstName?.trim();
+    const lastName = body.lastName?.trim();
+    if (!firstName || !lastName) {
+      throw new BadRequestException('Provide userId or first and last name');
+    }
+
+    // Prefer an existing member-linked user before creating a bare user account.
+    if (email) {
+      const member = await this.prisma.member.findFirst({
+        where: { churchId, email },
+        select: { userId: true, id: true },
+      });
+      if (member?.userId) return member.userId;
+    }
+
+    throw new BadRequestException(
+      'Deputy must be an existing church user. Create their account first, then assign Assistant or Secretary.',
+    );
   }
 
   async addMember(
@@ -1723,9 +2033,15 @@ export class MinistryCellsService {
 
   async listProvinces(user: AuthUser, churchId: string) {
     const ctx = await this.access.assertCanAccess(user, churchId);
+    const provinceIds = Array.from(
+      new Set([
+        ...(ctx.leaderProvinceId ? [ctx.leaderProvinceId] : []),
+        ...ctx.deputyProvinceIds,
+      ]),
+    );
     const where =
-      ctx.role === 'provincialLeader' && ctx.leaderProvinceId
-        ? { churchId, id: ctx.leaderProvinceId }
+      ctx.role === 'provincialLeader' && provinceIds.length
+        ? { churchId, id: provinceIds.length === 1 ? provinceIds[0] : { in: provinceIds } }
         : { churchId };
     const rows = await this.prisma.cellProvince.findMany({
       where,
@@ -1736,7 +2052,12 @@ export class MinistryCellsService {
       },
       orderBy: { name: 'asc' },
     });
-    return rows.map((p) => this.serializeProvince(p));
+    return Promise.all(
+      rows.map(async (p) => ({
+        ...this.serializeProvince(p),
+        deputies: await this.listDeputiesForScope(churchId, { provinceId: p.id }),
+      })),
+    );
   }
 
   async createProvince(

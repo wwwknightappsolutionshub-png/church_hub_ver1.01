@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { UpdateCellProvinceSchema } from '@church-hub/shared-types';
 import { api } from '@/lib/api';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
+import { CellDeputyAssignPanel } from '@/components/ministry-cells/CellDeputyAssignPanel';
 import type { CellProvinceRow } from '@/components/ministry-cells/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -163,6 +164,14 @@ export function ProvinceEditPanel({
             </Button>
           </div>
         </form>
+        <div className="border-t border-border p-4">
+          <CellDeputyAssignPanel
+            scope="province"
+            scopeId={province.id}
+            canAssign
+            onChanged={onSaved}
+          />
+        </div>
       </div>
     </div>
   );

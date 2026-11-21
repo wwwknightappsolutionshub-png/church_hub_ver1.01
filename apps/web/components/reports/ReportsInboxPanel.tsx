@@ -1018,7 +1018,7 @@ export function ReportsInboxPanel({
               <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Needs action
               </p>
-              <div className="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
+              <div className="flex flex-wrap gap-1 pb-1 lg:flex-col lg:pb-0">
                 <button
                   type="button"
                   onClick={() => {
@@ -1061,7 +1061,7 @@ export function ReportsInboxPanel({
               <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Sources
               </p>
-              <div className="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
+              <div className="flex flex-wrap gap-1 pb-1 lg:flex-col lg:pb-0">
                 {SOURCE_OPTIONS.map((o) => (
                   <button
                     key={o.value}

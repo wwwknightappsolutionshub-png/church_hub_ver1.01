@@ -210,7 +210,7 @@ export function MultiStepFormDialog({
 
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               <div className="shrink-0 border-b border-slate-200 bg-slate-50 px-3 py-2 lg:hidden">
-                <ol className="flex gap-1 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <ol className="flex flex-wrap gap-1 pb-0.5">
                   {stepButtons(false)}
                 </ol>
               </div>
@@ -222,7 +222,7 @@ export function MultiStepFormDialog({
         ) : (
           <>
             <div className="shrink-0 border-b border-border px-2 py-2 sm:px-6">
-              <ol className="flex gap-1 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <ol className="flex flex-wrap gap-1 pb-1">
                 {stepButtons(false)}
               </ol>
             </div>

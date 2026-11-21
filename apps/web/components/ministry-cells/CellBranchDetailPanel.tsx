@@ -15,6 +15,7 @@ import { BranchLeaderSelect } from '@/components/ministry-cells/BranchLeaderSele
 import { BranchMembersPanel } from '@/components/ministry-cells/BranchMembersPanel';
 import { BranchWeeklyAttendancePanel } from '@/components/ministry-cells/BranchWeeklyAttendancePanel';
 import { CellBranchMembersSheet } from '@/components/ministry-cells/CellBranchMembersSheet';
+import { CellDeputyAssignPanel } from '@/components/ministry-cells/CellDeputyAssignPanel';
 import { CellPrayerPanel } from '@/components/ministry-cells/CellPrayerPanel';
 import type { BranchDetail, FormDef, MinistryCellsContext, TeachingResource } from '@/components/ministry-cells/types';
 import { Badge } from '@/components/ui/badge';
@@ -114,6 +115,13 @@ export function CellBranchDetailPanel({
       })
     : null;
 
+  const canAssignDeputies =
+    !!ctx.canAssignDeputies &&
+    (ctx.canManage ||
+      (!ctx.isDeputy &&
+        ctx.role === 'cellLeader' &&
+        ctx.leaderBranchId === selectedBranchId));
+
   const sections: { id: WorkspaceSection; label: string }[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'weekly', label: 'Submit Attendance' },
@@ -208,7 +216,7 @@ export function CellBranchDetailPanel({
         </div>
 
         <nav
-          className="flex gap-1 overflow-x-auto border-t border-white/10 px-2 pb-2 pt-1 sm:px-4"
+          className="flex flex-wrap gap-1.5 border-t border-white/10 px-2 pb-2 pt-1 sm:px-4"
           aria-label="Branch workspace sections"
         >
           {sections.map(({ id, label }) => (
@@ -217,7 +225,7 @@ export function CellBranchDetailPanel({
               type="button"
               onClick={() => setSection(id)}
               className={cn(
-                'shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition sm:text-sm',
+                'rounded-lg px-3 py-1.5 text-xs font-medium transition sm:text-sm',
                 section === id
                   ? 'bg-white text-slate-900 shadow-sm'
                   : 'text-slate-400 hover:bg-white/10 hover:text-white',
@@ -282,6 +290,11 @@ export function CellBranchDetailPanel({
               {branchDetail.leader?.email && (
                 <Badge variant="secondary">{branchDetail.leader.email}</Badge>
               )}
+              {(branchDetail.deputies ?? []).map((d) => (
+                <Badge key={d.id} variant="outline">
+                  {d.role === 'ASSISTANT' ? 'Assistant' : 'Secretary'}: {d.user.name}
+                </Badge>
+              ))}
               {branchDetail.openIncidents > 0 && (
                 <Badge variant="destructive">
                   {branchDetail.openIncidents} open incident{branchDetail.openIncidents === 1 ? '' : 's'}
@@ -294,6 +307,12 @@ export function CellBranchDetailPanel({
                 </Badge>
               )}
             </div>
+            <CellDeputyAssignPanel
+              scope="branch"
+              scopeId={selectedBranchId}
+              canAssign={canAssignDeputies}
+              onChanged={onChanged}
+            />
           </CardContent>
         </Card>
       </div>

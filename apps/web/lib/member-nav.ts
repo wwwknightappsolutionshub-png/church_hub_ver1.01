@@ -153,6 +153,16 @@ export const STAFF_LEADERSHIP_NAV: DashboardNavItem[] = [
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ];
 
+/**
+ * Unit Leader / unit admin (not full church ADMIN/PASTOR staff) — Leadership strip.
+ * Service Unit Hub is the primary workspace; Community stays available but separate.
+ */
+export const UNIT_ADMIN_LEADERSHIP_NAV: DashboardNavItem[] = [
+  { href: '/dashboard/service-units', label: 'Service Unit Hub', icon: Layers },
+  { href: '/dashboard/profile', label: 'Profile', icon: UserCircle },
+  { href: '/dashboard/settings', label: 'Settings', icon: Settings },
+];
+
 /** Admin & pastor — Section 2: Community */
 export const STAFF_COMMUNITY_NAV: DashboardNavItem[] = [
   { href: '/dashboard/lounge', label: 'Lounge', icon: Coffee },

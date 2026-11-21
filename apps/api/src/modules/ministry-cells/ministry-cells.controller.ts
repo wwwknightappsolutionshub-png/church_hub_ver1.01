@@ -31,6 +31,7 @@ import { ZodBody } from '../../common/decorators/zod-body.decorator';
 import { MinistryCellsService } from './ministry-cells.service';
 import { ChurchId, CurrentUser, AuthUser } from '../auth/current-user.decorator';
 import { Roles } from '../auth/decorators';
+import { AssignCellDeputyDto } from './dto/cell-deputy.dto';
 
 @ApiTags('ministry-cells')
 @ApiBearerAuth()
@@ -175,6 +176,98 @@ export class MinistryCellsController {
     @Param('id') id: string,
   ) {
     return this.service.deleteBranch(user, churchId, id);
+  }
+
+  @Get('branches/:id/deputies')
+  @ApiOperation({ summary: 'List Assistant/Secretary deputies for a cell branch' })
+  listBranchDeputies(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.service.listBranchDeputies(user, churchId, id);
+  }
+
+  @Get('branches/:id/deputy-candidates')
+  @ApiOperation({
+    summary: 'List users eligible to be Assistant/Secretary on this branch (assigners only)',
+  })
+  listBranchDeputyCandidates(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.service.listDeputyCandidates(user, churchId, { branchId: id });
+  }
+
+  @Post('branches/:id/deputies')
+  @ApiOperation({
+    summary: 'Assign Assistant or Secretary (primary cell leader or church staff)',
+  })
+  assignBranchDeputy(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: AssignCellDeputyDto,
+  ) {
+    return this.service.assignBranchDeputy(user, churchId, id, body);
+  }
+
+  @Delete('branches/:id/deputies/:deputyId')
+  @ApiOperation({ summary: 'Remove a cell branch Assistant or Secretary' })
+  removeBranchDeputy(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('deputyId') deputyId: string,
+  ) {
+    return this.service.removeBranchDeputy(user, churchId, id, deputyId);
+  }
+
+  @Get('provinces/:id/deputies')
+  @ApiOperation({ summary: 'List Assistant/Secretary deputies for a province' })
+  listProvinceDeputies(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.service.listProvinceDeputies(user, churchId, id);
+  }
+
+  @Get('provinces/:id/deputy-candidates')
+  @ApiOperation({
+    summary: 'List users eligible to be Assistant/Secretary on this province (assigners only)',
+  })
+  listProvinceDeputyCandidates(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.service.listDeputyCandidates(user, churchId, { provinceId: id });
+  }
+
+  @Post('provinces/:id/deputies')
+  @ApiOperation({
+    summary: 'Assign province Assistant or Secretary (primary provincial leader or church staff)',
+  })
+  assignProvinceDeputy(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: AssignCellDeputyDto,
+  ) {
+    return this.service.assignProvinceDeputy(user, churchId, id, body);
+  }
+
+  @Delete('provinces/:id/deputies/:deputyId')
+  @ApiOperation({ summary: 'Remove a province Assistant or Secretary' })
+  removeProvinceDeputy(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('deputyId') deputyId: string,
+  ) {
+    return this.service.removeProvinceDeputy(user, churchId, id, deputyId);
   }
 
   @Post('branches/:id/members')

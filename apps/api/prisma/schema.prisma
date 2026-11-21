@@ -160,6 +160,7 @@ model Church {
   cellBranches              CellBranch[]
   cellBranchMembers         CellBranchMember[]
   cellProvinces             CellProvince[]
+  cellLeadershipDeputies    CellLeadershipDeputy[]
   cellFormDefinitions       CellFormDefinition[]
   cellReports               CellReport[]
   cellMeetings              CellMeeting[]
@@ -392,6 +393,7 @@ model User {
   cmsPagesUpdated           PlatformCmsPage[]     @relation("PlatformCmsPageUpdater")
   cellBranchesLed           CellBranch[]       @relation("CellBranchLeader")
   cellProvincesLed          CellProvince[]     @relation("CellProvinceLeader")
+  cellLeadershipDeputies    CellLeadershipDeputy[] @relation("CellLeadershipDeputyUser")
   cellReportsSubmitted      CellReport[]       @relation("CellReportSubmitter")
   cellAttendanceRecorded    CellAttendance[]   @relation("CellAttendanceRecorder")
   serviceUnitAttendanceRecorded ServiceUnitAttendance[] @relation("ServiceUnitAttendanceRecorder")
@@ -5826,6 +5828,7 @@ model CellProvince {
   leader    User                   @relation("CellProvinceLeader", fields: [leaderUserId], references: [id], onDelete: Restrict)
   postcodes CellProvincePostcode[]
   branches  CellBranch[]
+  deputies  CellLeadershipDeputy[]
 
   @@unique([churchId, name])
   @@unique([churchId, leaderUserId])
@@ -5863,6 +5866,7 @@ model CellBranch {
   province   CellProvince?       @relation(fields: [provinceId], references: [id], onDelete: SetNull)
   leader     User?               @relation("CellBranchLeader", fields: [leaderUserId], references: [id], onDelete: SetNull)
   members    CellBranchMember[]
+  deputies   CellLeadershipDeputy[]
   reports    CellReport[]
   meetings   CellMeeting[]
   attendance CellAttendance[]
@@ -5892,6 +5896,32 @@ model CellBranchMember {
   @@unique([churchId, memberId])
   @@index([branchId])
   @@map("cell_branch_members")
+}
+
+/// WSF deputies (Assistant/Secretary): operational access without assigning primary leaders.
+model CellLeadershipDeputy {
+  id         String   @id @default(uuid())
+  churchId   String
+  /// BRANCH | PROVINCE
+  scope      String
+  branchId   String?
+  provinceId String?
+  userId     String
+  /// ASSISTANT | SECRETARY
+  role       String
+  assignedAt DateTime @default(now())
+
+  church   Church        @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  branch   CellBranch?   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  province CellProvince? @relation(fields: [provinceId], references: [id], onDelete: Cascade)
+  user     User          @relation("CellLeadershipDeputyUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([branchId, role])
+  @@unique([provinceId, role])
+  @@index([churchId, userId])
+  @@index([branchId])
+  @@index([provinceId])
+  @@map("cell_leadership_deputies")
 }
 
 model CellFormDefinition {

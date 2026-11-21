@@ -8,11 +8,13 @@ import {
   MEMBER_NAV,
   STAFF_LEADERSHIP_NAV,
   STAFF_COMMUNITY_NAV,
+  UNIT_ADMIN_LEADERSHIP_NAV,
   buildVisibleMemberNav,
   filterStaffNav,
   type DashboardNavItem,
 } from '@/lib/member-nav';
-import { isChurchAdminRole, isPastorRole } from '@/lib/session-role';
+import { isChurchAdminRole, isPastorRole, unitAdminHomePath } from '@/lib/session-role';
+import { filterNavByTenantModules } from '@/lib/tenant-modules';
 import { getAppRouteTitle, hasModulePageChrome } from '@/lib/app-route-meta';
 import { memberInitials } from '@/lib/member-initials';
 import { accountAvatarUrl, userDisplayName } from '@/lib/user-display';
@@ -123,6 +125,8 @@ function DesktopSidebar({
     isPlatformOperator,
     hasPlatformPermission,
     isChurchStaff,
+    unitAdminUnitIds,
+    unitDeputyUnitIds,
     churchName,
     user,
     member,
@@ -167,55 +171,73 @@ function DesktopSidebar({
     isChurchAdminRole(userRoles) || isPastorRole(userRoles) || isChurchStaff;
   const isPastor = isPastorRole(userRoles);
   const isChurchAdmin = isChurchAdminRole(userRoles);
-  /** Pastors and church admins start with Community collapsed; they can expand it. */
+  /** Unit Leader / Assistant / Secretary — not full church ADMIN/PASTOR. */
+  const isUnitAdminOnly =
+    !isChurchStaff && (unitAdminUnitIds.length > 0 || unitDeputyUnitIds.length > 0);
+  const useStaffStyleNav = isChurchStaff || isUnitAdminOnly;
+  /** Pastors, church admins, and unit admins start with Community collapsed. */
   const [communityOpen, setCommunityOpen] = useState(false);
 
   useEffect(() => {
     if (accessLoading) return;
-    setCommunityOpen(!(isPastor || isChurchAdmin));
-  }, [accessLoading, isPastor, isChurchAdmin]);
+    setCommunityOpen(!(isPastor || isChurchAdmin || isUnitAdminOnly));
+  }, [accessLoading, isPastor, isChurchAdmin, isUnitAdminOnly]);
 
-  const staffNav = useMemo(
-    () =>
-      filterStaffNav(
-        STAFF_LEADERSHIP_NAV,
-        {
-          canManageStaff,
-          isChurchLeadership,
-          isPastor,
-          isChurchAdmin,
-        },
-        enabledModules,
-      ),
-    [canManageStaff, isChurchLeadership, isPastor, isChurchAdmin, enabledModules],
-  );
-  const staffCommunityNav = useMemo(
-    () =>
-      filterStaffNav(
-        STAFF_COMMUNITY_NAV,
-        {
-          canManageStaff,
-          isChurchLeadership,
-          isPastor,
-          isChurchAdmin,
-          canAccessDepartmentTools,
-        },
-        enabledModules,
-      ),
-    [
-      canManageStaff,
-      isChurchLeadership,
-      isPastor,
-      isChurchAdmin,
-      canAccessDepartmentTools,
+  const staffNav = useMemo(() => {
+    if (isUnitAdminOnly) {
+      return enabledModules
+        ? filterNavByTenantModules(UNIT_ADMIN_LEADERSHIP_NAV, enabledModules)
+        : UNIT_ADMIN_LEADERSHIP_NAV;
+    }
+    return filterStaffNav(
+      STAFF_LEADERSHIP_NAV,
+      {
+        canManageStaff,
+        isChurchLeadership,
+        isPastor,
+        isChurchAdmin,
+      },
       enabledModules,
-    ],
-  );
+    );
+  }, [
+    isUnitAdminOnly,
+    canManageStaff,
+    isChurchLeadership,
+    isPastor,
+    isChurchAdmin,
+    enabledModules,
+  ]);
+  const staffCommunityNav = useMemo(() => {
+    const base = filterStaffNav(
+      STAFF_COMMUNITY_NAV,
+      {
+        canManageStaff,
+        isChurchLeadership: isChurchLeadership || isUnitAdminOnly,
+        isPastor,
+        isChurchAdmin,
+        canAccessDepartmentTools,
+      },
+      enabledModules,
+    );
+    if (!isUnitAdminOnly) return base;
+    // Hub lives under Leadership for unit admins — avoid duplicate Community entry.
+    return base.filter((item) => item.href !== '/dashboard/service-units');
+  }, [
+    canManageStaff,
+    isChurchLeadership,
+    isUnitAdminOnly,
+    isPastor,
+    isChurchAdmin,
+    canAccessDepartmentTools,
+    enabledModules,
+  ]);
   const homeHref = isPlatformOperator
     ? '/dashboard/platform'
     : isChurchStaff
       ? '/dashboard'
-      : '/dashboard/lounge';
+      : isUnitAdminOnly
+        ? unitAdminHomePath(unitAdminUnitIds, unitDeputyUnitIds)
+        : '/dashboard/lounge';
 
   const collapsed = !expanded;
 
@@ -264,7 +286,7 @@ function DesktopSidebar({
               collapsed={collapsed}
             />
           ))
-        ) : isChurchStaff ? (
+        ) : useStaffStyleNav ? (
           <>
             {staffNav.length > 0 && (
               <>
@@ -390,6 +412,8 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
     userRoles,
     isPlatformOperator,
     isChurchStaff,
+    unitAdminUnitIds,
+    unitDeputyUnitIds,
     churchName,
     user,
     member,
@@ -426,42 +450,56 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
     isChurchAdminRole(userRoles) || isPastorRole(userRoles) || isChurchStaff;
   const isPastor = isPastorRole(userRoles);
   const isChurchAdmin = isChurchAdminRole(userRoles);
-  const staffNav = useMemo(
-    () =>
-      filterStaffNav(
-        STAFF_LEADERSHIP_NAV,
-        {
-          canManageStaff,
-          isChurchLeadership,
-          isPastor,
-          isChurchAdmin,
-        },
-        enabledModules,
-      ),
-    [canManageStaff, isChurchLeadership, isPastor, isChurchAdmin, enabledModules],
-  );
-  const staffCommunityNav = useMemo(
-    () =>
-      filterStaffNav(
-        STAFF_COMMUNITY_NAV,
-        {
-          canManageStaff,
-          isChurchLeadership,
-          isPastor,
-          isChurchAdmin,
-          canAccessDepartmentTools,
-        },
-        enabledModules,
-      ),
-    [
-      canManageStaff,
-      isChurchLeadership,
-      isPastor,
-      isChurchAdmin,
-      canAccessDepartmentTools,
+  const isUnitAdminOnly =
+    !isChurchStaff && (unitAdminUnitIds.length > 0 || unitDeputyUnitIds.length > 0);
+  const useStaffStyleNav = isChurchStaff || isUnitAdminOnly;
+  const staffNav = useMemo(() => {
+    if (isUnitAdminOnly) {
+      return enabledModules
+        ? filterNavByTenantModules(UNIT_ADMIN_LEADERSHIP_NAV, enabledModules)
+        : UNIT_ADMIN_LEADERSHIP_NAV;
+    }
+    return filterStaffNav(
+      STAFF_LEADERSHIP_NAV,
+      {
+        canManageStaff,
+        isChurchLeadership,
+        isPastor,
+        isChurchAdmin,
+      },
       enabledModules,
-    ],
-  );
+    );
+  }, [
+    isUnitAdminOnly,
+    canManageStaff,
+    isChurchLeadership,
+    isPastor,
+    isChurchAdmin,
+    enabledModules,
+  ]);
+  const staffCommunityNav = useMemo(() => {
+    const base = filterStaffNav(
+      STAFF_COMMUNITY_NAV,
+      {
+        canManageStaff,
+        isChurchLeadership: isChurchLeadership || isUnitAdminOnly,
+        isPastor,
+        isChurchAdmin,
+        canAccessDepartmentTools,
+      },
+      enabledModules,
+    );
+    if (!isUnitAdminOnly) return base;
+    return base.filter((item) => item.href !== '/dashboard/service-units');
+  }, [
+    canManageStaff,
+    isChurchLeadership,
+    isUnitAdminOnly,
+    isPastor,
+    isChurchAdmin,
+    canAccessDepartmentTools,
+    enabledModules,
+  ]);
 
   const displayName = userDisplayName(user, member);
   const initials = memberInitials(displayName);
@@ -483,7 +521,9 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
     ? '/dashboard/platform'
     : isChurchStaff
       ? '/dashboard'
-      : '/dashboard/lounge';
+      : isUnitAdminOnly
+        ? unitAdminHomePath(unitAdminUnitIds, unitDeputyUnitIds)
+        : '/dashboard/lounge';
 
   useEffect(() => {
     try {
@@ -596,8 +636,8 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
               allMemberNav={MEMBER_NAV}
               staffNav={staffNav}
               staffCommunityNav={staffCommunityNav}
-              isChurchStaff={isChurchStaff}
-              communityCollapsedByDefault={isPastor || isChurchAdmin}
+              isChurchStaff={useStaffStyleNav}
+              communityCollapsedByDefault={isPastor || isChurchAdmin || isUnitAdminOnly}
             />
           </>
         )}

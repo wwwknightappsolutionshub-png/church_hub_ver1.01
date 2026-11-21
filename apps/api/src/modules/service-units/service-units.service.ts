@@ -9,6 +9,21 @@ import { MembershipService } from '../membership/membership.service';
 import { MembershipRegistryService } from '../membership/membership-registry.service';
 import { CommunicationsQueueService } from '../communications/communications-queue.service';
 import type { AssignServiceUnitMemberDto, UpdateServiceUnitMemberDto } from './dto/assign-service-unit-member.dto';
+import type {
+  CreateServiceUnitDto,
+  CreateServiceUnitWithSetupDto,
+  ServiceUnitPersonInputDto,
+} from './dto/create-service-unit.dto';
+import {
+  getUnitMemberImportTemplateCsv,
+  parseUnitMemberImportFile,
+} from './service-units-member-import.util';
+import {
+  isUnitDeputyRole,
+  normalizeUnitLeaderRole,
+  unitRoleFromLeader,
+  type UnitDeputyRole,
+} from './service-unit-leader-roles';
 
 /** Holding unit for members/records moved off deleted service units. */
 export const UNCATEGORIZED_UNIT_NAME = 'Uncategorized';
@@ -412,19 +427,27 @@ export class ServiceUnitsService {
     data: { subject: string; body: string },
   ) {
     await this.requireUnitManager(userId, churchId, serviceUnitId);
+    const subject = data.subject?.trim();
+    const body = data.body?.trim();
+    if (!subject || !body) {
+      throw new BadRequestException('Email subject and body are required');
+    }
+    if (subject.length > 200 || body.length > 20_000) {
+      throw new BadRequestException('Email template exceeds allowed length');
+    }
     return (this.prisma as { serviceUnitEmailTemplate: { upsert: (a: object) => Promise<unknown> } }).serviceUnitEmailTemplate.upsert({
       where: { serviceUnitId_type: { serviceUnitId, type: 'WELCOME' } },
       create: {
         churchId,
         serviceUnitId,
         type: 'WELCOME',
-        subject: data.subject,
-        body: data.body,
+        subject,
+        body,
         updatedById: userId,
       },
       update: {
-        subject: data.subject,
-        body: data.body,
+        subject,
+        body,
         updatedById: userId,
       },
     });
@@ -619,12 +642,12 @@ export class ServiceUnitsService {
     preferredMemberId: string | undefined,
     ctx: UserMemberContext,
   ): Promise<string> {
-    if (preferredMemberId) {
-      const preferred = await this.prisma.member.findFirst({
-        where: { id: preferredMemberId, churchId },
-        select: { id: true },
-      });
-      if (preferred) return preferred.id;
+    // Never trust a client-supplied authorId for another person — only the caller's member.
+    if (preferredMemberId && ctx.memberId && preferredMemberId === ctx.memberId) {
+      return ctx.memberId;
+    }
+    if (preferredMemberId && preferredMemberId !== ctx.memberId) {
+      throw new ForbiddenException('Cannot publish a meeting summary as another member');
     }
     if (ctx.memberId) return ctx.memberId;
 
@@ -785,6 +808,8 @@ export class ServiceUnitsService {
     churchId: string,
     serviceUnitId: string,
   ): Promise<UserMemberContext> {
+    // Tenant bind first — church staff must not manage foreign-church unit UUIDs.
+    await this.getUnit(churchId, serviceUnitId);
     const ctx = await this.moduleAccess.resolveContext(userId, churchId);
     if (!ctx || !this.moduleAccess.canManageServiceUnit(ctx, serviceUnitId)) {
       throw new ForbiddenException('Service unit admin or church staff required');
@@ -792,21 +817,207 @@ export class ServiceUnitsService {
     return ctx;
   }
 
-  createUnit(
+  createUnit(churchId: string, data: CreateServiceUnitDto) {
+    const name = data.name.trim();
+    if (!name) throw new BadRequestException('Unit name is required');
+    return this.prisma.serviceUnit.create({
+      data: {
+        churchId,
+        name,
+        description: data.description?.trim() || undefined,
+        activities: data.activities?.trim() || undefined,
+        imageUrl: data.imageUrl?.trim() || undefined,
+      },
+    });
+  }
+
+  getMemberImportTemplateCsv(): string {
+    return getUnitMemberImportTemplateCsv();
+  }
+
+  /** Parse/validate a unit-member CSV or .xlsx without writing (wizard staging). */
+  async previewMemberImportCsv(file: { buffer: Buffer; originalname?: string }) {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('CSV or Excel (.xlsx) file is required');
+    }
+    const { rows, failures } = await parseUnitMemberImportFile(
+      file.buffer,
+      file.originalname,
+    );
+    if (!rows.length && failures.length) {
+      throw new BadRequestException(failures[0]?.reason ?? 'Could not parse file');
+    }
+    return {
+      rowCount: rows.length,
+      rows: rows.map((r) => ({
+        firstName: r.firstName,
+        lastName: r.lastName,
+        email: r.email,
+        phone: r.phone,
+      })),
+      failures,
+    };
+  }
+
+  /**
+   * Create a unit and optionally attach members + one unit admin in one staff action.
+   * Rolls back the new unit (hard delete) if member/leader attachment fails mid-way.
+   */
+  async createUnitWithSetup(
+    userId: string,
     churchId: string,
-    data: { name: string; description?: string; activities?: string; imageUrl?: string },
+    data: CreateServiceUnitWithSetupDto,
   ) {
-    return this.prisma.serviceUnit.create({ data: { churchId, ...data } });
+    const unit = await this.createUnit(churchId, data);
+    const members: Awaited<ReturnType<ServiceUnitsService['assignUnitMember']>>[] = [];
+    let leader: Awaited<ReturnType<ServiceUnitsService['assignUnitMember']>> | null = null;
+
+    try {
+      for (const person of data.members ?? []) {
+        members.push(
+          await this.assignUnitMember(userId, churchId, unit.id, {
+            ...this.personToAssignDto(person),
+            unitRole: 'MEMBER',
+          }),
+        );
+      }
+
+      if (data.leader) {
+        leader = await this.assignUnitMember(userId, churchId, unit.id, {
+          ...this.personToAssignDto(data.leader),
+          unitRole: 'UNIT_ADMIN',
+        });
+      }
+
+      return { unit, members, leader };
+    } catch (err) {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.serviceUnitLeader.deleteMany({ where: { serviceUnitId: unit.id } });
+        await tx.serviceUnitMember.deleteMany({ where: { serviceUnitId: unit.id } });
+        await tx.serviceUnit.delete({ where: { id: unit.id } });
+      });
+      throw err;
+    }
+  }
+
+  private personToAssignDto(person: ServiceUnitPersonInputDto): AssignServiceUnitMemberDto {
+    return {
+      memberId: person.memberId,
+      firstName: person.firstName,
+      lastName: person.lastName,
+      email: person.email,
+      phone: person.phone,
+    };
+  }
+
+  /**
+   * Import unit members from CSV or .xlsx. Church staff or unit admin.
+   * Partial success: valid rows are applied; failures are listed per row.
+   */
+  async importMembersFromCsv(
+    userId: string,
+    churchId: string,
+    serviceUnitId: string,
+    file: { buffer: Buffer; originalname?: string },
+  ) {
+    await this.requireUnitManager(userId, churchId, serviceUnitId);
+    await this.getUnit(churchId, serviceUnitId);
+
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('CSV or Excel (.xlsx) file is required');
+    }
+
+    const { rows, failures } = await parseUnitMemberImportFile(
+      file.buffer,
+      file.originalname,
+    );
+    if (!rows.length && failures.length) {
+      throw new BadRequestException(failures[0]?.reason ?? 'Could not parse file');
+    }
+    if (!rows.length) {
+      throw new BadRequestException('File has no data rows');
+    }
+
+    const imported: Awaited<ReturnType<ServiceUnitsService['assignUnitMember']>>[] = [];
+    const rowFailures = [...failures];
+
+    for (const row of rows) {
+      try {
+        const result = await this.assignUnitMember(userId, churchId, serviceUnitId, {
+          firstName: row.firstName,
+          lastName: row.lastName,
+          email: row.email,
+          phone: row.phone,
+          unitRole: 'MEMBER',
+        });
+        imported.push(result);
+      } catch (err) {
+        let reason = 'Could not import row';
+        if (err instanceof BadRequestException || err instanceof ForbiddenException) {
+          const res = err.getResponse();
+          if (typeof res === 'string') reason = res;
+          else if (res && typeof res === 'object' && 'message' in res) {
+            const msg = (res as { message: string | string[] }).message;
+            reason = Array.isArray(msg) ? msg.join(', ') : String(msg);
+          } else if (err.message) reason = err.message;
+        } else if (err instanceof Error) {
+          reason = err.message;
+        }
+        rowFailures.push({ rowIndex: row.rowIndex, reason });
+      }
+    }
+
+    return {
+      importedCount: imported.length,
+      failedCount: rowFailures.length,
+      imported,
+      failures: rowFailures,
+    };
   }
 
   async updateUnit(
     userId: string,
     churchId: string,
     id: string,
-    data: Partial<{ name: string; description: string; activities: string; imageUrl: string; isActive: boolean }>,
+    data: Partial<{
+      name: string;
+      description: string | null;
+      activities: string | null;
+      imageUrl: string | null;
+      isActive: boolean;
+    }>,
   ) {
     await this.requireUnitManager(userId, churchId, id);
-    return this.prisma.serviceUnit.update({ where: { id }, data });
+    const patch: Prisma.ServiceUnitUpdateInput = {};
+    if (data.name !== undefined) {
+      const name = data.name.trim();
+      if (!name) throw new BadRequestException('Unit name is required');
+      patch.name = name;
+    }
+    if (data.description !== undefined) {
+      patch.description = data.description?.trim() || null;
+    }
+    if (data.activities !== undefined) {
+      patch.activities = data.activities?.trim() || null;
+    }
+    if (data.imageUrl !== undefined) {
+      patch.imageUrl = data.imageUrl?.trim() || null;
+    }
+    if (data.isActive !== undefined) {
+      // Soft-delete / restore is church-staff only (leaders manage content, not lifecycle).
+      const ctx = await this.moduleAccess.resolveContext(userId, churchId);
+      if (!ctx || !this.moduleAccess.isChurchStaff(ctx)) {
+        throw new ForbiddenException('Only church staff can activate or deactivate a unit');
+      }
+      patch.isActive = data.isActive;
+    }
+    if (Object.keys(patch).length === 0) {
+      throw new BadRequestException('No valid fields to update');
+    }
+    return this.prisma.serviceUnit.update({
+      where: { id },
+      data: patch,
+    });
   }
 
   /**
@@ -1722,8 +1933,13 @@ export class ServiceUnitsService {
     memberId: string,
     body: UpdateServiceUnitMemberDto,
   ) {
-    await this.requireUnitManager(userId, churchId, serviceUnitId);
+    const ctx = await this.requireUnitManager(userId, churchId, serviceUnitId);
     await this.getUnit(churchId, serviceUnitId);
+    if (body.unitRole === 'UNIT_ADMIN' && !this.moduleAccess.canAssignUnitAdmin(ctx)) {
+      throw new ForbiddenException(
+        'Only church admin or pastor can assign a Unit Leader. Use Assign Assistants for Assistant/Secretary.',
+      );
+    }
 
     const member = await this.prisma.member.findFirst({
       where: { id: memberId, churchId },
@@ -1788,8 +2004,13 @@ export class ServiceUnitsService {
     serviceUnitId: string,
     body: AssignServiceUnitMemberDto,
   ) {
-    await this.requireUnitManager(userId, churchId, serviceUnitId);
+    const ctx = await this.requireUnitManager(userId, churchId, serviceUnitId);
     await this.getUnit(churchId, serviceUnitId);
+    if (body.unitRole === 'UNIT_ADMIN' && !this.moduleAccess.canAssignUnitAdmin(ctx)) {
+      throw new ForbiddenException(
+        'Only church admin or pastor can assign a Unit Leader. Use Assign Assistants for Assistant/Secretary.',
+      );
+    }
 
     let memberId = body.memberId?.trim();
     if (!memberId) {
@@ -1894,7 +2115,7 @@ export class ServiceUnitsService {
     return {
       memberId,
       member,
-      unitRole: leader?.isUnitAdmin ? ('UNIT_ADMIN' as const) : ('MEMBER' as const),
+      unitRole: unitRoleFromLeader(!!leader?.isUnitAdmin, leader?.role),
       designation: leader?.role ?? null,
       leaderId: leader?.id ?? null,
     };
@@ -1928,7 +2149,7 @@ export class ServiceUnitsService {
         memberId: row.memberId,
         joinedAt: row.joinedAt.toISOString(),
         member: row.member,
-        unitRole: leader?.isUnitAdmin ? ('UNIT_ADMIN' as const) : ('MEMBER' as const),
+        unitRole: unitRoleFromLeader(!!leader?.isUnitAdmin, leader?.role),
         designation: leader?.role ?? null,
         leaderId: leader?.id ?? null,
       };
@@ -1940,53 +2161,148 @@ export class ServiceUnitsService {
     churchId: string,
     serviceUnitId: string,
     data: {
-      memberId: string;
+      memberId?: string;
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+      phone?: string;
       role?: string;
       isModerator?: boolean;
       isUnitAdmin?: boolean;
+      deputyRole?: UnitDeputyRole;
     },
   ) {
-    await this.requireUnitManager(userId, churchId, serviceUnitId);
+    const ctx = await this.requireUnitManager(userId, churchId, serviceUnitId);
     await this.getUnit(churchId, serviceUnitId);
 
-    const member = await this.prisma.member.findFirst({
-      where: { id: data.memberId, churchId },
-      select: { id: true },
-    });
-    if (!member) {
-      throw new NotFoundException('Member not found in this church');
+    const deputyRole: UnitDeputyRole | null = data.deputyRole
+      ? data.deputyRole
+      : isUnitDeputyRole(data.role)
+        ? (normalizeUnitLeaderRole(data.role) as UnitDeputyRole)
+        : null;
+    const makeUnitAdmin = data.isUnitAdmin === true && !deputyRole;
+
+    if (makeUnitAdmin) {
+      if (!this.moduleAccess.canAssignUnitAdmin(ctx)) {
+        throw new ForbiddenException(
+          'Only church admin or pastor can assign a Unit Leader (volunteer unit admin)',
+        );
+      }
+    } else if (deputyRole) {
+      if (!this.moduleAccess.canAssignUnitDeputies(ctx, serviceUnitId)) {
+        throw new ForbiddenException(
+          'Only the Unit Admin or church staff can assign Assistant or Secretary',
+        );
+      }
+    } else if (!this.moduleAccess.canManageUnitLeaders(ctx, serviceUnitId)) {
+      throw new ForbiddenException('Unit Admin or church staff required to manage leaders');
     }
 
-    const makeUnitAdmin = data.isUnitAdmin === true;
+    const memberId = await this.resolveLeaderMemberId(churchId, data);
+
     if (makeUnitAdmin) {
-      await this.assertSoleUnitAdminLeadership(churchId, data.memberId, serviceUnitId);
+      await this.assertSoleUnitAdminLeadership(churchId, memberId, serviceUnitId);
     }
+
+    if (deputyRole) {
+      await this.assertSoleDeputySlot(serviceUnitId, deputyRole, memberId);
+    }
+
+    const storedRole =
+      deputyRole ?? (data.role?.trim() || (makeUnitAdmin ? 'LEADER' : 'LEADER'));
+    const moderator = data.isModerator ?? (makeUnitAdmin || !!deputyRole);
 
     await this.prisma.serviceUnitMember.upsert({
       where: {
-        serviceUnitId_memberId: { serviceUnitId, memberId: data.memberId },
+        serviceUnitId_memberId: { serviceUnitId, memberId },
       },
-      create: { serviceUnitId, memberId: data.memberId },
+      create: { serviceUnitId, memberId },
       update: {},
     });
     return this.prisma.serviceUnitLeader.upsert({
       where: {
-        serviceUnitId_memberId: { serviceUnitId, memberId: data.memberId },
+        serviceUnitId_memberId: { serviceUnitId, memberId },
       },
       create: {
         serviceUnitId,
-        memberId: data.memberId,
-        role: data.role?.trim() || 'LEADER',
-        isModerator: data.isModerator ?? makeUnitAdmin,
+        memberId,
+        role: storedRole,
+        isModerator: moderator,
         isUnitAdmin: makeUnitAdmin,
       },
       update: {
-        role: data.role?.trim() || undefined,
-        isModerator: data.isModerator ?? undefined,
-        isUnitAdmin: data.isUnitAdmin ?? undefined,
+        role: storedRole,
+        isModerator: moderator,
+        isUnitAdmin: makeUnitAdmin,
       },
-      include: { member: { select: { id: true, firstName: true, lastName: true, email: true } } },
+      include: {
+        member: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
+      },
     });
+  }
+
+  private async resolveLeaderMemberId(
+    churchId: string,
+    data: {
+      memberId?: string;
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+      phone?: string;
+    },
+  ): Promise<string> {
+    let memberId = data.memberId?.trim();
+    if (memberId) {
+      const exists = await this.prisma.member.findFirst({
+        where: { id: memberId, churchId },
+        select: { id: true },
+      });
+      if (!exists) throw new NotFoundException('Member not found in this church');
+      return memberId;
+    }
+
+    const firstName = data.firstName?.trim();
+    const lastName = data.lastName?.trim();
+    if (!firstName || !lastName) {
+      throw new BadRequestException('Provide memberId or first and last name');
+    }
+    const email = data.email?.trim() || undefined;
+    if (email) {
+      const existing = await this.prisma.member.findFirst({
+        where: { churchId, email },
+        select: { id: true },
+      });
+      if (existing) return existing.id;
+    }
+    const created = await this.membership.createMember(churchId, {
+      firstName,
+      lastName,
+      email,
+      phone: data.phone?.trim() || undefined,
+      status: 'ACTIVE_MEMBER',
+      startOnboarding: false,
+    });
+    return created.id;
+  }
+
+  private async assertSoleDeputySlot(
+    serviceUnitId: string,
+    deputyRole: UnitDeputyRole,
+    memberId: string,
+  ) {
+    const existing = await this.prisma.serviceUnitLeader.findMany({
+      where: { serviceUnitId, isUnitAdmin: false },
+      select: { memberId: true, role: true },
+    });
+    const taken = existing.find(
+      (row) =>
+        normalizeUnitLeaderRole(row.role) === deputyRole && row.memberId !== memberId,
+    );
+    if (taken) {
+      throw new BadRequestException(
+        `This unit already has a ${deputyRole === 'ASSISTANT' ? 'Assistant' : 'Secretary'}. Remove them first.`,
+      );
+    }
   }
 
   async removeLeader(
@@ -1995,12 +2311,21 @@ export class ServiceUnitsService {
     serviceUnitId: string,
     leaderId: string,
   ) {
-    await this.requireUnitManager(userId, churchId, serviceUnitId);
+    const ctx = await this.requireUnitManager(userId, churchId, serviceUnitId);
     await this.getUnit(churchId, serviceUnitId);
     const leader = await this.prisma.serviceUnitLeader.findFirst({
       where: { id: leaderId, serviceUnitId },
     });
     if (!leader) throw new NotFoundException('Leader not found');
+
+    if (leader.isUnitAdmin) {
+      if (!this.moduleAccess.canAssignUnitAdmin(ctx)) {
+        throw new ForbiddenException('Only church admin or pastor can remove a Unit Leader');
+      }
+    } else if (!this.moduleAccess.canManageUnitLeaders(ctx, serviceUnitId)) {
+      throw new ForbiddenException('Unit Admin or church staff required to remove leaders');
+    }
+
     return this.prisma.serviceUnitLeader.delete({ where: { id: leaderId } });
   }
 
@@ -2084,8 +2409,28 @@ export class ServiceUnitsService {
     return this.prisma.serviceUnitMeeting.delete({ where: { id: meetingId } });
   }
 
-  async listPosts(churchId: string, serviceUnitId: string) {
+  private async requireUnitViewer(
+    userId: string,
+    churchId: string,
+    serviceUnitId: string,
+  ): Promise<UserMemberContext> {
     await this.getUnit(churchId, serviceUnitId);
+    const ctx = await this.moduleAccess.resolveContext(userId, churchId);
+    if (!ctx || !(await this.moduleAccess.canViewServiceUnit(ctx, serviceUnitId))) {
+      throw new ForbiddenException('You are not a member of this service unit');
+    }
+    return ctx;
+  }
+
+  private requireCallerMemberId(ctx: UserMemberContext): string {
+    if (!ctx.memberId) {
+      throw new ForbiddenException('A member profile is required for this action');
+    }
+    return ctx.memberId;
+  }
+
+  async listPosts(userId: string, churchId: string, serviceUnitId: string) {
+    await this.requireUnitViewer(userId, churchId, serviceUnitId);
     return this.prisma.serviceUnitPost.findMany({
       where: { serviceUnitId },
       include: {
@@ -2102,13 +2447,20 @@ export class ServiceUnitsService {
   }
 
   async createPost(
+    userId: string,
     churchId: string,
     serviceUnitId: string,
-    data: { authorId: string; title?: string; body: string },
+    data: { title?: string; body: string },
   ) {
-    await this.getUnit(churchId, serviceUnitId);
+    const ctx = await this.requireUnitViewer(userId, churchId, serviceUnitId);
+    const authorId = this.requireCallerMemberId(ctx);
+    const body = data.body?.trim();
+    if (!body) throw new BadRequestException('Post body is required');
+    if (body.length > 10_000) throw new BadRequestException('Post body is too long');
+    const title = data.title?.trim() || undefined;
+    if (title && title.length > 200) throw new BadRequestException('Post title is too long');
     return this.prisma.serviceUnitPost.create({
-      data: { serviceUnitId, authorId: data.authorId, title: data.title, body: data.body },
+      data: { serviceUnitId, authorId, title, body },
       include: {
         author: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
         replies: true,
@@ -2117,26 +2469,53 @@ export class ServiceUnitsService {
   }
 
   async updatePost(
+    userId: string,
     churchId: string,
     serviceUnitId: string,
     postId: string,
     data: Partial<{ title: string; body: string; isPinned: boolean; isLocked: boolean }>,
-    moderatorMemberId?: string,
   ) {
-    await this.getUnit(churchId, serviceUnitId);
-    const post = await this.prisma.serviceUnitPost.findFirst({ where: { id: postId, serviceUnitId } });
+    const ctx = await this.requireUnitViewer(userId, churchId, serviceUnitId);
+    const callerMemberId = ctx.memberId;
+    const post = await this.prisma.serviceUnitPost.findFirst({
+      where: { id: postId, serviceUnitId },
+    });
     if (!post) throw new NotFoundException('Post not found');
 
-    const isModerator = moderatorMemberId
-      ? await this.isModerator(serviceUnitId, moderatorMemberId)
-      : false;
+    const isModerator =
+      this.moduleAccess.isChurchStaff(ctx) ||
+      (callerMemberId ? await this.isModerator(serviceUnitId, callerMemberId) : false);
+    const isAuthor = !!callerMemberId && post.authorId === callerMemberId;
+
     if (post.isLocked && !isModerator) {
       throw new ForbiddenException('This discussion is locked');
     }
 
+    const patch: Prisma.ServiceUnitPostUpdateInput = {};
+    if (data.title !== undefined) {
+      if (!isAuthor && !isModerator) throw new ForbiddenException('Not allowed to edit this post');
+      patch.title = data.title?.trim() || null;
+    }
+    if (data.body !== undefined) {
+      if (!isAuthor && !isModerator) throw new ForbiddenException('Not allowed to edit this post');
+      const body = data.body.trim();
+      if (!body) throw new BadRequestException('Post body is required');
+      patch.body = body;
+    }
+    if (data.isPinned !== undefined || data.isLocked !== undefined) {
+      if (!isModerator) {
+        throw new ForbiddenException('Only unit moderators or church staff can pin or lock posts');
+      }
+      if (data.isPinned !== undefined) patch.isPinned = data.isPinned;
+      if (data.isLocked !== undefined) patch.isLocked = data.isLocked;
+    }
+    if (Object.keys(patch).length === 0) {
+      throw new BadRequestException('No valid fields to update');
+    }
+
     return this.prisma.serviceUnitPost.update({
       where: { id: postId },
-      data,
+      data: patch,
       include: {
         author: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
         replies: {
@@ -2148,37 +2527,48 @@ export class ServiceUnitsService {
     });
   }
 
-  async deletePost(churchId: string, serviceUnitId: string, postId: string) {
-    await this.getUnit(churchId, serviceUnitId);
-    const post = await this.prisma.serviceUnitPost.findFirst({ where: { id: postId, serviceUnitId } });
+  async deletePost(userId: string, churchId: string, serviceUnitId: string, postId: string) {
+    await this.requireUnitManager(userId, churchId, serviceUnitId);
+    const post = await this.prisma.serviceUnitPost.findFirst({
+      where: { id: postId, serviceUnitId },
+    });
     if (!post) throw new NotFoundException('Post not found');
     return this.prisma.serviceUnitPost.delete({ where: { id: postId } });
   }
 
   async createReply(
+    userId: string,
     churchId: string,
     serviceUnitId: string,
     postId: string,
-    data: { authorId: string; body: string },
+    data: { body: string },
   ) {
-    await this.getUnit(churchId, serviceUnitId);
-    const post = await this.prisma.serviceUnitPost.findFirst({ where: { id: postId, serviceUnitId } });
+    const ctx = await this.requireUnitViewer(userId, churchId, serviceUnitId);
+    const authorId = this.requireCallerMemberId(ctx);
+    const post = await this.prisma.serviceUnitPost.findFirst({
+      where: { id: postId, serviceUnitId },
+    });
     if (!post) throw new NotFoundException('Post not found');
     if (post.isLocked) {
-      const isMod = await this.isModerator(serviceUnitId, data.authorId);
+      const isMod =
+        this.moduleAccess.isChurchStaff(ctx) ||
+        (await this.isModerator(serviceUnitId, authorId));
       if (!isMod) throw new ForbiddenException('This discussion is locked');
     }
+    const body = data.body?.trim();
+    if (!body) throw new BadRequestException('Reply body is required');
+    if (body.length > 5_000) throw new BadRequestException('Reply body is too long');
 
     return this.prisma.serviceUnitPostReply.create({
-      data: { postId, authorId: data.authorId, body: data.body },
+      data: { postId, authorId, body },
       include: {
         author: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
       },
     });
   }
 
-  async deleteReply(churchId: string, serviceUnitId: string, replyId: string) {
-    await this.getUnit(churchId, serviceUnitId);
+  async deleteReply(userId: string, churchId: string, serviceUnitId: string, replyId: string) {
+    await this.requireUnitManager(userId, churchId, serviceUnitId);
     const reply = await this.prisma.serviceUnitPostReply.findFirst({
       where: { id: replyId, post: { serviceUnitId } },
     });

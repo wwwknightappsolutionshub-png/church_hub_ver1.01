@@ -18,6 +18,7 @@ describe('ModuleAccessService extensions', () => {
     memberRoles: [],
     unitMembershipIds: [],
     unitAdminUnitIds: [],
+    unitDeputyUnitIds: [],
     unitLeaderUnitIds: [],
   };
 
@@ -76,5 +77,34 @@ describe('ModuleAccessService extensions', () => {
       unitAdminUnitIds: [],
     };
     expect(service.canAccessDepartmentTools(member)).toBe(false);
+  });
+
+  it('lets deputies operate a unit but not assign leaders', () => {
+    const deputy: UserMemberContext = {
+      ...staffCtx,
+      userRoles: [],
+      memberRoles: [],
+      unitLeaderUnitIds: ['unit-choir'],
+      unitAdminUnitIds: [],
+      unitDeputyUnitIds: ['unit-choir'],
+    };
+    expect(service.canManageServiceUnit(deputy, 'unit-choir')).toBe(true);
+    expect(service.canManageUnitLeaders(deputy, 'unit-choir')).toBe(false);
+    expect(service.canAssignUnitDeputies(deputy, 'unit-choir')).toBe(false);
+    expect(service.canAssignUnitAdmin(deputy)).toBe(false);
+  });
+
+  it('lets unit admins assign deputies but not create unit admins', () => {
+    const admin: UserMemberContext = {
+      ...staffCtx,
+      userRoles: [],
+      memberRoles: [],
+      unitLeaderUnitIds: ['unit-choir'],
+      unitAdminUnitIds: ['unit-choir'],
+      unitDeputyUnitIds: [],
+    };
+    expect(service.canManageUnitLeaders(admin, 'unit-choir')).toBe(true);
+    expect(service.canAssignUnitDeputies(admin, 'unit-choir')).toBe(true);
+    expect(service.canAssignUnitAdmin(admin)).toBe(false);
   });
 });

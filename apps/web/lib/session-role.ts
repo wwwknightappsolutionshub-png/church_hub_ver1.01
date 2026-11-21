@@ -99,7 +99,25 @@ export function consumeSaasMarketingLanding(): boolean {
   return v;
 }
 
-export function postLoginPath(bucket: SessionRoleBucket): string {
+/** Home for unit admins / deputies (Assistant, Secretary). */
+export function unitAdminHomePath(
+  unitAdminUnitIds: string[] | undefined | null,
+  unitDeputyUnitIds?: string[] | undefined | null,
+): string {
+  const ids = [
+    ...(unitAdminUnitIds ?? []).filter(Boolean),
+    ...(unitDeputyUnitIds ?? []).filter(Boolean),
+  ];
+  const unique = [...new Set(ids)];
+  if (unique.length === 1) return `/dashboard/service-units/${unique[0]}`;
+  if (unique.length > 1) return '/dashboard/service-units';
+  return '/dashboard/service-units';
+}
+
+export function postLoginPath(
+  bucket: SessionRoleBucket,
+  opts?: { unitAdminUnitIds?: string[]; unitDeputyUnitIds?: string[] },
+): string {
   switch (bucket) {
     case 'platform':
       return '/dashboard/platform';
@@ -107,6 +125,12 @@ export function postLoginPath(bucket: SessionRoleBucket): string {
     case 'pastor':
       return '/dashboard';
     default:
+      if (
+        (opts?.unitAdminUnitIds ?? []).length > 0 ||
+        (opts?.unitDeputyUnitIds ?? []).length > 0
+      ) {
+        return unitAdminHomePath(opts?.unitAdminUnitIds, opts?.unitDeputyUnitIds);
+      }
       return '/dashboard/lounge';
   }
 }

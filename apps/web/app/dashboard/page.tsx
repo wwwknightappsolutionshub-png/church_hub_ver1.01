@@ -19,6 +19,7 @@ import {
 } from '@/components/admin/UnifiedAdminHub';
 import { CelebrationColumnsPanel } from '@/components/membership/CelebrationColumnsPanel';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
+import { unitAdminHomePath } from '@/lib/session-role';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
@@ -35,6 +36,8 @@ export default function DashboardPage() {
   const {
     isPlatformOperator,
     isChurchStaff,
+    unitAdminUnitIds,
+    unitDeputyUnitIds,
     isLoading: accessLoading,
     user,
     member,
@@ -56,9 +59,20 @@ export default function DashboardPage() {
       return;
     }
     if (!isChurchStaff) {
+      if (unitAdminUnitIds.length > 0 || unitDeputyUnitIds.length > 0) {
+        router.replace(unitAdminHomePath(unitAdminUnitIds, unitDeputyUnitIds));
+        return;
+      }
       router.replace('/dashboard/lounge');
     }
-  }, [accessLoading, isPlatformOperator, isChurchStaff, router]);
+  }, [
+    accessLoading,
+    isPlatformOperator,
+    isChurchStaff,
+    unitAdminUnitIds,
+    unitDeputyUnitIds,
+    router,
+  ]);
 
   useEffect(() => {
     if (isPlatformOperator || accessLoading || !isChurchStaff) return;

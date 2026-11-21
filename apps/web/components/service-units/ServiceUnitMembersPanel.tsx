@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, Pencil, Plus, Trash2, UserPlus } from 'lucide-react';
+import { Download, FileSpreadsheet, Loader2, Pencil, Plus, Trash2, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import type { AxiosError } from 'axios';
 import { api } from '@/lib/api';
@@ -15,8 +15,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
-type UnitRole = 'MEMBER' | 'UNIT_ADMIN';
+type UnitRole = 'MEMBER' | 'UNIT_ADMIN' | 'ASSISTANT' | 'SECRETARY';
+type AddMode = 'existing' | 'new' | 'import';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 interface UnitMemberRow {
   memberId: string;
@@ -49,18 +53,25 @@ export function ServiceUnitMembersPanel({
   unitId,
   canManage,
   isOnline,
+  allowAssignUnitAdmin = false,
 }: {
   unitId: string;
   canManage: boolean;
   isOnline: (memberId: string) => boolean;
+  /** Church ADMIN/PASTOR only — volunteer Unit Leader assignment. */
+  allowAssignUnitAdmin?: boolean;
 }) {
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
-  const [mode, setMode] = useState<'existing' | 'new'>('existing');
+  const [mode, setMode] = useState<AddMode>('existing');
   const [existingMemberId, setExistingMemberId] = useState('');
   const [existingRole, setExistingRole] = useState<UnitRole>('MEMBER');
   const [existingDesignation, setExistingDesignation] = useState('');
   const [showCongregantEditor, setShowCongregantEditor] = useState(false);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importFailures, setImportFailures] = useState<Array<{ rowIndex: number; reason: string }>>(
+    [],
+  );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
     firstName: '',
@@ -176,6 +187,59 @@ export function ServiceUnitMembersPanel({
     }
   };
 
+  const downloadImportTemplate = () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    const url = `${API_URL}/api/v1/service-units/member-import-template.csv`;
+    if (!token) {
+      toast.error('Sign in required to download the template');
+      return;
+    }
+    fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => {
+        if (!r.ok) throw new Error('download failed');
+        return r.blob();
+      })
+      .then((blob) => {
+        const obj = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = obj;
+        a.download = 'service-unit-members-import-template.csv';
+        a.click();
+        URL.revokeObjectURL(obj);
+      })
+      .catch(() => toast.error('Could not download template'));
+  };
+
+  const importMembersFromFile = async (file: File) => {
+    setImportBusy(true);
+    setImportFailures([]);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const { data } = await api.post<{
+        importedCount: number;
+        failedCount: number;
+        failures: Array<{ rowIndex: number; reason: string }>;
+      }>(`/service-units/${unitId}/members/import`, fd);
+      setImportFailures(data.failures ?? []);
+      if (data.importedCount > 0) {
+        toast.success(
+          `Imported ${data.importedCount} member${data.importedCount === 1 ? '' : 's'}`,
+        );
+        invalidate();
+      } else {
+        toast.error('No members were imported');
+      }
+      if (data.failedCount > 0) {
+        toast.message(`${data.failedCount} row${data.failedCount === 1 ? '' : 's'} failed`);
+      }
+    } catch (err) {
+      toast.error(apiErrorMessage(err as AxiosError, 'Could not import members'));
+    } finally {
+      setImportBusy(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {canManage && (
@@ -186,8 +250,8 @@ export function ServiceUnitMembersPanel({
               Add member
             </CardTitle>
             <CardDescription>
-              Add someone from the church roster or create a new congregant in the global membership
-              database, then assign them as a unit member or unit admin.
+              Add someone from the church roster, create a new congregant, or import from an Excel /
+              CSV file, then assign them as a unit member or unit admin.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -214,6 +278,17 @@ export function ServiceUnitMembersPanel({
               >
                 Create new person
               </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={mode === 'import' ? 'default' : 'outline'}
+                onClick={() => {
+                  setMode('import');
+                  setShowCongregantEditor(false);
+                }}
+              >
+                Import Directory
+              </Button>
             </div>
 
             {mode === 'existing' ? (
@@ -237,18 +312,80 @@ export function ServiceUnitMembersPanel({
                   designation={existingDesignation}
                   onRoleChange={setExistingRole}
                   onDesignationChange={setExistingDesignation}
+                  allowAssignUnitAdmin={allowAssignUnitAdmin}
                 />
                 <Button type="submit" disabled={busy} className="gap-1">
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                   Add to unit
                 </Button>
               </form>
-            ) : (
+            ) : null}
+
+            {mode === 'new' ? (
               <p className="text-sm text-muted-foreground">
                 Use the Add New Congregant form to save them to the global membership database and
                 attach them to this unit.
               </p>
-            )}
+            ) : null}
+
+            {mode === 'import' ? (
+              <div className="space-y-3 rounded-lg border border-dashed border-border p-4">
+                <div className="flex items-start gap-3">
+                  <FileSpreadsheet className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0 flex-1 space-y-2 text-sm">
+                    <p className="font-medium">Import from Excel or CSV</p>
+                    <p className="text-muted-foreground">
+                      Download the sample, fill First Name / Last Name / Email / Phone, then upload
+                      .xlsx or .csv.
+                    </p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={downloadImportTemplate}
+                      >
+                        <Download className="mr-1.5 h-4 w-4" />
+                        Download sample
+                      </Button>
+                      <label className="inline-flex">
+                        <input
+                          type="file"
+                          accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                          className="sr-only"
+                          disabled={importBusy}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            e.target.value = '';
+                            if (f) void importMembersFromFile(f);
+                          }}
+                        />
+                        <span
+                          className={cn(
+                            'inline-flex h-8 cursor-pointer items-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground',
+                            importBusy && 'pointer-events-none opacity-60',
+                          )}
+                        >
+                          {importBusy ? (
+                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                          ) : null}
+                          Upload file
+                        </span>
+                      </label>
+                    </div>
+                    {importFailures.length > 0 ? (
+                      <ul className="mt-2 max-h-28 space-y-1 overflow-auto text-xs text-destructive">
+                        {importFailures.slice(0, 8).map((f) => (
+                          <li key={`${f.rowIndex}-${f.reason}`}>
+                            Row {f.rowIndex}: {f.reason}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       )}
@@ -313,6 +450,7 @@ export function ServiceUnitMembersPanel({
                               setEditForm({ ...editForm, designation })
                             }
                             className="md:col-span-2"
+                            allowAssignUnitAdmin={allowAssignUnitAdmin}
                           />
                           <div className="flex flex-wrap gap-2 md:col-span-2">
                             <Button
@@ -352,6 +490,10 @@ export function ServiceUnitMembersPanel({
                       <td className="py-3">
                         {row.unitRole === 'UNIT_ADMIN' ? (
                           <Badge variant="gold">Unit admin</Badge>
+                        ) : row.unitRole === 'ASSISTANT' ? (
+                          <Badge variant="outline">Assistant</Badge>
+                        ) : row.unitRole === 'SECRETARY' ? (
+                          <Badge variant="outline">Secretary</Badge>
                         ) : (
                           <Badge variant="secondary">Member</Badge>
                         )}
@@ -434,24 +576,26 @@ function RoleFields({
   onRoleChange,
   onDesignationChange,
   className,
+  allowAssignUnitAdmin = false,
 }: {
   unitRole: UnitRole;
   designation: string;
   onRoleChange: (role: UnitRole) => void;
   onDesignationChange: (value: string) => void;
   className?: string;
+  allowAssignUnitAdmin?: boolean;
 }) {
   return (
     <div className={`grid gap-3 md:grid-cols-2 ${className ?? ''}`}>
       <select
         className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-        value={unitRole}
+        value={unitRole === 'ASSISTANT' || unitRole === 'SECRETARY' ? 'MEMBER' : unitRole}
         onChange={(e) => onRoleChange(e.target.value as UnitRole)}
       >
         <option value="MEMBER">Unit member</option>
-        <option value="UNIT_ADMIN">Unit admin</option>
+        {allowAssignUnitAdmin ? <option value="UNIT_ADMIN">Unit admin</option> : null}
       </select>
-      {unitRole === 'UNIT_ADMIN' ? (
+      {unitRole === 'UNIT_ADMIN' && allowAssignUnitAdmin ? (
         <Input
           placeholder="Designation (optional)"
           value={designation}

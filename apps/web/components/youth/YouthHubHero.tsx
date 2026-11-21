@@ -76,13 +76,13 @@ export function YouthHubHero() {
           </div>
         </div>
 
-        <ul className="mt-6 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <ul className="mt-6 flex flex-wrap gap-2">
           {visibleFeatures.map((f) => (
             <li key={f.key}>
               <Link
                 href={f.href}
                 className={cn(
-                  'inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-white/30 bg-white/15 px-4 py-2 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/25',
+                  'inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/15 px-3 py-2 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/25',
                 )}
               >
                 <f.icon className="h-4 w-4" aria-hidden />
@@ -93,7 +93,7 @@ export function YouthHubHero() {
           <li>
             <Link
               href="/dashboard/youth/feed"
-              className="inline-flex items-center gap-2 whitespace-nowrap rounded-full bg-white px-4 py-2 text-sm font-bold text-violet-700 shadow-lg transition hover:bg-white/95"
+              className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-sm font-bold text-violet-700 shadow-lg transition hover:bg-white/95"
             >
               <Flame className="h-4 w-4" />
               Jump to feed

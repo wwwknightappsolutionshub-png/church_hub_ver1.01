@@ -12,6 +12,10 @@ export type AuthMeRouting = {
   isPlatformOperator?: boolean;
   isChurchStaff?: boolean;
   churchSlug?: string | null;
+  /** Units where this user is Unit Admin (isUnitAdmin leadership). */
+  unitAdminUnitIds?: string[];
+  /** Units where this user is Assistant or Secretary. */
+  unitDeputyUnitIds?: string[];
 };
 
 /** Call after tokens are stored — sets slug, role bucket, returns dashboard path. */
@@ -26,7 +30,10 @@ export async function applyAuthSessionFromApi(): Promise<string> {
     setLastChurchSlug(data.churchSlug);
   }
 
-  return postLoginPath(bucket);
+  return postLoginPath(bucket, {
+    unitAdminUnitIds: data.unitAdminUnitIds,
+    unitDeputyUnitIds: data.unitDeputyUnitIds,
+  });
 }
 
 export function applyAuthSessionFromMe(me: AuthMeRouting): string {
@@ -37,5 +44,8 @@ export function applyAuthSessionFromMe(me: AuthMeRouting): string {
   } else if (me.churchSlug) {
     setLastChurchSlug(me.churchSlug);
   }
-  return postLoginPath(bucket);
+  return postLoginPath(bucket, {
+    unitAdminUnitIds: me.unitAdminUnitIds,
+    unitDeputyUnitIds: me.unitDeputyUnitIds,
+  });
 }
