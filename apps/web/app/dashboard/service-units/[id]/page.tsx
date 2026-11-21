@@ -29,6 +29,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { SectionTabNav } from '@/components/ui/section-tab-nav';
 import { cn } from '@/lib/utils';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { ServiceUnitJoinSheet } from '@/components/service-units/ServiceUnitJoinSheet';
@@ -248,14 +249,35 @@ export default function ServiceUnitDetailPage() {
   };
 
   const deleteUnit = async () => {
-    if (!isChurchStaff || !window.confirm(`Deactivate "${unit.data?.name}"?`)) return;
+    if (!isChurchStaff || !unit.data) return;
+    if (unit.data.name.trim().toLowerCase() === 'uncategorized') {
+      toast.error('The Uncategorized unit cannot be deleted');
+      return;
+    }
+    const hasData =
+      (unit.data.members?.length ?? 0) > 0 || (unit.data.meetings?.length ?? 0) > 0;
+    const ok = window.confirm(
+      hasData
+        ? `Delete "${unit.data.name}"?\n\nMembers and related records will move to Uncategorized.`
+        : `Delete "${unit.data.name}"?`,
+    );
+    if (!ok) return;
     try {
       await api.delete(`/service-units/${id}`);
-      toast.success('Service unit deactivated');
+      toast.success(
+        hasData
+          ? 'Unit deleted — members moved to Uncategorized'
+          : 'Service unit deleted',
+      );
       queryClient.invalidateQueries({ queryKey: ['service-units'] });
       window.location.href = '/dashboard/service-units';
-    } catch {
-      toast.error('Could not deactivate service unit');
+    } catch (err: unknown) {
+      const msg =
+        err &&
+        typeof err === 'object' &&
+        'response' in err &&
+        (err as { response?: { data?: { message?: string } } }).response?.data?.message;
+      toast.error(typeof msg === 'string' ? msg : 'Could not delete service unit');
     }
   };
 
@@ -457,28 +479,25 @@ export default function ServiceUnitDetailPage() {
 
       <div
         className={cn(
-          'flex gap-2 overflow-x-auto pb-1 scrollbar-thin',
-          isDepartmentFocus ? 'rounded-xl border border-border/60 bg-muted/20 p-1.5' : 'border-b border-border',
+          isDepartmentFocus
+            ? 'rounded-xl border border-border/60 bg-muted/20 p-2'
+            : 'border-b border-border pb-2',
         )}
       >
-        {visibleTabs.map(({ id: tabId, label, icon: Icon }) => (
-          <button
-            key={tabId}
-            type="button"
-            onClick={() => setTab(tabId)}
-            className={cn(
-              'flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors md:px-4',
-              tab === tabId
-                ? isDepartmentFocus
-                  ? 'bg-background text-primary shadow-sm ring-1 ring-border/60'
-                  : 'border-b-2 border-primary text-primary'
-                : 'text-muted-foreground hover:bg-background/60 hover:text-foreground',
-            )}
-          >
-            <Icon className="h-4 w-4" />
-            {label}
-          </button>
-        ))}
+        <SectionTabNav
+          items={visibleTabs.map(({ id: tabId, label, icon }) => ({
+            id: tabId,
+            label,
+            shortLabel: label === 'Unit admin' ? 'Admin' : label,
+            icon,
+          }))}
+          activeId={tab}
+          onChange={(id) => setTab(id as Tab)}
+          ariaLabel="Service unit sections"
+          size="sm"
+          compactSelectBelow="sm"
+          selectId={`service-unit-tabs-${id}`}
+        />
       </div>
 
       {tab === 'department' && unit.data && canViewDepartmentTab && showDepartmentToolsTab(unit.data.departmentCode, unit.data.name) && (
@@ -535,9 +554,10 @@ export default function ServiceUnitDetailPage() {
                       <Button type="button" variant="outline" onClick={() => setEditingUnit(false)}>
                         Cancel
                       </Button>
-                      {isChurchStaff && (
+                      {isChurchStaff &&
+                        unit.data.name.trim().toLowerCase() !== 'uncategorized' && (
                         <Button type="button" variant="destructive" onClick={deleteUnit}>
-                          Deactivate unit
+                          Delete unit
                         </Button>
                       )}
                     </div>

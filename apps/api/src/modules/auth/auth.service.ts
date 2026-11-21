@@ -473,6 +473,48 @@ export class AuthService {
     return { success: true, message: GENERIC_LINK_SENT };
   }
 
+  /**
+   * Create a one-time password setup/reset link for a known user without sending the
+   * generic reset email (caller embeds the URL in their own invite message).
+   * Defaults to 48h TTL for staff onboarding.
+   */
+  async createPasswordSetupLink(userId: string, ttlMinutes = 48 * 60): Promise<string> {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, isActive: true },
+      select: { id: true },
+    });
+    if (!user) {
+      throw new BadRequestException('User not found or inactive');
+    }
+
+    await this.prisma.authLinkToken.updateMany({
+      where: {
+        userId: user.id,
+        purpose: AuthLinkPurpose.PASSWORD_RESET,
+        consumedAt: null,
+      },
+      data: { consumedAt: new Date() },
+    });
+
+    const rawToken = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + Math.max(30, ttlMinutes) * 60 * 1000);
+    await this.prisma.authLinkToken.create({
+      data: {
+        userId: user.id,
+        purpose: AuthLinkPurpose.PASSWORD_RESET,
+        tokenHash: this.hashToken(rawToken),
+        expiresAt,
+      },
+    });
+
+    const appUrl =
+      this.config.get<string>('APP_URL') ??
+      this.config.get<string>('NEXT_PUBLIC_APP_URL') ??
+      process.env.WEB_APP_URL ??
+      'http://localhost:3001';
+    return `${appUrl.replace(/\/$/, '')}/reset-password?token=${rawToken}`;
+  }
+
   /** Request a magic sign-in email. Always returns the same message (no email enumeration). */
   async requestMagicLink(email: string) {
     await this.issueAuthLink(email.trim().toLowerCase(), AuthLinkPurpose.MAGIC_LOGIN);

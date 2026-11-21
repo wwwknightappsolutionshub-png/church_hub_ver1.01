@@ -28,10 +28,9 @@ test.describe('Church Staff unit leader (UI)', () => {
   test('admin assigns LEADER to a service unit from Church Staff', async ({ page, request }) => {
     await seedAuth(page, request);
 
+    const token = await page.evaluate(() => localStorage.getItem('accessToken'));
     const unitsRes = await request.get(`${API_URL}/service-units`, {
-      headers: {
-        Authorization: `Bearer ${await page.evaluate(() => localStorage.getItem('accessToken'))}`,
-      },
+      headers: { Authorization: `Bearer ${token}` },
     });
     expect(unitsRes.ok()).toBeTruthy();
     const units = (await unitsRes.json()) as Array<{ id: string; name: string }>;
@@ -45,31 +44,40 @@ test.describe('Church Staff unit leader (UI)', () => {
     });
 
     await page.getByRole('button', { name: /Add staff/i }).click();
-    await page.getByLabel(/^Email$/i).fill(leaderEmail);
-    await page.getByLabel(/^Password/i).fill(password);
-    await page.getByLabel(/First name/i).fill('UI');
-    await page.getByLabel(/Last name/i).fill('UnitLeader');
+    const wizard = page.getByTestId('staff-account-wizard');
+    await expect(wizard).toBeVisible();
 
-    // Default role is ADMIN — switch to unit-only LEADER.
-    await page.getByRole('button', { name: /^ADMIN$/i }).click();
-    await page.getByRole('button', { name: /^LEADER$/i }).click();
-    await expect(page.getByText(/unit leader only/i)).toBeVisible();
+    await wizard.getByLabel(/^First name$/i).fill('UI');
+    await wizard.getByLabel(/^Last name$/i).fill('UnitLeader');
+    await wizard.getByLabel(/^Email$/i).fill(leaderEmail);
+    await expect(wizard.getByText(/set-password link|Passwords are never sent/i)).toBeVisible();
+    await wizard.getByRole('button', { name: /^Next$/i }).click();
 
-    await page.getByRole('button', { name: unitName, exact: true }).click();
-    await page.getByRole('button', { name: /^Save$/i }).click();
+    await expect(wizard.getByText(/What access type are you assigning/i)).toBeVisible();
+    await wizard.getByRole('button', { name: /Unit Leader/i }).click();
+    await wizard.getByRole('button', { name: /^Next$/i }).click();
+
+    await expect(wizard.getByText(/Which service unit will/i)).toBeVisible();
+    await wizard.getByRole('button', { name: unitName, exact: true }).click();
+    await wizard.getByRole('button', { name: /Create account/i }).click();
 
     await expect(page.getByText(leaderEmail)).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText(unitName).first()).toBeVisible();
 
     const listRes = await request.get(`${API_URL}/church-staff`, {
-      headers: {
-        Authorization: `Bearer ${await page.evaluate(() => localStorage.getItem('accessToken'))}`,
-      },
+      headers: { Authorization: `Bearer ${token}` },
     });
     const staff = (await listRes.json()) as Array<{ id: string; email: string }>;
     const created = staff.find((s) => s.email === leaderEmail);
     expect(created).toBeTruthy();
     staffId = created!.id;
+
+    // Set a known password so the scoped-access login test can run (invite link is email-only).
+    const patch = await request.patch(`${API_URL}/church-staff/${staffId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { password },
+    });
+    expect(patch.ok()).toBeTruthy();
   });
 
   test('unit leader cannot open Church Staff admin page', async ({ page, request }) => {

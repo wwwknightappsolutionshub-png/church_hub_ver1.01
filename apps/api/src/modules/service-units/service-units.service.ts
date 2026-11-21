@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.module';
 import { SERVICE_UNIT_CATALOG } from '../../../prisma/service-unit-catalog';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -8,6 +9,9 @@ import { MembershipService } from '../membership/membership.service';
 import { MembershipRegistryService } from '../membership/membership-registry.service';
 import { CommunicationsQueueService } from '../communications/communications-queue.service';
 import type { AssignServiceUnitMemberDto, UpdateServiceUnitMemberDto } from './dto/assign-service-unit-member.dto';
+
+/** Holding unit for members/records moved off deleted service units. */
+export const UNCATEGORIZED_UNIT_NAME = 'Uncategorized';
 
 const unitInclude = {
   members: {
@@ -79,10 +83,22 @@ export class ServiceUnitsService {
     }
   }
 
-  async listUnits(churchId: string) {
+  async listUnits(churchId: string, q?: string) {
     await this.ensureCatalogUnits(churchId);
+    const query = q?.trim().slice(0, 100);
     return this.prisma.serviceUnit.findMany({
-      where: { churchId, isActive: true },
+      where: {
+        churchId,
+        isActive: true,
+        ...(query
+          ? {
+              OR: [
+                { name: { contains: query, mode: 'insensitive' } },
+                { description: { contains: query, mode: 'insensitive' } },
+              ],
+            }
+          : {}),
+      },
       include: {
         leaders: {
           include: {
@@ -93,6 +109,55 @@ export class ServiceUnitsService {
         _count: { select: { members: true, meetings: true } },
       },
       orderBy: { name: 'asc' },
+    });
+  }
+
+  /** Suggest active unit names for admin search autosuggest. */
+  async suggestUnits(churchId: string, q: string, limit = 12) {
+    const query = q.trim().slice(0, 100);
+    if (!query) return [];
+    await this.ensureCatalogUnits(churchId);
+    return this.prisma.serviceUnit.findMany({
+      where: {
+        churchId,
+        isActive: true,
+        name: { contains: query, mode: 'insensitive' },
+      },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+      take: Math.min(Math.max(limit, 1), 25),
+    });
+  }
+
+  async ensureUncategorizedUnit(churchId: string) {
+    const existing = await this.prisma.serviceUnit.findFirst({
+      where: {
+        churchId,
+        name: { equals: UNCATEGORIZED_UNIT_NAME, mode: 'insensitive' },
+      },
+    });
+    if (existing) {
+      if (!existing.isActive) {
+        return this.prisma.serviceUnit.update({
+          where: { id: existing.id },
+          data: {
+            isActive: true,
+            name: UNCATEGORIZED_UNIT_NAME,
+            description:
+              existing.description ??
+              'Holding place for members and records from deleted units.',
+          },
+        });
+      }
+      return existing;
+    }
+    return this.prisma.serviceUnit.create({
+      data: {
+        churchId,
+        name: UNCATEGORIZED_UNIT_NAME,
+        description: 'Holding place for members and records from deleted units.',
+        isActive: true,
+      },
     });
   }
 
@@ -308,7 +373,19 @@ export class ServiceUnitsService {
     return updated;
   }
 
-  async getEmailTemplate(churchId: string, serviceUnitId: string): Promise<{ subject: string; body: string }> {
+  async getEmailTemplate(
+    userId: string,
+    churchId: string,
+    serviceUnitId: string,
+  ): Promise<{ subject: string; body: string }> {
+    await this.requireUnitManager(userId, churchId, serviceUnitId);
+    return this.loadWelcomeEmailTemplate(churchId, serviceUnitId);
+  }
+
+  private async loadWelcomeEmailTemplate(
+    churchId: string,
+    serviceUnitId: string,
+  ): Promise<{ subject: string; body: string }> {
     await this.getUnit(churchId, serviceUnitId);
     const emailTpl = (this.prisma as { serviceUnitEmailTemplate: { findUnique: (a: object) => Promise<{ subject: string; body: string } | null>; create: (a: object) => Promise<{ subject: string; body: string }> } }).serviceUnitEmailTemplate;
     let tpl = await emailTpl.findUnique({
@@ -374,7 +451,7 @@ export class ServiceUnitsService {
       requesterUserId?: string | null;
     },
   ) {
-    const tpl = await this.getEmailTemplate(churchId, serviceUnitId);
+    const tpl = await this.loadWelcomeEmailTemplate(churchId, serviceUnitId);
     const vars = {
       firstName: data.firstName,
       lastName: data.lastName,
@@ -732,9 +809,436 @@ export class ServiceUnitsService {
     return this.prisma.serviceUnit.update({ where: { id }, data });
   }
 
+  /**
+   * Soft-delete a unit. Members and related hub records are moved to Uncategorized
+   * so nothing is orphaned when the unit leaves the active list.
+   */
   async deleteUnit(churchId: string, id: string) {
-    await this.getUnit(churchId, id);
-    return this.prisma.serviceUnit.update({ where: { id }, data: { isActive: false } });
+    const unit = await this.getUnit(churchId, id);
+    if (unit.name.trim().toLowerCase() === UNCATEGORIZED_UNIT_NAME.toLowerCase()) {
+      throw new BadRequestException('The Uncategorized unit cannot be deleted');
+    }
+
+    const uncategorized = await this.ensureUncategorizedUnit(churchId);
+    if (uncategorized.id === id) {
+      throw new BadRequestException('The Uncategorized unit cannot be deleted');
+    }
+
+    return this.prisma.$transaction(
+      async (tx) => {
+        await this.reassignUnitDataToUncategorized(tx, churchId, id, uncategorized.id);
+        return tx.serviceUnit.update({
+          where: { id },
+          data: { isActive: false },
+        });
+      },
+      { timeout: 60_000 },
+    );
+  }
+
+  private async reassignUnitDataToUncategorized(
+    db: Prisma.TransactionClient,
+    churchId: string,
+    fromUnitId: string,
+    toUnitId: string,
+  ) {
+
+    const members = await db.serviceUnitMember.findMany({
+      where: { serviceUnitId: fromUnitId },
+      select: { memberId: true },
+    });
+    const leaders = await db.serviceUnitLeader.findMany({
+      where: { serviceUnitId: fromUnitId },
+      select: { memberId: true },
+    });
+    const memberIds = [
+      ...new Set([...members.map((m) => m.memberId), ...leaders.map((l) => l.memberId)]),
+    ];
+
+    if (memberIds.length) {
+      const already = await db.serviceUnitMember.findMany({
+        where: { serviceUnitId: toUnitId, memberId: { in: memberIds } },
+        select: { memberId: true },
+      });
+      const have = new Set(already.map((a) => a.memberId));
+      const toCreate = memberIds.filter((id) => !have.has(id));
+      if (toCreate.length) {
+        await db.serviceUnitMember.createMany({
+          data: toCreate.map((memberId) => ({ serviceUnitId: toUnitId, memberId })),
+          skipDuplicates: true,
+        });
+      }
+    }
+
+    await db.serviceUnitMember.deleteMany({ where: { serviceUnitId: fromUnitId } });
+    await db.serviceUnitLeader.deleteMany({ where: { serviceUnitId: fromUnitId } });
+    await db.serviceUnitPresence.deleteMany({ where: { serviceUnitId: fromUnitId } });
+
+    await db.serviceUnitMeeting.updateMany({
+      where: { serviceUnitId: fromUnitId },
+      data: { serviceUnitId: toUnitId },
+    });
+    await db.serviceUnitMeetingSummary.updateMany({
+      where: { serviceUnitId: fromUnitId },
+      data: { serviceUnitId: toUnitId },
+    });
+    await db.serviceUnitPost.updateMany({
+      where: { serviceUnitId: fromUnitId },
+      data: { serviceUnitId: toUnitId },
+    });
+    await db.serviceUnitJoinRequest.updateMany({
+      where: { serviceUnitId: fromUnitId },
+      data: { serviceUnitId: toUnitId },
+    });
+    await db.chatChannel.updateMany({
+      where: { serviceUnitId: fromUnitId },
+      data: { serviceUnitId: toUnitId },
+    });
+    await db.rtpRequest.updateMany({
+      where: { serviceUnitId: fromUnitId },
+      data: { serviceUnitId: toUnitId },
+    });
+    await db.communicationQueueItem.updateMany({
+      where: { serviceUnitId: fromUnitId },
+      data: { serviceUnitId: toUnitId },
+    });
+    await db.attendanceRecord.updateMany({
+      where: { churchId, serviceUnitId: fromUnitId },
+      data: { serviceUnitId: toUnitId },
+    });
+
+    const emailTemplates = await db.serviceUnitEmailTemplate.findMany({
+      where: { serviceUnitId: fromUnitId },
+      select: { id: true, type: true },
+    });
+    for (const tpl of emailTemplates) {
+      const existing = await db.serviceUnitEmailTemplate.findFirst({
+        where: { serviceUnitId: toUnitId, type: tpl.type },
+        select: { id: true },
+      });
+      if (existing) {
+        await db.serviceUnitEmailTemplate.delete({ where: { id: tpl.id } });
+      } else {
+        await db.serviceUnitEmailTemplate.update({
+          where: { id: tpl.id },
+          data: { serviceUnitId: toUnitId },
+        });
+      }
+    }
+
+    await this.moveUniqueWeekRows(
+      () =>
+        db.serviceUnitWeeklyReport.findMany({
+          where: { serviceUnitId: fromUnitId },
+          select: { id: true, weekStart: true },
+        }),
+      (weekStart) =>
+        db.serviceUnitWeeklyReport.findFirst({
+          where: { serviceUnitId: toUnitId, weekStart },
+          select: { id: true },
+        }),
+      (id) => db.serviceUnitWeeklyReport.delete({ where: { id } }),
+      (id) =>
+        db.serviceUnitWeeklyReport.update({
+          where: { id },
+          data: { serviceUnitId: toUnitId },
+        }),
+    );
+
+    await this.moveUniqueWeekRows(
+      () =>
+        db.usheringWeeklyHeadcount.findMany({
+          where: { serviceUnitId: fromUnitId },
+          select: { id: true, weekStart: true },
+        }),
+      (weekStart) =>
+        db.usheringWeeklyHeadcount.findFirst({
+          where: { serviceUnitId: toUnitId, weekStart },
+          select: { id: true },
+        }),
+      (id) => db.usheringWeeklyHeadcount.delete({ where: { id } }),
+      (id) =>
+        db.usheringWeeklyHeadcount.update({
+          where: { id },
+          data: { serviceUnitId: toUnitId },
+        }),
+    );
+
+    // Non-unique hub/dept rows — safe wholesale move.
+    await db.serviceUnitAttendance.updateMany({
+      where: { serviceUnitId: fromUnitId },
+      data: { serviceUnitId: toUnitId },
+    });
+    await db.deptSchedule.updateMany({
+      where: { serviceUnitId: fromUnitId },
+      data: { serviceUnitId: toUnitId },
+    });
+    await db.deptAssignment.updateMany({
+      where: { serviceUnitId: fromUnitId },
+      data: { serviceUnitId: toUnitId },
+    });
+    await db.deptModuleReport.updateMany({
+      where: { serviceUnitId: fromUnitId },
+      data: { serviceUnitId: toUnitId },
+    });
+    await db.deptInventoryItem.updateMany({
+      where: { serviceUnitId: fromUnitId },
+      data: { serviceUnitId: toUnitId },
+    });
+    await db.deptResource.updateMany({
+      where: { serviceUnitId: fromUnitId },
+      data: { serviceUnitId: toUnitId },
+    });
+    await db.deptTask.updateMany({
+      where: { serviceUnitId: fromUnitId },
+      data: { serviceUnitId: toUnitId },
+    });
+    await db.deptIncident.updateMany({
+      where: { serviceUnitId: fromUnitId },
+      data: { serviceUnitId: toUnitId },
+    });
+    await db.deptUnitFeedback.updateMany({
+      where: { serviceUnitId: fromUnitId },
+      data: { serviceUnitId: toUnitId },
+    });
+
+    // Unique-constrained dept rows: move when free, drop source row when target already has the key.
+    await this.moveOrDropByUniqueKey(
+      () =>
+        db.deptChildrenClassEnrollment.findMany({
+          where: { serviceUnitId: fromUnitId },
+          select: { id: true, childMemberId: true },
+        }),
+      (childMemberId) =>
+        db.deptChildrenClassEnrollment.findFirst({
+          where: { serviceUnitId: toUnitId, childMemberId },
+          select: { id: true },
+        }),
+      (id) => db.deptChildrenClassEnrollment.delete({ where: { id } }),
+      (id) =>
+        db.deptChildrenClassEnrollment.update({
+          where: { id },
+          data: { serviceUnitId: toUnitId },
+        }),
+      (row) => row.childMemberId,
+    );
+
+    await this.moveOrDropByUniqueKey(
+      () =>
+        db.deptChildrenClassDefinition.findMany({
+          where: { serviceUnitId: fromUnitId },
+          select: { id: true, code: true },
+        }),
+      (code) =>
+        db.deptChildrenClassDefinition.findFirst({
+          where: { serviceUnitId: toUnitId, code },
+          select: { id: true },
+        }),
+      (id) => db.deptChildrenClassDefinition.delete({ where: { id } }),
+      (id) =>
+        db.deptChildrenClassDefinition.update({
+          where: { id },
+          data: { serviceUnitId: toUnitId },
+        }),
+      (row) => row.code,
+    );
+
+    await this.moveOrDropByUniqueKey(
+      () =>
+        db.deptChildrenDutyRoster.findMany({
+          where: { serviceUnitId: fromUnitId },
+          select: { id: true, weekStart: true, classGroup: true },
+        }),
+      (key) => {
+        const [weekStart, classGroup] = key.split('\0');
+        return db.deptChildrenDutyRoster.findFirst({
+          where: { serviceUnitId: toUnitId, weekStart: new Date(weekStart), classGroup },
+          select: { id: true },
+        });
+      },
+      (id) => db.deptChildrenDutyRoster.delete({ where: { id } }),
+      (id) =>
+        db.deptChildrenDutyRoster.update({
+          where: { id },
+          data: { serviceUnitId: toUnitId },
+        }),
+      (row) => `${row.weekStart.toISOString()}\0${row.classGroup}`,
+    );
+
+    await this.moveOrDropByUniqueKey(
+      () =>
+        db.deptMedicalTeamAttendance.findMany({
+          where: { serviceUnitId: fromUnitId },
+          select: { id: true, memberId: true, serviceDate: true },
+        }),
+      (key) => {
+        const [memberId, serviceDate] = key.split('\0');
+        return db.deptMedicalTeamAttendance.findFirst({
+          where: { serviceUnitId: toUnitId, memberId, serviceDate: new Date(serviceDate) },
+          select: { id: true },
+        });
+      },
+      (id) => db.deptMedicalTeamAttendance.delete({ where: { id } }),
+      (id) =>
+        db.deptMedicalTeamAttendance.update({
+          where: { id },
+          data: { serviceUnitId: toUnitId },
+        }),
+      (row) => `${row.memberId}\0${row.serviceDate.toISOString()}`,
+    );
+
+    await this.moveOrDropByUniqueKey(
+      () =>
+        db.deptSkill.findMany({
+          where: { serviceUnitId: fromUnitId },
+          select: { id: true, memberId: true, skill: true },
+        }),
+      (key) => {
+        const [memberId, skill] = key.split('\0');
+        return db.deptSkill.findFirst({
+          where: { serviceUnitId: toUnitId, memberId, skill },
+          select: { id: true },
+        });
+      },
+      (id) => db.deptSkill.delete({ where: { id } }),
+      (id) =>
+        db.deptSkill.update({
+          where: { id },
+          data: { serviceUnitId: toUnitId },
+        }),
+      (row) => `${row.memberId}\0${row.skill}`,
+    );
+
+    await this.moveOrDropByUniqueKey(
+      () =>
+        db.deptPrayerScriptureGuide.findMany({
+          where: { serviceUnitId: fromUnitId },
+          select: { id: true, serviceDate: true },
+        }),
+      (serviceDateIso) =>
+        db.deptPrayerScriptureGuide.findFirst({
+          where: { serviceUnitId: toUnitId, serviceDate: new Date(serviceDateIso) },
+          select: { id: true },
+        }),
+      (id) => db.deptPrayerScriptureGuide.delete({ where: { id } }),
+      (id) =>
+        db.deptPrayerScriptureGuide.update({
+          where: { id },
+          data: { serviceUnitId: toUnitId },
+        }),
+      (row) => row.serviceDate.toISOString(),
+    );
+
+    await this.moveOrDropByUniqueKey(
+      () =>
+        db.deptPrayerChecklist.findMany({
+          where: { serviceUnitId: fromUnitId },
+          select: { id: true, checklistDate: true, itemKey: true },
+        }),
+      (key) => {
+        const [checklistDate, itemKey] = key.split('\0');
+        return db.deptPrayerChecklist.findFirst({
+          where: {
+            serviceUnitId: toUnitId,
+            checklistDate: new Date(checklistDate),
+            itemKey,
+          },
+          select: { id: true },
+        });
+      },
+      (id) => db.deptPrayerChecklist.delete({ where: { id } }),
+      (id) =>
+        db.deptPrayerChecklist.update({
+          where: { id },
+          data: { serviceUnitId: toUnitId },
+        }),
+      (row) => `${row.checklistDate.toISOString()}\0${row.itemKey}`,
+    );
+
+    await this.moveOrDropByUniqueKey(
+      () =>
+        db.deptChoirAttendance.findMany({
+          where: { serviceUnitId: fromUnitId },
+          select: { id: true, eventType: true, eventDate: true, memberId: true },
+        }),
+      (key) => {
+        const [eventType, eventDate, memberId] = key.split('\0');
+        return db.deptChoirAttendance.findFirst({
+          where: {
+            serviceUnitId: toUnitId,
+            eventType,
+            eventDate: new Date(eventDate),
+            memberId,
+          },
+          select: { id: true },
+        });
+      },
+      (id) => db.deptChoirAttendance.delete({ where: { id } }),
+      (id) =>
+        db.deptChoirAttendance.update({
+          where: { id },
+          data: { serviceUnitId: toUnitId },
+        }),
+      (row) => `${row.eventType}\0${row.eventDate.toISOString()}\0${row.memberId}`,
+    );
+  }
+
+  private async moveUniqueWeekRows(
+    listFrom: () => Promise<Array<{ id: string; weekStart: Date }>>,
+    findTarget: (weekStart: Date) => Promise<{ id: string } | null>,
+    deleteRow: (id: string) => Promise<unknown>,
+    updateRow: (id: string) => Promise<unknown>,
+  ) {
+    const rows = await listFrom();
+    for (const row of rows) {
+      const existing = await findTarget(row.weekStart);
+      if (existing) {
+        await deleteRow(row.id);
+      } else {
+        await updateRow(row.id);
+      }
+    }
+  }
+
+  /** Move rows to target unit; if unique key already exists on target, drop the source row. */
+  private async moveOrDropByUniqueKey<T extends { id: string }>(
+    listFrom: () => Promise<T[]>,
+    findTarget: (key: string) => Promise<{ id: string } | null>,
+    deleteRow: (id: string) => Promise<unknown>,
+    updateRow: (id: string) => Promise<unknown>,
+    keyOf: (row: T) => string,
+  ) {
+    const rows = await listFrom();
+    for (const row of rows) {
+      const existing = await findTarget(keyOf(row));
+      if (existing) {
+        await deleteRow(row.id);
+      } else {
+        await updateRow(row.id);
+      }
+    }
+  }
+
+  /** A member may be unit-admin of at most one active service unit in the church. */
+  private async assertSoleUnitAdminLeadership(
+    churchId: string,
+    memberId: string,
+    serviceUnitId: string,
+  ) {
+    const other = await this.prisma.serviceUnitLeader.findFirst({
+      where: {
+        memberId,
+        isUnitAdmin: true,
+        serviceUnitId: { not: serviceUnitId },
+        serviceUnit: { churchId, isActive: true },
+      },
+      select: { serviceUnit: { select: { name: true } } },
+    });
+    if (other) {
+      throw new BadRequestException(
+        `This person already leads "${other.serviceUnit.name}". A member can lead only one service unit.`,
+      );
+    }
   }
 
   async addMember(
@@ -780,7 +1284,7 @@ export class ServiceUnitsService {
       where: { serviceUnitId_memberId: { serviceUnitId, memberId: created.id } },
     });
     if (!membership) {
-      await this.applyUnitRole(serviceUnitId, created.id, 'MEMBER');
+      await this.applyUnitRole(churchId, serviceUnitId, created.id, 'MEMBER');
     }
 
     return created;
@@ -1243,7 +1747,7 @@ export class ServiceUnitsService {
     }
 
     if (body.unitRole) {
-      await this.applyUnitRole(serviceUnitId, memberId, body.unitRole, body.designation);
+      await this.applyUnitRole(churchId, serviceUnitId, memberId, body.unitRole, body.designation);
     } else if (body.designation !== undefined) {
       const leader = await this.prisma.serviceUnitLeader.findUnique({
         where: { serviceUnitId_memberId: { serviceUnitId, memberId } },
@@ -1327,11 +1831,12 @@ export class ServiceUnitsService {
     }
 
     const unitRole = body.unitRole ?? 'MEMBER';
-    await this.applyUnitRole(serviceUnitId, memberId, unitRole, body.designation);
+    await this.applyUnitRole(churchId, serviceUnitId, memberId, unitRole, body.designation);
     return this.getUnitMemberRow(churchId, serviceUnitId, memberId);
   }
 
   private async applyUnitRole(
+    churchId: string,
     serviceUnitId: string,
     memberId: string,
     unitRole: 'MEMBER' | 'UNIT_ADMIN',
@@ -1347,6 +1852,7 @@ export class ServiceUnitsService {
     });
 
     if (unitRole === 'UNIT_ADMIN') {
+      await this.assertSoleUnitAdminLeadership(churchId, memberId, serviceUnitId);
       await this.prisma.serviceUnitLeader.upsert({
         where: { serviceUnitId_memberId: { serviceUnitId, memberId } },
         create: {
@@ -1442,6 +1948,20 @@ export class ServiceUnitsService {
   ) {
     await this.requireUnitManager(userId, churchId, serviceUnitId);
     await this.getUnit(churchId, serviceUnitId);
+
+    const member = await this.prisma.member.findFirst({
+      where: { id: data.memberId, churchId },
+      select: { id: true },
+    });
+    if (!member) {
+      throw new NotFoundException('Member not found in this church');
+    }
+
+    const makeUnitAdmin = data.isUnitAdmin === true;
+    if (makeUnitAdmin) {
+      await this.assertSoleUnitAdminLeadership(churchId, data.memberId, serviceUnitId);
+    }
+
     await this.prisma.serviceUnitMember.upsert({
       where: {
         serviceUnitId_memberId: { serviceUnitId, memberId: data.memberId },
@@ -1456,12 +1976,12 @@ export class ServiceUnitsService {
       create: {
         serviceUnitId,
         memberId: data.memberId,
-        role: data.role ?? 'LEADER',
-        isModerator: data.isModerator ?? false,
-        isUnitAdmin: data.isUnitAdmin ?? false,
+        role: data.role?.trim() || 'LEADER',
+        isModerator: data.isModerator ?? makeUnitAdmin,
+        isUnitAdmin: makeUnitAdmin,
       },
       update: {
-        role: data.role ?? undefined,
+        role: data.role?.trim() || undefined,
         isModerator: data.isModerator ?? undefined,
         isUnitAdmin: data.isUnitAdmin ?? undefined,
       },
@@ -1469,7 +1989,13 @@ export class ServiceUnitsService {
     });
   }
 
-  async removeLeader(churchId: string, serviceUnitId: string, leaderId: string) {
+  async removeLeader(
+    userId: string,
+    churchId: string,
+    serviceUnitId: string,
+    leaderId: string,
+  ) {
+    await this.requireUnitManager(userId, churchId, serviceUnitId);
     await this.getUnit(churchId, serviceUnitId);
     const leader = await this.prisma.serviceUnitLeader.findFirst({
       where: { id: leaderId, serviceUnitId },
@@ -1478,11 +2004,17 @@ export class ServiceUnitsService {
     return this.prisma.serviceUnitLeader.delete({ where: { id: leaderId } });
   }
 
-  listMeetings(churchId: string, serviceUnitId: string) {
-    return this.getUnit(churchId, serviceUnitId).then((u) => u.meetings);
+  async listMeetings(userId: string, churchId: string, serviceUnitId: string) {
+    const access = await this.checkUnitAccess(userId, churchId, serviceUnitId);
+    if (!access.canView) {
+      throw new ForbiddenException('You are not a member of this service unit');
+    }
+    const unit = await this.getUnit(churchId, serviceUnitId);
+    return unit.meetings;
   }
 
   async createMeeting(
+    userId: string,
     churchId: string,
     serviceUnitId: string,
     data: {
@@ -1493,6 +2025,7 @@ export class ServiceUnitsService {
       endsAt?: string;
     },
   ) {
+    await this.requireUnitManager(userId, churchId, serviceUnitId);
     await this.getUnit(churchId, serviceUnitId);
     return this.prisma.serviceUnitMeeting.create({
       data: {
@@ -1508,6 +2041,7 @@ export class ServiceUnitsService {
   }
 
   async updateMeeting(
+    userId: string,
     churchId: string,
     serviceUnitId: string,
     meetingId: string,
@@ -1519,6 +2053,7 @@ export class ServiceUnitsService {
       endsAt: string;
     }>,
   ) {
+    await this.requireUnitManager(userId, churchId, serviceUnitId);
     await this.getUnit(churchId, serviceUnitId);
     const meeting = await this.prisma.serviceUnitMeeting.findFirst({
       where: { id: meetingId, serviceUnitId, churchId },
@@ -1534,7 +2069,13 @@ export class ServiceUnitsService {
     });
   }
 
-  async deleteMeeting(churchId: string, serviceUnitId: string, meetingId: string) {
+  async deleteMeeting(
+    userId: string,
+    churchId: string,
+    serviceUnitId: string,
+    meetingId: string,
+  ) {
+    await this.requireUnitManager(userId, churchId, serviceUnitId);
     await this.getUnit(churchId, serviceUnitId);
     const meeting = await this.prisma.serviceUnitMeeting.findFirst({
       where: { id: meetingId, serviceUnitId, churchId },

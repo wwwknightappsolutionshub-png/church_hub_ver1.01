@@ -27,6 +27,7 @@ describe('ChurchStaffService unit leadership', () => {
     prisma as never,
     { render: jest.fn() } as never,
     { send: jest.fn() } as never,
+    { createPasswordSetupLink: jest.fn().mockResolvedValue('http://localhost/reset') } as never,
   );
 
   beforeEach(() => {
@@ -49,19 +50,28 @@ describe('ChurchStaffService unit leadership', () => {
     expect(prisma.serviceUnitLeader.upsert).not.toHaveBeenCalled();
   });
 
+  it('syncUnitAdminLeadership rejects leading more than one unit', async () => {
+    await expect(
+      service.syncUnitAdminLeadership(churchId, memberId, [unitA, unitB]),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(prisma.serviceUnit.findMany).not.toHaveBeenCalled();
+    expect(prisma.serviceUnitLeader.upsert).not.toHaveBeenCalled();
+  });
+
   it('syncUnitAdminLeadership assigns unit-admin rows and membership', async () => {
-    prisma.serviceUnit.findMany.mockResolvedValue([{ id: unitA }, { id: unitB }]);
+    prisma.serviceUnit.findMany.mockResolvedValue([{ id: unitA }]);
     prisma.serviceUnitLeader.findMany.mockResolvedValue([
       { id: 'old-1', serviceUnitId: foreignUnit },
     ]);
 
-    await service.syncUnitAdminLeadership(churchId, memberId, [unitA, unitB]);
+    await service.syncUnitAdminLeadership(churchId, memberId, [unitA]);
 
     expect(prisma.serviceUnitLeader.deleteMany).toHaveBeenCalledWith({
       where: { id: { in: ['old-1'] } },
     });
-    expect(prisma.serviceUnitMember.upsert).toHaveBeenCalledTimes(2);
-    expect(prisma.serviceUnitLeader.upsert).toHaveBeenCalledTimes(2);
+    expect(prisma.serviceUnitMember.upsert).toHaveBeenCalledTimes(1);
+    expect(prisma.serviceUnitLeader.upsert).toHaveBeenCalledTimes(1);
     expect(prisma.serviceUnitLeader.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         create: expect.objectContaining({

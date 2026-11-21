@@ -7,8 +7,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.module';
 import { AutomationEmailTemplatesService } from '../automation/automation-email-templates.service';
+import { AuthService } from '../auth/auth.service';
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
 import {
   CHURCH_ASSIGNABLE_ROLES,
@@ -25,6 +27,7 @@ export class ChurchStaffService {
     private readonly prisma: PrismaService,
     private readonly emailTemplates: AutomationEmailTemplatesService,
     private readonly email: EmailAdapter,
+    private readonly auth: AuthService,
   ) {}
 
   private async roleIds(names: string[]) {
@@ -40,6 +43,8 @@ export class ChurchStaffService {
   }
 
   async list(churchId: string) {
+    await this.healMultiUnitLeadership(churchId);
+
     const users = await this.prisma.user.findMany({
       where: {
         churchId,
@@ -63,7 +68,7 @@ export class ChurchStaffService {
             id: true,
             status: true,
             serviceUnitLeaderships: {
-              where: { isUnitAdmin: true },
+              where: { isUnitAdmin: true, serviceUnit: { isActive: true } },
               select: {
                 serviceUnitId: true,
                 serviceUnit: { select: { id: true, name: true } },
@@ -77,6 +82,40 @@ export class ChurchStaffService {
     return users.map((u) => this.toStaffDto(u));
   }
 
+  /**
+   * Enforce one active unit-admin leadership per member. Keeps the earliest
+   * assignment and removes extras (heals legacy multi-unit data).
+   */
+  async healMultiUnitLeadership(churchId: string) {
+    const rows = await this.prisma.serviceUnitLeader.findMany({
+      where: {
+        isUnitAdmin: true,
+        serviceUnit: { churchId, isActive: true },
+      },
+      select: { id: true, memberId: true, assignedAt: true },
+      orderBy: { assignedAt: 'asc' },
+    });
+
+    const keepByMember = new Map<string, string>();
+    const toRemove: string[] = [];
+    for (const row of rows) {
+      const kept = keepByMember.get(row.memberId);
+      if (!kept) {
+        keepByMember.set(row.memberId, row.id);
+      } else {
+        toRemove.push(row.id);
+      }
+    }
+    if (toRemove.length) {
+      await this.prisma.serviceUnitLeader.deleteMany({
+        where: { id: { in: toRemove } },
+      });
+      this.logger.log(
+        `Healed ${toRemove.length} extra unit-admin row(s) for church ${churchId}`,
+      );
+    }
+  }
+
   async create(churchId: string, actorUserId: string, dto: CreateChurchStaffDto) {
     await this.assertCanCreate(actorUserId, churchId, dto.roles);
     this.assertUnitLeaderAssignment(dto.roles, dto.serviceUnitIds, true);
@@ -88,7 +127,9 @@ export class ChurchStaffService {
       throw new ConflictException('Email already in use');
     }
 
-    const passwordHash = await bcrypt.hash(dto.password, 12);
+    const plainPassword =
+      dto.password?.trim() || randomBytes(24).toString('base64url');
+    const passwordHash = await bcrypt.hash(plainPassword, 12);
     const roles = await this.roleIds(dto.roles);
 
     const user = await this.prisma.user.create({
@@ -99,6 +140,7 @@ export class ChurchStaffService {
         firstName: dto.firstName.trim(),
         lastName: dto.lastName.trim(),
         phone: dto.phone?.trim(),
+        mustChangePassword: true,
         roles: { create: roles.map((r) => ({ roleId: r.id })) },
       },
       include: {
@@ -117,14 +159,23 @@ export class ChurchStaffService {
     if (dto.serviceUnitIds !== undefined) {
       await this.syncUnitAdminLeadership(churchId, member.id, dto.serviceUnitIds);
     } else if (this.isUnitOnlyLeader(dto.roles)) {
-      throw new BadRequestException('Assign at least one service unit for a unit leader');
+      throw new BadRequestException('Assign a service unit for a unit leader');
+    }
+
+    let setPasswordUrl = '';
+    try {
+      setPasswordUrl = await this.auth.createPasswordSetupLink(user.id);
+    } catch (err) {
+      this.logger.warn(
+        `Password setup link failed for ${user.email}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
 
     await this.sendStaffWelcomeEmail(churchId, {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      temporaryPassword: dto.password,
+      setPasswordUrl,
       roles: dto.roles,
     });
 
@@ -137,7 +188,7 @@ export class ChurchStaffService {
       email: string;
       firstName: string;
       lastName: string;
-      temporaryPassword: string;
+      setPasswordUrl: string;
       roles: string[];
     },
   ) {
@@ -153,7 +204,11 @@ export class ChurchStaffService {
         lastName: data.lastName,
         fullName: `${data.firstName} ${data.lastName}`.trim(),
         email: data.email,
-        temporaryPassword: data.temporaryPassword,
+        setPasswordUrl:
+          data.setPasswordUrl ||
+          'Contact your church admin to set your password.',
+        // Legacy templates may still reference this — never put a real password here.
+        temporaryPassword: '(use the set-password link)',
         roleLabel,
       });
       const plain = rendered.bodyHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -255,6 +310,7 @@ export class ChurchStaffService {
       phone?: string | null;
       isActive?: boolean;
       passwordHash?: string;
+      mustChangePassword?: boolean;
     } = {};
 
     if (dto.email) data.email = dto.email.toLowerCase().trim();
@@ -262,7 +318,10 @@ export class ChurchStaffService {
     if (dto.lastName) data.lastName = dto.lastName.trim();
     if (dto.phone !== undefined) data.phone = dto.phone?.trim() || null;
     if (dto.isActive !== undefined) data.isActive = dto.isActive;
-    if (dto.password) data.passwordHash = await bcrypt.hash(dto.password, 12);
+    if (dto.password) {
+      data.passwordHash = await bcrypt.hash(dto.password, 12);
+      data.mustChangePassword = false;
+    }
 
     await this.prisma.user.update({ where: { id }, data });
 
@@ -427,18 +486,23 @@ export class ChurchStaffService {
     serviceUnitIds: string[] | undefined,
     requireOnCreate: boolean,
   ) {
+    if (serviceUnitIds !== undefined && serviceUnitIds.length > 1) {
+      throw new BadRequestException(
+        'A staff member can lead only one service unit',
+      );
+    }
     if (!this.isUnitOnlyLeader(roles)) return;
     if (requireOnCreate && (!serviceUnitIds || serviceUnitIds.length === 0)) {
-      throw new BadRequestException('Assign at least one service unit for a unit leader');
+      throw new BadRequestException('Assign a service unit for a unit leader');
     }
     if (serviceUnitIds !== undefined && serviceUnitIds.length === 0) {
-      throw new BadRequestException('Assign at least one service unit for a unit leader');
+      throw new BadRequestException('Assign a service unit for a unit leader');
     }
   }
 
   /**
    * Replace unit-admin leadership for a member with exactly `serviceUnitIds`
-   * (must all belong to this church). Also ensures ServiceUnitMember rows.
+   * (at most one unit; must belong to this church). Also ensures ServiceUnitMember rows.
    */
   async syncUnitAdminLeadership(
     churchId: string,
@@ -446,6 +510,11 @@ export class ChurchStaffService {
     serviceUnitIds: string[],
   ) {
     const uniqueIds = [...new Set(serviceUnitIds)];
+    if (uniqueIds.length > 1) {
+      throw new BadRequestException(
+        'A staff member can lead only one service unit',
+      );
+    }
     if (uniqueIds.length) {
       const units = await this.prisma.serviceUnit.findMany({
         where: { churchId, id: { in: uniqueIds } },

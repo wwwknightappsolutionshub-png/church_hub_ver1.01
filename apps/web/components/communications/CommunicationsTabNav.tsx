@@ -45,10 +45,10 @@ export function CommunicationsTabNav({
       className="sticky top-0 z-20 border-b border-slate-200/80 bg-gradient-to-b from-slate-50 to-white/95 backdrop-blur-md dark:border-slate-800 dark:from-slate-950 dark:to-slate-950/95"
       aria-label={ariaLabel}
     >
-      {/* Mobile & tablet: group switcher + tabs in group */}
+      {/* Mobile & tablet: group switcher + tabs in group (wrap, no horizontal scroll) */}
       <div className="lg:hidden">
         <div
-          className="flex gap-1 overflow-x-auto px-3 py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex flex-wrap gap-1.5 px-3 py-2"
           role="tablist"
           aria-label="Communication categories"
         >
@@ -66,7 +66,7 @@ export function CommunicationsTabNav({
                   if (!hasActive) onChange(group.tabs[0].id as CommTabId);
                 }}
                 className={cn(
-                  'shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition',
+                  'rounded-full px-3 py-1.5 text-xs font-semibold transition',
                   isGroupActive
                     ? 'bg-slate-900 text-white shadow-sm dark:bg-slate-100 dark:text-slate-900'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300',
@@ -79,7 +79,7 @@ export function CommunicationsTabNav({
         </div>
 
         <div
-          className="flex gap-1.5 overflow-x-auto border-t border-slate-200/60 px-3 py-2 dark:border-slate-800"
+          className="flex flex-wrap gap-1.5 border-t border-slate-200/60 px-3 py-2 dark:border-slate-800"
           role="tablist"
         >
           {focusedGroup.tabs.map((tab) => {
@@ -95,7 +95,7 @@ export function CommunicationsTabNav({
                 aria-current={isActive ? 'page' : undefined}
                 onClick={() => onChange(tab.id as CommTabId)}
                 className={cn(
-                  'flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2 text-left transition',
+                  'inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-left transition',
                   isActive
                     ? 'border-emerald-500/40 bg-emerald-50 text-emerald-950 shadow-sm dark:border-emerald-500/30 dark:bg-emerald-950/40 dark:text-emerald-100'
                     : 'border-transparent bg-white text-slate-600 hover:border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-700',

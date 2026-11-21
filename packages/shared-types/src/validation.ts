@@ -393,12 +393,16 @@ export const CHURCH_ASSIGNABLE_ROLE_VALUES = [
   'DRIVER',
 ] as const;
 
-const serviceUnitIdsSchema = z.array(z.string().uuid()).max(50);
+/** One person may lead at most one service unit (email-scoped staff account). */
+const serviceUnitIdsSchema = z
+  .array(z.string().uuid())
+  .max(1, 'A staff member can lead only one service unit');
 
 export const CreateChurchStaffSchema = z
   .object({
     email: emailSchema,
-    password: passwordSchema,
+    /** Optional — when omitted, API generates a random password and emails a set-password link. */
+    password: passwordSchema.optional(),
     firstName: z
       .string()
       .transform((v) => sanitizeText(v, 80))
@@ -411,7 +415,7 @@ export const CreateChurchStaffSchema = z
     roles: z
       .array(z.enum(CHURCH_ASSIGNABLE_ROLE_VALUES))
       .min(1, 'Select at least one role'),
-    /** Service units this person leads as unit admin (required when LEADER without ADMIN/PASTOR). */
+    /** Service unit this person leads as unit admin (required when LEADER without ADMIN/PASTOR). */
     serviceUnitIds: serviceUnitIdsSchema.optional(),
   })
   .superRefine((data, ctx) => {
@@ -421,7 +425,7 @@ export const CreateChurchStaffSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['serviceUnitIds'],
-          message: 'Assign at least one service unit for a unit leader',
+          message: 'Assign a service unit for a unit leader',
         });
       }
     }
@@ -445,7 +449,7 @@ export const UpdateChurchStaffSchema = z
     phone: optionalPhoneSchema,
     roles: z.array(z.enum(CHURCH_ASSIGNABLE_ROLE_VALUES)).min(1).optional(),
     isActive: z.boolean().optional(),
-    /** When set, replaces unit-admin leadership for this staff member. */
+    /** When set, replaces unit-admin leadership for this staff member (max one unit). */
     serviceUnitIds: serviceUnitIdsSchema.optional(),
   })
   .superRefine((data, ctx) => {
@@ -458,7 +462,7 @@ export const UpdateChurchStaffSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['serviceUnitIds'],
-          message: 'Assign at least one service unit for a unit leader',
+          message: 'Assign a service unit for a unit leader',
         });
       }
     }

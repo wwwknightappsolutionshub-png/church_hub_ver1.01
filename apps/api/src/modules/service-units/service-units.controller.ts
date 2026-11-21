@@ -16,6 +16,7 @@ import { ChurchId, CurrentUser, AuthUser } from '../auth/current-user.decorator'
 import { ModuleGate, Roles } from '../auth/decorators';
 import { ModuleAccessService } from '../access/module-access.service';
 import { AssignServiceUnitMemberDto, UpdateServiceUnitMemberDto } from './dto/assign-service-unit-member.dto';
+import { AddServiceUnitLeaderDto } from './dto/service-unit-leader.dto';
 
 @ApiTags('service-units')
 @ApiBearerAuth()
@@ -30,8 +31,8 @@ export class ServiceUnitsController {
 
   @Get()
   @ApiOperation({ summary: 'List all service units' })
-  list(@ChurchId() churchId: string) {
-    return this.serviceUnits.listUnits(churchId);
+  list(@ChurchId() churchId: string, @Query('q') q?: string) {
+    return this.serviceUnits.listUnits(churchId, q);
   }
 
   /** Static segment before :id — avoids GET service-units/departments matching :id. */
@@ -48,6 +49,22 @@ export class ServiceUnitsController {
       );
     }
     return this.departmentUnits.listDepartments(churchId);
+  }
+
+  @Get('suggest')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({ summary: 'Autosuggest active service unit names' })
+  suggest(
+    @ChurchId() churchId: string,
+    @Query('q') q = '',
+    @Query('limit') limit?: string,
+  ) {
+    const take = limit ? Number.parseInt(limit, 10) : 12;
+    return this.serviceUnits.suggestUnits(
+      churchId,
+      typeof q === 'string' ? q.slice(0, 100) : '',
+      Number.isFinite(take) ? take : 12,
+    );
   }
 
   @Get('registry-catalog')
@@ -117,8 +134,12 @@ export class ServiceUnitsController {
   }
 
   @Get(':id/email-template')
-  getEmailTemplate(@ChurchId() churchId: string, @Param('id') id: string) {
-    return this.serviceUnits.getEmailTemplate(churchId, id);
+  getEmailTemplate(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.serviceUnits.getEmailTemplate(user.userId, churchId, id);
   }
 
   @Patch(':id/email-template')
@@ -263,66 +284,75 @@ export class ServiceUnitsController {
   }
 
   @Post(':id/leaders')
-  @ApiOperation({ summary: 'Add or update a unit leader (unit admin)' })
+  @ApiOperation({
+    summary: 'Add or update a unit leader (church staff or unit admin of this unit)',
+  })
   addLeader(
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
-    @Body()
-    body: {
-      memberId: string;
-      role?: string;
-      isModerator?: boolean;
-      isUnitAdmin?: boolean;
-    },
+    @Body() body: AddServiceUnitLeaderDto,
   ) {
     return this.serviceUnits.addLeader(user.userId, churchId, id, body);
   }
 
+  /** AuthZ via requireUnitManager — unit admins may lack User role LEADER. */
   @Delete(':id/leaders/:leaderId')
-  @Roles('ADMIN', 'PASTOR', 'LEADER')
+  @ApiOperation({
+    summary: 'Remove a unit leader (church staff or unit admin of this unit)',
+  })
   removeLeader(
     @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Param('leaderId') leaderId: string,
   ) {
-    return this.serviceUnits.removeLeader(churchId, id, leaderId);
+    return this.serviceUnits.removeLeader(user.userId, churchId, id, leaderId);
   }
 
   @Get(':id/meetings')
-  listMeetings(@ChurchId() churchId: string, @Param('id') id: string) {
-    return this.serviceUnits.listMeetings(churchId, id);
+  listMeetings(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.serviceUnits.listMeetings(user.userId, churchId, id);
   }
 
   @Post(':id/meetings')
-  @Roles('ADMIN', 'PASTOR', 'LEADER')
   createMeeting(
     @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body() body: Record<string, unknown>,
   ) {
-    return this.serviceUnits.createMeeting(churchId, id, body as Parameters<ServiceUnitsService['createMeeting']>[2]);
+    return this.serviceUnits.createMeeting(
+      user.userId,
+      churchId,
+      id,
+      body as Parameters<ServiceUnitsService['createMeeting']>[3],
+    );
   }
 
   @Patch(':id/meetings/:meetingId')
-  @Roles('ADMIN', 'PASTOR', 'LEADER')
   updateMeeting(
     @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Param('meetingId') meetingId: string,
     @Body() body: Record<string, unknown>,
   ) {
-    return this.serviceUnits.updateMeeting(churchId, id, meetingId, body);
+    return this.serviceUnits.updateMeeting(user.userId, churchId, id, meetingId, body);
   }
 
   @Delete(':id/meetings/:meetingId')
-  @Roles('ADMIN', 'PASTOR', 'LEADER')
   deleteMeeting(
     @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Param('meetingId') meetingId: string,
   ) {
-    return this.serviceUnits.deleteMeeting(churchId, id, meetingId);
+    return this.serviceUnits.deleteMeeting(user.userId, churchId, id, meetingId);
   }
 
   @Get(':id/meeting-summaries')

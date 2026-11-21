@@ -44,7 +44,7 @@ test.describe('Church Staff unit leader API', () => {
     expect(list.status()).toBe(403);
   });
 
-  test('rejects unit-only LEADER without units and foreign unit ids', async ({ request }) => {
+  test('rejects unit-only LEADER without units, multi-unit, and foreign unit ids', async ({ request }) => {
     const missing = await request.post(`${API_URL}/church-staff`, {
       headers: adminHeaders,
       data: {
@@ -56,6 +56,19 @@ test.describe('Church Staff unit leader API', () => {
       },
     });
     expect(missing.status()).toBe(400);
+
+    const multi = await request.post(`${API_URL}/church-staff`, {
+      headers: adminHeaders,
+      data: {
+        email: `pw-multi-${Date.now()}@demo.church`,
+        password: PASSWORD,
+        firstName: 'Multi',
+        lastName: 'Units',
+        roles: ['LEADER'],
+        serviceUnitIds: [unitAId, unitBId],
+      },
+    });
+    expect(multi.status()).toBe(400);
 
     const foreign = await request.post(`${API_URL}/church-staff`, {
       headers: adminHeaders,

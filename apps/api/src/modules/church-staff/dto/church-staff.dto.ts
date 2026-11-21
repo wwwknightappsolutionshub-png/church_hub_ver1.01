@@ -38,10 +38,12 @@ export class CreateChurchStaffDto {
   @MaxLength(255)
   email!: string;
 
+  /** Optional — when omitted, a random password is generated and a set-password link is emailed. */
+  @IsOptional()
   @IsString()
   @MinLength(8)
   @MaxLength(128)
-  password!: string;
+  password?: string;
 
   @Transform(({ value }) => trimString(value))
   @IsString()
@@ -66,10 +68,10 @@ export class CreateChurchStaffDto {
   @IsIn(CHURCH_ASSIGNABLE_ROLES, { each: true })
   roles!: ChurchAssignableRole[];
 
-  /** Units this person leads as unit admin (required for LEADER without ADMIN/PASTOR). */
+  /** Unit this person leads as unit admin (required for LEADER without ADMIN/PASTOR). Max one. */
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(50)
+  @ArrayMaxSize(1)
   @IsUUID('4', { each: true })
   serviceUnitIds?: string[];
 }
@@ -117,10 +119,10 @@ export class UpdateChurchStaffDto {
   @IsBoolean()
   isActive?: boolean;
 
-  /** When provided, replaces unit-admin leadership for this staff member. */
+  /** When provided, replaces unit-admin leadership (max one unit per staff account). */
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(50)
+  @ArrayMaxSize(1)
   @IsUUID('4', { each: true })
   serviceUnitIds?: string[];
 }
