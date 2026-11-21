@@ -1,4 +1,4 @@
-﻿-- WSF / Ministry-Cells Assistant & Secretary deputies (operational access, no primary assign)
+-- WSF / Ministry-Cells Assistant & Secretary deputies (operational access, no primary assign)
 CREATE TABLE "cell_leadership_deputies" (
     "id" TEXT NOT NULL,
     "churchId" TEXT NOT NULL,
@@ -22,3 +22,4 @@ ALTER TABLE "cell_leadership_deputies" ADD CONSTRAINT "cell_leadership_deputies_
 ALTER TABLE "cell_leadership_deputies" ADD CONSTRAINT "cell_leadership_deputies_branchId_fkey" FOREIGN KEY ("branchId") REFERENCES "cell_branches"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "cell_leadership_deputies" ADD CONSTRAINT "cell_leadership_deputies_provinceId_fkey" FOREIGN KEY ("provinceId") REFERENCES "cell_provinces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "cell_leadership_deputies" ADD CONSTRAINT "cell_leadership_deputies_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
