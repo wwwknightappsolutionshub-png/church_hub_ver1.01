@@ -295,7 +295,6 @@ export function MemberOnboardingWizard({
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
               />
               <Input
-                placeholder="Phone"
                 type="tel"
                 inputMode="tel"
                 placeholder="Phone (e.g. 07123 456789)"
