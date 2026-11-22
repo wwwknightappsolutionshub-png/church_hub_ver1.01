@@ -19,14 +19,19 @@ export type FollowUpExportScope =
   | { kind: 'phase'; phaseId: string }
   | { kind: 'stage'; stage: string };
 
-function phaseColumns(pipeline?: ResolvedPipeline | null) {
+function phaseColumns(pipeline?: ResolvedPipeline | null): Array<{
+  id: string;
+  step: number;
+  title: string;
+  stages: string[];
+}> {
   const fromApi = phaseColumnsFromPipeline(pipeline);
   if (fromApi.length) return fromApi;
   return PIPELINE_COLUMNS.map((col) => ({
     id: col.id,
     step: col.step,
     title: col.title,
-    stages: [...col.stages],
+    stages: col.stages.map((s) => s as string),
   }));
 }
 
