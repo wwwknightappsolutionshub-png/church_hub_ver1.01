@@ -99,7 +99,7 @@ export default function ForgotPasswordPage() {
               <p className="font-semibold text-foreground">Check your email</p>
               <p className="mt-2 text-muted-foreground">
                 If an account exists for <strong>{getValues('email')}</strong>, we sent a link.
-                It expires in 30 minutes.
+                It expires in 45 minutes.
               </p>
               <Button
                 type="button"

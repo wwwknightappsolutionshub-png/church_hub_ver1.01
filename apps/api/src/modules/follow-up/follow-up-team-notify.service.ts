@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.module';
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
+import { SmsAdapter } from '../notifications/adapters/sms.adapter';
+import { trySendWhatsApp } from '../notifications/try-send-whatsapp';
 
 const TEAM_ROLES = ['ADMIN', 'PASTOR', 'LEADER'] as const;
 
@@ -21,6 +23,7 @@ export class FollowUpTeamNotifyService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly email: EmailAdapter,
+    private readonly sms: SmsAdapter,
   ) {}
 
   /** Map evangelist Member → linked User (staff account). */
@@ -79,7 +82,7 @@ export class FollowUpTeamNotifyService {
         isActive: true,
         roles: { some: { role: { name: { in: [...TEAM_ROLES] } } } },
       },
-      select: { id: true, firstName: true, lastName: true, email: true },
+      select: { id: true, firstName: true, lastName: true, email: true, phone: true },
     });
 
     if (team.length === 0) {
@@ -137,6 +140,12 @@ export class FollowUpTeamNotifyService {
             churchId: params.churchId,
           });
         }
+        await trySendWhatsApp(this.sms, this.logger, {
+          to: user.phone,
+          body: `Hi ${user.firstName},\n\n${body}`,
+          churchId: params.churchId,
+          label: 'Follow-up new lead team',
+        });
       }),
     );
 
@@ -159,7 +168,7 @@ export class FollowUpTeamNotifyService {
         isActive: true,
         roles: { some: { role: { name: { in: [...TEAM_ROLES] } } } },
       },
-      select: { id: true, firstName: true, lastName: true, email: true },
+      select: { id: true, firstName: true, lastName: true, email: true, phone: true },
     });
 
     if (team.length === 0) {
@@ -201,6 +210,12 @@ export class FollowUpTeamNotifyService {
             churchId: params.churchId,
           });
         }
+        await trySendWhatsApp(this.sms, this.logger, {
+          to: user.phone,
+          body: `Hi ${user.firstName},\n\n${body}`,
+          churchId: params.churchId,
+          label: 'Follow-up archive request team',
+        });
       }),
     );
 
@@ -222,7 +237,7 @@ export class FollowUpTeamNotifyService {
         isActive: true,
         roles: { some: { role: { name: { in: [...TEAM_ROLES] } } } },
       },
-      select: { id: true, firstName: true, lastName: true, email: true },
+      select: { id: true, firstName: true, lastName: true, email: true, phone: true },
     });
 
     if (team.length === 0) {
@@ -268,6 +283,12 @@ export class FollowUpTeamNotifyService {
             churchId: params.churchId,
           });
         }
+        await trySendWhatsApp(this.sms, this.logger, {
+          to: user.phone,
+          body: `Hi ${user.firstName},\n\n${body}`,
+          churchId: params.churchId,
+          label: 'Follow-up joined-group day-6 team',
+        });
       }),
     );
 

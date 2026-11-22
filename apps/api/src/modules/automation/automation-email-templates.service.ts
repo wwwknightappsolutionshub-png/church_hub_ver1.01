@@ -22,7 +22,7 @@ const SYSTEM_DEFAULTS: Record<
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;background:#f8fafc;border-left:4px solid ${BRAND};border-radius:8px;">
 <tr><td style="padding:16px 20px;font-family:system-ui,sans-serif;">
 <p style="margin:0 0 8px;"><strong>Sign-in email:</strong> {{email}}</p>
-<p style="margin:0 0 12px;font-size:13px;color:#64748b;">For security, we do not send passwords by email. Use the secure link below to choose your password (expires in 48 hours).</p>
+<p style="margin:0 0 12px;font-size:13px;color:#64748b;">For security, we do not send passwords by email. Use the secure link below to choose your password (expires in 45 minutes).</p>
 <p style="margin:0;"><a href="{{setPasswordUrl}}" style="display:inline-block;background:${BRAND};color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600;">Set your password</a></p>
 <p style="margin:12px 0 0;font-size:12px;color:#94a3b8;word-break:break-all;">Or copy this link:<br/>{{setPasswordUrl}}</p>
 </td></tr></table>
@@ -140,6 +140,22 @@ export class AutomationEmailTemplatesService {
         existing.isSystem &&
         existing.bodyHtml.includes('temporaryPassword') &&
         !existing.bodyHtml.includes('setPasswordUrl')
+      ) {
+        await this.prisma.automationEmailTemplate.update({
+          where: { id: existing.id },
+          data: {
+            subject: def.subject,
+            bodyHtml: def.bodyHtml,
+            name: def.name,
+          },
+        });
+        continue;
+      }
+      // Refresh system copy that still says 48-hour password-link expiry.
+      if (
+        code === 'STAFF_WELCOME' &&
+        existing.isSystem &&
+        existing.bodyHtml.includes('expires in 48 hours')
       ) {
         await this.prisma.automationEmailTemplate.update({
           where: { id: existing.id },

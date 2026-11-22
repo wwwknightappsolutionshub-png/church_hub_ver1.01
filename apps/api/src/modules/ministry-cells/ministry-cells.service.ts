@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -18,6 +19,8 @@ import { MembershipService } from '../membership/membership.service';
 import { MembershipRegistryService } from '../membership/membership-registry.service';
 import { CommunicationsQueueService } from '../communications/communications-queue.service';
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
+import { SmsAdapter } from '../notifications/adapters/sms.adapter';
+import { trySendWhatsApp } from '../notifications/try-send-whatsapp';
 import {
   escapeHtml,
   findOneAdminAndOnePastor,
@@ -74,6 +77,8 @@ const branchListInclude = {
 
 @Injectable()
 export class MinistryCellsService {
+  private readonly logger = new Logger(MinistryCellsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: MinistryCellsAccessService,
@@ -81,6 +86,7 @@ export class MinistryCellsService {
     private readonly registry: MembershipRegistryService,
     private readonly commQueue: CommunicationsQueueService,
     private readonly email: EmailAdapter,
+    private readonly sms: SmsAdapter,
   ) {}
 
   async getContext(user: AuthUser, churchId: string) {
@@ -1333,6 +1339,12 @@ export class MinistryCellsService {
         html,
         churchId,
         purpose: 'reports',
+      });
+      await trySendWhatsApp(this.sms, this.logger, {
+        to: recipient.phone,
+        body: `${subject}\n\n${text}`,
+        churchId,
+        label: 'Cell weekly digest',
       });
       await this.prisma.notification.create({
         data: {

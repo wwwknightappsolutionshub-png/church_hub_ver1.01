@@ -529,7 +529,7 @@ export class RtpService {
         kind: 'DIRECT_ALERT',
         title,
         body,
-        channels: ['IN_APP', 'EMAIL'],
+        channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
         targetUserId: staff.id,
         metadata: {
           reportType: 'RTP Reminder',
@@ -591,7 +591,7 @@ export class RtpService {
         kind: 'DIRECT_ALERT',
         title,
         body,
-        channels: ['IN_APP', 'EMAIL'],
+        channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
         targetUserId: staff.id,
         metadata: {
           reportType: 'RTP Request',
@@ -638,7 +638,7 @@ export class RtpService {
           `Status: Processing`,
           `Updated: ${new Date().toISOString()}`,
         ].join('\n'),
-        channels: ['IN_APP', 'EMAIL'],
+        channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
         targetUserId: row.submittedByUserId,
         metadata: {
           reportType: 'RTP Status',
@@ -689,7 +689,7 @@ export class RtpService {
           `Title: ${row.title}`,
           `Status: Approved`,
         ].join('\n'),
-        channels: ['IN_APP', 'EMAIL'],
+        channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
         targetUserId: row.submittedByUserId,
         metadata: { reportType: 'RTP Status', rtpRequestId: row.id, status: 'APPROVED' },
       });
@@ -742,7 +742,7 @@ export class RtpService {
         ]
           .filter(Boolean)
           .join('\n'),
-        channels: ['IN_APP', 'EMAIL'],
+        channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
         targetUserId: row.submittedByUserId,
         metadata: { reportType: 'RTP Status', rtpRequestId: row.id, status: 'REJECTED' },
       });
@@ -800,7 +800,7 @@ export class RtpService {
           kind: 'DIRECT_ALERT',
           title,
           body,
-          channels: ['IN_APP', 'EMAIL'],
+          channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
           targetUserId: staff.id,
           metadata: {
             reportType: 'RTP Reminder',

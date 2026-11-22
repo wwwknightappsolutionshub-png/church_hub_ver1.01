@@ -39,6 +39,34 @@ export async function resetPasswordWithToken(
   }
 }
 
+export async function validatePasswordResetToken(
+  token: string,
+): Promise<
+  | { ok: true; status: 'valid' | 'unusable'; expiresAt?: string }
+  | { ok: false; message: string }
+> {
+  try {
+    const res = await api.post<{
+      status: 'valid' | 'unusable';
+      expiresAt?: string;
+    }>('/auth/reset-password/validate', { token });
+    return { ok: true, status: res.data.status, expiresAt: res.data.expiresAt };
+  } catch (err) {
+    return { ok: false, message: apiMessage(err, 'Could not validate reset link') };
+  }
+}
+
+export async function resendPasswordSetupLink(
+  token: string,
+): Promise<{ ok: true; message: string } | { ok: false; message: string }> {
+  try {
+    const res = await api.post<{ message: string }>('/auth/reset-password/resend', { token });
+    return { ok: true, message: res.data.message };
+  } catch (err) {
+    return { ok: false, message: apiMessage(err, 'Could not request a new link') };
+  }
+}
+
 export async function requestMagicLink(email: string): Promise<{ ok: true; message: string } | { ok: false; message: string }> {
   try {
     const res = await api.post<{ message: string }>('/auth/magic-link', { email });

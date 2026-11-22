@@ -19,15 +19,16 @@ const nextConfig = {
     ],
   },
   async headers() {
+    const authNoStore = [
+      { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate' },
+      { key: 'Referrer-Policy', value: 'no-referrer' },
+    ];
     return [
-      {
-        source: '/login',
-        headers: [{ key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate' }],
-      },
-      {
-        source: '/register',
-        headers: [{ key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate' }],
-      },
+      { source: '/login', headers: authNoStore },
+      { source: '/login/magic', headers: authNoStore },
+      { source: '/register', headers: authNoStore },
+      { source: '/forgot-password', headers: authNoStore },
+      { source: '/reset-password', headers: authNoStore },
       {
         source: '/sw.js',
         headers: [{ key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate' }],

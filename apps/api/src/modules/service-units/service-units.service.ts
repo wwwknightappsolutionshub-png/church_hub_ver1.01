@@ -14,6 +14,8 @@ import { SERVICE_UNIT_CATALOG } from '../../../prisma/service-unit-catalog';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { ModuleAccessService, UserMemberContext } from '../access/module-access.service';
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
+import { SmsAdapter } from '../notifications/adapters/sms.adapter';
+import { trySendWhatsApp } from '../notifications/try-send-whatsapp';
 import { MembershipService } from '../membership/membership.service';
 import { MembershipRegistryService } from '../membership/membership-registry.service';
 import { CommunicationsQueueService } from '../communications/communications-queue.service';
@@ -79,6 +81,7 @@ export class ServiceUnitsService {
     private readonly commQueue: CommunicationsQueueService,
     private readonly auth: AuthService,
     private readonly emailTemplates: AutomationEmailTemplatesService,
+    private readonly sms: SmsAdapter,
   ) {}
 
   private async ensureCatalogUnits(churchId: string) {
@@ -396,6 +399,7 @@ export class ServiceUnitsService {
       firstName: request.firstName,
       lastName: request.lastName,
       email: request.email,
+      phone: request.phone,
       unitName: updated.serviceUnit.name,
       requesterUserId: request.requesterUserId,
     });
@@ -485,6 +489,7 @@ export class ServiceUnitsService {
       firstName: string;
       lastName: string;
       email?: string | null;
+      phone?: string | null;
       unitName: string;
       requesterUserId?: string | null;
     },
@@ -499,17 +504,26 @@ export class ServiceUnitsService {
     const body = this.applyTemplate(tpl.body, vars);
 
     let to = data.email;
-    if (!to && data.requesterUserId) {
+    let phone = data.phone;
+    if (data.requesterUserId && (!to || !phone)) {
       const user = await this.prisma.user.findUnique({
         where: { id: data.requesterUserId },
-        select: { email: true },
+        select: { email: true, phone: true },
       });
-      to = user?.email;
+      if (!to) to = user?.email;
+      if (!phone) phone = user?.phone;
     }
 
     if (to) {
       await this.email.send({ churchId, to, subject, body });
     }
+
+    await trySendWhatsApp(this.sms, this.logger, {
+      to: phone,
+      body: `${subject}\n\n${body}`,
+      churchId,
+      label: 'Unit join welcome',
+    });
 
     if (data.requesterUserId) {
       await this.prisma.notification.create({
@@ -761,7 +775,7 @@ export class ServiceUnitsService {
         kind: 'DIRECT_ALERT',
         title,
         body,
-        channels: ['IN_APP', 'EMAIL'],
+        channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
         targetUserId: staff.id,
         metadata: {
           reportType: 'Meeting Summary',
@@ -1878,7 +1892,7 @@ export class ServiceUnitsService {
             kind: 'DIRECT_ALERT',
             title,
             body,
-            channels: ['IN_APP', 'EMAIL'],
+            channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
             targetUserId: admin.member.userId ?? undefined,
             targetMemberId: admin.member.id,
             metadata: {
@@ -2417,6 +2431,7 @@ export class ServiceUnitsService {
 
     await this.sendUnitLeaderWelcomeEmail(churchId, {
       email,
+      phone: member.phone,
       firstName: member.firstName,
       lastName: member.lastName,
       unitName: unit.name,
@@ -2428,6 +2443,7 @@ export class ServiceUnitsService {
     churchId: string,
     data: {
       email: string;
+      phone?: string | null;
       firstName: string;
       lastName: string;
       unitName: string;
@@ -2456,7 +2472,7 @@ export class ServiceUnitsService {
           data.setPasswordUrl ||
           'Contact your church admin if you need a password reset.',
         passwordSetupBlurb: hasLink
-          ? 'For security, we do not send passwords by email. Use the secure link below to choose your password (expires in 48 hours).'
+          ? 'For security, we do not send passwords by email. Use the secure link below to choose your password (expires in 45 minutes).'
           : 'Your ChurchHub login is ready — use the password you already set.',
         setPasswordBlock,
       });
@@ -2468,6 +2484,16 @@ export class ServiceUnitsService {
         html: rendered.bodyHtml,
         churchId,
         purpose: 'onboarding',
+      });
+      // Never put set-password bearer URLs on WhatsApp (phone may be unverified/stale).
+      const waBody = hasLink
+        ? `${rendered.subject}\n\nHi ${data.firstName}, you are Unit Leader for ${data.unitName}. Check your email for a one-time set-password link (expires in 45 minutes).`
+        : `${rendered.subject}\n\nHi ${data.firstName}, you are Unit Leader for ${data.unitName}. Sign in with your existing ChurchHub password.`;
+      await trySendWhatsApp(this.sms, this.logger, {
+        to: data.phone,
+        body: waBody,
+        churchId,
+        label: 'Unit leader welcome',
       });
     } catch (err) {
       this.logger.warn(

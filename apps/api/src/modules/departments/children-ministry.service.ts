@@ -951,7 +951,7 @@ export class ChildrenMinistryService {
           kind: 'BIRTHDAY_GREETING',
           title: subject,
           body: `Today is ${childName}'s birthday! ${applyCelebrationTemplate(birthdayTpl.bodyHtml.replace(/<[^>]+>/g, ' '), vars)}`,
-          channels: ['EMAIL'],
+          channels: ['EMAIL', 'WHATSAPP'],
           targetMemberId: link.parent.id,
           targetUserId: link.parent.userId ?? undefined,
           serviceUnitId,

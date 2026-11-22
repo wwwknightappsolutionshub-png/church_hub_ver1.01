@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { FollowUpStage } from '@prisma/client';
 import {
   CreateFollowUpSchema,
@@ -9,6 +9,7 @@ import { PrismaService } from '../../prisma/prisma.module';
 import { NotificationsQueueService } from '../notifications/notifications-queue.service';
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
 import { SmsAdapter } from '../notifications/adapters/sms.adapter';
+import { trySendWhatsApp } from '../notifications/try-send-whatsapp';
 import {
   DEFAULT_FOLLOW_UP_TEMPLATES,
   FOLLOW_UP_STAGE_ORDER,
@@ -26,6 +27,8 @@ const followUpInclude = {
 
 @Injectable()
 export class FollowUpService {
+  private readonly logger = new Logger(FollowUpService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsQueueService,
@@ -963,20 +966,33 @@ export class FollowUpService {
     if (!followUp.archivedAt) {
       throw new BadRequestException('Only archived leads can be re-contacted this way');
     }
-    if (!followUp.contactEmail) {
-      throw new BadRequestException('No email on this archived lead');
+    if (!followUp.contactEmail && !followUp.contactPhone) {
+      throw new BadRequestException('No email or phone on this archived lead');
     }
 
     const subject = data.subject.trim();
     const body = data.body.trim();
     if (!subject || !body) throw new BadRequestException('Subject and message are required');
 
-    await this.email.send({
-      to: followUp.contactEmail,
-      subject,
-      body,
-      churchId,
-    });
+    const channels: string[] = [];
+    if (followUp.contactEmail) {
+      await this.email.send({
+        to: followUp.contactEmail,
+        subject,
+        body,
+        churchId,
+      });
+      channels.push('email');
+    }
+    if (followUp.contactPhone) {
+      await trySendWhatsApp(this.sms, this.logger, {
+        to: followUp.contactPhone,
+        body: `${subject}\n\n${body}`,
+        churchId,
+        label: 'Archived recontact',
+      });
+      channels.push('whatsapp');
+    }
 
     await this.prisma.pastoralNote.create({
       data: {
@@ -984,14 +1000,19 @@ export class FollowUpService {
         authorId: actorId,
         followUpId: id,
         memberId: followUp.memberId,
-        content: `Re-contacted by email.\nSubject: ${subject}\n\n${body}`,
+        content: `Re-contacted by ${channels.join(' + ')}.\nSubject: ${subject}\n\n${body}`,
         isConfidential: false,
         stageAtTime: followUp.stage,
         kind: 'RECONTACT',
       },
     });
 
-    return { success: true, to: followUp.contactEmail };
+    return {
+      success: true,
+      to: followUp.contactEmail ?? undefined,
+      phone: followUp.contactPhone ?? undefined,
+      channels,
+    };
   }
 
   async getPastoralNotes(

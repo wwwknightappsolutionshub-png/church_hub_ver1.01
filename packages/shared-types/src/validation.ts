@@ -240,10 +240,29 @@ export const optionalPhoneSchema = z
     return normalizeUkPhoneToE164(raw) ?? undefined;
   });
 
+export const PASSWORD_HINT =
+  'Use at least 12 characters with upper and lower case letters, a number, and a special character';
+
+/** Strong password: 12+ with upper, lower, digit, and special — rejects single-class strings. */
 export const passwordSchema = z
   .string()
-  .min(8, 'Password must be at least 8 characters')
-  .max(128);
+  .min(12, 'Password must be at least 12 characters')
+  .max(128)
+  .refine((v) => /[a-z]/.test(v), { message: 'Include a lowercase letter' })
+  .refine((v) => /[A-Z]/.test(v), { message: 'Include an uppercase letter' })
+  .refine((v) => /\d/.test(v), { message: 'Include a number' })
+  .refine((v) => /[^A-Za-z0-9]/.test(v), { message: 'Include a special character' })
+  .refine((v) => !/^\d+$/.test(v), { message: 'Password cannot be numbers only' })
+  .refine((v) => !/^[A-Za-z]+$/.test(v), { message: 'Password cannot be letters only' })
+  .refine((v) => !/^[^A-Za-z0-9]+$/.test(v), {
+    message: 'Password cannot be special characters only',
+  });
+
+export function passwordFormatError(value: string): string | null {
+  const parsed = passwordSchema.safeParse(value);
+  if (parsed.success) return null;
+  return parsed.error.issues[0]?.message ?? PASSWORD_HINT;
+}
 
 export const personNameSchema = z
   .string()

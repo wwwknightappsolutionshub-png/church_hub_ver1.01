@@ -128,7 +128,7 @@ export class CommunicationsAutomationService {
         kind: 'SERVICE_REMINDER',
         title: `Reminder: ${svc.name}`,
         body: `Join us tomorrow for ${svc.name}${timeLabel}. We look forward to worshipping together!`,
-        channels: ['IN_APP', 'EMAIL'],
+        channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
         scheduledAt: new Date(),
         metadata: { churchServiceId: svc.id, serviceName: svc.name },
       });
@@ -173,7 +173,7 @@ export class CommunicationsAutomationService {
           kind: 'BIRTHDAY_GREETING' as CommunicationQueueKind,
           title: applyCelebrationTemplate(birthdayTpl.subject, vars),
           body: applyCelebrationTemplate(birthdayTpl.bodyHtml, vars),
-          channels: ['EMAIL', 'IN_APP'],
+          channels: ['EMAIL', 'IN_APP', 'WHATSAPP'],
           targetMemberId: m.id,
           metadata: { templateKind: 'BIRTHDAY' },
         });
@@ -212,7 +212,7 @@ export class CommunicationsAutomationService {
           kind: 'ANNIVERSARY_GREETING' as CommunicationQueueKind,
           title: applyCelebrationTemplate(anniversaryTpl.subject, vars),
           body: applyCelebrationTemplate(anniversaryTpl.bodyHtml, vars),
-          channels: ['EMAIL', 'IN_APP'],
+          channels: ['EMAIL', 'IN_APP', 'WHATSAPP'],
           targetMemberId: row.memberId ?? undefined,
           metadata: { templateKind: 'ANNIVERSARY', familyId: row.familyId },
         });

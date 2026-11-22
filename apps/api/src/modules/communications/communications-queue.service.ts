@@ -169,10 +169,13 @@ export class CommunicationsQueueService {
     }
 
     if (channels.includes('WHATSAPP')) {
+      const waBody = /<[a-z][\s\S]*>/i.test(item.body)
+        ? item.body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+        : item.body;
       for (const phone of recipients.phones) {
         await this.sms.sendWhatsApp({
           to: phone,
-          body: item.body,
+          body: waBody,
           churchId: item.churchId,
         });
       }

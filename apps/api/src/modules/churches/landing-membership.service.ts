@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConsentType, Prisma } from '@prisma/client';
@@ -20,6 +21,8 @@ import { PrismaService } from '../../prisma/prisma.module';
 import { MembershipService } from '../membership/membership.service';
 import { ServiceUnitsService } from '../service-units/service-units.service';
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
+import { SmsAdapter } from '../notifications/adapters/sms.adapter';
+import { trySendWhatsApp } from '../notifications/try-send-whatsapp';
 import { PlatformPrivacyService } from '../platform/platform-privacy.service';
 import { PublicMembershipRegisterDto } from './dto/public-membership-register.dto';
 
@@ -40,12 +43,15 @@ function mergeFormConfig(
 
 @Injectable()
 export class LandingMembershipService {
+  private readonly logger = new Logger(LandingMembershipService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly membershipService: MembershipService,
     private readonly serviceUnits: ServiceUnitsService,
     private readonly email: EmailAdapter,
     private readonly privacy: PlatformPrivacyService,
+    private readonly sms: SmsAdapter,
   ) {}
 
   readFormConfig(settings: unknown): LandingMembershipFormConfig {
@@ -158,7 +164,7 @@ export class LandingMembershipService {
           },
         },
       },
-      select: { id: true, email: true, firstName: true },
+      select: { id: true, email: true, phone: true, firstName: true },
     });
 
     for (const user of staff) {
@@ -180,6 +186,12 @@ export class LandingMembershipService {
           body: params.emailBody,
         });
       }
+      await trySendWhatsApp(this.sms, this.logger, {
+        to: user.phone,
+        body: `${params.emailSubject}\n\n${params.emailBody}`,
+        churchId: params.churchId,
+        label: 'Landing staff notify',
+      });
     }
   }
 
@@ -354,7 +366,7 @@ export class LandingMembershipService {
       emailBody: applyTemplateVars(form.staffEmailBody, templateVars),
     });
 
-    if (email) {
+    {
       const registrantSubject = tempPassword
         ? applyTemplateVars(form.registrantEmailSubject, templateVars)
         : `Thank you for registering with ${church.name}`;
@@ -362,12 +374,21 @@ export class LandingMembershipService {
         ? applyTemplateVars(form.registrantEmailBody, templateVars)
         : `Hello ${member.firstName},\n\nThank you for registering with ${church.name}. Our team will be in touch soon.\n\nBlessings,\n${church.name}`;
 
-      await this.email.send({
+      if (email) {
+        await this.email.send({
+          churchId: church.id,
+          to: email,
+          subject: registrantSubject,
+          body: registrantBody,
+          purpose: 'onboarding',
+        });
+      }
+
+      await trySendWhatsApp(this.sms, this.logger, {
+        to: phone,
+        body: `${registrantSubject}\n\n${registrantBody}`,
         churchId: church.id,
-        to: email,
-        subject: registrantSubject,
-        body: registrantBody,
-        purpose: 'onboarding',
+        label: 'Landing registrant welcome',
       });
 
       if (userId) {

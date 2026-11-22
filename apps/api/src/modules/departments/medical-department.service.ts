@@ -134,7 +134,7 @@ export class MedicalDepartmentService {
         kind: 'DIRECT_ALERT',
         title: 'Medical — serious incident',
         body,
-        channels: ['IN_APP', 'EMAIL'],
+        channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
         serviceUnitId,
         targetUserId: staff.id,
         metadata: { incidentId: incident.id },

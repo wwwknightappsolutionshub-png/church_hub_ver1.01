@@ -113,7 +113,7 @@ export class SuggestionsService {
           kind: 'DIRECT_ALERT',
           title,
           body,
-          channels: ['IN_APP', 'EMAIL'],
+          channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
           targetUserId: staff.id,
           metadata: {
             reportType: 'Member Suggestion',

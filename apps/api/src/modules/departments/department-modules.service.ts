@@ -1187,7 +1187,7 @@ export class DepartmentModulesService {
         kind: 'DEPARTMENT_ABSENTEE',
         title: `[${unit.name}] ${body.subject}`,
         body: body.message,
-        channels: ['IN_APP', 'EMAIL'],
+        channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
         serviceUnitId,
         targetMemberId: m.memberId,
         metadata: { alertType: 'department_module' },

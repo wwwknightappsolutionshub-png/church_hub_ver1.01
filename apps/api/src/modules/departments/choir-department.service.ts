@@ -188,7 +188,7 @@ export class ChoirDepartmentService {
         kind: 'DIRECT_ALERT',
         title: 'Choir — rehearsal / ministration',
         body: msg,
-        channels: ['IN_APP', 'EMAIL'],
+        channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
         serviceUnitId,
         targetUserId: row.member.userId,
         targetMemberId: row.member.id,
@@ -595,7 +595,7 @@ export class ChoirDepartmentService {
         kind: 'DIRECT_ALERT',
         title: 'Choir — attendance follow-up',
         body: `${reason} for ${row.eventType.replace('_', ' ').toLowerCase()}. Please connect with your section leader.`,
-        channels: ['IN_APP', 'EMAIL'],
+        channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
         serviceUnitId,
         targetUserId: row.member.userId,
       });

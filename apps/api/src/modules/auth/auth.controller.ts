@@ -22,6 +22,7 @@ import {
   RequestMagicLinkDto,
   ResetPasswordDto,
   ConsumeMagicLinkDto,
+  PasswordResetTokenDto,
 } from './dto/auth-link.dto';
 import { LoginDto, Login2faVerifyDto, RegisterStartDto, RegisterVerifyDto } from './dto/register.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -122,6 +123,24 @@ export class AuthController {
   @ApiOperation({ summary: 'Set a new password using a reset token from email' })
   resetPassword(@Body() body: ResetPasswordDto) {
     return this.authService.resetPasswordWithToken(body.token, body.newPassword);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 15, ttl: 60000 } })
+  @Post('reset-password/validate')
+  @ApiOperation({ summary: 'Validate a password reset/setup token without consuming it' })
+  validateResetPassword(@Body() body: PasswordResetTokenDto) {
+    return this.authService.validatePasswordResetToken(body.token);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @Post('reset-password/resend')
+  @ApiOperation({
+    summary: 'Request a new set-password link from an expired or used reset token',
+  })
+  resendResetPassword(@Body() body: PasswordResetTokenDto) {
+    return this.authService.resendPasswordSetupFromToken(body.token);
   }
 
   @Public()

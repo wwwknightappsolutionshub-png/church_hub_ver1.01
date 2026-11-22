@@ -3,6 +3,7 @@ import type { PrismaService } from '../../prisma/prisma.service';
 export type DigestRecipient = {
   id: string;
   email: string;
+  phone?: string | null;
   role: 'ADMIN' | 'PASTOR';
 };
 
@@ -23,7 +24,7 @@ export async function findOneAdminAndOnePastor(
         roles: { some: { role: { name: 'ADMIN' } } },
       },
       orderBy: { createdAt: 'asc' },
-      select: { id: true, email: true },
+      select: { id: true, email: true, phone: true },
     }),
     prisma.user.findFirst({
       where: {
@@ -33,18 +34,18 @@ export async function findOneAdminAndOnePastor(
         roles: { some: { role: { name: 'PASTOR' } } },
       },
       orderBy: { createdAt: 'asc' },
-      select: { id: true, email: true },
+      select: { id: true, email: true, phone: true },
     }),
   ]);
 
   const out: DigestRecipient[] = [];
   if (admin?.email) {
-    out.push({ id: admin.id, email: admin.email, role: 'ADMIN' });
+    out.push({ id: admin.id, email: admin.email, phone: admin.phone, role: 'ADMIN' });
   }
   if (pastor?.email && pastor.id !== admin?.id) {
-    out.push({ id: pastor.id, email: pastor.email, role: 'PASTOR' });
+    out.push({ id: pastor.id, email: pastor.email, phone: pastor.phone, role: 'PASTOR' });
   } else if (pastor?.email && !admin) {
-    out.push({ id: pastor.id, email: pastor.email, role: 'PASTOR' });
+    out.push({ id: pastor.id, email: pastor.email, phone: pastor.phone, role: 'PASTOR' });
   }
   return out;
 }

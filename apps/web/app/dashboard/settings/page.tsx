@@ -14,6 +14,7 @@ import {
 } from '@/lib/contact-validation';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import type { ModuleAccess } from '@/lib/hooks/use-module-access';
+import { isChurchLeadershipRole } from '@/lib/session-role';
 import { accountAvatarUrl, userDisplayName } from '@/lib/user-display';
 import { LogoutButton } from '@/components/app/LogoutButton';
 import { ProfilePhotoUpload } from '@/components/settings/ProfilePhotoUpload';
@@ -77,7 +78,10 @@ function formFromSaved(saved: SavedProfile): AccountForm {
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
-  const { user, member, memberId, canAccessMyProfile, isChurchStaff, isLoading } = useModuleAccess();
+  const { user, member, memberId, canAccessMyProfile, isChurchStaff, userRoles, isLoading } =
+    useModuleAccess();
+  /** Privacy & Session cards — Church Admin & Pastor only. Profile stays available to all. */
+  const showLeadershipPrivacySession = isChurchLeadershipRole(userRoles);
   const [busy, setBusy] = useState(false);
   const formHydrated = useRef(false);
   const [form, setForm] = useState<AccountForm>({
@@ -335,97 +339,101 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Privacy & data</CardTitle>
-          <CardDescription>
-            Download a copy of your account data or request erasure. Legal documents are at{' '}
-            <Link href="/legal/privacy-policy" className="font-medium text-primary hover:underline">
-              Privacy Policy
-            </Link>
-            .
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={busy}
-            onClick={async () => {
-              setBusy(true);
-              try {
-                const { data } = await api.get('/privacy/export');
-                const blob = new Blob([JSON.stringify(data, null, 2)], {
-                  type: 'application/json',
-                });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `churchhub-data-export-${new Date().toISOString().slice(0, 10)}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
-                toast.success('Data export downloaded');
-              } catch (err) {
-                toast.error(apiErrorMessage(err));
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            Download my data
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            disabled={busy}
-            onClick={async () => {
-              if (
-                !window.confirm(
-                  'Request permanent erasure of your account? You can choose to erase immediately or queue for review.',
-                )
-              ) {
-                return;
-              }
-              const executeNow = window.confirm(
-                'Erase immediately? Click OK to anonymize now (you will be signed out), or Cancel to submit a request for review.',
-              );
-              setBusy(true);
-              try {
-                await api.post('/privacy/erasure', { executeNow });
-                toast.success(
-                  executeNow
-                    ? 'Account anonymized. Signing you out…'
-                    : 'Erasure request submitted. Our team will process it.',
-                );
-                if (executeNow) {
-                  clearAuthTokens();
-                  window.location.href = '/login';
+      {showLeadershipPrivacySession ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Privacy & data</CardTitle>
+            <CardDescription>
+              Download a copy of your account data or request erasure. Legal documents are at{' '}
+              <Link href="/legal/privacy-policy" className="font-medium text-primary hover:underline">
+                Privacy Policy
+              </Link>
+              .
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  const { data } = await api.get('/privacy/export');
+                  const blob = new Blob([JSON.stringify(data, null, 2)], {
+                    type: 'application/json',
+                  });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `churchhub-data-export-${new Date().toISOString().slice(0, 10)}.json`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  toast.success('Data export downloaded');
+                } catch (err) {
+                  toast.error(apiErrorMessage(err));
+                } finally {
+                  setBusy(false);
                 }
-              } catch (err) {
-                toast.error(apiErrorMessage(err));
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            Request erasure
-          </Button>
-        </CardContent>
-      </Card>
+              }}
+            >
+              Download my data
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={busy}
+              onClick={async () => {
+                if (
+                  !window.confirm(
+                    'Request permanent erasure of your account? You can choose to erase immediately or queue for review.',
+                  )
+                ) {
+                  return;
+                }
+                const executeNow = window.confirm(
+                  'Erase immediately? Click OK to anonymize now (you will be signed out), or Cancel to submit a request for review.',
+                );
+                setBusy(true);
+                try {
+                  await api.post('/privacy/erasure', { executeNow });
+                  toast.success(
+                    executeNow
+                      ? 'Account anonymized. Signing you out…'
+                      : 'Erasure request submitted. Our team will process it.',
+                  );
+                  if (executeNow) {
+                    clearAuthTokens();
+                    window.location.href = '/login';
+                  }
+                } catch (err) {
+                  toast.error(apiErrorMessage(err));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              Request erasure
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <TenantBackupRequestPanel enabled={!!isChurchStaff} />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Session</CardTitle>
-          <CardDescription>Sign out and return to the church home page.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <LogoutButton variant="menu" className="max-w-xs" />
-        </CardContent>
-      </Card>
+      {showLeadershipPrivacySession ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Session</CardTitle>
+            <CardDescription>Sign out and return to the church home page.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <LogoutButton variant="menu" className="max-w-xs" />
+          </CardContent>
+        </Card>
+      ) : null}
 
-      {canAccessMyProfile && (
+      {canAccessMyProfile ? (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Membership profile</CardTitle>
@@ -439,7 +447,7 @@ export default function SettingsPage() {
             </Button>
           </CardContent>
         </Card>
-      )}
+      ) : null}
       </EnterpriseContent>
     </EnterpriseShell>
   );

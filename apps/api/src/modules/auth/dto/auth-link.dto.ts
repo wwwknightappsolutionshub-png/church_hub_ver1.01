@@ -26,9 +26,16 @@ export class ResetPasswordDto {
   token!: string;
 
   @IsString()
-  @MinLength(8)
+  @MinLength(12)
   @MaxLength(128)
   newPassword!: string;
+}
+
+export class PasswordResetTokenDto {
+  @IsString()
+  @MinLength(32)
+  @MaxLength(128)
+  token!: string;
 }
 
 export class ConsumeMagicLinkDto {

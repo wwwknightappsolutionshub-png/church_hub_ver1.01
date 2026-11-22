@@ -391,7 +391,7 @@ export class PrayerDepartmentService {
         kind: 'DIRECT_ALERT',
         title: 'Prayer Squad — pastoral escalation',
         body: alertBody,
-        channels: ['IN_APP', 'EMAIL'],
+        channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
         serviceUnitId,
         targetUserId: staff.id,
         metadata: { prayerItemId: item.id },

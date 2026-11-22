@@ -14,9 +14,12 @@ import { PrismaService } from '../../prisma/prisma.module';
 import {
   createDefaultChurchLanding,
   DEFAULT_LANDING_MEMBERSHIP_FORM,
+  passwordFormatError,
 } from '@church-hub/shared-types';
 import { PlatformMarketingDripService } from '../platform/platform-marketing-drip.service';
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
+import { SmsAdapter } from '../notifications/adapters/sms.adapter';
+import { trySendWhatsApp } from '../notifications/try-send-whatsapp';
 import { RedisCacheService } from '../../common/cache/redis-cache.service';
 import { buildAuthLinkEmail } from './auth-link-email';
 import { userRequiresLogin2fa } from './login-2fa.constants';
@@ -27,7 +30,10 @@ export interface JwtPayload {
   email: string;
 }
 
-const AUTH_LINK_TTL_MINUTES = 30;
+/** Password reset / magic-login / setup-invite links. */
+const AUTH_LINK_TTL_MINUTES = 45;
+/** Staff + unit-leader set-password invites (same window as reset page countdown). */
+export const PASSWORD_SETUP_TTL_MINUTES = 45;
 const REGISTER_OTP_TTL_SEC = 15 * 60;
 const REGISTER_OTP_MAX_ATTEMPTS = 5;
 const LOGIN_2FA_TTL_SEC = 15 * 60;
@@ -40,6 +46,9 @@ const LOGIN_CLEAR_PASSWORD_AT = 3;
 const LOGIN_AUTO_RESET_AT = 4;
 /** Sliding window for counting failed logins (30 minutes). */
 const LOGIN_FAILURE_WINDOW_MS = 30 * 60 * 1000;
+/** Max password-link resends per user within the cooldown window. */
+const PASSWORD_RESEND_MAX_PER_WINDOW = 3;
+const PASSWORD_RESEND_WINDOW_SEC = 60 * 60;
 
 interface PendingRegistration {
   churchName: string;
@@ -75,8 +84,14 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly drips: PlatformMarketingDripService,
     private readonly email: EmailAdapter,
+    private readonly sms: SmsAdapter,
     private readonly cache: RedisCacheService,
   ) {}
+
+  private assertStrongPassword(password: string) {
+    const err = passwordFormatError(password);
+    if (err) throw new BadRequestException(err);
+  }
 
   /** Step 1: validate signup, email OTP, store pending registration. */
   async startRegistration(input: {
@@ -100,9 +115,7 @@ export class AuthService {
     if (!churchSlug) {
       throw new BadRequestException('Church name is required to create a URL slug');
     }
-    if (input.password.length < 8) {
-      throw new BadRequestException('Password must be at least 8 characters');
-    }
+    this.assertStrongPassword(input.password);
 
     const existing = await this.prisma.user.findFirst({
       where: { email: { equals: email, mode: 'insensitive' } },
@@ -156,7 +169,7 @@ export class AuthService {
     }
 
     if (process.env.NODE_ENV !== 'production' && !this.email.isConfigured('auth')) {
-      this.logger.log(`[register-otp] ${email} → ${otp}`);
+      this.logger.log(`[register-otp] issued for ${email} (code redacted)`);
     }
 
     return {
@@ -374,25 +387,20 @@ export class AuthService {
   /**
    * Record a failed password attempt. Clears the password field after 3 failures;
    * on the 4th, emails a reset link (if the account exists) and resets the counter.
+   * Client response stays generic — never reveals whether the account exists or a reset was sent.
    */
   private async rejectFailedLogin(emailKey: string): Promise<never> {
     const failedAttempts = await this.recordLoginFailure(emailKey);
     const clearPassword = failedAttempts >= LOGIN_CLEAR_PASSWORD_AT;
-    let resetLinkSent = false;
 
     if (failedAttempts >= LOGIN_AUTO_RESET_AT) {
       await this.requestPasswordReset(emailKey);
-      resetLinkSent = true;
       await this.clearLoginFailures(emailKey);
     }
 
     throw new UnauthorizedException({
-      message: resetLinkSent
-        ? 'Too many failed attempts. Check your registered email for a password reset link.'
-        : 'Invalid credentials',
+      message: 'Invalid credentials',
       clearPassword,
-      resetLinkSent,
-      failedAttempts,
     });
   }
 
@@ -454,9 +462,7 @@ export class AuthService {
       throw new UnauthorizedException('Current password is incorrect');
     }
 
-    if (newPassword.length < 8) {
-      throw new BadRequestException('New password must be at least 8 characters');
-    }
+    this.assertStrongPassword(newPassword);
 
     const passwordHash = await bcrypt.hash(newPassword, 12);
     await this.prisma.user.update({
@@ -476,9 +482,12 @@ export class AuthService {
   /**
    * Create a one-time password setup/reset link for a known user without sending the
    * generic reset email (caller embeds the URL in their own invite message).
-   * Defaults to 48h TTL for staff onboarding.
+   * Defaults to 45 minutes (single-use; consumed on successful password set).
    */
-  async createPasswordSetupLink(userId: string, ttlMinutes = 48 * 60): Promise<string> {
+  async createPasswordSetupLink(
+    userId: string,
+    ttlMinutes = PASSWORD_SETUP_TTL_MINUTES,
+  ): Promise<string> {
     const user = await this.prisma.user.findFirst({
       where: { id: userId, isActive: true },
       select: { id: true },
@@ -497,7 +506,7 @@ export class AuthService {
     });
 
     const rawToken = randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + Math.max(30, ttlMinutes) * 60 * 1000);
+    const expiresAt = new Date(Date.now() + Math.max(5, ttlMinutes) * 60 * 1000);
     await this.prisma.authLinkToken.create({
       data: {
         userId: user.id,
@@ -515,6 +524,118 @@ export class AuthService {
     return `${appUrl.replace(/\/$/, '')}/reset-password?token=${rawToken}`;
   }
 
+  /**
+   * Inspect a reset/setup token without consuming it (for countdown UX).
+   * Non-valid states collapse to `unusable` so callers cannot fingerprint used vs expired.
+   */
+  async validatePasswordResetToken(rawToken: string): Promise<{
+    status: 'valid' | 'unusable';
+    expiresAt?: string;
+  }> {
+    const tokenHash = this.hashToken(rawToken.trim());
+    const record = await this.prisma.authLinkToken.findUnique({
+      where: { tokenHash },
+    });
+    if (
+      !record ||
+      record.purpose !== AuthLinkPurpose.PASSWORD_RESET ||
+      record.consumedAt ||
+      record.expiresAt < new Date()
+    ) {
+      return { status: 'unusable' };
+    }
+    return { status: 'valid', expiresAt: record.expiresAt.toISOString() };
+  }
+
+  /**
+   * From an old/expired/used reset token, mint a new 45‑min link and email it.
+   * WhatsApp only notifies that email was sent (no bearer URL).
+   * Always returns the same generic message (no enumeration).
+   */
+  async resendPasswordSetupFromToken(rawToken: string) {
+    const tokenHash = this.hashToken(rawToken.trim());
+    const record = await this.prisma.authLinkToken.findUnique({
+      where: { tokenHash },
+      select: { userId: true, purpose: true },
+    });
+    if (record?.purpose === AuthLinkPurpose.PASSWORD_RESET) {
+      const user = await this.prisma.user.findFirst({
+        where: { id: record.userId, isActive: true },
+        select: { id: true, email: true, phone: true, firstName: true, churchId: true },
+      });
+      if (user && (await this.allowPasswordResend(user.id))) {
+        try {
+          const actionUrl = await this.createPasswordSetupLink(user.id);
+          const rendered = buildAuthLinkEmail({
+            firstName: user.firstName || 'there',
+            purpose: 'PASSWORD_RESET',
+            actionUrl,
+            expiresMinutes: AUTH_LINK_TTL_MINUTES,
+          });
+          try {
+            await this.email.send({
+              to: user.email,
+              subject: rendered.subject,
+              body: rendered.text,
+              html: rendered.html,
+              churchId: user.churchId,
+              purpose: 'auth',
+            });
+          } catch (err) {
+            this.logger.warn(
+              `Password resend email failed for ${user.email}: ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            );
+          }
+          await trySendWhatsApp(this.sms, this.logger, {
+            to: user.phone,
+            body: this.authLinkWhatsAppNotice(
+              user.firstName || 'there',
+              'PASSWORD_RESET',
+            ),
+            churchId: user.churchId,
+            label: 'Password resend',
+          });
+        } catch (err) {
+          this.logger.warn(
+            `Password resend failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
+    }
+    return { success: true, message: GENERIC_LINK_SENT };
+  }
+
+  /** Per-user resend budget — fails closed (skips send) when over limit. */
+  private async allowPasswordResend(userId: string): Promise<boolean> {
+    const key = `auth:password-resend:${userId}`;
+    const current = (await this.cache.get<number>(key)) ?? 0;
+    if (current >= PASSWORD_RESEND_MAX_PER_WINDOW) {
+      this.logger.warn(`Password resend rate-limited for user ${userId}`);
+      return false;
+    }
+    await this.cache.set(key, current + 1, PASSWORD_RESEND_WINDOW_SEC);
+    return true;
+  }
+
+  /** WhatsApp must not carry password/magic bearer URLs (unverified phone risk). */
+  private authLinkWhatsAppNotice(
+    firstName: string,
+    purpose: 'PASSWORD_RESET' | 'MAGIC_LOGIN',
+  ): string {
+    const isReset = purpose === 'PASSWORD_RESET';
+    return [
+      isReset ? 'Church_Hub password reset' : 'Church_Hub sign-in',
+      '',
+      `Hi ${firstName},`,
+      isReset
+        ? 'We sent a one-time set-password link to your email. It expires in 45 minutes.'
+        : 'We sent a one-time sign-in link to your email. It expires in 45 minutes.',
+      'Open that email on this device to continue. If you did not request this, ignore this message.',
+    ].join('\n');
+  }
+
   /** Request a magic sign-in email. Always returns the same message (no email enumeration). */
   async requestMagicLink(email: string) {
     await this.issueAuthLink(email.trim().toLowerCase(), AuthLinkPurpose.MAGIC_LOGIN);
@@ -522,21 +643,52 @@ export class AuthService {
   }
 
   async resetPasswordWithToken(token: string, newPassword: string) {
-    if (newPassword.length < 8) {
-      throw new BadRequestException('New password must be at least 8 characters');
-    }
-
-    const record = await this.consumeAuthLink(token, AuthLinkPurpose.PASSWORD_RESET);
+    this.assertStrongPassword(newPassword);
     const passwordHash = await bcrypt.hash(newPassword, 12);
-    await this.prisma.user.update({
-      where: { id: record.userId },
-      data: { passwordHash, mustChangePassword: false },
-    });
+    const tokenHash = this.hashToken(token.trim());
+    const now = new Date();
 
-    await this.prisma.refreshToken.updateMany({
-      where: { userId: record.userId, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const consumed = await tx.authLinkToken.updateMany({
+          where: {
+            tokenHash,
+            purpose: AuthLinkPurpose.PASSWORD_RESET,
+            consumedAt: null,
+            expiresAt: { gt: now },
+          },
+          data: { consumedAt: now },
+        });
+        if (consumed.count !== 1) {
+          throw new BadRequestException(
+            'This password reset link is invalid or has expired',
+          );
+        }
+
+        const record = await tx.authLinkToken.findUnique({ where: { tokenHash } });
+        if (!record) {
+          throw new BadRequestException(
+            'This password reset link is invalid or has expired',
+          );
+        }
+
+        await tx.user.update({
+          where: { id: record.userId },
+          data: { passwordHash, mustChangePassword: false },
+        });
+
+        await tx.refreshToken.updateMany({
+          where: { userId: record.userId, revokedAt: null },
+          data: { revokedAt: now },
+        });
+      });
+    } catch (err) {
+      if (err instanceof BadRequestException) throw err;
+      this.logger.warn(
+        `Password reset transaction failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      throw new BadRequestException('Could not update password. Request a new link and try again.');
+    }
 
     return { success: true, message: 'Password updated. You can sign in with your new password.' };
   }
@@ -562,6 +714,13 @@ export class AuthService {
   private async issueAuthLink(email: string, purpose: AuthLinkPurpose) {
     const user = await this.prisma.user.findFirst({
       where: { email: { equals: email, mode: 'insensitive' }, isActive: true },
+      select: {
+        id: true,
+        email: true,
+        phone: true,
+        firstName: true,
+        churchId: true,
+      },
     });
     if (!user) return;
 
@@ -614,23 +773,39 @@ export class AuthService {
       // Still succeed to the client — do not leak delivery failures as "email not found".
     }
 
+    await trySendWhatsApp(this.sms, this.logger, {
+      to: user.phone,
+      body: this.authLinkWhatsAppNotice(
+        user.firstName || 'there',
+        purpose === AuthLinkPurpose.PASSWORD_RESET ? 'PASSWORD_RESET' : 'MAGIC_LOGIN',
+      ),
+      churchId: user.churchId,
+      label: `Auth link (${purpose})`,
+    });
+
     if (process.env.NODE_ENV !== 'production' && !this.email.isConfigured('auth')) {
-      this.logger.log(`[auth-link:${purpose}] ${user.email} → ${actionUrl}`);
+      // Never log the bearer token — even in non-prod shared environments.
+      this.logger.log(
+        `[auth-link:${purpose}] issued for ${user.email} (token redacted, expires ${AUTH_LINK_TTL_MINUTES}m)`,
+      );
     }
   }
 
+  /** Atomically consume a one-time auth link (conditional update — no TOCTOU race). */
   private async consumeAuthLink(rawToken: string, purpose: AuthLinkPurpose) {
     const tokenHash = this.hashToken(rawToken.trim());
-    const record = await this.prisma.authLinkToken.findUnique({
-      where: { tokenHash },
+    const now = new Date();
+    const consumed = await this.prisma.authLinkToken.updateMany({
+      where: {
+        tokenHash,
+        purpose,
+        consumedAt: null,
+        expiresAt: { gt: now },
+      },
+      data: { consumedAt: now },
     });
 
-    if (
-      !record ||
-      record.purpose !== purpose ||
-      record.consumedAt ||
-      record.expiresAt < new Date()
-    ) {
+    if (consumed.count !== 1) {
       throw new BadRequestException(
         purpose === AuthLinkPurpose.PASSWORD_RESET
           ? 'This password reset link is invalid or has expired'
@@ -638,10 +813,16 @@ export class AuthService {
       );
     }
 
-    await this.prisma.authLinkToken.update({
-      where: { id: record.id },
-      data: { consumedAt: new Date() },
+    const record = await this.prisma.authLinkToken.findUnique({
+      where: { tokenHash },
     });
+    if (!record) {
+      throw new BadRequestException(
+        purpose === AuthLinkPurpose.PASSWORD_RESET
+          ? 'This password reset link is invalid or has expired'
+          : 'This sign-in link is invalid or has expired',
+      );
+    }
 
     return record;
   }
@@ -771,6 +952,7 @@ export class AuthService {
     id: string;
     email: string;
     firstName: string;
+    phone?: string | null;
     churchId: string | null;
     mustChangePassword: boolean;
   }) {
@@ -788,11 +970,14 @@ export class AuthService {
 
     await this.cache.set(`login:2fa:${challengeId}`, pending, LOGIN_2FA_TTL_SEC);
 
+    const subject = 'Your Church_Hub sign-in code';
+    const textBody = `Hi ${user.firstName || 'there'},\n\nYour sign-in verification code is ${otp}.\n\nIt expires in 15 minutes.\n\nIf you did not try to sign in, ignore this message.\n\n— Church_Hub`;
+
     try {
       await this.email.send({
         to: user.email,
-        subject: 'Your Church_Hub sign-in code',
-        body: `Hi ${user.firstName || 'there'},\n\nYour sign-in verification code is ${otp}.\n\nIt expires in 15 minutes.\n\nIf you did not try to sign in, ignore this email.\n\n— Church_Hub`,
+        subject,
+        body: textBody,
         html: `<p>Hi ${user.firstName || 'there'},</p><p>Your sign-in verification code is <strong style="font-size:1.25rem;letter-spacing:0.1em">${otp}</strong>.</p><p>It expires in 15 minutes.</p><p>If you did not try to sign in, ignore this email.</p><p>— Church_Hub</p>`,
         churchId: user.churchId,
         purpose: 'auth',
@@ -807,15 +992,30 @@ export class AuthService {
       );
     }
 
+    let phone = user.phone;
+    if (phone === undefined) {
+      const row = await this.prisma.user.findUnique({
+        where: { id: user.id },
+        select: { phone: true },
+      });
+      phone = row?.phone ?? null;
+    }
+    await trySendWhatsApp(this.sms, this.logger, {
+      to: phone,
+      body: textBody,
+      churchId: user.churchId,
+      label: 'Login 2FA',
+    });
+
     if (process.env.NODE_ENV !== 'production' && !this.email.isConfigured('auth')) {
-      this.logger.log(`[login-2fa] ${user.email} → ${otp}`);
+      this.logger.log(`[login-2fa] issued for ${user.email} (code redacted)`);
     }
 
     return {
       requires2fa: true as const,
       challengeId,
       email: user.email,
-      message: 'We sent a 6-digit verification code to your email.',
+      message: 'We sent a 6-digit verification code to your email (and WhatsApp if a phone is on file).',
       expiresInSeconds: LOGIN_2FA_TTL_SEC,
     };
   }

@@ -347,7 +347,7 @@ export class MembershipAutomationService {
         kind: 'FIRST_TIMER_WELCOME',
         title: 'Welcome — glad you joined us',
         body: `Hi ${name}, thank you for worshipping with us! A leader will connect with you about next steps and membership class.`,
-        channels: ['IN_APP', 'EMAIL'],
+        channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
         targetMemberId: member.id,
         targetUserId: member.userId ?? undefined,
       });
@@ -488,7 +488,7 @@ export class MembershipAutomationService {
           kind: 'PASTORAL_ALERT',
           title: `Pastoral alert: ${c.title}`,
           body: `Counseling case "${c.title}" has had no update in 14+ days. Please review.`,
-          channels: ['IN_APP', 'EMAIL'],
+          channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
           targetUserId: userId,
           metadata: { caseId: c.id, alertType: 'STALE_COUNSELING' },
         });
@@ -635,7 +635,7 @@ export class MembershipAutomationService {
           kind: 'AUTOMATION_RECOMMENDATION',
           title: 'Membership automation insights',
           body,
-          channels: ['IN_APP', 'EMAIL'],
+          channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
           targetUserId: userId,
           metadata: { recommendationIds: recs.map((r) => r.id) },
         });

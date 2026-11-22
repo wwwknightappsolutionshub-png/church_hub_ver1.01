@@ -28,6 +28,7 @@ describe('ChurchStaffService unit leadership', () => {
     { render: jest.fn() } as never,
     { send: jest.fn() } as never,
     { createPasswordSetupLink: jest.fn().mockResolvedValue('http://localhost/reset') } as never,
+    { sendWhatsApp: jest.fn() } as never,
   );
 
   beforeEach(() => {

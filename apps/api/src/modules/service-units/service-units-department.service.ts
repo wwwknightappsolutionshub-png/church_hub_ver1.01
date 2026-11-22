@@ -17,6 +17,8 @@ import { ModuleAccessService, UserMemberContext } from '../access/module-access.
 import { MembershipAttendanceService } from '../membership/membership-attendance.service';
 import { CommunicationsQueueService } from '../communications/communications-queue.service';
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
+import { SmsAdapter } from '../notifications/adapters/sms.adapter';
+import { trySendWhatsApp } from '../notifications/try-send-whatsapp';
 import {
   escapeHtml,
   findOneAdminAndOnePastor,
@@ -51,6 +53,7 @@ export class ServiceUnitsDepartmentService {
     private readonly attendance: MembershipAttendanceService,
     private readonly commQueue: CommunicationsQueueService,
     private readonly email: EmailAdapter,
+    private readonly sms: SmsAdapter,
   ) {}
 
   private async upsertCatalogUnit(
@@ -384,7 +387,7 @@ export class ServiceUnitsDepartmentService {
         kind: 'DEPARTMENT_ABSENTEE',
         title: `${label} — we missed you`,
         body: `You were marked absent for ${label} on ${targetDate}. Reply to your unit leader if you need support.`,
-        channels: ['IN_APP', 'EMAIL'],
+        channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
         serviceUnitId,
         targetMemberId: memberId,
         metadata: { serviceDate: targetDate, departmentCode: unit.departmentCode },
@@ -628,6 +631,12 @@ export class ServiceUnitsDepartmentService {
         html,
         churchId,
         purpose: 'reports',
+      });
+      await trySendWhatsApp(this.sms, this.logger, {
+        to: recipient.phone,
+        body: `${subject}\n\n${text}`,
+        churchId,
+        label: 'Department weekly report',
       });
       await this.prisma.notification.create({
         data: {

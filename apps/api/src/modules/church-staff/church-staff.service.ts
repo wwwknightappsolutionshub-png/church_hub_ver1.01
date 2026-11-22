@@ -12,6 +12,8 @@ import { PrismaService } from '../../prisma/prisma.module';
 import { AutomationEmailTemplatesService } from '../automation/automation-email-templates.service';
 import { AuthService } from '../auth/auth.service';
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
+import { SmsAdapter } from '../notifications/adapters/sms.adapter';
+import { trySendWhatsApp } from '../notifications/try-send-whatsapp';
 import {
   CHURCH_ASSIGNABLE_ROLES,
   CreateChurchStaffDto,
@@ -28,6 +30,7 @@ export class ChurchStaffService {
     private readonly emailTemplates: AutomationEmailTemplatesService,
     private readonly email: EmailAdapter,
     private readonly auth: AuthService,
+    private readonly sms: SmsAdapter,
   ) {}
 
   private async roleIds(names: string[]) {
@@ -173,6 +176,7 @@ export class ChurchStaffService {
 
     await this.sendStaffWelcomeEmail(churchId, {
       email: user.email,
+      phone: user.phone,
       firstName: user.firstName,
       lastName: user.lastName,
       setPasswordUrl,
@@ -186,6 +190,7 @@ export class ChurchStaffService {
     churchId: string,
     data: {
       email: string;
+      phone?: string | null;
       firstName: string;
       lastName: string;
       setPasswordUrl: string;
@@ -219,6 +224,16 @@ export class ChurchStaffService {
         html: rendered.bodyHtml,
         churchId,
         purpose: 'onboarding',
+      });
+      // Never put set-password bearer URLs on WhatsApp (phone may be unverified/stale).
+      const waBody = data.setPasswordUrl
+        ? `${rendered.subject}\n\nHi ${data.firstName}, your ChurchHub account is ready. Check your email for a one-time set-password link (expires in 45 minutes).`
+        : `${rendered.subject}\n\nHi ${data.firstName}, your ChurchHub account is ready. Sign in with the password you already set.`;
+      await trySendWhatsApp(this.sms, this.logger, {
+        to: data.phone,
+        body: waBody,
+        churchId,
+        label: 'Staff welcome',
       });
     } catch (err) {
       this.logger.warn(

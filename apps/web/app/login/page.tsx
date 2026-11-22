@@ -226,15 +226,6 @@ export default function LoginPage() {
       setValue('password', '');
     }
 
-    if (result.resetLinkSent) {
-      toast.message('Check your registered email', {
-        description:
-          'We sent a password reset link after too many failed sign-in attempts. Open that email to set a new password.',
-        duration: 10_000,
-      });
-      return;
-    }
-
     toast.error(result.message);
   };
 

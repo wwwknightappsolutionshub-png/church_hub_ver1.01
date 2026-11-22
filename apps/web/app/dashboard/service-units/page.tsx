@@ -43,7 +43,14 @@ const UNCATEGORIZED = 'Uncategorized';
 export default function ServiceUnitsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { user, member, isChurchStaff, unitMembershipIds } = useModuleAccess();
+  const {
+    user,
+    member,
+    isChurchStaff,
+    unitMembershipIds,
+    unitAdminUnitIds,
+    unitDeputyUnitIds,
+  } = useModuleAccess();
   const units = useApiQuery<ServiceUnitListItem[]>(['service-units'], '/service-units');
   const [showCreateWizard, setShowCreateWizard] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -55,16 +62,29 @@ export default function ServiceUnitsPage() {
   const [suggestLoading, setSuggestLoading] = useState(false);
   const suggestRef = useRef<HTMLDivElement>(null);
 
+  const belongsToUnit = (unitId: string) =>
+    unitMembershipIds.includes(unitId) ||
+    unitAdminUnitIds.includes(unitId) ||
+    unitDeputyUnitIds.includes(unitId);
+
   const filteredUnits = useMemo(() => {
     const q = search.trim().toLowerCase();
     const list = units.data ?? [];
-    if (!q) return list;
-    return list.filter(
-      (u) =>
-        u.name.toLowerCase().includes(q) ||
-        (u.description ?? '').toLowerCase().includes(q),
-    );
-  }, [units.data, search]);
+    const matched = !q
+      ? list
+      : list.filter(
+          (u) =>
+            u.name.toLowerCase().includes(q) ||
+            (u.description ?? '').toLowerCase().includes(q),
+        );
+    // My units first so membership is obvious in the hub grid.
+    return [...matched].sort((a, b) => {
+      const aMine = belongsToUnit(a.id) ? 0 : 1;
+      const bMine = belongsToUnit(b.id) ? 0 : 1;
+      if (aMine !== bMine) return aMine - bMine;
+      return a.name.localeCompare(b.name);
+    });
+  }, [units.data, search, unitMembershipIds, unitAdminUnitIds, unitDeputyUnitIds]);
 
   useEffect(() => {
     if (!isChurchStaff) {
@@ -268,10 +288,15 @@ export default function ServiceUnitsPage() {
               const leader = unit.leaders[0]?.member;
               const isUncategorized =
                 unit.name.trim().toLowerCase() === UNCATEGORIZED.toLowerCase();
+              const isMyUnit = belongsToUnit(unit.id);
               return (
                 <Card
                   key={unit.id}
-                  className="relative h-full transition-shadow hover:shadow-elevated"
+                  className={cn(
+                    'relative h-full transition-shadow hover:shadow-elevated',
+                    isMyUnit &&
+                      'border-2 border-amber-500 bg-gradient-to-br from-amber-50 via-amber-100/80 to-orange-50 shadow-md ring-2 ring-amber-400/50',
+                  )}
                 >
                   {isChurchStaff && !isUncategorized ? (
                     <Button
@@ -301,8 +326,20 @@ export default function ServiceUnitsPage() {
                     onClick={() => openUnit(unit)}
                   >
                     <CardHeader className="pb-3">
+                      {isMyUnit ? (
+                        <p className="mb-2 inline-flex rounded-md bg-amber-500 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white">
+                          You Belong To This Unit
+                        </p>
+                      ) : null}
                       <div className="flex items-start justify-between gap-2">
-                        <CardTitle className="text-base leading-snug">{unit.name}</CardTitle>
+                        <CardTitle
+                          className={cn(
+                            'text-base leading-snug',
+                            isMyUnit && 'text-amber-950',
+                          )}
+                        >
+                          {unit.name}
+                        </CardTitle>
                         {onlineCount > 0 && (
                           <Badge variant="outline" className="shrink-0 gap-1 text-[10px]">
                             <OnlineIndicator online size="sm" />
@@ -310,17 +347,29 @@ export default function ServiceUnitsPage() {
                           </Badge>
                         )}
                       </div>
-                      <CardDescription className="line-clamp-2">
+                      <CardDescription
+                        className={cn('line-clamp-2', isMyUnit && 'text-amber-900/75')}
+                      >
                         {unit.description ?? 'Church service group'}
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3 text-sm">
-                      <div className="flex items-center gap-2 text-muted-foreground">
+                      <div
+                        className={cn(
+                          'flex items-center gap-2 text-muted-foreground',
+                          isMyUnit && 'text-amber-900/80',
+                        )}
+                      >
                         <Users className="h-4 w-4" />
                         {unit._count.members} members · {unit._count.meetings} meetings
                       </div>
                       {leader && (
-                        <p className="font-sans text-xs text-muted-foreground">
+                        <p
+                          className={cn(
+                            'font-sans text-xs text-muted-foreground',
+                            isMyUnit && 'text-amber-900/70',
+                          )}
+                        >
                           Leader: {leader.firstName} {leader.lastName}
                         </p>
                       )}
