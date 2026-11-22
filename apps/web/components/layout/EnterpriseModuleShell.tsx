@@ -138,12 +138,25 @@ export function EnterpriseTabNav({
   );
 }
 
-export function EnterpriseContent({ children, className }: { children: ReactNode; className?: string }) {
+export function EnterpriseContent({
+  children,
+  className,
+  /** Skip the single outer white panel — use when children are already separate sections. */
+  bare = false,
+}: {
+  children: ReactNode;
+  className?: string;
+  bare?: boolean;
+}) {
   return (
     <div className={cn('w-full min-w-0 px-4 py-4 sm:px-6 sm:py-5 md:px-8', className)}>
-      <div className="min-w-0 rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5 dark:border-slate-800 dark:bg-card">
-        {children}
-      </div>
+      {bare ? (
+        children
+      ) : (
+        <div className="min-w-0 rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5 dark:border-slate-800 dark:bg-card">
+          {children}
+        </div>
+      )}
     </div>
   );
 }

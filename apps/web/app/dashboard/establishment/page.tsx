@@ -39,6 +39,7 @@ import {
 } from '@/lib/follow-up-pdf';
 import { FOLLOW_UP_STAGES, STAGE_LABELS, sortByNewestFirst } from '@/lib/follow-up';
 import {
+  entryStageKey,
   stageFilterTabActiveClass,
   stageFilterTabClass,
 } from '@/lib/pipeline-definition';
@@ -119,7 +120,7 @@ function FollowUpPageContent() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [assigneeFilter, setAssigneeFilter] = useState('');
-  const [stageFilter, setStageFilter] = useState('');
+  const [stageFilter, setStageFilter] = useState('NEW_LEAD');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [exportOpen, setExportOpen] = useState(false);
@@ -184,6 +185,14 @@ function FollowUpPageContent() {
     resolvedStageKeys.length > 0 ? resolvedStageKeys : [...FOLLOW_UP_STAGES];
   const journeyLabels =
     Object.keys(resolvedLabels).length > 0 ? resolvedLabels : STAGE_LABELS;
+  const defaultStage = entryStageKey(pipeline, journeyStageKeys[0] ?? 'NEW_LEAD');
+
+  useEffect(() => {
+    if (!journeyStageKeys.includes(stageFilter)) {
+      setStageFilter(defaultStage);
+    }
+  }, [journeyStageKeys, stageFilter, defaultStage]);
+
   const exportOptions = useMemo(
     () => buildFollowUpExportOptions(pipeline),
     [pipeline],
@@ -550,14 +559,14 @@ function FollowUpPageContent() {
               <button
                 key={stage}
                 type="button"
-                onClick={() => setStageFilter((prev) => (prev === stage ? '' : stage))}
+                onClick={() => setStageFilter(stage)}
                 className={cn(
                   'inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-center text-xs font-semibold transition',
                   stageFilterTabClass(pipeline, stage),
                   active && stageFilterTabActiveClass(pipeline, stage),
                 )}
                 aria-pressed={active}
-                title={`Filter: ${label}`}
+                title={`Show: ${label}`}
                 data-stage={stage}
               >
                 <span className="truncate">
@@ -567,12 +576,6 @@ function FollowUpPageContent() {
             );
           })}
         </div>
-        )}
-
-        {!isLoading && !isError && filteredItems.length === 0 && (data?.length ?? 0) > 0 && view !== 'calendar' && view !== 'archived' && (
-          <p className="mb-4 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
-            No matches for the current filters. Clear stage or date to see more people.
-          </p>
         )}
 
         {showPipelineEmpty && (
@@ -622,10 +625,11 @@ function FollowUpPageContent() {
           />
         )}
 
-        {view === 'pipeline' &&
-          (filteredItems.length > 0 || (data?.length ?? 0) === 0) && (
+        {view === 'pipeline' && !showPipelineEmpty && (
             <FollowUpPipeline
               items={filteredItems}
+              overviewItems={stageSummaryItems}
+              activeStage={stageFilter}
               selectedId={selectedId}
               onSelect={setSelectedId}
               pipeline={pipeline}

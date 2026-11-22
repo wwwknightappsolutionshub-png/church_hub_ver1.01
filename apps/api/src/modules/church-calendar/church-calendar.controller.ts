@@ -1,5 +1,12 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { BadRequestException, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  CreateChurchCalendarEventSchema,
+  UpdateChurchCalendarEventSchema,
+  type CreateChurchCalendarEventInput,
+  type UpdateChurchCalendarEventInput,
+} from '@church-hub/shared-types';
+import { ZodBody } from '../../common/decorators/zod-body.decorator';
 import { AuthUser, ChurchId, CurrentUser } from '../auth/current-user.decorator';
 import { Roles } from '../auth/decorators';
 import { ChurchCalendarService } from './church-calendar.service';
@@ -22,6 +29,17 @@ export class ChurchCalendarController {
     const end = to
       ? new Date(to)
       : new Date(start.getFullYear(), start.getMonth() + 1, 0, 23, 59, 59);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      throw new BadRequestException('from/to must be valid dates');
+    }
+    if (end.getTime() < start.getTime()) {
+      throw new BadRequestException('to must be on or after from');
+    }
+    // Cap feed window to 93 days to limit PII/celebration scrape volume.
+    const maxMs = 93 * 24 * 60 * 60 * 1000;
+    if (end.getTime() - start.getTime() > maxMs) {
+      throw new BadRequestException('Date range cannot exceed 93 days');
+    }
     return this.calendar.getFeed(churchId, start, end);
   }
 
@@ -30,16 +48,7 @@ export class ChurchCalendarController {
   createEvent(
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
-    @Body()
-    body: {
-      title: string;
-      description?: string;
-      startsAt: string;
-      endsAt?: string;
-      allDay?: boolean;
-      isPinned?: boolean;
-      highlightColor?: string;
-    },
+    @ZodBody(CreateChurchCalendarEventSchema) body: CreateChurchCalendarEventInput,
   ) {
     return this.calendar.createEvent(churchId, user.userId, body);
   }
@@ -49,16 +58,7 @@ export class ChurchCalendarController {
   updateEvent(
     @ChurchId() churchId: string,
     @Param('id') id: string,
-    @Body()
-    body: Partial<{
-      title: string;
-      description: string | null;
-      startsAt: string;
-      endsAt: string | null;
-      allDay: boolean;
-      isPinned: boolean;
-      highlightColor: string | null;
-    }>,
+    @ZodBody(UpdateChurchCalendarEventSchema) body: UpdateChurchCalendarEventInput,
   ) {
     return this.calendar.updateEvent(churchId, id, body);
   }

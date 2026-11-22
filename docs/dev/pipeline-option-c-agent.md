@@ -35,7 +35,8 @@ Membership journey stages are **data**: system templates (`PipelineTemplate`) an
 - `GET|PUT` templates / base-template — Phase 6
 - `POST` fork / discard / stages — Phase 5
 - `GET` updates · `POST` merge · dismiss · bump — Phase 7
-- `POST /follow-up/pipeline/templates/:key/resync` · `…/bump` — QA only (`PIPELINE_QA_TOOLS=true`); shared templates
+- `POST /follow-up/pipeline/templates/:key/resync` · `…/bump` — QA only (`PIPELINE_QA_TOOLS=true`, hard-blocked in production); shared templates
+- Church `PATCH …/stages/:key` — labels only (`label` / `shortLabel`)
 
 ## QA proof
 

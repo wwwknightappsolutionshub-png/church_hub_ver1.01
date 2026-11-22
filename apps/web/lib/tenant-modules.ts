@@ -47,6 +47,7 @@ export const ROUTE_TENANT_MODULE: Record<string, ChurchTenantModuleId> = {
   '/dashboard/admin-reports': 'communicationsHub',
   '/dashboard/sermon-notes': 'sermonNote',
   '/dashboard/ministry-cells': 'ministryCells',
+  '/dashboard/ministry-cells/ministers': 'ministryCells',
 };
 
 export function isTenantModuleEnabled(

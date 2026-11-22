@@ -154,7 +154,7 @@ export const STAFF_LEADERSHIP_NAV: DashboardNavItem[] = [
     icon: Radio,
     requiresPastor: true,
   },
-  { href: '/dashboard/staff', label: 'Church Staff', icon: UserCog, requiresStaffManage: true },
+  { href: '/dashboard/staff', label: 'Church Officers', icon: UserCog, requiresStaffManage: true },
   { href: '/dashboard/communications', label: 'Communication Hub', icon: Radio },
   {
     href: '/dashboard/sermon-notes',

@@ -3,12 +3,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import { Download, HardDriveDownload, Loader2 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { SettingsSection } from '@/components/settings/SettingsSection';
 
 type BackupRequest = {
   id: string;
@@ -30,7 +30,17 @@ function apiErr(err: unknown) {
   return 'Request failed';
 }
 
-export function TenantBackupRequestPanel({ enabled }: { enabled: boolean }) {
+export function TenantBackupRequestPanel({
+  enabled,
+  icon,
+  id,
+  index,
+}: {
+  enabled: boolean;
+  icon?: ReactNode;
+  id?: string;
+  index?: string;
+}) {
   const qc = useQueryClient();
   const [reason, setReason] = useState('');
 
@@ -86,18 +96,14 @@ export function TenantBackupRequestPanel({ enabled }: { enabled: boolean }) {
   if (!enabled) return null;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <HardDriveDownload className="h-4 w-4" />
-          Data backup request
-        </CardTitle>
-        <CardDescription>
-          Request a secure export of this church&apos;s data. A platform administrator must approve
-          before the backup is generated and available to download.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <SettingsSection
+      id={id}
+      index={index}
+      title="Data backup request"
+      description="Request a secure export of this church's data. A platform administrator must approve before the backup is generated and available to download."
+      icon={icon ?? <HardDriveDownload className="h-4 w-4" aria-hidden />}
+    >
+      <div className="space-y-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
           <label className="flex-1 text-xs text-muted-foreground">
             Reason (optional)
@@ -151,7 +157,7 @@ export function TenantBackupRequestPanel({ enabled }: { enabled: boolean }) {
             <p className="text-sm text-muted-foreground">No backup requests yet.</p>
           ) : null}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </SettingsSection>
   );
 }

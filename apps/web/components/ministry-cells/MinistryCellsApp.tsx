@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import type { AxiosError } from 'axios';
 import {
@@ -12,6 +14,8 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Users,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -68,6 +72,7 @@ export function MinistryCellsApp() {
   const [selectedProvinceId, setSelectedProvinceId] = useState<string | null>(null);
   const [selectedProvinceName, setSelectedProvinceName] = useState<string | null>(null);
   const [branchSearch, setBranchSearch] = useState('');
+  const searchParams = useSearchParams();
   const [showCreateBranch, setShowCreateBranch] = useState(false);
   const [createLeaderId, setCreateLeaderId] = useState('');
   const [editBranchOpen, setEditBranchOpen] = useState(false);
@@ -198,6 +203,14 @@ export function MinistryCellsApp() {
       setSelectedBranchId(ctx.leaderBranchId);
     }
   }, [ctx, selectedBranchId]);
+
+  useEffect(() => {
+    const branchFromQuery = searchParams.get('branch')?.trim() ?? '';
+    // Reject non-UUID values to avoid probing arbitrary IDs via query string.
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(branchFromQuery)) {
+      setSelectedBranchId(branchFromQuery);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (ctx?.role === 'provincialLeader' && ctx.leaderProvinceId && tab === 'branches') {
@@ -434,6 +447,17 @@ export function MinistryCellsApp() {
               {ctx.canManage && (
                 <>
                   <Button
+                    asChild
+                    size="sm"
+                    variant="outline"
+                    className="h-auto min-h-[3.25rem] shrink-0 self-stretch rounded-xl px-3 text-xs sm:px-4 sm:text-sm"
+                  >
+                    <Link href="/dashboard/ministry-cells/ministers">
+                      <Users className="mr-1.5 h-4 w-4 shrink-0" />
+                      <span className="whitespace-nowrap">Cell Ministers</span>
+                    </Link>
+                  </Button>
+                  <Button
                     size="sm"
                     variant="secondary"
                     className="h-auto min-h-[3.25rem] shrink-0 self-stretch rounded-xl px-3 text-xs sm:px-4 sm:text-sm"
@@ -450,7 +474,7 @@ export function MinistryCellsApp() {
                   <Button
                     size="sm"
                     className="h-auto min-h-[3.25rem] shrink-0 self-stretch rounded-xl px-3 text-xs sm:px-4 sm:text-sm"
-                    onClick={() => setShowCreateBranch((v) => !v)}
+                    onClick={() => setShowCreateBranch(true)}
                   >
                     <Plus className="mr-1.5 h-4 w-4 shrink-0 sm:mr-2" />
                     <span className="whitespace-nowrap">Add New Cell</span>
@@ -460,51 +484,99 @@ export function MinistryCellsApp() {
             </div>
           )}
 
-          {showCreateBranch && ctx.canManage && !showWorkspace && (
-            <Card className="overflow-hidden rounded-2xl border-primary/20 shadow-sm">
-              <div className="border-b border-border/60 bg-muted/30 px-4 py-2">
-                <p className="text-sm font-semibold">Add New Cell</p>
-              </div>
-              <CardContent className="py-4">
-                <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5" onSubmit={createBranch}>
+          {showCreateBranch && ctx.canManage ? (
+            <div
+              className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
+              onClick={() => {
+                setShowCreateBranch(false);
+                setCreateLeaderId('');
+              }}
+            >
+              <div
+                className="flex max-h-[min(94vh,36rem)] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-background shadow-xl sm:rounded-2xl"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="add-new-cell-title"
+                data-testid="add-new-cell-modal"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
                   <div>
-                    <Label htmlFor="name">Name</Label>
-                    <Input id="name" name="name" className="mt-1 h-10" required />
+                    <h2 id="add-new-cell-title" className="text-base font-semibold">
+                      Add New Cell
+                    </h2>
+                    <p className="text-xs text-muted-foreground">
+                      Create a cell branch and optionally assign a leader
+                    </p>
                   </div>
-                  <div>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    aria-label="Close"
+                    onClick={() => {
+                      setShowCreateBranch(false);
+                      setCreateLeaderId('');
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <form
+                  className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4"
+                  onSubmit={createBranch}
+                >
+                  <div className="space-y-1">
+                    <Label htmlFor="name">Name</Label>
+                    <Input id="name" name="name" className="h-10" required autoFocus />
+                  </div>
+                  <div className="space-y-1">
                     <Label htmlFor="postcode">Postcode</Label>
                     <Input
                       id="postcode"
                       name="postcode"
-                      className="mt-1 h-10"
+                      className="h-10"
                       placeholder="N1 1AA"
                       required
                     />
                   </div>
-                  <div>
+                  <div className="space-y-1">
                     <Label htmlFor="location">Location</Label>
-                    <Input id="location" name="location" className="mt-1 h-10" placeholder="Area or address" />
-                  </div>
-                  <div className="sm:col-span-2 lg:col-span-1">
-                    <BranchLeaderSelect
-                      id="create-leader"
-                      value={createLeaderId}
-                      onChange={setCreateLeaderId}
-                      enabled={ctx.canManage}
+                    <Input
+                      id="location"
+                      name="location"
+                      className="h-10"
+                      placeholder="Area or address"
                     />
                   </div>
-                  <div className="flex gap-2 sm:col-span-2 lg:col-span-1 lg:items-end">
-                    <Button type="submit" className="h-10 flex-1">
+                  <BranchLeaderSelect
+                    id="create-leader"
+                    value={createLeaderId}
+                    onChange={setCreateLeaderId}
+                    enabled={ctx.canManage}
+                  />
+                  <div className="flex flex-wrap gap-2 border-t border-border pt-3">
+                    <Button type="submit" className="h-10 flex-1 sm:flex-none">
                       Create cell
                     </Button>
-                    <Button type="button" variant="ghost" className="h-10" onClick={() => setShowCreateBranch(false)}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-10"
+                      onClick={() => {
+                        setShowCreateBranch(false);
+                        setCreateLeaderId('');
+                      }}
+                    >
                       Cancel
                     </Button>
                   </div>
                 </form>
-              </CardContent>
-            </Card>
-          )}
+              </div>
+            </div>
+          ) : null}
 
           {showBranchGrid && !showWorkspace && !ctx.canManage && (
             <CellBranchesList

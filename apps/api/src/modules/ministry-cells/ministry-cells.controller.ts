@@ -50,6 +50,15 @@ export class MinistryCellsController {
     return this.service.listBranches(user, churchId);
   }
 
+  @Get('ministers')
+  @Roles('ADMIN', 'PASTOR', 'PROVINCIAL_LEADER')
+  @ApiOperation({
+    summary: 'Cell ministers roster (assigned leaders only — no member PII)',
+  })
+  listCellMinisters(@ChurchId() churchId: string, @CurrentUser() user: AuthUser) {
+    return this.service.listCellMinisters(user, churchId);
+  }
+
   @Post('branches')
   @Roles('ADMIN', 'PASTOR')
   createBranch(

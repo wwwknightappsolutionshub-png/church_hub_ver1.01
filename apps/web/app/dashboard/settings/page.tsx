@@ -4,7 +4,15 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
-import { Loader2, User } from 'lucide-react';
+import {
+  DatabaseBackup,
+  GitBranch,
+  Loader2,
+  LogOut,
+  Shield,
+  User,
+  UserCircle2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { api, clearAuthTokens } from '@/lib/api';
 import {
@@ -18,10 +26,14 @@ import { isChurchLeadershipRole } from '@/lib/session-role';
 import { accountAvatarUrl, userDisplayName } from '@/lib/user-display';
 import { LogoutButton } from '@/components/app/LogoutButton';
 import { ProfilePhotoUpload } from '@/components/settings/ProfilePhotoUpload';
+import {
+  SettingsSection,
+  SettingsSideNav,
+  type SettingsNavItem,
+} from '@/components/settings/SettingsSection';
 import { TenantBackupRequestPanel } from '@/components/backups/TenantBackupRequestPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { EnterpriseContent, EnterpriseHero, EnterpriseShell } from '@/components/layout/EnterpriseModuleShell';
 
@@ -237,233 +249,277 @@ export default function SettingsPage() {
     avatarUrl: form.avatarUrl || null,
   };
 
+  const navItems: SettingsNavItem[] = [
+    { id: 'settings-profile', label: 'Profile' },
+    ...(showLeadershipPrivacySession
+      ? [
+          { id: 'settings-pipeline', label: 'Pipeline' },
+          { id: 'settings-privacy', label: 'Privacy' },
+        ]
+      : []),
+    ...(isChurchStaff ? [{ id: 'settings-backup', label: 'Backup' }] : []),
+    ...(showLeadershipPrivacySession ? [{ id: 'settings-session', label: 'Session' }] : []),
+    ...(canAccessMyProfile ? [{ id: 'settings-membership', label: 'Membership' }] : []),
+  ];
+
+  const [activeId, setActiveId] = useState('settings-profile');
+  const navIds = navItems.map((item) => item.id).join('|');
+
+  useEffect(() => {
+    if (!navItems.some((item) => item.id === activeId)) {
+      setActiveId(navItems[0]?.id ?? 'settings-profile');
+    }
+    // Keep selection valid when role-gated items appear/disappear.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by navIds
+  }, [navIds, activeId]);
+
+  const sectionIndex = Object.fromEntries(
+    navItems.map((item, i) => [item.id, String(i + 1).padStart(2, '0')]),
+  );
+
   return (
     <EnterpriseShell>
       <EnterpriseHero
         title="Settings"
         description={MODULE_DESCRIPTIONS.settings}
       />
-      <EnterpriseContent className="space-y-6 pb-24 md:pb-8">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <User className="h-4 w-4" />
-            Your profile
-          </CardTitle>
-          <CardDescription>
-            Nickname is shown in the app header and community areas when set.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-1 text-center sm:text-left">
-            <p className="font-heading text-lg font-semibold">
-              {userDisplayName(previewUser, member)}
-            </p>
-            <p className="text-sm text-muted-foreground">{user.email}</p>
+      <EnterpriseContent bare className="pb-24 md:pb-10">
+        <div className="lg:grid lg:grid-cols-[14rem_minmax(0,1fr)] lg:items-start lg:gap-10 xl:grid-cols-[15.5rem_minmax(0,1fr)] xl:gap-12">
+          <SettingsSideNav items={navItems} activeId={activeId} onSelect={setActiveId} />
+
+          <div className="min-w-0">
+            {activeId === 'settings-profile' ? (
+              <SettingsSection
+                id="settings-profile"
+                index={sectionIndex['settings-profile']}
+                title="Your profile"
+                description="Nickname is shown in the app header and community areas when set."
+                icon={<User className="h-4 w-4" aria-hidden />}
+                footer={
+                  <Button type="button" onClick={save} disabled={busy}>
+                    {busy ? 'Saving…' : 'Save profile'}
+                  </Button>
+                }
+              >
+                <div className="space-y-6">
+                  <div className="space-y-1 text-center sm:text-left">
+                    <p className="font-heading text-lg font-semibold">
+                      {userDisplayName(previewUser, member)}
+                    </p>
+                    <p className="text-sm text-muted-foreground">{user.email}</p>
+                  </div>
+
+                  <ProfilePhotoUpload
+                    displayUser={previewUser}
+                    avatarUrl={form.avatarUrl}
+                    disabled={busy}
+                    onAvatarUrlChange={(url) => setForm((f) => ({ ...f, avatarUrl: url }))}
+                    onAutoSaved={persistAvatar}
+                  />
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <details className="md:col-span-2 rounded-lg border border-border px-3 py-2">
+                      <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Advanced: paste image URL
+                      </summary>
+                      <Input
+                        className="mt-2"
+                        placeholder="https://…"
+                        value={form.avatarUrl}
+                        onChange={(e) => setForm((f) => ({ ...f, avatarUrl: e.target.value }))}
+                      />
+                    </details>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Nickname
+                      </label>
+                      <Input
+                        placeholder="How you want to be called"
+                        maxLength={32}
+                        value={form.nickname}
+                        onChange={(e) => setForm((f) => ({ ...f, nickname: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Phone
+                      </label>
+                      <Input
+                        type="tel"
+                        inputMode="tel"
+                        placeholder="e.g. 07123 456789"
+                        value={form.phone}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, phone: filterPhoneTyping(e.target.value) }))
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        First name
+                      </label>
+                      <Input
+                        value={form.firstName}
+                        onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Last name
+                      </label>
+                      <Input
+                        value={form.lastName}
+                        onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Email
+                      </label>
+                      <Input value={user.email} disabled className="bg-muted/50" />
+                    </div>
+                  </div>
+                </div>
+              </SettingsSection>
+            ) : null}
+
+            {activeId === 'settings-pipeline' && showLeadershipPrivacySession ? (
+              <SettingsSection
+                id="settings-pipeline"
+                index={sectionIndex['settings-pipeline']}
+                title="Membership Pipeline"
+                description="Templates, activate a base journey, stage labels, and merge product updates for Establishment."
+                icon={<GitBranch className="h-4 w-4" aria-hidden />}
+              >
+                <Button variant="outline" asChild>
+                  <Link href="/dashboard/settings/membership-pipeline">Customize pipeline</Link>
+                </Button>
+              </SettingsSection>
+            ) : null}
+
+            {activeId === 'settings-privacy' && showLeadershipPrivacySession ? (
+              <SettingsSection
+                id="settings-privacy"
+                index={sectionIndex['settings-privacy']}
+                title="Privacy & data"
+                description={
+                  <>
+                    Download a copy of your account data or request erasure. Legal documents are at{' '}
+                    <Link
+                      href="/legal/privacy-policy"
+                      className="font-medium text-primary hover:underline"
+                    >
+                      Privacy Policy
+                    </Link>
+                    .
+                  </>
+                }
+                icon={<Shield className="h-4 w-4" aria-hidden />}
+              >
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={async () => {
+                      setBusy(true);
+                      try {
+                        const { data } = await api.get('/privacy/export');
+                        const blob = new Blob([JSON.stringify(data, null, 2)], {
+                          type: 'application/json',
+                        });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `churchhub-data-export-${new Date().toISOString().slice(0, 10)}.json`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                        toast.success('Data export downloaded');
+                      } catch (err) {
+                        toast.error(apiErrorMessage(err));
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  >
+                    Download my data
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={busy}
+                    onClick={async () => {
+                      if (
+                        !window.confirm(
+                          'Request permanent erasure of your account? You can choose to erase immediately or queue for review.',
+                        )
+                      ) {
+                        return;
+                      }
+                      const executeNow = window.confirm(
+                        'Erase immediately? Click OK to anonymize now (you will be signed out), or Cancel to submit a request for review.',
+                      );
+                      setBusy(true);
+                      try {
+                        await api.post('/privacy/erasure', { executeNow });
+                        toast.success(
+                          executeNow
+                            ? 'Account anonymized. Signing you out…'
+                            : 'Erasure request submitted. Our team will process it.',
+                        );
+                        if (executeNow) {
+                          clearAuthTokens();
+                          window.location.href = '/login';
+                        }
+                      } catch (err) {
+                        toast.error(apiErrorMessage(err));
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  >
+                    Request erasure
+                  </Button>
+                </div>
+              </SettingsSection>
+            ) : null}
+
+            {activeId === 'settings-backup' ? (
+              <TenantBackupRequestPanel
+                enabled={!!isChurchStaff}
+                id="settings-backup"
+                index={sectionIndex['settings-backup']}
+                icon={<DatabaseBackup className="h-4 w-4" aria-hidden />}
+              />
+            ) : null}
+
+            {activeId === 'settings-session' && showLeadershipPrivacySession ? (
+              <SettingsSection
+                id="settings-session"
+                index={sectionIndex['settings-session']}
+                title="Session"
+                description="Sign out and return to the church home page."
+                icon={<LogOut className="h-4 w-4" aria-hidden />}
+              >
+                <LogoutButton variant="menu" className="max-w-xs" />
+              </SettingsSection>
+            ) : null}
+
+            {activeId === 'settings-membership' && canAccessMyProfile ? (
+              <SettingsSection
+                id="settings-membership"
+                index={sectionIndex['settings-membership']}
+                title="Membership profile"
+                description="Service units, business details, and in-app messages live on your membership profile."
+                icon={<UserCircle2 className="h-4 w-4" aria-hidden />}
+              >
+                <Button variant="outline" asChild>
+                  <Link href="/dashboard/profile">Open My Profile</Link>
+                </Button>
+              </SettingsSection>
+            ) : null}
           </div>
-
-          <ProfilePhotoUpload
-            displayUser={previewUser}
-            avatarUrl={form.avatarUrl}
-            disabled={busy}
-            onAvatarUrlChange={(url) => setForm((f) => ({ ...f, avatarUrl: url }))}
-            onAutoSaved={persistAvatar}
-          />
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <details className="md:col-span-2 rounded-lg border border-border px-3 py-2">
-              <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Advanced: paste image URL
-              </summary>
-              <Input
-                className="mt-2"
-                placeholder="https://…"
-                value={form.avatarUrl}
-                onChange={(e) => setForm((f) => ({ ...f, avatarUrl: e.target.value }))}
-              />
-            </details>
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Nickname
-              </label>
-              <Input
-                placeholder="How you want to be called"
-                maxLength={32}
-                value={form.nickname}
-                onChange={(e) => setForm((f) => ({ ...f, nickname: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Phone
-              </label>
-              <Input
-                type="tel"
-                inputMode="tel"
-                placeholder="e.g. 07123 456789"
-                value={form.phone}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, phone: filterPhoneTyping(e.target.value) }))
-                }
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                First name
-              </label>
-              <Input
-                value={form.firstName}
-                onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Last name
-              </label>
-              <Input
-                value={form.lastName}
-                onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Email
-              </label>
-              <Input value={user.email} disabled className="bg-muted/50" />
-            </div>
-          </div>
-
-          <Button type="button" onClick={save} disabled={busy}>
-            {busy ? 'Saving…' : 'Save profile'}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {showLeadershipPrivacySession ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Membership Pipeline</CardTitle>
-            <CardDescription>
-              Templates, customize (fork), stage labels, and merge product updates for Establishment.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button variant="outline" asChild>
-              <Link href="/dashboard/settings/membership-pipeline">Customize pipeline</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {showLeadershipPrivacySession ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Privacy & data</CardTitle>
-            <CardDescription>
-              Download a copy of your account data or request erasure. Legal documents are at{' '}
-              <Link href="/legal/privacy-policy" className="font-medium text-primary hover:underline">
-                Privacy Policy
-              </Link>
-              .
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={busy}
-              onClick={async () => {
-                setBusy(true);
-                try {
-                  const { data } = await api.get('/privacy/export');
-                  const blob = new Blob([JSON.stringify(data, null, 2)], {
-                    type: 'application/json',
-                  });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `churchhub-data-export-${new Date().toISOString().slice(0, 10)}.json`;
-                  a.click();
-                  URL.revokeObjectURL(url);
-                  toast.success('Data export downloaded');
-                } catch (err) {
-                  toast.error(apiErrorMessage(err));
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              Download my data
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              disabled={busy}
-              onClick={async () => {
-                if (
-                  !window.confirm(
-                    'Request permanent erasure of your account? You can choose to erase immediately or queue for review.',
-                  )
-                ) {
-                  return;
-                }
-                const executeNow = window.confirm(
-                  'Erase immediately? Click OK to anonymize now (you will be signed out), or Cancel to submit a request for review.',
-                );
-                setBusy(true);
-                try {
-                  await api.post('/privacy/erasure', { executeNow });
-                  toast.success(
-                    executeNow
-                      ? 'Account anonymized. Signing you out…'
-                      : 'Erasure request submitted. Our team will process it.',
-                  );
-                  if (executeNow) {
-                    clearAuthTokens();
-                    window.location.href = '/login';
-                  }
-                } catch (err) {
-                  toast.error(apiErrorMessage(err));
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              Request erasure
-            </Button>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      <TenantBackupRequestPanel enabled={!!isChurchStaff} />
-
-      {showLeadershipPrivacySession ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Session</CardTitle>
-            <CardDescription>Sign out and return to the church home page.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <LogoutButton variant="menu" className="max-w-xs" />
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {canAccessMyProfile ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Membership profile</CardTitle>
-            <CardDescription>
-              Service units, business details, and in-app messages live on your membership profile.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button variant="outline" asChild>
-              <Link href="/dashboard/profile">Open My Profile</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      ) : null}
+        </div>
       </EnterpriseContent>
     </EnterpriseShell>
   );

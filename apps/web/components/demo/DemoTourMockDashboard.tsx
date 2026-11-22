@@ -184,7 +184,7 @@ function MockModuleContent({
   if (href.includes('staff')) {
     return (
       <div className="space-y-4 p-6">
-        <p className="text-sm font-semibold">Church Staff</p>
+        <p className="text-sm font-semibold">Church Officers</p>
         <div className="space-y-2">
           {[
             { name: 'Admin User', role: 'Church Admin' },

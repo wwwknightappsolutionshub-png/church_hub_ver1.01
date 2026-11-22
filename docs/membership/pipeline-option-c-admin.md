@@ -51,7 +51,7 @@ Custom stages you added are preserved on merge.
 
 `bump` and `resync` mutate **shared** system templates (affects every church). They are **disabled by default**.
 
-Enable only for local/QA tooling:
+Enable only for local/QA tooling (`NODE_ENV` must not be `production`):
 
 ```text
 PIPELINE_QA_TOOLS=true
@@ -62,15 +62,14 @@ Then:
 - `POST /follow-up/pipeline/templates/:key/resync` — restore seed (version → 1, prune extras)
 - `POST /follow-up/pipeline/templates/:key/bump` — product update simulation
 
-Do **not** enable `PIPELINE_QA_TOOLS` in production. Church customize (fork / rename / add stage / merge) does not need this flag.
+In **production**, bump/resync are always rejected (even if `PIPELINE_QA_TOOLS=true` is mis-set). Do not enable the flag on production. Church customize (fork / rename / add stage / merge) does not need this flag.
 
 ## Guardrails
 
 - Exactly one **entry** stage (where new captures land).
-- Cannot disable a stage that still has active contacts.
 - Cannot switch base template while a church definition is active — discard first.
 - Stage keys must be `UPPER_SNAKE_CASE` (2–48 characters).
-- Church stage edits cannot change `blocksArchive` / `graduatesSla` (product policy).
+- Church stage PATCH accepts **labels only** (`label` / `shortLabel`); structure, entry, enablement, and policy flags (`blocksArchive` / `graduatesSla`) are rejected.
 
 ## Related screens
 

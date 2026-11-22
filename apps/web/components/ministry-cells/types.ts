@@ -16,6 +16,7 @@ export interface BranchRow {
   createdAt: string;
   memberCount: number;
   incidentCount: number;
+  latestAttendance?: { presentCount: number; weekStart: string } | null;
   members?: BranchListMember[];
   leader: { id: string; name: string; email: string } | null;
 }

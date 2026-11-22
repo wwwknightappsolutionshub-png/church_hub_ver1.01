@@ -9,8 +9,16 @@ const COLOR_TOKEN_MAX = 32;
 const LABEL_MAX = 80;
 const SHORT_LABEL_MAX = 40;
 
-/** Global system-template mutations (bump/resync) — opt-in QA / product tooling only. */
+/**
+ * Global system-template mutations (bump/resync) — local/QA only.
+ * Always blocked in production, even if PIPELINE_QA_TOOLS is mis-set.
+ */
 export function assertPipelineQaToolsEnabled() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new ForbiddenException(
+      'System template bump/resync is not available in production',
+    );
+  }
   if (process.env.PIPELINE_QA_TOOLS !== 'true') {
     throw new ForbiddenException(
       'System template bump/resync is disabled. Set PIPELINE_QA_TOOLS=true for local/QA tooling only.',

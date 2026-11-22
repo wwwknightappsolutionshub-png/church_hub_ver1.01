@@ -34,9 +34,15 @@ test.describe('Pipeline Option C Phase 6 — template picker UI', () => {
     const picker = page.getByTestId('pipeline-template-picker');
     await expect(picker).toBeVisible({ timeout: 15_000 });
     await picker.locator('[data-template-key="simple_visitor"]').click();
+    await page.getByTestId('pipeline-activate-btn').click();
     await expect(page.getByTestId('pipeline-active-template-key')).toHaveText('simple_visitor', {
       timeout: 10_000,
     });
+    await expect(picker.locator('[data-template-key="simple_visitor"]')).toHaveAttribute(
+      'data-active',
+      'true',
+    );
+    await expect(picker.locator('[data-template-key="simple_visitor"]')).toContainText('Active');
 
     // Stage list should not include Engrafted / Baptism keys on settings preview
     const panel = page.getByTestId('membership-pipeline-settings');

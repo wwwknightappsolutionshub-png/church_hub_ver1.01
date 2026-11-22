@@ -34,16 +34,31 @@ export type ResolvedPipeline = {
   phases: ResolvedPipelinePhase[];
 };
 
+type StageStyle = {
+  tab: string;
+  tabActive: string;
+  badge: string;
+  accentBorder: string;
+  /** Full-card ring / tint so stage color reads around each card. */
+  cardHighlight: string;
+  /** Stage board panel (single box around the active stage’s cards). */
+  panel: string;
+  header: string;
+  title: string;
+  subtitle: string;
+  dot: string;
+};
+
 /** Phase / token → filter tab + badge styles (matches winners_default color tokens). */
-const TOKEN_STYLES: Record<
-  string,
-  { tab: string; tabActive: string; badge: string; accentBorder: string; header: string; title: string; subtitle: string; dot: string }
-> = {
+const TOKEN_STYLES: Record<string, StageStyle> = {
   sky: {
     tab: 'border-sky-300 bg-sky-100 text-sky-950 hover:bg-sky-200/80 dark:border-sky-700 dark:bg-sky-950/70 dark:text-sky-100',
     tabActive: 'ring-2 ring-sky-400/60 shadow-sm',
     badge: 'border-transparent bg-[#e0f2fe] text-sky-900 dark:bg-sky-950/80 dark:text-sky-200',
-    accentBorder: 'border-l-sky-400',
+    accentBorder: 'border-l-sky-500',
+    cardHighlight:
+      'border-sky-300/80 bg-sky-50/80 ring-1 ring-sky-300/70 dark:border-sky-700 dark:bg-sky-950/40 dark:ring-sky-700/60',
+    panel: 'bg-sky-50/50 dark:bg-sky-950/25',
     header: 'bg-sky-100 border-sky-200 dark:bg-sky-950 dark:border-sky-800',
     title: 'text-sky-950 dark:text-sky-50',
     subtitle: 'text-sky-800 dark:text-sky-200',
@@ -53,7 +68,10 @@ const TOKEN_STYLES: Record<
     tab: 'border-amber-300 bg-amber-100 text-amber-950 hover:bg-amber-200/80 dark:border-amber-700 dark:bg-amber-950/60 dark:text-amber-50',
     tabActive: 'ring-2 ring-amber-400/60 shadow-sm',
     badge: 'border-transparent bg-[#fef3c7] text-amber-950 dark:bg-amber-950/70 dark:text-amber-100',
-    accentBorder: 'border-l-amber-400',
+    accentBorder: 'border-l-amber-500',
+    cardHighlight:
+      'border-amber-300/80 bg-amber-50/80 ring-1 ring-amber-300/70 dark:border-amber-700 dark:bg-amber-950/35 dark:ring-amber-700/60',
+    panel: 'bg-amber-50/50 dark:bg-amber-950/20',
     header: 'bg-amber-100 border-amber-200 dark:bg-amber-950 dark:border-amber-800',
     title: 'text-amber-950 dark:text-amber-50',
     subtitle: 'text-amber-900 dark:text-amber-200',
@@ -64,6 +82,9 @@ const TOKEN_STYLES: Record<
     tabActive: 'ring-2 ring-emerald-400/60 shadow-sm',
     badge: 'border-transparent bg-[#d1fae5] text-emerald-900 dark:bg-emerald-950/80 dark:text-emerald-100',
     accentBorder: 'border-l-emerald-500',
+    cardHighlight:
+      'border-emerald-300/80 bg-emerald-50/80 ring-1 ring-emerald-300/70 dark:border-emerald-700 dark:bg-emerald-950/35 dark:ring-emerald-700/60',
+    panel: 'bg-emerald-50/50 dark:bg-emerald-950/20',
     header: 'bg-emerald-100 border-emerald-200 dark:bg-emerald-950 dark:border-emerald-800',
     title: 'text-emerald-950 dark:text-emerald-50',
     subtitle: 'text-emerald-900 dark:text-emerald-200',
@@ -74,6 +95,9 @@ const TOKEN_STYLES: Record<
     tabActive: 'ring-2 ring-violet-400/60 shadow-sm',
     badge: 'border-transparent bg-violet-100 text-violet-900 dark:bg-violet-950/80 dark:text-violet-100',
     accentBorder: 'border-l-violet-500',
+    cardHighlight:
+      'border-violet-300/80 bg-violet-50/80 ring-1 ring-violet-300/70 dark:border-violet-700 dark:bg-violet-950/35 dark:ring-violet-700/60',
+    panel: 'bg-violet-50/50 dark:bg-violet-950/20',
     header: 'bg-violet-100 border-violet-200 dark:bg-violet-950 dark:border-violet-800',
     title: 'text-violet-950 dark:text-violet-50',
     subtitle: 'text-violet-900 dark:text-violet-200',
@@ -82,18 +106,24 @@ const TOKEN_STYLES: Record<
 };
 
 /** Per-stage overrides for winners_default entry / WSF brown tokens. */
-const STAGE_STYLE_OVERRIDE: Record<string, Partial<(typeof TOKEN_STYLES)[string]>> = {
+const STAGE_STYLE_OVERRIDE: Record<string, Partial<StageStyle>> = {
   NEW_LEAD: {
     tab: 'border-[#2f3ba7]/35 bg-[#2f3ba7]/15 text-[#2f3ba7] hover:bg-[#2f3ba7]/25',
-    tabActive: 'ring-2 ring-[#2f3ba7]/50 shadow-sm',
+    tabActive: 'ring-2 ring-[#2f3ba7]/55 shadow-sm border-[#2f3ba7]/55',
     badge: 'border-transparent bg-[#2f3ba7]/15 text-[#2f3ba7]',
     accentBorder: 'border-l-[#2f3ba7]',
+    cardHighlight:
+      'border-[#2f3ba7]/45 bg-[#2f3ba7]/10 ring-2 ring-[#2f3ba7]/35 shadow-sm',
+    panel: 'bg-[#2f3ba7]/5',
   },
   ATTENDED: {
     tab: 'border-[#b58b62]/60 bg-[#b58b62]/25 text-[#5c4030] hover:bg-[#b58b62]/35 dark:text-amber-100',
     tabActive: 'ring-2 ring-[#b58b62]/55 shadow-sm',
     badge: 'border-transparent bg-[#b58b62]/30 text-[#5c4030] dark:text-amber-100',
     accentBorder: 'border-l-[#b58b62]',
+    cardHighlight:
+      'border-[#b58b62]/55 bg-[#b58b62]/15 ring-1 ring-[#b58b62]/45',
+    panel: 'bg-[#b58b62]/10',
   },
 };
 
@@ -153,6 +183,33 @@ export function stageAccentBorderClass(
   const stage = enabledStages(pipeline).find((s) => s.key === stageKey);
   if (!stage) return 'border-l-border';
   return stylesForStage(stage).accentBorder;
+}
+
+export function stageCardHighlightClass(
+  pipeline: ResolvedPipeline | null | undefined,
+  stageKey: string,
+): string {
+  const stage = enabledStages(pipeline).find((s) => s.key === stageKey);
+  if (!stage) return 'border-border bg-card';
+  return stylesForStage(stage).cardHighlight;
+}
+
+export function stagePanelClass(
+  pipeline: ResolvedPipeline | null | undefined,
+  stageKey: string,
+): string {
+  const stage = enabledStages(pipeline).find((s) => s.key === stageKey);
+  if (!stage) return 'bg-transparent';
+  return stylesForStage(stage).panel;
+}
+
+/** Prefer enabled entry stage; else first enabled key. */
+export function entryStageKey(
+  pipeline: ResolvedPipeline | null | undefined,
+  fallback = 'NEW_LEAD',
+): string {
+  const stages = enabledStages(pipeline);
+  return stages.find((s) => s.isEntry)?.key ?? stages[0]?.key ?? fallback;
 }
 
 export function isArchiveBlockedInPipeline(

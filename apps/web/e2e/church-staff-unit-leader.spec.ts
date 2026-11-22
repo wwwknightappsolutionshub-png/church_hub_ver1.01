@@ -39,7 +39,7 @@ test.describe('Church Staff unit leader (UI)', () => {
     leaderEmail = `ui-unit-leader-${Date.now()}@demo.church`;
 
     await page.goto('/dashboard/staff');
-    await expect(page.getByRole('heading', { name: /Church staff/i })).toBeVisible({
+    await expect(page.getByRole('heading', { name: /Church Officers/i })).toBeVisible({
       timeout: 20_000,
     });
 

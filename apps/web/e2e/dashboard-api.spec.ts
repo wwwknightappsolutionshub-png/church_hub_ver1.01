@@ -42,6 +42,30 @@ test.describe('Dashboard extensions API', () => {
     expect(Array.isArray(body.items)).toBeTruthy();
   });
 
+  test('POST calendar event rejects unsanitized / invalid payloads', async ({ request }) => {
+    const badColor = await request.post(`${API_URL}/church-calendar/events`, {
+      headers,
+      data: {
+        title: 'Bad color',
+        startsAt: new Date().toISOString(),
+        highlightColor: 'javascript:alert(1)',
+      },
+    });
+    expect(badColor.status()).toBeGreaterThanOrEqual(400);
+
+    const badDate = await request.post(`${API_URL}/church-calendar/events`, {
+      headers,
+      data: { title: 'Bad date', startsAt: 'not-a-date' },
+    });
+    expect(badDate.status()).toBeGreaterThanOrEqual(400);
+
+    const wideFeed = await request.get(
+      `${API_URL}/church-calendar/feed?from=${encodeURIComponent('2020-01-01T00:00:00.000Z')}&to=${encodeURIComponent('2026-12-31T00:00:00.000Z')}`,
+      { headers },
+    );
+    expect(wideFeed.status()).toBeGreaterThanOrEqual(400);
+  });
+
   test('POST calendar event with highlight', async ({ request }) => {
     const res = await request.post(`${API_URL}/church-calendar/events`, {
       headers,

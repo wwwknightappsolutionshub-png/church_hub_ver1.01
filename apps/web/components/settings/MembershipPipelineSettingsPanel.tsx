@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, Plus, Save } from 'lucide-react';
+import { Check, Loader2, Plus, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
+import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { usePipelineDefinition } from '@/lib/hooks/use-pipeline-definition';
 import type { ResolvedPipeline, ResolvedPipelineStage } from '@/lib/pipeline-definition';
+import { isChurchLeadershipRole } from '@/lib/session-role';
 import { PipelineUpdatesPanel } from '@/components/settings/PipelineUpdatesPanel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -38,17 +40,23 @@ function axiosMessage(err: unknown): string {
 
 export function MembershipPipelineSettingsPanel() {
   const queryClient = useQueryClient();
-  const { pipeline, isLoading, isError, refetch } = usePipelineDefinition();
+  const { userRoles, isLoading: accessLoading } = useModuleAccess();
+  const allowed = isChurchLeadershipRole(userRoles);
+  const { pipeline, isLoading, isError, refetch } = usePipelineDefinition({
+    enabled: allowed,
+  });
   const templatesQuery = useApiQuery<TemplateCatalog>(
     ['follow-up', 'pipeline-templates'],
     '/follow-up/pipeline/templates',
-    { staleTime: 30_000 },
+    { staleTime: 30_000, enabled: allowed },
   );
   const [busy, setBusy] = useState(false);
   const [definitionName, setDefinitionName] = useState('');
   const [drafts, setDrafts] = useState<Record<string, { label: string; shortLabel: string }>>({});
   const [newKey, setNewKey] = useState('');
   const [newLabel, setNewLabel] = useState('');
+  /** Template highlighted in the picker (may differ from the live/active base until Activate). */
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (!pipeline) return;
@@ -59,6 +67,12 @@ export function MembershipPipelineSettingsPanel() {
       ),
     );
   }, [pipeline]);
+
+  useEffect(() => {
+    const preferred =
+      templatesQuery.data?.preferredTemplateKey ?? pipeline?.templateKey ?? null;
+    if (preferred) setSelectedKey((prev) => prev ?? preferred);
+  }, [templatesQuery.data?.preferredTemplateKey, pipeline?.templateKey]);
 
   const invalidate = async (next?: ResolvedPipeline) => {
     if (next) {
@@ -71,13 +85,14 @@ export function MembershipPipelineSettingsPanel() {
     await templatesQuery.refetch();
   };
 
-  const selectTemplate = async (templateKey: string) => {
+  const activateTemplate = async (templateKey: string) => {
     setBusy(true);
     try {
       const { data } = await api.put<ResolvedPipeline>('/follow-up/pipeline/base-template', {
         templateKey,
       });
-      toast.success(`Base template set to ${templateKey}`);
+      setSelectedKey(templateKey);
+      toast.success(`Activated ${templateKey}`);
       await invalidate(data);
     } catch (err) {
       toast.error(axiosMessage(err));
@@ -89,7 +104,7 @@ export function MembershipPipelineSettingsPanel() {
   const discard = async () => {
     if (
       !window.confirm(
-        'Discard the church definition and return to the system template? Stage label edits on the fork will no longer apply.',
+        'Discard church customizations and return to the system template? Label edits will no longer apply.',
       )
     ) {
       return;
@@ -106,7 +121,7 @@ export function MembershipPipelineSettingsPanel() {
     }
   };
 
-  const fork = async () => {
+  const customize = async () => {
     setBusy(true);
     try {
       const preferred = templatesQuery.data?.preferredTemplateKey;
@@ -116,7 +131,7 @@ export function MembershipPipelineSettingsPanel() {
       toast.success(
         data.source === 'definition'
           ? 'Church pipeline ready to customize'
-          : 'Pipeline forked',
+          : 'Pipeline customized',
       );
       await invalidate(data);
     } catch (err) {
@@ -177,10 +192,18 @@ export function MembershipPipelineSettingsPanel() {
     }
   };
 
-  if (isLoading) {
+  if (accessLoading || isLoading) {
     return (
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" /> Loading pipeline…
+      </p>
+    );
+  }
+
+  if (!allowed) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Only Church Admin or Pastor can manage the membership pipeline.
       </p>
     );
   }
@@ -193,9 +216,14 @@ export function MembershipPipelineSettingsPanel() {
     );
   }
 
-  const forked = pipeline.source === 'definition';
+  const customized = pipeline.source === 'definition';
   const stages = [...pipeline.stages].sort((a, b) => a.sortOrder - b.sortOrder);
   const catalog = templatesQuery.data;
+  const activeKey =
+    catalog?.preferredTemplateKey ?? pipeline.templateKey ?? selectedKey ?? null;
+  const pendingKey = selectedKey ?? activeKey;
+  const canActivate =
+    !customized && !!pendingKey && pendingKey !== activeKey && !busy;
 
   return (
     <div className="space-y-6" data-testid="membership-pipeline-settings">
@@ -204,7 +232,7 @@ export function MembershipPipelineSettingsPanel() {
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-heading text-lg font-semibold">{pipeline.name}</h2>
             <Badge variant="outline" data-pipeline-source={pipeline.source}>
-              {forked ? 'Church definition' : 'System template'}
+              {customized ? 'Church definition' : 'System template'}
             </Badge>
             {pipeline.templateKey ? (
               <Badge variant="secondary" data-testid="pipeline-active-template-key">
@@ -213,13 +241,13 @@ export function MembershipPipelineSettingsPanel() {
             ) : null}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            {forked
+            {customized
               ? 'Editing your church’s copy. Changes appear on Establishment tabs immediately.'
-              : 'Pick a system template, preview stages below, then customize to fork a church-owned copy.'}
+              : 'Select a system template, then Activate to use it. Customize to edit labels for your church.'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {forked ? (
+          {customized ? (
             <Button
               type="button"
               variant="outline"
@@ -227,12 +255,12 @@ export function MembershipPipelineSettingsPanel() {
               disabled={busy}
               data-testid="pipeline-discard-btn"
             >
-              Discard fork
+              Discard customizations
             </Button>
           ) : (
             <Button
               type="button"
-              onClick={() => void fork()}
+              onClick={() => void customize()}
               disabled={busy}
               data-testid="pipeline-fork-btn"
             >
@@ -244,7 +272,7 @@ export function MembershipPipelineSettingsPanel() {
       </div>
 
       <PipelineUpdatesPanel
-        enabled={forked}
+        enabled={customized}
         onMerged={(next) => {
           void invalidate(next);
         }}
@@ -254,36 +282,65 @@ export function MembershipPipelineSettingsPanel() {
         className="rounded-xl border border-border bg-card p-4"
         data-testid="pipeline-template-picker"
       >
-        <p className="text-sm font-semibold">System templates</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          {forked
-            ? 'Base template is locked while a church definition is active. Discard the fork to switch.'
-            : 'Select a base journey. Establishment tabs update immediately (before you customize).'}
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold">System templates</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {customized
+                ? 'Base template is locked while a church definition is active. Discard customizations to switch.'
+                : 'Select a base journey, then Activate. Establishment updates when the template is activated.'}
+            </p>
+          </div>
+          {!customized ? (
+            <Button
+              type="button"
+              disabled={!canActivate}
+              onClick={() => pendingKey && void activateTemplate(pendingKey)}
+              data-testid="pipeline-activate-btn"
+            >
+              {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
+              Activate
+            </Button>
+          ) : null}
+        </div>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {(catalog?.templates ?? []).map((tpl) => {
-            const active =
-              (!forked && (tpl.isPreferred || pipeline.templateKey === tpl.key)) ||
-              (forked && pipeline.templateKey === tpl.key);
+            const isActive = activeKey === tpl.key;
+            const isSelected = pendingKey === tpl.key;
             return (
               <button
                 key={tpl.key}
                 type="button"
-                disabled={busy || forked}
+                disabled={busy || customized}
                 data-template-key={tpl.key}
-                data-selected={active ? 'true' : 'false'}
-                onClick={() => void selectTemplate(tpl.key)}
+                data-selected={isSelected ? 'true' : 'false'}
+                data-active={isActive ? 'true' : 'false'}
+                onClick={() => {
+                  if (!customized) setSelectedKey(tpl.key);
+                }}
                 className={cn(
-                  'rounded-lg border p-3 text-left transition',
-                  active
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-primary/40',
-                  forked && 'cursor-not-allowed opacity-70',
+                  'rounded-lg border-2 p-3 text-left transition',
+                  isActive
+                    ? 'border-sky-500 bg-sky-50 shadow-sm ring-2 ring-sky-500/25 dark:border-sky-400 dark:bg-sky-950/40 dark:ring-sky-400/20'
+                    : isSelected
+                      ? 'border-slate-900 bg-slate-50 dark:border-slate-100 dark:bg-slate-900'
+                      : 'border-border hover:border-slate-400',
+                  customized && 'cursor-not-allowed opacity-70',
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-medium">{tpl.name}</p>
-                  <Badge variant={active ? 'default' : 'outline'}>{tpl.stageCount} stages</Badge>
+                  <div className="flex flex-wrap items-center justify-end gap-1.5">
+                    {isActive ? (
+                      <Badge className="bg-sky-600 text-white hover:bg-sky-600">Active</Badge>
+                    ) : null}
+                    {isSelected && !isActive ? (
+                      <Badge variant="outline">Selected</Badge>
+                    ) : null}
+                    <Badge variant={isActive ? 'secondary' : 'outline'}>
+                      {tpl.stageCount} stages
+                    </Badge>
+                  </div>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {tpl.description ?? tpl.key}
@@ -300,7 +357,7 @@ export function MembershipPipelineSettingsPanel() {
         </div>
       </div>
 
-      {forked ? (
+      {customized ? (
         <div className="flex flex-wrap items-end gap-2 rounded-xl border border-border bg-card p-4">
           <div className="min-w-[12rem] flex-1">
             <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -359,7 +416,7 @@ export function MembershipPipelineSettingsPanel() {
                       </label>
                       <Input
                         value={draft.label}
-                        disabled={!forked || busy}
+                        disabled={!customized || busy}
                         onChange={(e) =>
                           setDrafts((d) => ({
                             ...d,
@@ -374,7 +431,7 @@ export function MembershipPipelineSettingsPanel() {
                       </label>
                       <Input
                         value={draft.shortLabel}
-                        disabled={!forked || busy}
+                        disabled={!customized || busy}
                         onChange={(e) =>
                           setDrafts((d) => ({
                             ...d,
@@ -385,7 +442,7 @@ export function MembershipPipelineSettingsPanel() {
                     </div>
                   </div>
                 </div>
-                {forked ? (
+                {customized ? (
                   <Button
                     type="button"
                     size="sm"
@@ -402,7 +459,7 @@ export function MembershipPipelineSettingsPanel() {
         </ul>
       </div>
 
-      {forked ? (
+      {customized ? (
         <div className="rounded-xl border border-dashed border-border bg-muted/20 p-4">
           <p className="text-sm font-semibold">Add stage</p>
           <p className="mt-0.5 text-xs text-muted-foreground">

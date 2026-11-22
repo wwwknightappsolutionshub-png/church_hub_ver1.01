@@ -136,13 +136,13 @@ export function PipelineUpdatesPanel({ enabled, onMerged }: PipelineUpdatesPanel
               {data.updatesAvailable ? 'Updates available' : 'Template up to date'}
             </p>
             <Badge variant="outline">
-              fork v{data.forkedFromVersion ?? '—'} → template v{data.templateVersion ?? '—'}
+              church v{data.forkedFromVersion ?? '—'} → template v{data.templateVersion ?? '—'}
             </Badge>
             {data.templateKey ? <Badge variant="secondary">{data.templateKey}</Badge> : null}
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
             {data.updatesAvailable
-              ? 'The system template has changed since you forked. Review the diff, then merge or dismiss.'
+              ? 'The system template has changed since you customized. Review the diff, then merge or dismiss.'
               : 'Your church definition is aligned with the current template version.'}
           </p>
         </div>

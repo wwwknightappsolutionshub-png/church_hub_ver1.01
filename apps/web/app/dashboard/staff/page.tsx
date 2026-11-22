@@ -149,7 +149,7 @@ export default function ChurchStaffPage() {
   return (
     <DashboardModuleShell
       eyebrow="Administration"
-      title="Church staff"
+      title="Church Officers"
       description={MODULE_DESCRIPTIONS.staff}
       actions={
         <Button onClick={openCreate}>

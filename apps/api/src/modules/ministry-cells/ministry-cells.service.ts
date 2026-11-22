@@ -148,11 +148,100 @@ export class MinistryCellsService {
       include: branchListInclude,
       orderBy: { name: 'asc' },
     });
-    return branches.map((b) => this.mapBranchListRow(b));
+    const latestByBranch = await this.latestAttendanceByBranchIds(
+      churchId,
+      branches.map((b) => b.id),
+    );
+    return branches.map((b) =>
+      this.mapBranchListRow(b, latestByBranch.get(b.id) ?? null),
+    );
+  }
+
+  /**
+   * Leadership roster of assigned cell leaders — no member PII payload.
+   * Admin/Pastor only (full church). Provincial leaders get province-scoped rows.
+   */
+  async listCellMinisters(user: AuthUser, churchId: string) {
+    const ctx = await this.access.assertCanAccess(user, churchId);
+    if (ctx.role !== 'admin' && ctx.role !== 'pastor' && ctx.role !== 'provincialLeader') {
+      throw new ForbiddenException('Only church leadership can view the cell ministers roster');
+    }
+
+    const where =
+      ctx.role === 'provincialLeader'
+        ? this.branchWhere(
+            churchId,
+            ctx.role,
+            ctx.leaderBranchId,
+            ctx.leaderProvinceId,
+            ctx.deputyBranchIds,
+            ctx.deputyProvinceIds,
+          )
+        : { churchId, leaderUserId: { not: null } };
+
+    const branches = await this.prisma.cellBranch.findMany({
+      where:
+        ctx.role === 'provincialLeader'
+          ? { ...where, leaderUserId: { not: null } }
+          : where,
+      select: {
+        id: true,
+        name: true,
+        location: true,
+        postcode: true,
+        createdAt: true,
+        leader: { select: { id: true, firstName: true, lastName: true, email: true } },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    const latestByBranch = await this.latestAttendanceByBranchIds(
+      churchId,
+      branches.map((b) => b.id),
+    );
+
+    return branches
+      .filter((b) => b.leader)
+      .map((b) => ({
+        id: b.id,
+        ministerName: `${b.leader!.firstName} ${b.leader!.lastName}`.trim(),
+        ministerEmail: b.leader!.email,
+        cellName: b.name,
+        createdAt: b.createdAt,
+        postcode: b.postcode,
+        location: b.location,
+        latestAttendance: latestByBranch.get(b.id)
+          ? {
+              presentCount: latestByBranch.get(b.id)!.presentCount,
+              weekStart: latestByBranch.get(b.id)!.weekStart,
+            }
+          : null,
+      }))
+      .sort((a, b) => a.ministerName.localeCompare(b.ministerName));
+  }
+
+  private async latestAttendanceByBranchIds(churchId: string, branchIds: string[]) {
+    const latestByBranch = new Map<string, { presentCount: number; weekStart: Date }>();
+    if (!branchIds.length) return latestByBranch;
+    const attendanceRows = await this.prisma.cellAttendance.findMany({
+      where: { churchId, branchId: { in: branchIds } },
+      orderBy: { weekStart: 'desc' },
+      select: { branchId: true, presentCount: true, weekStart: true },
+    });
+    for (const row of attendanceRows) {
+      if (!latestByBranch.has(row.branchId)) {
+        latestByBranch.set(row.branchId, {
+          presentCount: row.presentCount,
+          weekStart: row.weekStart,
+        });
+      }
+    }
+    return latestByBranch;
   }
 
   private mapBranchListRow(
     b: Prisma.CellBranchGetPayload<{ include: typeof branchListInclude }>,
+    latestAttendance: { presentCount: number; weekStart: Date } | null = null,
   ) {
     return {
       id: b.id,
@@ -176,6 +265,7 @@ export class MinistryCellsService {
       createdAt: b.createdAt,
       memberCount: b._count.members,
       incidentCount: b._count.incidents,
+      latestAttendance,
       members: b.members.map((row) => ({
         id: row.member.id,
         firstName: row.member.firstName,

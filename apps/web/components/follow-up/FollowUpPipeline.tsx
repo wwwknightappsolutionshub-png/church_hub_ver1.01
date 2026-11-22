@@ -1,10 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowRight,
   Eye,
   HeartHandshake,
+  Loader2,
   Phone,
   Sprout,
   User,
@@ -26,7 +27,9 @@ import {
   phaseColumnsFromPipeline,
   stageAccentBorderClass,
   stageBadgeClass,
+  stageCardHighlightClass,
   stageLabelMap,
+  stagePanelClass,
   stageShortMap,
   type PipelinePhaseColumn,
   type ResolvedPipeline,
@@ -80,6 +83,10 @@ interface FollowUpPipelineProps {
   onSelect: (id: string) => void;
   /** Resolved membership pipeline (Phase 3). Falls back to static winners_default maps. */
   pipeline?: ResolvedPipeline | null;
+  /** Active stage tab — drives the single card box (defaults to first item’s stage / entry). */
+  activeStage?: string | null;
+  /** Unfiltered contacts for phase-strip totals (defaults to `items`). */
+  overviewItems?: FollowUpCard[];
   canArchive?: boolean;
   canRequestArchive?: boolean;
   onArchive?: (id: string, reason: string) => void | Promise<void>;
@@ -94,6 +101,9 @@ const PHASE_ICONS: Record<string, LucideIcon> = {
   engagement: Sprout,
   belonging: HeartHandshake,
 };
+
+/** Cards revealed per infinite-scroll page. */
+const STAGE_BOARD_PAGE_SIZE = 12;
 
 function fallbackPhaseColumns(): PipelinePhaseColumn[] {
   return PIPELINE_COLUMNS.map((col) => ({
@@ -157,6 +167,9 @@ function LeadCard({
   const accentClass = pipeline
     ? stageAccentBorderClass(pipeline, item.stage)
     : 'border-l-border';
+  const highlightClass = pipeline
+    ? stageCardHighlightClass(pipeline, item.stage)
+    : 'border-border bg-card';
 
   const showArchive = !archiveBlocked && canArchive && onArchiveClick;
   const showDnd = !archiveBlocked && canRequestArchive && !canArchive && onDndClick;
@@ -169,6 +182,7 @@ function LeadCard({
       className={cn(
         'relative h-full border-l-4 transition-shadow hover:shadow-elevated',
         accentClass,
+        highlightClass,
         selected &&
           'border-2 border-amber-500 bg-gradient-to-br from-amber-50 via-amber-100/80 to-orange-50 shadow-md ring-2 ring-amber-400/50',
         archiveRequested && !selected && 'ring-1 ring-destructive/40',
@@ -318,6 +332,8 @@ export function FollowUpPipeline({
   selectedId,
   onSelect,
   pipeline,
+  activeStage,
+  overviewItems,
   canArchive,
   canRequestArchive,
   onArchive,
@@ -331,6 +347,8 @@ export function FollowUpPipeline({
     contactName: string;
     mode: 'archive' | 'dnd' | 'decline';
   } | null>(null);
+  const [visibleCount, setVisibleCount] = useState(STAGE_BOARD_PAGE_SIZE);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const phaseColumns = useMemo(() => {
     const fromApi = phaseColumnsFromPipeline(pipeline);
@@ -343,6 +361,50 @@ export function FollowUpPipeline({
   }, [pipeline]);
 
   const shorts = useMemo(() => stageShortMap(pipeline), [pipeline]);
+
+  const stageKey = activeStage || items[0]?.stage || 'NEW_LEAD';
+  const stageItems = useMemo(
+    () =>
+      sortByNewestFirst(
+        activeStage ? items.filter((f) => f.stage === activeStage) : items,
+      ),
+    [items, activeStage],
+  );
+  const phaseCountSource = overviewItems ?? items;
+  const stageLabel = labels[stageKey] ?? STAGE_LABELS[stageKey] ?? stageKey;
+  const activePhase = phaseColumns.find((col) => col.stages.includes(stageKey));
+  const panelClass = pipeline
+    ? stagePanelClass(pipeline, stageKey)
+    : 'bg-transparent';
+
+  useEffect(() => {
+    setVisibleCount(STAGE_BOARD_PAGE_SIZE);
+  }, [stageKey, stageItems.length]);
+
+  const visibleItems = useMemo(
+    () => stageItems.slice(0, visibleCount),
+    [stageItems, visibleCount],
+  );
+  const hasMore = visibleCount < stageItems.length;
+
+  useEffect(() => {
+    if (!hasMore) return;
+    const node = loadMoreRef.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setVisibleCount((prev) =>
+            Math.min(prev + STAGE_BOARD_PAGE_SIZE, stageItems.length),
+          );
+        }
+      },
+      { root: null, rootMargin: '240px 0px', threshold: 0 },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore, stageItems.length, visibleCount]);
 
   const cardActions = (item: FollowUpCard) => ({
     canArchive,
@@ -405,13 +467,22 @@ export function FollowUpPipeline({
       >
         {phaseColumns.map((col, i) => {
           const Icon = PHASE_ICONS[col.id] ?? Users;
-          const count = items.filter((f) => col.stages.includes(f.stage)).length;
+          const count = phaseCountSource.filter((f) =>
+            col.stages.includes(f.stage),
+          ).length;
+          const phaseActive = activePhase?.id === col.id;
           return (
             <div key={col.id} className="relative min-w-0">
               {i < phaseColumns.length - 1 && (
                 <ArrowRight className="absolute -right-3 top-1/2 z-10 hidden h-5 w-5 -translate-y-1/2 text-muted-foreground/40 md:block" />
               )}
-              <div className={cn('rounded-xl border px-4 py-3.5', col.headerClass)}>
+              <div
+                className={cn(
+                  'rounded-xl border px-4 py-3.5 transition',
+                  col.headerClass,
+                  phaseActive && 'shadow-md ring-2 ring-foreground/15 ring-offset-2 ring-offset-background',
+                )}
+              >
                 <div className="flex gap-3">
                   <div
                     className={cn(
@@ -436,6 +507,7 @@ export function FollowUpPipeline({
                     ) : null}
                     <p className="mt-1 text-xs font-medium text-muted-foreground">
                       {count} in this phase
+                      {phaseActive ? ` · viewing ${stageLabel}` : ''}
                     </p>
                   </div>
                 </div>
@@ -445,47 +517,73 @@ export function FollowUpPipeline({
         })}
       </div>
 
-      <div className="space-y-8">
-        {phaseColumns.map((col) => {
-          const phaseItems = sortByNewestFirst(
-            items.filter((f) => col.stages.includes(f.stage)),
-          );
-          return (
-            <section key={col.id} className="space-y-3" data-phase={col.id}>
-              <div className="flex items-center gap-2 px-0.5">
-                <span className={cn('h-2.5 w-2.5 rounded-full', col.dotClass)} />
-                <h4 className={cn('font-heading text-sm font-bold', col.titleClass)}>
-                  Phase {col.step}: {col.title}
-                </h4>
-                <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-foreground">
-                  {phaseItems.length}
-                </span>
-              </div>
+      <section
+        className={cn('space-y-4 rounded-2xl px-0.5 py-1', panelClass)}
+        data-testid="pipeline-stage-board"
+        data-stage={stageKey}
+        data-phase={activePhase?.id}
+      >
+        <div className="flex flex-wrap items-center gap-2 px-0.5">
+          <span
+            className={cn(
+              'h-2.5 w-2.5 rounded-full',
+              activePhase?.dotClass ?? 'bg-muted-foreground',
+            )}
+          />
+          <h4
+            className={cn(
+              'font-heading text-sm font-bold',
+              activePhase?.titleClass ?? 'text-foreground',
+            )}
+          >
+            {stageLabel}
+          </h4>
+          {activePhase ? (
+            <span className="text-xs text-muted-foreground">
+              Phase {activePhase.step}: {activePhase.title}
+            </span>
+          ) : null}
+          <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-foreground">
+            {stageItems.length}
+          </span>
+        </div>
 
-              {phaseItems.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-10 text-center text-sm text-muted-foreground">
-                  No one in this phase yet
-                </p>
-              ) : (
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {phaseItems.map((item) => (
-                    <LeadCard
-                      key={item.id}
-                      item={item}
-                      selected={selectedId === item.id}
-                      onSelect={() => onSelect(item.id)}
-                      pipeline={pipeline}
-                      labels={labels}
-                      shorts={shorts}
-                      {...cardActions(item)}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
-          );
-        })}
-      </div>
+        {stageItems.length === 0 ? (
+          <p
+            className="rounded-xl bg-muted/20 px-4 py-12 text-center text-sm font-medium text-muted-foreground"
+            data-testid="pipeline-stage-empty"
+          >
+            No Data Available
+          </p>
+        ) : (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {visibleItems.map((item) => (
+                <LeadCard
+                  key={item.id}
+                  item={item}
+                  selected={selectedId === item.id}
+                  onSelect={() => onSelect(item.id)}
+                  pipeline={pipeline}
+                  labels={labels}
+                  shorts={shorts}
+                  {...cardActions(item)}
+                />
+              ))}
+            </div>
+            {hasMore ? (
+              <div
+                ref={loadMoreRef}
+                className="flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground"
+                data-testid="pipeline-stage-load-more"
+              >
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Loading more…
+              </div>
+            ) : null}
+          </>
+        )}
+      </section>
     </div>
   );
 }

@@ -677,3 +677,150 @@ export const MapBranchProvinceSchema = z.object({
     .pipe(z.string().min(1, 'Province is required')),
 });
 export type MapBranchProvinceInput = z.infer<typeof MapBranchProvinceSchema>;
+
+const HEX_COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+function parseIsoDateRequired(value: unknown, label: string): Date {
+  const raw = sanitizeText(value, 40);
+  const d = new Date(raw);
+  if (!raw || Number.isNaN(d.getTime())) {
+    throw new Error(`${label} must be a valid date`);
+  }
+  return d;
+}
+
+/** Church calendar create — sanitize + bound title/description/color/dates. */
+export const CreateChurchCalendarEventSchema = z
+  .object({
+    title: z
+      .string()
+      .transform((v) => sanitizeText(v, 120))
+      .pipe(z.string().min(1, 'Event title is required').max(120)),
+    description: z
+      .union([z.string(), z.literal(''), z.undefined(), z.null()])
+      .transform((v) => {
+        if (v == null || v === '') return undefined;
+        const s = sanitizeText(v, 2000);
+        return s || undefined;
+      })
+      .optional(),
+    startsAt: z.string().min(1, 'startsAt is required'),
+    endsAt: z.union([z.string(), z.literal(''), z.undefined(), z.null()]).optional(),
+    allDay: z.boolean().optional(),
+    isPinned: z.boolean().optional(),
+    highlightColor: z
+      .union([z.string(), z.literal(''), z.undefined(), z.null()])
+      .transform((v) => {
+        if (v == null || v === '') return undefined;
+        const s = sanitizeText(v, 16);
+        return s || undefined;
+      })
+      .optional(),
+  })
+  .superRefine((data, ctx) => {
+    try {
+      parseIsoDateRequired(data.startsAt, 'startsAt');
+    } catch (e) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: e instanceof Error ? e.message : 'Invalid startsAt',
+        path: ['startsAt'],
+      });
+    }
+    if (data.endsAt) {
+      try {
+        parseIsoDateRequired(data.endsAt, 'endsAt');
+      } catch (e) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: e instanceof Error ? e.message : 'Invalid endsAt',
+          path: ['endsAt'],
+        });
+      }
+    }
+    if (data.highlightColor && !HEX_COLOR_RE.test(data.highlightColor)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'highlightColor must be a hex color (#RGB or #RRGGBB)',
+        path: ['highlightColor'],
+      });
+    }
+  })
+  .transform((data) => {
+    const startsAt = parseIsoDateRequired(data.startsAt, 'startsAt').toISOString();
+    const endsAt = data.endsAt
+      ? parseIsoDateRequired(data.endsAt, 'endsAt').toISOString()
+      : undefined;
+    return {
+      title: data.title,
+      description: data.description,
+      startsAt,
+      endsAt,
+      allDay: data.allDay ?? true,
+      isPinned: data.isPinned ?? false,
+      highlightColor: data.highlightColor,
+    };
+  });
+export type CreateChurchCalendarEventInput = z.infer<typeof CreateChurchCalendarEventSchema>;
+
+export const UpdateChurchCalendarEventSchema = z
+  .object({
+    title: z
+      .string()
+      .transform((v) => sanitizeText(v, 120))
+      .pipe(z.string().min(1).max(120))
+      .optional(),
+    description: z
+      .union([z.string(), z.literal(''), z.null(), z.undefined()])
+      .transform((v) => {
+        if (v === undefined) return undefined;
+        if (v === null) return null;
+        const s = sanitizeText(v, 2000);
+        return s || null;
+      })
+      .optional(),
+    startsAt: z.string().optional(),
+    endsAt: z.union([z.string(), z.literal(''), z.null(), z.undefined()]).optional(),
+    allDay: z.boolean().optional(),
+    isPinned: z.boolean().optional(),
+    highlightColor: z
+      .union([z.string(), z.literal(''), z.null(), z.undefined()])
+      .transform((v) => {
+        if (v === undefined) return undefined;
+        if (v === null || v === '') return null;
+        return sanitizeText(v, 16) || null;
+      })
+      .optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.startsAt !== undefined) {
+      try {
+        parseIsoDateRequired(data.startsAt, 'startsAt');
+      } catch (e) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: e instanceof Error ? e.message : 'Invalid startsAt',
+          path: ['startsAt'],
+        });
+      }
+    }
+    if (data.endsAt) {
+      try {
+        parseIsoDateRequired(data.endsAt, 'endsAt');
+      } catch (e) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: e instanceof Error ? e.message : 'Invalid endsAt',
+          path: ['endsAt'],
+        });
+      }
+    }
+    if (data.highlightColor && !HEX_COLOR_RE.test(data.highlightColor)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'highlightColor must be a hex color (#RGB or #RRGGBB)',
+        path: ['highlightColor'],
+      });
+    }
+  });
+export type UpdateChurchCalendarEventInput = z.infer<typeof UpdateChurchCalendarEventSchema>;

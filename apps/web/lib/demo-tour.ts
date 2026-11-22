@@ -46,7 +46,7 @@ const STEP_CAPTIONS: Record<string, string> = {
   '/dashboard/pastor-reports':
     'Pastor reports — leadership digest and congregation health signals.',
   '/dashboard/staff':
-    'Church staff — roles, permissions, and team invitations.',
+    'Church Officers — roles, permissions, and team invitations.',
   '/dashboard/communications':
     'Communication Hub — broadcasts, segments, and corporate messaging.',
   '/dashboard/sermon-notes':

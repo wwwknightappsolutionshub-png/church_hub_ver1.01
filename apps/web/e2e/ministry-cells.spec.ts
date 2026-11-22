@@ -35,6 +35,10 @@ test.describe('Ministry/Cells end-to-end', () => {
 
   test.beforeEach(async ({ page, request }) => {
     await seedAuth(page, request);
+    const cookies = page.getByRole('button', { name: /Essential only|Accept all/i });
+    if (await cookies.first().isVisible().catch(() => false)) {
+      await cookies.first().click();
+    }
   });
 
   test('API context and module access', async ({ request }) => {
@@ -49,12 +53,17 @@ test.describe('Ministry/Cells end-to-end', () => {
 
   test('page loads with branches tab', async ({ page }) => {
     await page.goto('/dashboard/ministry-cells');
+    const cookies = page.getByRole('button', { name: /Essential only|Accept all/i });
+    if (await cookies.first().isVisible().catch(() => false)) {
+      await cookies.first().click();
+    }
     await expect(page.getByRole('heading', { name: 'Ministry/Cells' })).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.getByRole('button', { name: 'Branches' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Cell Performance' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Branches' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('tab', { name: 'Analytics' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Setup' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Cell Ministers' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add New Cell' })).toBeVisible();
   });
 
@@ -271,9 +280,42 @@ test.describe('Ministry/Cells end-to-end', () => {
 
   test('branches tab keeps Add New Cell visible', async ({ page }) => {
     await page.goto('/dashboard/ministry-cells');
-    await page.getByRole('button', { name: 'Cell Performance' }).click();
-    await page.getByRole('button', { name: 'Branches' }).click();
+    await page.getByRole('tab', { name: 'Analytics' }).click();
+    await page.getByRole('tab', { name: 'Branches' }).click();
     await expect(page.getByRole('button', { name: 'Add New Cell' })).toBeVisible();
+  });
+
+  test('Cell Ministers page + API roster', async ({ page, request }) => {
+    const headers = await authHeaders(request);
+    const apiRes = await request.get(`${API_URL}/ministry-cells/ministers`, { headers });
+    expect(apiRes.ok()).toBeTruthy();
+    const roster = await apiRes.json();
+    expect(Array.isArray(roster)).toBeTruthy();
+
+    await page.goto('/dashboard/ministry-cells');
+    await expect(page.getByRole('link', { name: 'Cell Ministers' })).toBeVisible({
+      timeout: 15_000,
+    });
+    await page.getByRole('link', { name: 'Cell Ministers' }).click();
+    await expect(page).toHaveURL(/\/dashboard\/ministry-cells\/ministers/);
+    await expect(page.getByTestId('cell-ministers-page')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('columnheader', { name: 'S/N' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: "Minister's Name" })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Cell Name' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Created On' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Cell Postcode' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Cell Area' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Last Attendance' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Lookup' })).toBeVisible();
+
+    const liveRows = page.getByTestId('cell-minister-row');
+    const empty = page.getByTestId('cell-ministers-empty');
+    const rowCount = await liveRows.count();
+    if (rowCount > 0) {
+      await expect(liveRows.first().getByRole('link', { name: 'Lookup' })).toBeVisible();
+    } else {
+      await expect(empty).toBeVisible();
+    }
   });
 
   test('cancel buttons close forms without submitting', async ({ page, request }) => {
@@ -285,11 +327,12 @@ test.describe('Ministry/Cells end-to-end', () => {
 
     await page.goto('/dashboard/ministry-cells');
 
-    // Add New Cell toggle open/close
+    // Add New Cell modal open/close
     await page.getByRole('button', { name: 'Add New Cell' }).click();
+    await expect(page.getByTestId('add-new-cell-modal')).toBeVisible();
     await expect(page.locator('#name')).toBeVisible();
-    await page.getByRole('button', { name: 'Add New Cell' }).click();
-    await expect(page.locator('#name')).not.toBeVisible();
+    await page.getByTestId('add-new-cell-modal').getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByTestId('add-new-cell-modal')).not.toBeVisible();
 
     // Edit branch cancel
     await selectBranch(page, branch.name);

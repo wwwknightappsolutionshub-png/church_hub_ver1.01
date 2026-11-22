@@ -99,8 +99,7 @@ export class FollowUpController {
   @Patch('pipeline/stages/:key')
   @Roles('ADMIN', 'PASTOR')
   @ApiOperation({
-    summary:
-      'Update a forked stage (label, order, color, entry/enabled). Cannot change archive/SLA flags or disable in-use stages.',
+    summary: 'Rename a customized stage label/shortLabel (presentation only)',
   })
   patchPipelineStage(
     @ChurchId() churchId: string,

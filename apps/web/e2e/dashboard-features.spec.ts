@@ -21,6 +21,18 @@ test.describe('Dashboard feature UI', () => {
     await expect(page.getByText('Recent Activity')).toHaveCount(0);
   });
 
+  test('calendar day double-click opens modal', async ({ page }) => {
+    await page.goto('/dashboard');
+    const calendar = page.getByTestId('dashboard-church-calendar');
+    await expect(calendar).toBeVisible({ timeout: 15_000 });
+    await expect(calendar.getByText(/double click to add events/i)).toBeVisible();
+    const dayButton = calendar.locator('button[aria-label*="Double-click to open"]').first();
+    await dayButton.dblclick();
+    await expect(page.getByTestId('calendar-day-modal')).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId('calendar-day-modal').getByRole('button', { name: 'Close' }).click();
+    await expect(page.getByTestId('calendar-day-modal')).not.toBeVisible();
+  });
+
   test('automation email templates WYSIWYG editor', async ({ page }) => {
     await page.goto('/dashboard/automation');
     await page.getByTestId('automation-email-templates-tab').click();

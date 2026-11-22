@@ -119,17 +119,25 @@ export class ChurchCalendarService {
     },
   ) {
     if (!data.title?.trim()) throw new BadRequestException('Title is required');
+    const startsAt = new Date(data.startsAt);
+    if (Number.isNaN(startsAt.getTime())) {
+      throw new BadRequestException('startsAt must be a valid date');
+    }
+    const endsAt = data.endsAt ? new Date(data.endsAt) : undefined;
+    if (endsAt && Number.isNaN(endsAt.getTime())) {
+      throw new BadRequestException('endsAt must be a valid date');
+    }
     return this.prisma.churchCalendarEvent.create({
       data: {
         churchId,
-        title: data.title.trim(),
-        description: data.description?.trim(),
-        startsAt: new Date(data.startsAt),
-        endsAt: data.endsAt ? new Date(data.endsAt) : undefined,
-        allDay: data.allDay ?? false,
+        title: data.title.trim().slice(0, 120),
+        description: data.description?.trim().slice(0, 2000) || undefined,
+        startsAt,
+        endsAt,
+        allDay: data.allDay ?? true,
         kind: ChurchCalendarEventKind.EVENT,
         isPinned: data.isPinned ?? false,
-        highlightColor: data.highlightColor?.trim() || null,
+        highlightColor: data.highlightColor?.trim().slice(0, 16) || null,
         createdByUserId: userId,
       },
     });
@@ -149,18 +157,44 @@ export class ChurchCalendarService {
     }>,
   ) {
     await this.assertEvent(churchId, id);
+    if (data.startsAt !== undefined) {
+      const startsAt = new Date(data.startsAt);
+      if (Number.isNaN(startsAt.getTime())) {
+        throw new BadRequestException('startsAt must be a valid date');
+      }
+    }
+    if (data.endsAt) {
+      const endsAt = new Date(data.endsAt);
+      if (Number.isNaN(endsAt.getTime())) {
+        throw new BadRequestException('endsAt must be a valid date');
+      }
+    }
     return this.prisma.churchCalendarEvent.update({
       where: { id },
       data: {
-        ...(data.title !== undefined ? { title: data.title.trim() } : {}),
-        ...(data.description !== undefined ? { description: data.description } : {}),
+        ...(data.title !== undefined ? { title: data.title.trim().slice(0, 120) } : {}),
+        ...(data.description !== undefined
+          ? {
+              description:
+                data.description === null
+                  ? null
+                  : data.description.trim().slice(0, 2000) || null,
+            }
+          : {}),
         ...(data.startsAt !== undefined ? { startsAt: new Date(data.startsAt) } : {}),
         ...(data.endsAt !== undefined
           ? { endsAt: data.endsAt ? new Date(data.endsAt) : null }
           : {}),
         ...(data.allDay !== undefined ? { allDay: data.allDay } : {}),
         ...(data.isPinned !== undefined ? { isPinned: data.isPinned } : {}),
-        ...(data.highlightColor !== undefined ? { highlightColor: data.highlightColor } : {}),
+        ...(data.highlightColor !== undefined
+          ? {
+              highlightColor:
+                data.highlightColor === null
+                  ? null
+                  : data.highlightColor.trim().slice(0, 16) || null,
+            }
+          : {}),
       },
     });
   }

@@ -31,17 +31,10 @@ export type PipelineTemplateSummary = {
   isPreferred: boolean;
 };
 
-/** Church-facing stage edits — presentation + entry/enabled only (not archive/SLA policy). */
+/** Church-facing stage PATCH — labels only (structure/flags via add-stage / product templates). */
 export type PatchStageInput = {
   label?: string;
   shortLabel?: string;
-  sortOrder?: number;
-  phaseKey?: string;
-  phaseStep?: number;
-  phaseTitle?: string;
-  colorToken?: string | null;
-  isEntry?: boolean;
-  isEnabled?: boolean;
 };
 
 export type AddStageInput = {
@@ -247,32 +240,24 @@ export class PipelineDefinitionService {
     });
     if (!stage) throw new NotFoundException(`Stage not found: ${key}`);
 
-    // Reject policy flags if a client still sends them (mass-assignment hardening).
-    const raw = patch as PatchStageInput & {
-      blocksArchive?: unknown;
-      graduatesSla?: unknown;
-    };
-    if (raw.blocksArchive !== undefined || raw.graduatesSla !== undefined) {
+    // Mass-assignment harden: church PATCH may only rename presentation labels.
+    const raw = patch as Record<string, unknown>;
+    const blocked = [
+      'blocksArchive',
+      'graduatesSla',
+      'isEntry',
+      'isEnabled',
+      'sortOrder',
+      'phaseKey',
+      'phaseStep',
+      'phaseTitle',
+      'colorToken',
+      'key',
+    ];
+    if (blocked.some((field) => raw[field] !== undefined)) {
       throw new BadRequestException(
-        'blocksArchive and graduatesSla cannot be changed on church definitions (product policy)',
+        'Stage PATCH only accepts label and shortLabel on church definitions',
       );
-    }
-
-    if (patch.isEnabled === false && stage.isEnabled) {
-      await this.assertStageNotInUse(churchId, key);
-    }
-
-    if (patch.isEntry === false && stage.isEntry) {
-      throw new BadRequestException(
-        'Set isEntry on another stage instead of clearing the only entry stage',
-      );
-    }
-
-    if (patch.isEntry === true) {
-      await this.prisma.pipelineStage.updateMany({
-        where: { definitionId: def.id, isEntry: true },
-        data: { isEntry: false },
-      });
     }
 
     const data: Record<string, unknown> = {};
@@ -280,23 +265,6 @@ export class PipelineDefinitionService {
     if (patch.shortLabel !== undefined) {
       data.shortLabel = assertLabel(patch.shortLabel, 'shortLabel');
     }
-    if (patch.sortOrder !== undefined) {
-      if (!Number.isInteger(patch.sortOrder) || patch.sortOrder < 1 || patch.sortOrder > 999) {
-        throw new BadRequestException('sortOrder must be an integer from 1–999');
-      }
-      data.sortOrder = patch.sortOrder;
-    }
-    Object.assign(
-      data,
-      assertOptionalPhaseFields({
-        phaseKey: patch.phaseKey,
-        phaseStep: patch.phaseStep,
-        phaseTitle: patch.phaseTitle,
-        colorToken: patch.colorToken,
-      }),
-    );
-    if (patch.isEntry !== undefined) data.isEntry = patch.isEntry;
-    if (patch.isEnabled !== undefined) data.isEnabled = patch.isEnabled;
 
     if (Object.keys(data).length === 0) {
       throw new BadRequestException('No stage fields to update');
@@ -307,7 +275,6 @@ export class PipelineDefinitionService {
       data,
     });
 
-    await this.assertExactlyOneEntry(def.id);
     return this.resolve.resolveForChurch(churchId);
   }
 
@@ -384,17 +351,6 @@ export class PipelineDefinitionService {
       );
     }
     return def;
-  }
-
-  private async assertStageNotInUse(churchId: string, stageKey: string) {
-    const inUse = await this.prisma.followUp.count({
-      where: { churchId, stage: stageKey, archivedAt: null },
-    });
-    if (inUse > 0) {
-      throw new BadRequestException(
-        `Cannot disable stage "${stageKey}" — ${inUse} active contact(s) still use it`,
-      );
-    }
   }
 
   private async assertExactlyOneEntry(definitionId: string) {

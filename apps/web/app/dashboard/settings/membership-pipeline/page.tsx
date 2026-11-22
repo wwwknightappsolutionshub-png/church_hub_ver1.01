@@ -11,8 +11,9 @@ import {
   EnterpriseContent,
   EnterpriseHero,
   EnterpriseShell,
+  enterpriseHeroChipClass,
 } from '@/components/layout/EnterpriseModuleShell';
-import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 function MembershipPipelineSettingsContent() {
   const { userRoles, isLoading } = useModuleAccess();
@@ -39,14 +40,18 @@ export default function MembershipPipelineSettingsPage() {
       <EnterpriseShell>
         <EnterpriseHero
           title="Membership Pipeline"
-          description="Choose a system template, customize (fork) your church journey, and merge product updates when available."
+          description="Choose a system template, activate it for Establishment, and customize labels for your church when needed."
           actions={
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/dashboard/settings">
-                <ChevronLeft className="mr-1 h-4 w-4" />
-                Settings
-              </Link>
-            </Button>
+            <Link
+              href="/dashboard/settings"
+              className={cn(
+                'inline-flex h-9 items-center rounded-md px-3 text-sm',
+                enterpriseHeroChipClass,
+              )}
+            >
+              <ChevronLeft className="mr-1 h-4 w-4" />
+              Settings
+            </Link>
           }
         />
         <EnterpriseContent className="pb-24 md:pb-8">

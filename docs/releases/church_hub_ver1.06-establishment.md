@@ -24,7 +24,7 @@ Splits field **Outreach** from the **Establishment** membership pipeline, then d
 - Docs: admin how-to + agent note; full regression GO
 
 ### Security harden
-- `bump` / `resync` require `PIPELINE_QA_TOOLS=true` (shared templates; never enable in production)
+- `bump` / `resync` require `PIPELINE_QA_TOOLS=true` and are hard-blocked when `NODE_ENV=production` (shared templates; never enable in production)
 - Church stage patch cannot change `blocksArchive` / `graduatesSla`
 - Stage key + phase field validation
 

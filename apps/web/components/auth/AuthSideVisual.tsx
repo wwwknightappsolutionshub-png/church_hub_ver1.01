@@ -1,12 +1,6 @@
 'use client';
 
-import {
-  BarChart3,
-  CheckCircle2,
-  Lock,
-  ShieldCheck,
-  Users,
-} from 'lucide-react';
+import { BarChart3, CheckCircle2 } from 'lucide-react';
 import { BrandMark } from '@/components/brand/BrandMark';
 import { cn } from '@/lib/utils';
 
@@ -27,7 +21,7 @@ const REGISTER_FEATURES = [
 const COPY = {
   login: {
     eyebrow: 'Trusted by growing congregations',
-    title: 'Operate your church like an enterprise',
+    title: 'Manage your church with clarity',
     description:
       'One secure workspace for pastors, leaders, and members — membership, discipleship, outreach, and operations without spreadsheet chaos.',
     features: LOGIN_FEATURES,
@@ -41,18 +35,12 @@ const COPY = {
   },
 } as const;
 
-const TRUST_PILLS = [
-  { icon: ShieldCheck, label: 'RBAC & audit logs' },
-  { icon: Lock, label: 'Tenant isolation' },
-  { icon: Users, label: 'Multi-campus ready' },
-];
-
 interface AuthSideVisualProps {
   variant: 'login' | 'register';
   className?: string;
 }
 
-function EnterpriseDashboardMock() {
+function DashboardMock() {
   return (
     <div
       className="relative mx-auto w-full max-w-md overflow-hidden rounded-xl border border-white/15 bg-slate-950/60 shadow-2xl backdrop-blur-sm"
@@ -88,7 +76,7 @@ function EnterpriseDashboardMock() {
             {[
               { label: 'Members', value: '2.8k' },
               { label: 'Outreach', value: '78%' },
-              { label: 'Outreach', value: '+24%' },
+              { label: 'Growth', value: '+24%' },
             ].map((s) => (
               <div key={s.label} className="rounded-lg bg-white/5 px-2 py-1.5 ring-1 ring-white/10">
                 <p className="text-[8px] uppercase tracking-wide text-slate-500">{s.label}</p>
@@ -123,21 +111,11 @@ export function AuthSideVisual({ variant, className }: AuthSideVisualProps) {
       )}
       aria-label="Church Hub platform highlights"
     >
-      {/* Enterprise backdrop: deep navy + subtle grid */}
       <div
         className="absolute inset-0"
         style={{
           background:
             'linear-gradient(155deg, #0f172a 0%, #1e1b4b 42%, #172554 78%, #0f172a 100%)',
-        }}
-        aria-hidden
-      />
-      <div
-        className="absolute inset-0 opacity-[0.35]"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(148,163,184,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.08) 1px, transparent 1px)',
-          backgroundSize: '48px 48px',
         }}
         aria-hidden
       />
@@ -153,15 +131,10 @@ export function AuthSideVisual({ variant, className }: AuthSideVisualProps) {
       />
 
       <div className="relative flex h-full min-h-[280px] flex-col justify-between gap-8 p-8 lg:min-h-[100dvh] lg:p-10 xl:p-12">
-        <div className="flex items-start justify-between gap-4">
-          <BrandMark variant="light" showTagline />
-          <span className="hidden rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-slate-300 sm:inline">
-            Enterprise
-          </span>
-        </div>
+        <BrandMark variant="light" showTagline />
 
         <div className="space-y-8">
-          <EnterpriseDashboardMock />
+          <DashboardMock />
 
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[hsl(43,74%,58%)]">
@@ -181,18 +154,6 @@ export function AuthSideVisual({ variant, className }: AuthSideVisualProps) {
                 </li>
               ))}
             </ul>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {TRUST_PILLS.map(({ icon: Icon, label }) => (
-              <span
-                key={label}
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-slate-300"
-              >
-                <Icon className="h-3 w-3 text-[hsl(43,74%,58%)]" />
-                {label}
-              </span>
-            ))}
           </div>
         </div>
 
