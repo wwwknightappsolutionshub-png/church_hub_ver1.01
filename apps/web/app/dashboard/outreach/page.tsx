@@ -58,7 +58,7 @@ export default function OutreachPage() {
   return (
     <DashboardModuleShell
       eyebrow="Evangelism"
-      title="Field Outreach"
+      title="Outreach"
       description={MODULE_DESCRIPTIONS.outreach}
       badge={<Badge variant="success">Offline-ready</Badge>}
       actions={
@@ -74,6 +74,9 @@ export default function OutreachPage() {
           </Button>
           <Button variant="outline" size="sm" asChild>
             <Link href="/dashboard/outreach/field">Field mode</Link>
+          </Button>
+          <Button variant="secondary" size="sm" asChild>
+            <Link href="/dashboard/establishment">Establishment</Link>
           </Button>
         </div>
       }
@@ -137,9 +140,9 @@ export default function OutreachPage() {
           <div className="space-y-6 lg:col-span-2">
             <Card className="shadow-sm">
               <CardHeader>
-                <CardTitle>Outreach Capture Form</CardTitle>
+                <CardTitle>Lead capture</CardTitle>
                 <CardDescription>
-                  Add a new guest or contact.
+                  Add a new guest or contact. They appear as New Contact in Establishment.
                 </CardDescription>
               </CardHeader>
               <CardContent>

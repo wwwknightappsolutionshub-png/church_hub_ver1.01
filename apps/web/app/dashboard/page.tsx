@@ -19,7 +19,7 @@ import {
 } from '@/components/admin/UnifiedAdminHub';
 import { CelebrationColumnsPanel } from '@/components/membership/CelebrationColumnsPanel';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
-import { unitAdminHomePath } from '@/lib/session-role';
+import { memberHomePath } from '@/lib/session-role';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
@@ -38,6 +38,8 @@ export default function DashboardPage() {
     isChurchStaff,
     unitAdminUnitIds,
     unitDeputyUnitIds,
+    canAccessFollowUp,
+    establishmentAccess,
     isLoading: accessLoading,
     user,
     member,
@@ -59,11 +61,14 @@ export default function DashboardPage() {
       return;
     }
     if (!isChurchStaff) {
-      if (unitAdminUnitIds.length > 0 || unitDeputyUnitIds.length > 0) {
-        router.replace(unitAdminHomePath(unitAdminUnitIds, unitDeputyUnitIds));
-        return;
-      }
-      router.replace('/dashboard/lounge');
+      router.replace(
+        memberHomePath({
+          unitAdminUnitIds,
+          unitDeputyUnitIds,
+          canAccessFollowUp,
+          establishmentMode: establishmentAccess.mode,
+        }),
+      );
     }
   }, [
     accessLoading,
@@ -71,6 +76,8 @@ export default function DashboardPage() {
     isChurchStaff,
     unitAdminUnitIds,
     unitDeputyUnitIds,
+    canAccessFollowUp,
+    establishmentAccess.mode,
     router,
   ]);
 
@@ -157,7 +164,7 @@ export default function DashboardPage() {
                     : `${metrics.evangelism.thisMonth} this month`
                 }
                 icon={Megaphone}
-                href="/dashboard/follow-up"
+                href="/dashboard/establishment"
               />
               <StatCard
                 className={cn(STAT_TONES[2], 'bg-gradient-to-br from-amber-500/5 to-transparent')}

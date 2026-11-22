@@ -10,7 +10,7 @@ import { MODULE_GATE_KEY, type ModuleGateType } from './decorators';
 
 const GATE_MESSAGES: Record<ModuleGateType, string> = {
   followUp:
-    'Follow-Up requires church staff, a follow-up/evangelism unit, or an approved discipleship role.',
+    'Establishment requires church staff, Follow-up / Harvesters / Prayer / WFS unit membership, a WSF cell leader role, or an approved discipleship role.',
   serviceUnitHub:
     'Service Unit Hub requires an active membership (New Member, Active Member, or Discipled) or service unit assignment.',
   profile:

@@ -1,0 +1,56 @@
+{
+  "at": "2026-11-22T08:25:00.038Z",
+  "cols": [
+    {
+      "table_name": "follow_up_automation_rules",
+      "column_name": "stage",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "follow_up_stage_audits",
+      "column_name": "fromStage",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "follow_up_stage_audits",
+      "column_name": "toStage",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "follow_ups",
+      "column_name": "stage",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "follow_ups",
+      "column_name": "stageAtAssignment",
+      "data_type": "text",
+      "udt_name": "text"
+    },
+    {
+      "table_name": "pastoral_notes",
+      "column_name": "stageAtTime",
+      "data_type": "text",
+      "udt_name": "text"
+    }
+  ],
+  "followUpStageEnumExists": false,
+  "sample": [
+    {
+      "id": "948afde4-8813-45ba-9fac-dc067a7c14f3",
+      "stage": "JOINED_GROUP"
+    },
+    {
+      "id": "378b3019-3ca0-45d1-8348-1fc9e1a803b9",
+      "stage": "NEW_LEAD"
+    },
+    {
+      "id": "eee7b42d-5713-44f4-9266-7bc0fda2b725",
+      "stage": "CONTACTED"
+    }
+  ]
+}

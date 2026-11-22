@@ -30,7 +30,9 @@ model Church {
   members            Member[]
   families           Family[]
   followUps          FollowUp[]
+  followUpStageAudits FollowUpStageAudit[]
   followUpTemplates  FollowUpTemplate[]
+  pipelineDefinitions PipelineDefinition[]
   pastoralNotes      PastoralNote[]
   outreachContacts   OutreachContact[]
   evangelistQrCodes  EvangelistQrCode[]
@@ -352,6 +354,7 @@ model User {
   assignedFollowUps FollowUp[] @relation("AssignedFollowUps")
   followUpsArchived FollowUp[] @relation("FollowUpArchivedBy")
   followUpsArchiveRequested FollowUp[] @relation("FollowUpArchiveRequestedBy")
+  followUpStageAudits FollowUpStageAudit[] @relation("FollowUpStageAuditActor")
   pastoralNotes PastoralNote[] @relation("PastoralNoteAuthor")
   counselingAssigned CounselingCase[] @relation("CounselingAssignee")
   counselingSessionsAuthored CounselingSession[] @relation("CounselingSessionAuthor")
@@ -1147,13 +1150,87 @@ model Member {
 
 // ─── Follow-Up & Discipleship ────────────────────────────────
 
-enum FollowUpStage {
-  NEW_LEAD
-  CONTACTED
-  VISITED
-  ATTENDED
-  JOINED_GROUP
-  ENLISTED_FOR_BAPTISM
+/// System (or curated) membership-pipeline template. Phase 1 seeds `winners_default`.
+/// Phase 2: FollowUp.stage is a string key validated against the resolved pipeline.
+model PipelineTemplate {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  name        String
+  description String?
+  version     Int      @default(1)
+  isSystem    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  stages      PipelineTemplateStage[]
+  definitions PipelineDefinition[]
+
+  @@map("pipeline_templates")
+}
+
+model PipelineTemplateStage {
+  id            String  @id @default(uuid())
+  templateId    String
+  key           String
+  label         String
+  shortLabel    String
+  sortOrder     Int
+  phaseKey      String
+  phaseStep     Int
+  phaseTitle    String
+  colorToken    String?
+  isEntry       Boolean @default(false)
+  blocksArchive Boolean @default(false)
+  graduatesSla  Boolean @default(false)
+  isEnabled     Boolean @default(true)
+
+  template PipelineTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, key])
+  @@index([templateId, sortOrder])
+  @@map("pipeline_template_stages")
+}
+
+/// Church-owned fork of a pipeline template (Phase 5: POST /follow-up/pipeline/fork).
+model PipelineDefinition {
+  id                String   @id @default(uuid())
+  churchId          String
+  templateId        String?
+  name              String
+  forkedFromVersion Int?
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  church   Church            @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  template PipelineTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  stages   PipelineStage[]
+
+  @@index([churchId, isActive])
+  @@map("pipeline_definitions")
+}
+
+model PipelineStage {
+  id            String  @id @default(uuid())
+  definitionId  String
+  key           String
+  label         String
+  shortLabel    String
+  sortOrder     Int
+  phaseKey      String
+  phaseStep     Int
+  phaseTitle    String
+  colorToken    String?
+  isEntry       Boolean @default(false)
+  blocksArchive Boolean @default(false)
+  graduatesSla  Boolean @default(false)
+  isEnabled     Boolean @default(true)
+
+  definition PipelineDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+
+  @@unique([definitionId, key])
+  @@index([definitionId, sortOrder])
+  @@map("pipeline_stages")
 }
 
 model FollowUp {
@@ -1163,8 +1240,18 @@ model FollowUp {
   contactName  String
   contactPhone String?
   contactEmail String?
-  stage        FollowUpStage @default(NEW_LEAD)
+  stage        String   @default("NEW_LEAD")
   assignedToId String?
+  /// When the current assignee was set (72h stage-update SLA clock).
+  assignedAt   DateTime?
+  /// Pipeline stage at assignment — overdue if still equal after 72h.
+  stageAtAssignment String?
+  /// One-shot alert when assignment SLA is breached.
+  assignmentStaleNotifiedAt DateTime?
+  /// Last assign or stage advance — drives 12–24h “Due today” window.
+  lastProgressAt DateTime?
+  /// Winners Satellite Fellowship (WSF) cell branch this contact is assigned to.
+  wsfCellBranchId String?
   dueAt        DateTime?
   /// Short description of the next action (shown on calendar / cards).
   nextAction   String?
@@ -1188,18 +1275,41 @@ model FollowUp {
   assignedTo User?   @relation("AssignedFollowUps", fields: [assignedToId], references: [id])
   archivedBy User?   @relation("FollowUpArchivedBy", fields: [archivedById], references: [id], onDelete: SetNull)
   archiveRequestedBy User? @relation("FollowUpArchiveRequestedBy", fields: [archiveRequestedById], references: [id], onDelete: SetNull)
+  wsfCellBranch CellBranch? @relation("FollowUpWsfBranch", fields: [wsfCellBranchId], references: [id], onDelete: SetNull)
   outreachContact OutreachContact?
   reminders  FollowUpReminder[]
   pastoralNotes PastoralNote[]
   counselingCases CounselingCase[]
   carePrayerRequests CarePrayerRequest[]
   automationRuns FollowUpAutomationRun[]
+  stageAudits FollowUpStageAudit[]
 
   @@index([churchId, stage])
   @@index([churchId, stage, completedAt])
   @@index([churchId, archivedAt])
   @@index([assignedToId, dueAt])
+  @@index([churchId, wsfCellBranchId])
   @@map("follow_ups")
+}
+
+/// Immutable stage-change audit (who / when / from → to). Managers read via API.
+model FollowUpStageAudit {
+  id         String   @id @default(uuid())
+  churchId   String
+  followUpId String
+  actorId    String
+  fromStage  String
+  toStage    String
+  note       String?
+  createdAt  DateTime @default(now())
+
+  church   Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  followUp FollowUp @relation(fields: [followUpId], references: [id], onDelete: Cascade)
+  actor    User     @relation("FollowUpStageAuditActor", fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([churchId, followUpId, createdAt])
+  @@index([followUpId, createdAt])
+  @@map("follow_up_stage_audits")
 }
 
 model FollowUpReminder {
@@ -1241,7 +1351,7 @@ model PastoralNote {
   content        String
   isConfidential Boolean  @default(true)
   /// Pipeline stage when the note was written (for journey timeline).
-  stageAtTime    FollowUpStage?
+  stageAtTime    String?
   /// NOTE | STAGE_PROGRESS | ARCHIVE_REQUEST | ARCHIVE | ARCHIVE_DECLINED | RECONTACT
   kind           String   @default("NOTE")
   createdAt      DateTime @default(now())
@@ -1268,7 +1378,7 @@ model FollowUpAutomationRule {
   churchId     String
   name         String
   trigger      FollowUpAutomationTrigger
-  stage        FollowUpStage?
+  stage        String?
   delayHours   Int                     @default(24)
   channel      String                  @default("WHATSAPP")
   message      String?
@@ -1436,6 +1546,9 @@ model OutreachContact {
   addressCountry String?
   addressPostal  String?
   photoConsent  Boolean  @default(false)
+  /// UK GDPR — contact consented to store/process personal data at capture.
+  gdprConsent   Boolean  @default(false)
+  gdprConsentAt DateTime?
   photoUrl      String?
   notes         String?
   voiceNotes    String?
@@ -5875,6 +5988,7 @@ model CellBranch {
   messages   CellMessage[]
   prayers    CellPrayerRequest[]
   reminders  CellReminder[]
+  establishmentFollowUps FollowUp[] @relation("FollowUpWsfBranch")
 
   @@index([churchId, name])
   @@index([churchId, leaderUserId])

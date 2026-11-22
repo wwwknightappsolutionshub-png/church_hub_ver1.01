@@ -18,6 +18,8 @@ export const MODULE_DESCRIPTIONS = {
   adminReports: 'Review church reports and delivery issues that need attention.',
   business: 'Member businesses, jobs, events, and kingdom networking.',
   followUp: 'Walk new contacts from first visit through to baptism and belonging.',
+  establishment:
+    'Walk new contacts from first visit through belonging, service units, and baptism.',
   outreach: 'Capture new contacts in the field and keep your outreach team in sync.',
   serviceUnits: 'Organise ministry teams, schedules, and unit attendance.',
   departments: 'Tools for choir, ushering, children, medical, prayer, and more.',

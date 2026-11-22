@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import {
-  FollowUpStage,
   MemberGender,
   MemberStatus,
   Prisma,
@@ -26,7 +25,7 @@ import {
 } from './membership-analytics.util';
 
 const RETAINED_STATUSES: MemberStatus[] = ['NEW_MEMBER', 'ACTIVE_MEMBER', 'DISCIPLED'];
-const COMPLETED_STAGE: FollowUpStage = 'JOINED_GROUP';
+const COMPLETED_STAGE = 'JOINED_GROUP';
 const SETTINGS_TARGETS_KEY = 'analyticsTargets';
 
 export interface AnalyticsTargets {

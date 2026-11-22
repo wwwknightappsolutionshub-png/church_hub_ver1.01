@@ -27,6 +27,7 @@ export const ROUTE_TENANT_MODULE: Record<string, ChurchTenantModuleId> = {
   '/dashboard/business': 'kingdomKonnect',
   '/dashboard/spirify': 'spirify',
   '/dashboard/follow-up': 'followUp',
+  '/dashboard/establishment': 'followUp',
   '/dashboard/pastoral-care': 'followUp',
   '/dashboard/service-units': 'serviceUnitHub',
   '/dashboard/departments': 'serviceUnitHub',

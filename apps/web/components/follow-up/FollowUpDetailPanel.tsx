@@ -19,7 +19,16 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { CHANNEL_LABELS, STAGE_BADGE_CLASS, STAGE_LABELS, nextStage, stageStatusLabel } from '@/lib/follow-up';
+import {
+  isGraduatedStage,
+  nextStageFromPipeline,
+  stageBadgeClass,
+  stageLabelMap,
+  stageShortMap,
+  type ResolvedPipeline,
+} from '@/lib/pipeline-definition';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -87,10 +96,28 @@ interface FollowUpDetailPanelProps {
   pastoralNotes: PastoralNote[];
   members: MemberOption[];
   canManageMembers: boolean;
+  /** Establishment managers may assign/reassign. */
+  canAssign?: boolean;
+  /** Workers/managers may edit stage, notes, reminders on allowed contacts. */
+  canMutate?: boolean;
+  /** Prayer Squad / WSF leaders — view only. */
+  readOnly?: boolean;
+  /** Managers can open the stage-change audit tab. */
+  showStageAudit?: boolean;
+  pipeline?: ResolvedPipeline | null;
   onClose: () => void;
   onUpdated: () => void;
   onAdvance?: (id: string, payload: ProgressAdvancePayload) => void | Promise<void>;
   advancing?: boolean;
+}
+
+interface StageAuditRow {
+  id: string;
+  fromStage: string;
+  toStage: string;
+  note?: string | null;
+  createdAt: string;
+  actor: { id: string; firstName: string; lastName: string; email?: string | null };
 }
 
 const channelIcon: Record<string, typeof Smartphone> = {
@@ -191,13 +218,25 @@ export function FollowUpDetailPanel({
   pastoralNotes,
   members,
   canManageMembers,
+  canAssign = false,
+  canMutate = true,
+  readOnly = false,
+  showStageAudit = false,
+  pipeline,
   onClose,
   onUpdated,
   onAdvance,
   advancing,
 }: FollowUpDetailPanelProps) {
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<'details' | 'reminders' | 'messages' | 'notes'>('details');
+  const [tab, setTab] = useState<'details' | 'reminders' | 'messages' | 'notes' | 'audit'>(
+    'details',
+  );
+  const { data: stageAudits } = useApiQuery<StageAuditRow[]>(
+    ['follow-up-stage-audit', followUp.id],
+    `/follow-up/${followUp.id}/stage-audit`,
+    { enabled: showStageAudit && tab === 'audit', retry: false },
+  );
   const [busy, setBusy] = useState(false);
   const [assigneeId, setAssigneeId] = useState(followUp.assignedTo?.id ?? '');
   const [dueAt, setDueAt] = useState(
@@ -322,13 +361,20 @@ export function FollowUpDetailPanel({
     }
   };
 
-  const nxt = nextStage(followUp.stage);
+  const labels = Object.keys(stageLabelMap(pipeline)).length
+    ? stageLabelMap(pipeline)
+    : STAGE_LABELS;
+  const shorts = stageShortMap(pipeline);
+  const nxt =
+    nextStageFromPipeline(pipeline, followUp.stage) ?? nextStage(followUp.stage);
+  const graduated = isGraduatedStage(pipeline, followUp.stage);
 
   const tabs = [
     { id: 'details' as const, label: 'Details' },
     { id: 'reminders' as const, label: 'Reminders' },
     { id: 'messages' as const, label: 'Templates' },
     { id: 'notes' as const, label: 'Pastoral notes' },
+    ...(showStageAudit ? [{ id: 'audit' as const, label: 'Stage audit' }] : []),
   ];
 
   const initial = followUp.contactName.charAt(0).toUpperCase();
@@ -341,6 +387,9 @@ export function FollowUpDetailPanel({
         open={showAdvance && !!nxt}
         contactName={followUp.contactName}
         nextStage={nxt ?? ''}
+        nextStageLabel={
+          nxt ? shorts[nxt] ?? labels[nxt] ?? nxt : undefined
+        }
         submitting={advancing}
         onClose={() => {
           if (!advancing) setShowAdvance(false);
@@ -374,13 +423,15 @@ export function FollowUpDetailPanel({
               <Badge
                 className={cn(
                   'mt-2',
-                  STAGE_BADGE_CLASS[followUp.stage] ?? 'bg-muted text-muted-foreground',
+                  pipeline
+                    ? stageBadgeClass(pipeline, followUp.stage)
+                    : STAGE_BADGE_CLASS[followUp.stage] ?? 'bg-muted text-muted-foreground',
                 )}
               >
                 {stageStatusLabel(followUp.stage)}
               </Badge>
               <p className="mt-1 text-xs text-muted-foreground">
-                {STAGE_LABELS[followUp.stage] ?? followUp.stage}
+                {labels[followUp.stage] ?? STAGE_LABELS[followUp.stage] ?? followUp.stage}
               </p>
               {followUp.referredBy?.trim() ? (
                 <p className="mt-2 text-sm text-muted-foreground">
@@ -459,8 +510,8 @@ export function FollowUpDetailPanel({
               ) : canManageMembers ? (
                 <>
                   <p className="text-xs text-muted-foreground">
-                    {followUp.stage === 'JOINED_GROUP'
-                      ? 'Convert to Members within 7 days. On day 6 leaders are reminded; on day 7 this contact leaves Joined Group automatically.'
+                    {graduated || followUp.stage === 'JOINED_GROUP'
+                      ? 'Convert to Members within 7 days. On day 6 leaders are reminded; on day 7 this contact leaves the belonging stage automatically.'
                       : 'Link this new contact to an existing member or create a new visitor record.'}
                   </p>
                   <select
@@ -492,32 +543,41 @@ export function FollowUpDetailPanel({
               )}
             </div>
 
-            <div className="space-y-3 rounded-lg border border-border p-4">
-              <p className="text-sm font-medium">Assign A Follow Up Manager</p>
-              <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={assigneeId}
-                onChange={(e) => setAssigneeId(e.target.value)}
-              >
-                <option value="">Unassigned</option>
-                {assignees.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.firstName} {a.lastName}
-                  </option>
-                ))}
-              </select>
-              <label className="text-xs text-muted-foreground">Follow-up due</label>
-              <Input
-                type="datetime-local"
-                value={dueAt}
-                onChange={(e) => setDueAt(e.target.value)}
-              />
-              <Button size="sm" disabled={busy} onClick={saveAssignment}>
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save assignment'}
-              </Button>
-            </div>
+            {canAssign ? (
+              <div className="space-y-3 rounded-lg border border-border p-4">
+                <p className="text-sm font-medium">Assign A Follow Up Manager</p>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={assigneeId}
+                  onChange={(e) => setAssigneeId(e.target.value)}
+                >
+                  <option value="">Unassigned</option>
+                  {assignees.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.firstName} {a.lastName}
+                    </option>
+                  ))}
+                </select>
+                <label className="text-xs text-muted-foreground">Follow-up due</label>
+                <Input
+                  type="datetime-local"
+                  value={dueAt}
+                  onChange={(e) => setDueAt(e.target.value)}
+                />
+                <Button size="sm" disabled={busy} onClick={saveAssignment}>
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save assignment'}
+                </Button>
+              </div>
+            ) : followUp.assignedTo ? (
+              <div className="rounded-lg border border-border p-4 text-sm">
+                <p className="font-medium">Assigned to</p>
+                <p className="mt-1 text-muted-foreground">
+                  {followUp.assignedTo.firstName} {followUp.assignedTo.lastName}
+                </p>
+              </div>
+            ) : null}
 
-            {nxt && onAdvance ? (
+            {nxt && onAdvance && canMutate && !readOnly ? (
               <Button
                 type="button"
                 variant="outline"
@@ -526,9 +586,15 @@ export function FollowUpDetailPanel({
                 disabled={advancing}
                 onClick={() => setShowAdvance(true)}
               >
-                Advance to next stage → {STAGE_LABELS[nxt]}
+                Advance to next stage → {labels[nxt] ?? STAGE_LABELS[nxt] ?? nxt}
                 <ChevronRight className="h-4 w-4" />
               </Button>
+            ) : null}
+
+            {readOnly ? (
+              <p className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                View only — you can browse this contact but cannot change stages or assignments.
+              </p>
             ) : null}
           </div>
         )}
@@ -558,52 +624,56 @@ export function FollowUpDetailPanel({
               )}
             </ul>
 
-            <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-4">
-              <p className="flex items-center gap-2 text-sm font-medium">
-                <Bell className="h-4 w-4 text-primary" />
-                Schedule reminder
-              </p>
-              <Input
-                type="datetime-local"
-                value={remindAt}
-                onChange={(e) => setRemindAt(e.target.value)}
-              />
-              <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={remindChannel}
-                onChange={(e) => setRemindChannel(e.target.value)}
-              >
-                {['EMAIL', 'WHATSAPP', 'SMS'].map((c) => (
-                  <option key={c} value={c}>
-                    {CHANNEL_LABELS[c]}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={selectedTemplate}
-                onChange={(e) => {
-                  setSelectedTemplate(e.target.value);
-                  const tpl = templates.find((t) => t.id === e.target.value);
-                  if (tpl) setRemindMessage(tpl.body.replace(/\{\{name\}\}/gi, followUp.contactName));
-                }}
-              >
-                <option value="">Optional template</option>
-                {templates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} ({t.channel})
-                  </option>
-                ))}
-              </select>
-              <textarea
-                className="flex min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={remindMessage}
-                onChange={(e) => setRemindMessage(e.target.value)}
-              />
-              <Button size="sm" disabled={busy || !remindAt} onClick={scheduleReminder}>
-                Schedule automated reminder
-              </Button>
-            </div>
+            {canMutate && !readOnly ? (
+              <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-4">
+                <p className="flex items-center gap-2 text-sm font-medium">
+                  <Bell className="h-4 w-4 text-primary" />
+                  Schedule reminder
+                </p>
+                <Input
+                  type="datetime-local"
+                  value={remindAt}
+                  onChange={(e) => setRemindAt(e.target.value)}
+                />
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={remindChannel}
+                  onChange={(e) => setRemindChannel(e.target.value)}
+                >
+                  {['EMAIL', 'WHATSAPP', 'SMS'].map((c) => (
+                    <option key={c} value={c}>
+                      {CHANNEL_LABELS[c]}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={selectedTemplate}
+                  onChange={(e) => {
+                    setSelectedTemplate(e.target.value);
+                    const tpl = templates.find((t) => t.id === e.target.value);
+                    if (tpl) {
+                      setRemindMessage(tpl.body.replace(/\{\{name\}\}/gi, followUp.contactName));
+                    }
+                  }}
+                >
+                  <option value="">Optional template</option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} ({t.channel})
+                    </option>
+                  ))}
+                </select>
+                <textarea
+                  className="flex min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={remindMessage}
+                  onChange={(e) => setRemindMessage(e.target.value)}
+                />
+                <Button size="sm" disabled={busy || !remindAt} onClick={scheduleReminder}>
+                  Schedule automated reminder
+                </Button>
+              </div>
+            ) : null}
           </div>
         )}
 
@@ -627,15 +697,17 @@ export function FollowUpDetailPanel({
                     <p className="mt-1 text-xs text-muted-foreground">Subject: {tpl.subject}</p>
                   )}
                   <p className="mt-2 line-clamp-3 text-xs text-muted-foreground">{tpl.body}</p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="mt-3"
-                    disabled={busy}
-                    onClick={() => sendTemplate(tpl.id)}
-                  >
-                    Send now
-                  </Button>
+                  {canMutate && !readOnly ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-3"
+                      disabled={busy}
+                      onClick={() => sendTemplate(tpl.id)}
+                    >
+                      Send now
+                    </Button>
+                  ) : null}
                 </div>
               );
             })}
@@ -660,7 +732,9 @@ export function FollowUpDetailPanel({
                 >
                   <p className="text-xs text-muted-foreground">
                     {n.author.firstName} {n.author.lastName}
-                    {n.stageAtTime ? ` · ${STAGE_LABELS[n.stageAtTime] ?? n.stageAtTime}` : ''}
+                    {n.stageAtTime
+                      ? ` · ${labels[n.stageAtTime] ?? STAGE_LABELS[n.stageAtTime] ?? n.stageAtTime}`
+                      : ''}
                     {n.kind && n.kind !== 'NOTE' ? ` · ${n.kind.replace(/_/g, ' ').toLowerCase()}` : ''}
                     {n.isConfidential ? ' · Confidential' : ''} ·{' '}
                     {new Date(n.createdAt).toLocaleDateString()}
@@ -672,26 +746,58 @@ export function FollowUpDetailPanel({
                 <p className="text-sm text-muted-foreground">No journey comments yet</p>
               )}
             </ul>
-            <div className="space-y-2 rounded-lg border border-border p-4">
-              <textarea
-                className="flex min-h-[88px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                placeholder="Stage comment, prayer points, discipleship notes…"
-                value={noteBody}
-                onChange={(e) => setNoteBody(e.target.value)}
-              />
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={confidential}
-                  onChange={(e) => setConfidential(e.target.checked)}
+            {!readOnly ? (
+              <div className="space-y-2 rounded-lg border border-border p-4">
+                <textarea
+                  className="flex min-h-[88px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  placeholder="Stage comment, prayer points, discipleship notes…"
+                  value={noteBody}
+                  onChange={(e) => setNoteBody(e.target.value)}
                 />
-                <Lock className="h-3.5 w-3.5" />
-                Confidential (restricted)
-              </label>
-              <Button size="sm" disabled={busy} onClick={addNote}>
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Add comment'}
-              </Button>
-            </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={confidential}
+                    onChange={(e) => setConfidential(e.target.checked)}
+                  />
+                  <Lock className="h-3.5 w-3.5" />
+                  Confidential (restricted)
+                </label>
+                <Button size="sm" disabled={busy} onClick={addNote}>
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Add comment'}
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        {tab === 'audit' && showStageAudit && (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Stage changes are logged with who moved the contact, when, and from → to.
+            </p>
+            {(stageAudits ?? []).length === 0 ? (
+              <p className="text-sm text-muted-foreground">No stage changes recorded yet.</p>
+            ) : (
+              <ul className="space-y-2">
+                {(stageAudits ?? []).map((row) => (
+                  <li key={row.id} className="rounded-lg border border-border p-3 text-sm">
+                    <p className="font-medium">
+                      {labels[row.fromStage] ?? STAGE_LABELS[row.fromStage] ?? row.fromStage}
+                      {' → '}
+                      {labels[row.toStage] ?? STAGE_LABELS[row.toStage] ?? row.toStage}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {row.actor.firstName} {row.actor.lastName} ·{' '}
+                      {new Date(row.createdAt).toLocaleString()}
+                    </p>
+                    {row.note ? (
+                      <p className="mt-2 whitespace-pre-wrap text-muted-foreground">{row.note}</p>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
       </div>

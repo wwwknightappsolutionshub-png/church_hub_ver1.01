@@ -558,6 +558,12 @@ async function main() {
     }
   }
 
+  // Option C Phase 1+6 — system membership pipeline templates (idempotent)
+  const { ensureSystemPipelineTemplates } = await import(
+    '../src/modules/follow-up/pipeline-template.seed'
+  );
+  await ensureSystemPipelineTemplates(prisma);
+
   const michaelMember = memberByEmail['michael@demo.church'];
   if (michaelMember) {
     const qrExists = await prisma.evangelistQrCode.findFirst({

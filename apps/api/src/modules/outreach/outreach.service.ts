@@ -151,6 +151,7 @@ export class OutreachService {
       addressCountry?: string;
       addressPostal?: string;
       photoConsent?: boolean;
+      gdprConsent?: boolean;
       photoUrl?: string;
       notes?: string;
       voiceNotes?: string;
@@ -164,6 +165,9 @@ export class OutreachService {
       capturedByUserId?: string;
     },
   ) {
+    if (!data.gdprConsent) {
+      throw new BadRequestException('GDPR consent is required to save this contact');
+    }
     if (data.photoUrl && !data.photoConsent) {
       throw new BadRequestException('Photo consent is required before uploading a photo');
     }
@@ -173,6 +177,10 @@ export class OutreachService {
         where: { clientId: data.clientId },
       });
       if (dup) {
+        // Global unique clientId — never return or mutate another tenant's capture.
+        if (dup.churchId !== churchId) {
+          throw new BadRequestException('Capture clientId is already in use');
+        }
         const serverPayload = this.contactToPayload(dup);
         const clientPayload = data as OutreachCapturePayload;
         if (outreachPayloadsConflict(serverPayload, clientPayload)) {
@@ -207,8 +215,15 @@ export class OutreachService {
     }
 
     if (data.qrCodeId) {
+      const qr = await this.prisma.evangelistQrCode.findFirst({
+        where: { id: data.qrCodeId, churchId, isActive: true },
+        select: { id: true },
+      });
+      if (!qr) {
+        throw new BadRequestException('QR code not found for this church');
+      }
       await this.prisma.evangelistQrCode.update({
-        where: { id: data.qrCodeId },
+        where: { id: qr.id },
         data: { scanCount: { increment: 1 } },
       });
     }
@@ -250,6 +265,8 @@ export class OutreachService {
         addressCountry: encrypted.addressCountry,
         addressPostal: encrypted.addressPostal,
         photoConsent: data.photoConsent ?? false,
+        gdprConsent: true,
+        gdprConsentAt: new Date(),
         photoUrl: data.photoUrl,
         notes: encrypted.notes,
         voiceNotes: encrypted.voiceNotes,

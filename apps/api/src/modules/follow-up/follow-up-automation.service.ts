@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { FollowUpAutomationTrigger, FollowUpStage, Prisma } from '@prisma/client';
+import { FollowUpAutomationTrigger, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.module';
 import { NotificationsQueueService } from '../notifications/notifications-queue.service';
 import { DEFAULT_FOLLOW_UP_AUTOMATION_RULES } from './follow-up-automation.constants';
+import { archiveBlockedStageKeys } from './pipeline-stage-flags';
 
 function channelUsesEmail(channel: string) {
   const c = channel.toUpperCase();
@@ -82,7 +83,7 @@ export class FollowUpAutomationService {
       id?: string;
       name: string;
       trigger: FollowUpAutomationTrigger;
-      stage?: FollowUpStage | null;
+      stage?: string | null;
       delayHours: number;
       channel: string;
       message?: string;
@@ -127,7 +128,7 @@ export class FollowUpAutomationService {
   async onFollowUpEvent(
     churchId: string,
     followUpId: string,
-    event: 'NEW_LEAD' | { stage: FollowUpStage },
+    event: 'NEW_LEAD' | { stage: string },
   ) {
     const followUp = await this.prisma.followUp.findFirst({
       where: { id: followUpId, churchId },
@@ -217,7 +218,7 @@ export class FollowUpAutomationService {
       const overdue = await this.prisma.followUp.findMany({
         where: {
           churchId: rule.churchId,
-          stage: { not: 'JOINED_GROUP' },
+          stage: { notIn: archiveBlockedStageKeys() },
           dueAt: { lt: now },
         },
         take: 50,

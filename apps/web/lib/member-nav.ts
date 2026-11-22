@@ -49,7 +49,22 @@ export interface DashboardNavItem {
   requiresDepartmentTools?: boolean;
 }
 
-/** Open to all signed-in church users */
+/**
+ * Member work modules — pinned above Community (Outreach → Establishment → unit hub).
+ * Not listed under the Community accordion.
+ */
+export const MEMBER_WORK_NAV: DashboardNavItem[] = [
+  { href: '/dashboard/outreach', label: 'Outreach', icon: Megaphone },
+  {
+    href: '/dashboard/establishment',
+    label: 'Establishment',
+    icon: HeartHandshake,
+    gate: 'followUp',
+  },
+  { href: '/dashboard/service-units', label: 'Service Unit Hub', icon: Layers, gate: 'serviceUnitHub' },
+];
+
+/** Open to all signed-in church users (Community section). */
 export const OPEN_MEMBER_NAV: DashboardNavItem[] = [
   { href: '/dashboard/lounge', label: 'Lounge', icon: Coffee, exact: false },
   { href: '/dashboard/prayer-hub', label: 'Prayer Hub', icon: Heart },
@@ -57,29 +72,38 @@ export const OPEN_MEMBER_NAV: DashboardNavItem[] = [
   { href: '/dashboard/suggestions', label: 'Suggestions', icon: Lightbulb },
   { href: '/dashboard/devotional-hub', label: 'Devotional Hub', icon: BookOpen },
   { href: '/dashboard/wisdom365', label: 'Wisdom365+', icon: Sunrise },
-  { href: '/dashboard/outreach', label: 'Field Outreach', icon: Megaphone },
   { href: '/dashboard/youth', label: 'Youth Hub', icon: Sparkles },
   { href: '/dashboard/business', label: 'Kingdom Konnect', icon: Briefcase },
   { href: '/dashboard/spirify', label: 'Spirify', icon: Disc3 },
 ];
 
-/** Membership determines access */
-export const GATED_MEMBER_NAV: DashboardNavItem[] = [
+/** Membership-gated items that stay in Community (or account). */
+export const GATED_MEMBER_COMMUNITY_NAV: DashboardNavItem[] = [
   { href: '/dashboard/sermon-notes', label: 'Sermon Note', icon: ScrollText, gate: 'sermonNote' },
-  { href: '/dashboard/follow-up', label: 'Outreach', icon: HeartHandshake, gate: 'followUp' },
   { href: '/dashboard/ministry-cells', label: 'Ministry/Cells', icon: Network, gate: 'ministryCells' },
-  { href: '/dashboard/service-units', label: 'Service Unit Hub', icon: Layers, gate: 'serviceUnitHub' },
   // Departments hub stays at /dashboard/departments (and via Service Unit tools) but is hidden from menus.
   { href: '/dashboard/profile', label: 'My Profile', icon: UserCircle, gate: 'profile' },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ];
 
-export const MEMBER_NAV: DashboardNavItem[] = [...OPEN_MEMBER_NAV, ...GATED_MEMBER_NAV];
+/** @deprecated Prefer MEMBER_WORK_NAV + GATED_MEMBER_COMMUNITY_NAV */
+export const GATED_MEMBER_NAV: DashboardNavItem[] = [
+  ...MEMBER_WORK_NAV,
+  ...GATED_MEMBER_COMMUNITY_NAV,
+];
+
+export const MEMBER_COMMUNITY_NAV: DashboardNavItem[] = [
+  ...OPEN_MEMBER_NAV,
+  ...GATED_MEMBER_COMMUNITY_NAV,
+];
+
+export const MEMBER_NAV: DashboardNavItem[] = [...MEMBER_WORK_NAV, ...MEMBER_COMMUNITY_NAV];
 
 /** Admin & pastor — Section 1: Leadership */
 export const STAFF_LEADERSHIP_NAV: DashboardNavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-  { href: '/dashboard/follow-up', label: 'Outreach', icon: HeartHandshake },
+  { href: '/dashboard/outreach', label: 'Outreach', icon: Megaphone },
+  { href: '/dashboard/establishment', label: 'Establishment', icon: HeartHandshake },
   {
     href: '/dashboard/ministry-cells',
     label: 'Ministry/Cells',
@@ -172,8 +196,7 @@ export const STAFF_COMMUNITY_NAV: DashboardNavItem[] = [
   { href: '/dashboard/suggestions', label: 'Suggestions', icon: Lightbulb },
   { href: '/dashboard/devotional-hub', label: 'Devotional Hub', icon: BookOpen },
   // Departments remains functional via /dashboard/departments and Service Unit workspaces; not listed in nav.
-  { href: '/dashboard/outreach', label: 'Field Outreach', icon: Megaphone },
-  { href: '/dashboard/follow-up', label: 'Outreach', icon: HeartHandshake },
+  // Outreach + Establishment live under Leadership (not duplicated here).
   { href: '/dashboard/business', label: 'Kingdom Konnect', icon: Briefcase },
   { href: '/dashboard/youth', label: 'Youth Hub', icon: Sparkles },
   { href: '/dashboard/spirify', label: 'Spirify', icon: Disc3 },
@@ -248,6 +271,24 @@ export function buildVisibleMemberNav(
   enabledModules?: ChurchTenantModulesMap,
 ) {
   const gated = filterMemberNav(MEMBER_NAV, access);
+  if (!enabledModules) return gated;
+  return filterNavByTenantModules(gated, enabledModules);
+}
+
+export function buildVisibleMemberWorkNav(
+  access: ModuleGateAccess,
+  enabledModules?: ChurchTenantModulesMap,
+) {
+  const gated = filterMemberNav(MEMBER_WORK_NAV, access);
+  if (!enabledModules) return gated;
+  return filterNavByTenantModules(gated, enabledModules);
+}
+
+export function buildVisibleMemberCommunityNav(
+  access: ModuleGateAccess,
+  enabledModules?: ChurchTenantModulesMap,
+) {
+  const gated = filterMemberNav(MEMBER_COMMUNITY_NAV, access);
   if (!enabledModules) return gated;
   return filterNavByTenantModules(gated, enabledModules);
 }

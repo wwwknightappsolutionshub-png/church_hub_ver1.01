@@ -26,7 +26,7 @@ export function LoginTestAccountsPanel({ onUseAccount }: Props) {
     >
       <p className="font-semibold text-foreground">Test logins (local / seeded database)</p>
       <p className="mt-1 text-xs text-muted-foreground">
-        Password for both: <code className="rounded bg-muted px-1">{LOGIN_TEST_ACCOUNTS[0].password}</code>
+        Password for all: <code className="rounded bg-muted px-1">{LOGIN_TEST_ACCOUNTS[0].password}</code>
       </p>
       <ul className="mt-3 space-y-3">
         {LOGIN_TEST_ACCOUNTS.map((account) => (

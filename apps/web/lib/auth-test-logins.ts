@@ -16,6 +16,13 @@ export const LOGIN_TEST_ACCOUNTS = [
     password: TEST_LOGIN_PASSWORD,
     hint: 'Full church workspace (membership, modules). Pastor: pastor@demo.church — same password.',
   },
+  {
+    id: 'harvester',
+    title: 'Harvesters Worker',
+    email: 'harvester@demo.church',
+    password: TEST_LOGIN_PASSWORD,
+    hint: 'Establishment worker UI — assigned contacts only (Harvesters Squad member).',
+  },
 ] as const;
 
 /** Show on login in local/dev unless explicitly hidden. */

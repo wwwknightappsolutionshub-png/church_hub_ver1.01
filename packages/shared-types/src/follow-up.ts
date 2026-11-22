@@ -14,6 +14,25 @@ export const CreateFollowUpSchema = z.object({
 });
 export type CreateFollowUpInput = z.infer<typeof CreateFollowUpSchema>;
 
+/**
+ * Allow-listed fields for PATCH /follow-up/:id.
+ * Stage / archive / church / member linkage must use dedicated endpoints.
+ */
+export const UpdateFollowUpSchema = z
+  .object({
+    contactName: z.string().min(1).max(200).optional(),
+    contactPhone: optionalPhoneSchema,
+    contactEmail: optionalEmailSchema,
+    assignedToId: z.string().uuid().nullable().optional(),
+    wsfCellBranchId: z.string().uuid().nullable().optional(),
+    // Date inputs may be YYYY-MM-DD or ISO datetime; service parses + validates.
+    dueAt: z.union([z.string().min(1).max(40), z.literal('')]).nullable().optional(),
+    notes: z.string().max(2000).optional(),
+    nextAction: z.string().max(2000).nullable().optional(),
+  })
+  .strict();
+export type UpdateFollowUpInput = z.infer<typeof UpdateFollowUpSchema>;
+
 export const UpdateFollowUpStageSchema = z.object({
   stage: FollowUpStageSchema,
   notes: z.string().max(2000).optional(),

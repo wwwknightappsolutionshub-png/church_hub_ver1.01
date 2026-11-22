@@ -1,13 +1,7 @@
-import { FollowUpStage } from '@prisma/client';
+import { WINNERS_DEFAULT_STAGES } from './pipeline-template.seed';
 
-export const FOLLOW_UP_STAGE_ORDER: FollowUpStage[] = [
-  'NEW_LEAD',
-  'CONTACTED',
-  'VISITED',
-  'ATTENDED',
-  'JOINED_GROUP',
-  'ENLISTED_FOR_BAPTISM',
-];
+/** Canonical stage order from winners_default (Phase 0/1 baseline). */
+export const FOLLOW_UP_STAGE_ORDER: string[] = WINNERS_DEFAULT_STAGES.map((s) => s.key);
 
 export const DEFAULT_FOLLOW_UP_TEMPLATES = [
   {

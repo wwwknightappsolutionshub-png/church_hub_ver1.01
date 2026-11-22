@@ -42,6 +42,8 @@ export const OutreachCaptureBaseSchema = z.object({
   addressCountry: optionalAddressLine(100),
   addressPostal: optionalPostalCodeSchema,
   photoConsent: z.boolean().default(false),
+  /** Contact agreed to store/process their personal data (UK GDPR). */
+  gdprConsent: z.boolean().default(false),
   photoUrl: z.string().max(600_000).optional(),
   notes: z.string().max(2000).optional(),
   voiceNotes: z.string().max(5000).optional(),
@@ -93,7 +95,23 @@ export function refineInternationalAddress(
   }
 }
 
-export const OutreachCaptureSchema = OutreachCaptureBaseSchema.superRefine(refineInternationalAddress);
+export function refineGdprConsent(
+  data: { gdprConsent?: boolean },
+  ctx: z.RefinementCtx,
+) {
+  if (!data.gdprConsent) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['gdprConsent'],
+      message: 'GDPR consent is required to save this contact',
+    });
+  }
+}
+
+export const OutreachCaptureSchema = OutreachCaptureBaseSchema.superRefine((data, ctx) => {
+  refineInternationalAddress(data, ctx);
+  refineGdprConsent(data, ctx);
+});
 
 /** Public QR/NFC self-registration (no GPS/postcode required). */
 export const PublicOutreachRegisterSchema = z.object({

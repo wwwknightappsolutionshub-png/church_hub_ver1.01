@@ -18,6 +18,20 @@ const nextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: '/dashboard/follow-up',
+        destination: '/dashboard/establishment',
+        permanent: true,
+      },
+      {
+        source: '/dashboard/follow-up/:path*',
+        destination: '/dashboard/establishment/:path*',
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     const authNoStore = [
       { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate' },

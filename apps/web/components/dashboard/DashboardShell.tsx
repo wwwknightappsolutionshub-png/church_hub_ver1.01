@@ -10,10 +10,12 @@ import {
   STAFF_COMMUNITY_NAV,
   UNIT_ADMIN_LEADERSHIP_NAV,
   buildVisibleMemberNav,
+  buildVisibleMemberCommunityNav,
+  buildVisibleMemberWorkNav,
   filterStaffNav,
   type DashboardNavItem,
 } from '@/lib/member-nav';
-import { isChurchAdminRole, isPastorRole, unitAdminHomePath } from '@/lib/session-role';
+import { isChurchAdminRole, isPastorRole, memberHomePath } from '@/lib/session-role';
 import { filterNavByTenantModules } from '@/lib/tenant-modules';
 import { getAppRouteTitle, hasModulePageChrome } from '@/lib/app-route-meta';
 import { memberInitials } from '@/lib/member-initials';
@@ -127,6 +129,7 @@ function DesktopSidebar({
     isChurchStaff,
     unitAdminUnitIds,
     unitDeputyUnitIds,
+    establishmentAccess,
     churchName,
     user,
     member,
@@ -142,20 +145,30 @@ function DesktopSidebar({
     [hasPlatformPermission],
   );
 
-  const memberNav = useMemo(
-    () =>
-      buildVisibleMemberNav(
-        {
-          canAccessFollowUp,
-          canAccessServiceUnitHub,
-          canAccessDepartmentTools,
-          canAccessMyProfile,
-          canAccessSermonNote,
-          canAccessMinistryCells,
-          accessLoading,
-        },
-        enabledModules,
-      ),
+  const memberGateAccess = {
+    canAccessFollowUp,
+    canAccessServiceUnitHub,
+    canAccessDepartmentTools,
+    canAccessMyProfile,
+    canAccessSermonNote,
+    canAccessMinistryCells,
+    accessLoading,
+  };
+  const memberWorkNav = useMemo(
+    () => buildVisibleMemberWorkNav(memberGateAccess, enabledModules),
+    [
+      canAccessFollowUp,
+      canAccessServiceUnitHub,
+      canAccessDepartmentTools,
+      canAccessMyProfile,
+      canAccessSermonNote,
+      canAccessMinistryCells,
+      accessLoading,
+      enabledModules,
+    ],
+  );
+  const memberCommunityNav = useMemo(
+    () => buildVisibleMemberCommunityNav(memberGateAccess, enabledModules),
     [
       canAccessFollowUp,
       canAccessServiceUnitHub,
@@ -175,13 +188,8 @@ function DesktopSidebar({
   const isUnitAdminOnly =
     !isChurchStaff && (unitAdminUnitIds.length > 0 || unitDeputyUnitIds.length > 0);
   const useStaffStyleNav = isChurchStaff || isUnitAdminOnly;
-  /** Pastors, church admins, and unit admins start with Community collapsed. */
+  /** Community accordion starts collapsed for staff and members. */
   const [communityOpen, setCommunityOpen] = useState(false);
-
-  useEffect(() => {
-    if (accessLoading) return;
-    setCommunityOpen(!(isPastor || isChurchAdmin || isUnitAdminOnly));
-  }, [accessLoading, isPastor, isChurchAdmin, isUnitAdminOnly]);
 
   const staffNav = useMemo(() => {
     if (isUnitAdminOnly) {
@@ -235,9 +243,12 @@ function DesktopSidebar({
     ? '/dashboard/platform'
     : isChurchStaff
       ? '/dashboard'
-      : isUnitAdminOnly
-        ? unitAdminHomePath(unitAdminUnitIds, unitDeputyUnitIds)
-        : '/dashboard/lounge';
+      : memberHomePath({
+          unitAdminUnitIds,
+          unitDeputyUnitIds,
+          canAccessFollowUp,
+          establishmentMode: establishmentAccess.mode,
+        });
 
   const collapsed = !expanded;
 
@@ -341,12 +352,7 @@ function DesktopSidebar({
           </>
         ) : (
           <>
-            {!collapsed ? (
-              <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
-                Community
-              </p>
-            ) : null}
-            {memberNav.map((item) => (
+            {memberWorkNav.map((item) => (
               <NavLink
                 key={item.href}
                 item={item}
@@ -355,6 +361,38 @@ function DesktopSidebar({
                 collapsed={collapsed}
               />
             ))}
+            {memberCommunityNav.length > 0 && (
+              <div className={cn(memberWorkNav.length > 0 && !collapsed && 'mt-4')}>
+                {!collapsed ? (
+                  <button
+                    type="button"
+                    onClick={() => setCommunityOpen((o) => !o)}
+                    className="mb-2 flex w-full items-center justify-between px-3 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40 hover:text-sidebar-foreground/70"
+                    aria-expanded={communityOpen}
+                  >
+                    <span>Community</span>
+                    <ChevronDown
+                      className={cn(
+                        'h-3.5 w-3.5 shrink-0 transition-transform',
+                        communityOpen ? 'rotate-0' : '-rotate-90',
+                      )}
+                      aria-hidden
+                    />
+                  </button>
+                ) : null}
+                {(collapsed || communityOpen)
+                  ? memberCommunityNav.map((item) => (
+                      <NavLink
+                        key={item.href}
+                        item={item}
+                        pathname={pathname}
+                        onNavigate={onNavigate}
+                        collapsed={collapsed}
+                      />
+                    ))
+                  : null}
+              </div>
+            )}
           </>
         )}
       </nav>
@@ -414,6 +452,7 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
     isChurchStaff,
     unitAdminUnitIds,
     unitDeputyUnitIds,
+    establishmentAccess,
     churchName,
     user,
     member,
@@ -521,9 +560,12 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
     ? '/dashboard/platform'
     : isChurchStaff
       ? '/dashboard'
-      : isUnitAdminOnly
-        ? unitAdminHomePath(unitAdminUnitIds, unitDeputyUnitIds)
-        : '/dashboard/lounge';
+      : memberHomePath({
+          unitAdminUnitIds,
+          unitDeputyUnitIds,
+          canAccessFollowUp,
+          establishmentMode: establishmentAccess.mode,
+        });
 
   useEffect(() => {
     try {
@@ -565,7 +607,7 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
 
         <div
           className={cn(
-            'flex min-h-[100dvh] flex-1 flex-col transition-[padding] duration-200',
+            'flex min-h-[100dvh] min-w-0 flex-1 flex-col transition-[padding] duration-200',
             sidebarExpanded ? 'xl:pl-64' : 'xl:pl-16',
           )}
         >
@@ -637,7 +679,7 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
               staffNav={staffNav}
               staffCommunityNav={staffCommunityNav}
               isChurchStaff={useStaffStyleNav}
-              communityCollapsedByDefault={isPastor || isChurchAdmin || isUnitAdminOnly}
+              communityCollapsedByDefault
             />
           </>
         )}

@@ -5,6 +5,7 @@ import { Loader2, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { STAGE_LABELS } from '@/lib/follow-up';
+import { stageLabelMap, type ResolvedPipeline } from '@/lib/pipeline-definition';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +27,7 @@ interface FollowUpArchivedTableProps {
   canRecontact: boolean;
   onSelect: (id: string) => void;
   selectedId: string | null;
+  pipeline?: ResolvedPipeline | null;
   onRecontacted?: () => void;
 }
 
@@ -34,8 +36,12 @@ export function FollowUpArchivedTable({
   canRecontact,
   onSelect,
   selectedId,
+  pipeline,
   onRecontacted,
 }: FollowUpArchivedTableProps) {
+  const labels = Object.keys(stageLabelMap(pipeline)).length
+    ? stageLabelMap(pipeline)
+    : STAGE_LABELS;
   const [emailFor, setEmailFor] = useState<ArchivedLead | null>(null);
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
@@ -109,7 +115,9 @@ export function FollowUpArchivedTable({
                   )}
                 </td>
                 <td className="px-4 py-3">
-                  <Badge variant="outline">{STAGE_LABELS[item.stage] ?? item.stage}</Badge>
+                  <Badge variant="outline">
+                    {labels[item.stage] ?? STAGE_LABELS[item.stage] ?? item.stage}
+                  </Badge>
                 </td>
                 <td className="max-w-[220px] truncate px-4 py-3 text-muted-foreground">
                   {item.archiveReason || '—'}

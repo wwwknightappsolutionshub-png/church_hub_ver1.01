@@ -3,10 +3,20 @@ import { PrismaService } from '../../prisma/prisma.module';
 import { NotificationDeliveryService } from '../notifications/notification-delivery.service';
 import { FollowUpAutomationService } from './follow-up-automation.service';
 import { FollowUpTeamNotifyService } from './follow-up-team-notify.service';
+import {
+  ASSIGNMENT_STAGE_SLA_HOURS,
+  GRADUATED_FOLLOW_UP_STAGES,
+  assignmentSlaCutoff,
+  assignmentStaleWhereBranches,
+} from './follow-up-assignment-sla';
+import { archiveBlockedStageKeys } from './pipeline-stage-flags';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const JOINED_GROUP_DAY6_MS = 6 * MS_PER_DAY;
 const JOINED_GROUP_MAX_MS = 7 * MS_PER_DAY;
+
+/** Stages that block archive (winners_default: JOINED_GROUP) — retention clock applies. */
+const ARCHIVE_BLOCKED_STAGES = archiveBlockedStageKeys();
 
 /** Fail-safe: deliver due reminders even if BullMQ/redis timers were missed. */
 @Injectable()
@@ -86,7 +96,72 @@ export class FollowUpReminderSchedulerService implements OnModuleInit, OnModuleD
     }
 
     await this.automation.processOverdueRules();
+    await this.processAssignmentStageSla();
     await this.processJoinedGroupRetention();
+  }
+
+  /**
+   * After assignment, stage must change within ASSIGNMENT_STAGE_SLA_HOURS (default 72).
+   * One-shot: in-app to unit leaders + email to assignee.
+   */
+  async processAssignmentStageSla() {
+    const cutoff = assignmentSlaCutoff();
+
+    const missingClock = await this.prisma.followUp.findMany({
+      where: {
+        archivedAt: null,
+        assignedToId: { not: null },
+        assignedAt: null,
+        stage: { notIn: [...GRADUATED_FOLLOW_UP_STAGES] },
+      },
+      select: { id: true, stage: true, updatedAt: true, createdAt: true },
+      take: 50,
+    });
+    for (const row of missingClock) {
+      await this.prisma.followUp.update({
+        where: { id: row.id },
+        data: {
+          assignedAt: row.updatedAt ?? row.createdAt,
+          stageAtAssignment: row.stage,
+        },
+      });
+    }
+
+    const stale = await this.prisma.followUp.findMany({
+      where: {
+        archivedAt: null,
+        assignmentStaleNotifiedAt: null,
+        stage: { notIn: [...GRADUATED_FOLLOW_UP_STAGES] },
+        OR: assignmentStaleWhereBranches(cutoff),
+      },
+      select: {
+        id: true,
+        churchId: true,
+        contactName: true,
+        assignedToId: true,
+      },
+      take: 40,
+    });
+
+    for (const row of stale) {
+      if (!row.assignedToId) continue;
+      try {
+        await this.teamNotify.notifyAssignmentStageOverdue({
+          churchId: row.churchId,
+          followUpId: row.id,
+          contactName: row.contactName,
+          assignedToId: row.assignedToId,
+        });
+        await this.prisma.followUp.update({
+          where: { id: row.id },
+          data: { assignmentStaleNotifiedAt: new Date() },
+        });
+      } catch (err) {
+        this.logger.warn(
+          `Assignment SLA notify failed for ${row.id} (${ASSIGNMENT_STAGE_SLA_HOURS}h): ${err}`,
+        );
+      }
+    }
   }
 
   /**
@@ -101,7 +176,7 @@ export class FollowUpReminderSchedulerService implements OnModuleInit, OnModuleD
     // Legacy rows: start the Joined Group clock from when the row was last updated.
     const missingClock = await this.prisma.followUp.findMany({
       where: {
-        stage: 'JOINED_GROUP',
+        stage: { in: ARCHIVE_BLOCKED_STAGES },
         archivedAt: null,
         completedAt: null,
       },
@@ -117,7 +192,7 @@ export class FollowUpReminderSchedulerService implements OnModuleInit, OnModuleD
 
     const day6Candidates = await this.prisma.followUp.findMany({
       where: {
-        stage: 'JOINED_GROUP',
+        stage: { in: ARCHIVE_BLOCKED_STAGES },
         archivedAt: null,
         joinedGroupDay6NotifiedAt: null,
         completedAt: { lte: day6Cutoff, not: null },
@@ -150,7 +225,7 @@ export class FollowUpReminderSchedulerService implements OnModuleInit, OnModuleD
 
     const expired = await this.prisma.followUp.findMany({
       where: {
-        stage: 'JOINED_GROUP',
+        stage: { in: ARCHIVE_BLOCKED_STAGES },
         archivedAt: null,
         completedAt: { lte: day7Cutoff, not: null },
       },

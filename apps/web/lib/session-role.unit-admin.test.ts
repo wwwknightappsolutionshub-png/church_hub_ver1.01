@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { postLoginPath, unitAdminHomePath } from './session-role';
+import { memberHomePath, postLoginPath, unitAdminHomePath } from './session-role';
 
 describe('unit admin login routing', () => {
   it('lands a single-unit admin on their unit detail', () => {
@@ -19,6 +19,31 @@ describe('unit admin login routing', () => {
   it('postLoginPath keeps lounge for ordinary members', () => {
     expect(postLoginPath('member')).toBe('/dashboard/lounge');
     expect(postLoginPath('member', { unitAdminUnitIds: [] })).toBe('/dashboard/lounge');
+  });
+
+  it('lands Establishment workers on the worker pipeline home', () => {
+    expect(
+      postLoginPath('member', {
+        canAccessFollowUp: true,
+        establishmentMode: 'worker',
+      }),
+    ).toBe('/dashboard/establishment');
+    expect(
+      memberHomePath({
+        canAccessFollowUp: true,
+        establishmentMode: 'worker',
+      }),
+    ).toBe('/dashboard/establishment');
+  });
+
+  it('prefers unit admin home over Establishment for unit leaders', () => {
+    expect(
+      memberHomePath({
+        unitAdminUnitIds: ['harvesters'],
+        canAccessFollowUp: true,
+        establishmentMode: 'manager',
+      }),
+    ).toBe('/dashboard/service-units/harvesters');
   });
 
   it('does not override admin/pastor dashboard home', () => {

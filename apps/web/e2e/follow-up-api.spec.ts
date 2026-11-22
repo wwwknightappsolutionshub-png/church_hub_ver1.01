@@ -1,5 +1,5 @@
 /**
- * API smoke test — verifies Outreach (follow-up) endpoints respond for church admin.
+ * API smoke test — Establishment (follow-up) endpoints for church admin.
  * Run: npx playwright test e2e/follow-up-api.spec.ts
  */
 import { test, expect } from '@playwright/test';
@@ -7,7 +7,7 @@ import { API_URL, assertLogin } from './helpers/auth';
 
 test.describe.configure({ mode: 'serial' });
 
-test.describe('Outreach API smoke', () => {
+test.describe('Establishment API smoke', () => {
   let headers: Record<string, string>;
   let leadId: string;
 
@@ -15,7 +15,7 @@ test.describe('Outreach API smoke', () => {
     headers = await assertLogin(request);
     const statsRes = await request.get(`${API_URL}/follow-up/stats`, { headers });
     if (!statsRes.ok()) {
-      test.skip(true, `Outreach API unavailable (${statsRes.status()})`);
+      test.skip(true, `Establishment API unavailable (${statsRes.status()})`);
     }
   });
 
@@ -24,14 +24,18 @@ test.describe('Outreach API smoke', () => {
       const res = await request.get(`${API_URL}${path}`, { headers });
       expect(res.ok(), `${path} → ${res.status()}`).toBeTruthy();
     }
+    const stats = await (await request.get(`${API_URL}/follow-up/stats`, { headers })).json();
+    expect(stats).toHaveProperty('assigned');
+    expect(stats).toHaveProperty('dueToday');
+    expect(stats).toHaveProperty('graduated');
   });
 
-  test('POST lead and PATCH stage', async ({ request }) => {
+  test('POST lead, PATCH stage, GET stage-audit', async ({ request }) => {
     const createRes = await request.post(`${API_URL}/follow-up`, {
       headers,
       data: {
         contactName: `API Smoke Lead ${Date.now()}`,
-        contactPhone: '555-0199',
+        contactPhone: '07123456789',
         contactEmail: `smoke-${Date.now()}@example.com`,
       },
     });
@@ -50,6 +54,12 @@ test.describe('Outreach API smoke', () => {
     expect(detailRes.ok()).toBeTruthy();
     const detail = await detailRes.json();
     expect(detail.stage).toBe('CONTACTED');
+
+    const auditRes = await request.get(`${API_URL}/follow-up/${leadId}/stage-audit`, { headers });
+    expect(auditRes.ok()).toBeTruthy();
+    const audits = await auditRes.json();
+    expect(audits.length).toBeGreaterThanOrEqual(1);
+    expect(audits[0].toStage).toBe('CONTACTED');
   });
 
   test('GET reminders and automation rules', async ({ request }) => {

@@ -16,6 +16,8 @@ export type AuthMeRouting = {
   unitAdminUnitIds?: string[];
   /** Units where this user is Assistant or Secretary. */
   unitDeputyUnitIds?: string[];
+  canAccessFollowUp?: boolean;
+  establishmentAccess?: { mode?: string | null } | null;
 };
 
 /** Call after tokens are stored — sets slug, role bucket, returns dashboard path. */
@@ -33,6 +35,8 @@ export async function applyAuthSessionFromApi(): Promise<string> {
   return postLoginPath(bucket, {
     unitAdminUnitIds: data.unitAdminUnitIds,
     unitDeputyUnitIds: data.unitDeputyUnitIds,
+    canAccessFollowUp: data.canAccessFollowUp,
+    establishmentMode: data.establishmentAccess?.mode,
   });
 }
 
@@ -47,5 +51,7 @@ export function applyAuthSessionFromMe(me: AuthMeRouting): string {
   return postLoginPath(bucket, {
     unitAdminUnitIds: me.unitAdminUnitIds,
     unitDeputyUnitIds: me.unitDeputyUnitIds,
+    canAccessFollowUp: me.canAccessFollowUp,
+    establishmentMode: me.establishmentAccess?.mode,
   });
 }

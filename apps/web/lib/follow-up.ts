@@ -1,3 +1,7 @@
+/**
+ * Static winners_default maps — **load fallback only**.
+ * Prefer `usePipelineDefinition()` / `@/lib/pipeline-definition` at runtime (Option C).
+ */
 export const FOLLOW_UP_STAGES = [
   'NEW_LEAD',
   'CONTACTED',
@@ -7,6 +11,7 @@ export const FOLLOW_UP_STAGES = [
   'ENLISTED_FOR_BAPTISM',
 ] as const;
 
+/** @deprecated Prefer resolved pipeline labels; kept as resolve-empty fallback. */
 export const STAGE_LABELS: Record<string, string> = {
   NEW_LEAD: 'New Contacts',
   CONTACTED: 'Contacted',
@@ -16,6 +21,7 @@ export const STAGE_LABELS: Record<string, string> = {
   ENLISTED_FOR_BAPTISM: 'Enlisted for Baptism',
 };
 
+/** @deprecated Prefer resolved pipeline shortLabel. */
 export const STAGE_SHORT: Record<string, string> = {
   NEW_LEAD: 'Fresh',
   CONTACTED: 'Contacted',
@@ -26,7 +32,8 @@ export const STAGE_SHORT: Record<string, string> = {
 };
 
 /**
- * Journey status pill colors — shared by pipeline cards and Outreach Directory.
+ * Journey status pill colors — fallback when resolve is empty.
+ * Prefer `stageBadgeClass(pipeline, key)`.
  */
 export const STAGE_BADGE_CLASS: Record<string, string> = {
   NEW_LEAD: 'border-transparent bg-[#2f3ba7]/15 text-[#2f3ba7]',
@@ -43,7 +50,7 @@ export function stageStatusLabel(stage: string): string {
   return STAGE_SHORT[stage] ?? STAGE_LABELS[stage] ?? stage;
 }
 
-/** Macro phases grouping pipeline stages */
+/** Macro phases — fallback when resolve is empty. Prefer `phaseColumnsFromPipeline`. */
 export const PIPELINE_COLUMNS = [
   {
     id: 'outreach',
@@ -124,6 +131,7 @@ export const CHANNEL_LABELS: Record<string, string> = {
   IN_APP: 'In-app',
 };
 
+/** Fallback next-stage; prefer `nextStageFromPipeline`. */
 export function nextStage(current: string): string | null {
   const idx = FOLLOW_UP_STAGES.indexOf(current as (typeof FOLLOW_UP_STAGES)[number]);
   if (idx < 0 || idx >= FOLLOW_UP_STAGES.length - 1) return null;
@@ -166,14 +174,7 @@ export function sortByNewestFirst<T extends { createdAt?: string | null }>(items
   });
 }
 
-export function phaseForStage(stage: string): (typeof PIPELINE_COLUMNS)[number]['id'] {
-  for (const col of PIPELINE_COLUMNS) {
-    if ((col.stages as readonly string[]).includes(stage)) return col.id;
-  }
-  return 'outreach';
-}
-
-/** Stages that block archive (must convert / progress instead). */
+/** Fallback archive block; prefer `isArchiveBlockedInPipeline`. */
 export function isArchiveBlockedStage(stage: string): boolean {
   return stage === 'JOINED_GROUP';
 }

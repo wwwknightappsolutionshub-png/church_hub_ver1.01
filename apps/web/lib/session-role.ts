@@ -114,9 +114,37 @@ export function unitAdminHomePath(
   return '/dashboard/service-units';
 }
 
+/** Home for ordinary members — Establishment workers land on their pipeline, not Lounge. */
+export function memberHomePath(opts?: {
+  unitAdminUnitIds?: string[];
+  unitDeputyUnitIds?: string[];
+  canAccessFollowUp?: boolean;
+  establishmentMode?: string | null;
+}): string {
+  if (
+    (opts?.unitAdminUnitIds ?? []).length > 0 ||
+    (opts?.unitDeputyUnitIds ?? []).length > 0
+  ) {
+    return unitAdminHomePath(opts?.unitAdminUnitIds, opts?.unitDeputyUnitIds);
+  }
+  const establishmentMode = (opts?.establishmentMode ?? '').trim();
+  if (
+    opts?.canAccessFollowUp ||
+    (establishmentMode && establishmentMode !== 'none')
+  ) {
+    return '/dashboard/establishment';
+  }
+  return '/dashboard/lounge';
+}
+
 export function postLoginPath(
   bucket: SessionRoleBucket,
-  opts?: { unitAdminUnitIds?: string[]; unitDeputyUnitIds?: string[] },
+  opts?: {
+    unitAdminUnitIds?: string[];
+    unitDeputyUnitIds?: string[];
+    canAccessFollowUp?: boolean;
+    establishmentMode?: string | null;
+  },
 ): string {
   switch (bucket) {
     case 'platform':
@@ -125,13 +153,7 @@ export function postLoginPath(
     case 'pastor':
       return '/dashboard';
     default:
-      if (
-        (opts?.unitAdminUnitIds ?? []).length > 0 ||
-        (opts?.unitDeputyUnitIds ?? []).length > 0
-      ) {
-        return unitAdminHomePath(opts?.unitAdminUnitIds, opts?.unitDeputyUnitIds);
-      }
-      return '/dashboard/lounge';
+      return memberHomePath(opts);
   }
 }
 

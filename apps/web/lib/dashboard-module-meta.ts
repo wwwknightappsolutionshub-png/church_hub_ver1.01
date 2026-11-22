@@ -19,6 +19,7 @@ const MODULE_PAGE_CHROME_PREFIXES = [
   '/dashboard/admin-reports',
   '/dashboard/business',
   '/dashboard/follow-up',
+  '/dashboard/establishment',
   '/dashboard/outreach',
   '/dashboard/service-units',
   '/dashboard/departments',
@@ -53,7 +54,7 @@ export const MOBILE_ROUTE_TITLES: Record<string, string> = {
   '/dashboard/suggestions': 'Suggestions',
   '/dashboard/devotional-hub': 'Devotional Hub',
   '/dashboard/testimony-hub': 'Testimony Hub',
-  '/dashboard/outreach/field': 'Outreach Capture',
+  '/dashboard/outreach/field': 'Lead capture',
   '/dashboard/change-password': 'Change password',
 };
 

@@ -28,10 +28,10 @@ export default function OutreachFieldPage() {
         <Button variant="ghost" size="sm" asChild>
           <Link href="/dashboard/outreach">
             <ArrowLeft className="mr-1 h-4 w-4" />
-            Field Outreach
+            Outreach
           </Link>
         </Button>
-        <span className="font-heading text-sm font-semibold">Outreach Capture</span>
+        <span className="font-heading text-sm font-semibold">Lead capture</span>
         {!online ? (
           <Badge variant="outline" className="gap-1 text-amber-700">
             <WifiOff className="h-3 w-3" />

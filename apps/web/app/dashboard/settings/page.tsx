@@ -342,6 +342,22 @@ export default function SettingsPage() {
       {showLeadershipPrivacySession ? (
         <Card>
           <CardHeader>
+            <CardTitle className="text-base">Membership Pipeline</CardTitle>
+            <CardDescription>
+              Templates, customize (fork), stage labels, and merge product updates for Establishment.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button variant="outline" asChild>
+              <Link href="/dashboard/settings/membership-pipeline">Customize pipeline</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {showLeadershipPrivacySession ? (
+        <Card>
+          <CardHeader>
             <CardTitle className="text-base">Privacy & data</CardTitle>
             <CardDescription>
               Download a copy of your account data or request erasure. Legal documents are at{' '}

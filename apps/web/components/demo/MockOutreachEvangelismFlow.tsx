@@ -92,7 +92,7 @@ function FieldHubView() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-violet-600">Evangelism</p>
-          <p className="text-lg font-semibold">Field Outreach</p>
+          <p className="text-lg font-semibold">Outreach</p>
         </div>
         <Badge variant="success">Offline-ready</Badge>
       </div>
@@ -192,6 +192,15 @@ function CaptureFormView({
             {needsBus ? (
               <Input readOnly value="12 Riverside Close" placeholder="Pickup address" className="mt-3 ring-1 ring-primary/30" />
             ) : null}
+          </div>
+
+          <div className="mt-4 rounded-lg border border-border p-4">
+            <label className="flex items-start gap-2 text-sm font-medium">
+              <input type="checkbox" checked readOnly className="mt-0.5 rounded" />
+              <span>
+                Contact consented to store and process their personal data (GDPR / Privacy Policy).
+              </span>
+            </label>
           </div>
 
           <Button type="button" className="mt-4 w-full" disabled={saving}>

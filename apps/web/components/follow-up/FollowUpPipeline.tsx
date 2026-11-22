@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ArrowRight,
-  Clock,
   Eye,
   HeartHandshake,
+  Phone,
   Sprout,
   User,
   Users,
@@ -16,15 +16,30 @@ import {
   PIPELINE_COLUMNS,
   STAGE_BADGE_CLASS,
   STAGE_LABELS,
-  STAGE_ROW_CLASS,
-  STAGE_ROW_MUTED_CLASS,
   formatCapturedAt,
   isArchiveBlockedStage,
   sortByNewestFirst,
   stageStatusLabel,
 } from '@/lib/follow-up';
+import {
+  isArchiveBlockedInPipeline,
+  phaseColumnsFromPipeline,
+  stageAccentBorderClass,
+  stageBadgeClass,
+  stageLabelMap,
+  stageShortMap,
+  type PipelinePhaseColumn,
+  type ResolvedPipeline,
+} from '@/lib/pipeline-definition';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import type { ProgressFormValues } from '@/components/follow-up/ProgressStageDialog';
 import {
   ArchiveIconButton,
@@ -39,6 +54,13 @@ export interface FollowUpCard {
   contactEmail?: string | null;
   stage: string;
   dueAt?: string | null;
+  /** Set when assigned — 72h SLA clock for stage update. */
+  assignedAt?: string | null;
+  /** Stage at assignment; overdue while still equal after SLA. */
+  stageAtAssignment?: string | null;
+  /** Last assign or stage advance — 12–24h Due today window. */
+  lastProgressAt?: string | null;
+  assignedToId?: string | null;
   nextAction?: string | null;
   createdAt?: string | null;
   notes?: string | null;
@@ -56,6 +78,8 @@ interface FollowUpPipelineProps {
   items: FollowUpCard[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** Resolved membership pipeline (Phase 3). Falls back to static winners_default maps. */
+  pipeline?: ResolvedPipeline | null;
   canArchive?: boolean;
   canRequestArchive?: boolean;
   onArchive?: (id: string, reason: string) => void | Promise<void>;
@@ -71,10 +95,27 @@ const PHASE_ICONS: Record<string, LucideIcon> = {
   belonging: HeartHandshake,
 };
 
+function fallbackPhaseColumns(): PipelinePhaseColumn[] {
+  return PIPELINE_COLUMNS.map((col) => ({
+    id: col.id,
+    step: col.step,
+    title: col.title,
+    subtitle: col.subtitle,
+    headerClass: col.headerClass,
+    titleClass: col.titleClass,
+    subtitleClass: col.subtitleClass,
+    dotClass: col.dotClass,
+    stages: [...col.stages],
+  }));
+}
+
 function LeadCard({
   item,
   selected,
   onSelect,
+  pipeline,
+  labels,
+  shorts,
   canArchive,
   canRequestArchive,
   onArchiveClick,
@@ -85,6 +126,9 @@ function LeadCard({
   item: FollowUpCard;
   selected: boolean;
   onSelect: () => void;
+  pipeline?: ResolvedPipeline | null;
+  labels: Record<string, string>;
+  shorts: Record<string, string>;
   canArchive?: boolean;
   canRequestArchive?: boolean;
   onArchiveClick?: () => void;
@@ -95,121 +139,177 @@ function LeadCard({
   const archiveRequested = !!item.archiveRequestedAt;
   const referred = item.referredBy?.trim() || null;
   const captured = formatCapturedAt(item.createdAt);
-  const muted = STAGE_ROW_MUTED_CLASS[item.stage] ?? 'text-muted-foreground';
-  const archiveBlocked = isArchiveBlockedStage(item.stage);
+  const archiveBlocked = pipeline
+    ? isArchiveBlockedInPipeline(pipeline, item.stage)
+    : isArchiveBlockedStage(item.stage);
+  const assignee = item.assignedTo
+    ? `${item.assignedTo.firstName} ${item.assignedTo.lastName}`.trim()
+    : null;
+  const stageLabel = labels[item.stage] ?? STAGE_LABELS[item.stage] ?? item.stage;
+  const shortLabel = shorts[item.stage] ?? stageStatusLabel(item.stage);
+  const description =
+    item.nextAction?.trim() ||
+    item.notes?.trim() ||
+    (captured ? `Captured ${captured}` : stageLabel);
+  const badgeClass = pipeline
+    ? stageBadgeClass(pipeline, item.stage)
+    : (STAGE_BADGE_CLASS[item.stage] ?? 'bg-muted text-muted-foreground');
+  const accentClass = pipeline
+    ? stageAccentBorderClass(pipeline, item.stage)
+    : 'border-l-border';
+
+  const showArchive = !archiveBlocked && canArchive && onArchiveClick;
+  const showDnd = !archiveBlocked && canRequestArchive && !canArchive && onDndClick;
+  const showApprove = !archiveBlocked && canArchive && archiveRequested && onApproveClick;
+  const showDecline = !archiveBlocked && canArchive && archiveRequested && onDeclineClick;
+  const hasActions = showArchive || showDnd || showApprove || showDecline;
 
   return (
-    <article
+    <Card
       className={cn(
-        'group rounded-xl border transition-all',
-        STAGE_ROW_CLASS[item.stage] ?? 'bg-card border-border',
-        selected
-          ? 'ring-2 ring-primary/40 shadow-md'
-          : 'shadow-sm hover:brightness-[0.98] dark:hover:brightness-110',
-        archiveRequested && 'ring-1 ring-destructive/40',
+        'relative h-full border-l-4 transition-shadow hover:shadow-elevated',
+        accentClass,
+        selected &&
+          'border-2 border-amber-500 bg-gradient-to-br from-amber-50 via-amber-100/80 to-orange-50 shadow-md ring-2 ring-amber-400/50',
+        archiveRequested && !selected && 'ring-1 ring-destructive/40',
       )}
+      data-stage={item.stage}
     >
-      <div className="w-full p-3 text-left">
-        <button type="button" onClick={onSelect} className="w-full text-left">
-          <div className="flex items-start gap-2.5">
-            <div
-              className={cn(
-                'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold',
-                item.stage === 'ATTENDED'
-                  ? 'bg-white/20 text-inherit'
-                  : item.stage === 'NEW_LEAD'
-                    ? 'bg-[#2f3ba7]/15 text-[#2f3ba7]'
-                    : 'bg-black/5 text-inherit dark:bg-white/10',
-              )}
-            >
-              {item.contactName.charAt(0).toUpperCase()}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <h4 className="font-semibold leading-tight">{item.contactName}</h4>
-                <Badge
-                  className={cn(
-                    'text-[10px]',
-                    STAGE_BADGE_CLASS[item.stage] ?? 'bg-muted text-muted-foreground',
-                  )}
-                >
-                  {stageStatusLabel(item.stage)}
-                </Badge>
-                {archiveRequested && (
-                  <Badge variant="destructive" className="text-[10px]">
-                    Archive requested
-                  </Badge>
-                )}
-              </div>
-              {captured ? (
-                <p className={cn('mt-1 flex items-center gap-1 text-[11px]', muted)}>
-                  <Clock className="h-3 w-3 shrink-0" />
-                  Captured {captured}
-                </p>
-              ) : null}
-            </div>
-          </div>
-        </button>
-
-        <div className="mt-2 flex items-center gap-1">
-          <p className={cn('min-w-0 flex-1 truncate text-xs', muted)}>
-            {referred ? (
-              <span className="inline-flex items-center gap-1.5">
-                <User className="h-3 w-3 shrink-0" />
-                Referred by {referred}
-              </span>
-            ) : (
-              'No referrer noted'
-            )}
-          </p>
-          {!archiveBlocked && canArchive && onArchiveClick ? (
-            <ArchiveIconButton title="Archive" onClick={onArchiveClick} />
-          ) : null}
-          {!archiveBlocked && canRequestArchive && !canArchive && onDndClick ? (
-            <DndIconButton onClick={onDndClick} />
-          ) : null}
-          {!archiveBlocked && canArchive && archiveRequested && onApproveClick ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 px-2 text-[10px] font-semibold text-destructive"
-              onClick={(e) => {
-                e.stopPropagation();
-                onApproveClick();
-              }}
-            >
-              Approve
-            </Button>
-          ) : null}
-          {!archiveBlocked && canArchive && archiveRequested && onDeclineClick ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 px-2 text-[10px]"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDeclineClick();
-              }}
-            >
-              Decline
-            </Button>
-          ) : null}
+      <div className="absolute right-2 top-2 z-10 flex items-center gap-0.5">
+        {showArchive ? <ArchiveIconButton title="Archive" onClick={onArchiveClick} /> : null}
+        {showDnd ? <DndIconButton onClick={onDndClick} /> : null}
+        {showApprove ? (
           <Button
             type="button"
             variant="ghost"
-            size="icon"
-            className="h-8 w-8 shrink-0"
-            title="View detailed"
-            aria-label={`View detailed — ${item.contactName}`}
-            onClick={onSelect}
+            size="sm"
+            className="h-8 px-2 text-[10px] font-semibold text-destructive"
+            onClick={(e) => {
+              e.stopPropagation();
+              onApproveClick();
+            }}
           >
-            <Eye className="h-4 w-4" />
+            Approve
           </Button>
-        </div>
+        ) : null}
+        {showDecline ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2 text-[10px]"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDeclineClick();
+            }}
+          >
+            Decline
+          </Button>
+        ) : null}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 shrink-0 text-muted-foreground"
+          title="View detailed"
+          aria-label={`View detailed — ${item.contactName}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect();
+          }}
+        >
+          <Eye className="h-4 w-4" />
+        </Button>
       </div>
-    </article>
+
+      <button
+        type="button"
+        className={cn('w-full text-left', hasActions ? 'pr-20' : 'pr-10')}
+        onClick={onSelect}
+      >
+        <CardHeader className="pb-3">
+          {selected ? (
+            <p className="mb-2 inline-flex rounded-md bg-amber-500 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white">
+              Selected
+            </p>
+          ) : null}
+          <div className="flex items-start justify-between gap-2">
+            <CardTitle
+              className={cn('text-base leading-snug', selected && 'text-amber-950')}
+            >
+              {item.contactName}
+            </CardTitle>
+            <Badge className={cn('shrink-0 gap-1 text-[10px]', badgeClass)}>
+              {shortLabel}
+            </Badge>
+          </div>
+          {archiveRequested ? (
+            <Badge variant="destructive" className="mt-1 w-fit text-[10px]">
+              Archive requested
+            </Badge>
+          ) : null}
+          <CardDescription
+            className={cn('line-clamp-2', selected && 'text-amber-900/75')}
+          >
+            {description}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <div
+            className={cn(
+              'flex items-center gap-2 text-muted-foreground',
+              selected && 'text-amber-900/80',
+            )}
+          >
+            {item.contactPhone ? (
+              <>
+                <Phone className="h-4 w-4 shrink-0" />
+                <span className="truncate">{item.contactPhone}</span>
+              </>
+            ) : (
+              <>
+                <Users className="h-4 w-4 shrink-0" />
+                <span className="truncate">
+                  {stageLabel}
+                  {captured ? ` · ${captured}` : ''}
+                </span>
+              </>
+            )}
+          </div>
+          {item.contactPhone && captured ? (
+            <p
+              className={cn(
+                'font-sans text-xs text-muted-foreground',
+                selected && 'text-amber-900/70',
+              )}
+            >
+              Captured {captured}
+            </p>
+          ) : null}
+          {referred ? (
+            <p
+              className={cn(
+                'inline-flex items-center gap-1.5 font-sans text-xs text-muted-foreground',
+                selected && 'text-amber-900/70',
+              )}
+            >
+              <User className="h-3.5 w-3.5 shrink-0" />
+              Referred by {referred}
+            </p>
+          ) : null}
+          {assignee ? (
+            <p
+              className={cn(
+                'font-sans text-xs text-muted-foreground',
+                selected && 'text-amber-900/70',
+              )}
+            >
+              Assignee: {assignee}
+            </p>
+          ) : null}
+        </CardContent>
+      </button>
+    </Card>
   );
 }
 
@@ -217,6 +317,7 @@ export function FollowUpPipeline({
   items,
   selectedId,
   onSelect,
+  pipeline,
   canArchive,
   canRequestArchive,
   onArchive,
@@ -231,8 +332,56 @@ export function FollowUpPipeline({
     mode: 'archive' | 'dnd' | 'decline';
   } | null>(null);
 
+  const phaseColumns = useMemo(() => {
+    const fromApi = phaseColumnsFromPipeline(pipeline);
+    return fromApi.length ? fromApi : fallbackPhaseColumns();
+  }, [pipeline]);
+
+  const labels = useMemo(() => {
+    const fromApi = stageLabelMap(pipeline);
+    return Object.keys(fromApi).length ? fromApi : STAGE_LABELS;
+  }, [pipeline]);
+
+  const shorts = useMemo(() => stageShortMap(pipeline), [pipeline]);
+
+  const cardActions = (item: FollowUpCard) => ({
+    canArchive,
+    canRequestArchive,
+    onArchiveClick: onArchive
+      ? () =>
+          setArchiveDlg({
+            id: item.id,
+            contactName: item.contactName,
+            mode: 'archive',
+          })
+      : undefined,
+    onDndClick: onRequestArchive
+      ? () =>
+          setArchiveDlg({
+            id: item.id,
+            contactName: item.contactName,
+            mode: 'dnd',
+          })
+      : undefined,
+    onApproveClick: onApproveArchive
+      ? () =>
+          void onApproveArchive(
+            item.id,
+            item.archiveRequestReason || 'Approved archive request',
+          )
+      : undefined,
+    onDeclineClick: onDeclineArchive
+      ? () =>
+          setArchiveDlg({
+            id: item.id,
+            contactName: item.contactName,
+            mode: 'decline',
+          })
+      : undefined,
+  });
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-pipeline-source={pipeline?.source ?? 'static'}>
       <FollowUpArchiveDialog
         open={!!archiveDlg}
         mode={archiveDlg?.mode ?? 'archive'}
@@ -250,120 +399,90 @@ export function FollowUpPipeline({
         }}
       />
 
-      <div className="grid gap-5 md:grid-cols-3">
-        {PIPELINE_COLUMNS.map((col, i) => {
+      <div
+        className="grid gap-5 md:grid-cols-3"
+        data-testid="pipeline-phase-strip"
+      >
+        {phaseColumns.map((col, i) => {
           const Icon = PHASE_ICONS[col.id] ?? Users;
-          const count = items.filter((f) =>
-            (col.stages as readonly string[]).includes(f.stage),
-          ).length;
+          const count = items.filter((f) => col.stages.includes(f.stage)).length;
           return (
-            <div key={col.id} className="relative flex min-w-0 flex-col gap-4">
-              <div className="relative">
-                {i < PIPELINE_COLUMNS.length - 1 && (
-                  <ArrowRight className="absolute -right-3 top-1/2 z-10 hidden h-5 w-5 -translate-y-1/2 text-muted-foreground/40 md:block" />
-                )}
-                <div className={cn('rounded-xl border px-4 py-3.5', col.headerClass)}>
-                  <div className="flex gap-3">
-                    <div
-                      className={cn(
-                        'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-card/70',
-                        col.headerClass,
-                      )}
-                    >
-                      <Icon className={cn('h-5 w-5', col.titleClass)} strokeWidth={2} />
+            <div key={col.id} className="relative min-w-0">
+              {i < phaseColumns.length - 1 && (
+                <ArrowRight className="absolute -right-3 top-1/2 z-10 hidden h-5 w-5 -translate-y-1/2 text-muted-foreground/40 md:block" />
+              )}
+              <div className={cn('rounded-xl border px-4 py-3.5', col.headerClass)}>
+                <div className="flex gap-3">
+                  <div
+                    className={cn(
+                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-card/70',
+                      col.headerClass,
+                    )}
+                  >
+                    <Icon className={cn('h-5 w-5', col.titleClass)} strokeWidth={2} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className={cn('h-2 w-2 rounded-full', col.dotClass)} />
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Phase {col.step}
+                      </span>
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className={cn('h-2 w-2 rounded-full', col.dotClass)} />
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                          Phase {col.step}
-                        </span>
-                      </div>
-                      <h3 className={cn('mt-0.5 font-heading text-base font-bold', col.titleClass)}>
-                        {col.title}
-                      </h3>
+                    <h3 className={cn('mt-0.5 font-heading text-base font-bold', col.titleClass)}>
+                      {col.title}
+                    </h3>
+                    {col.subtitle ? (
                       <p className={cn('text-sm', col.subtitleClass)}>{col.subtitle}</p>
-                      <p className="mt-1 text-xs font-medium text-muted-foreground">
-                        {count} in this phase
-                      </p>
-                    </div>
+                    ) : null}
+                    <p className="mt-1 text-xs font-medium text-muted-foreground">
+                      {count} in this phase
+                    </p>
                   </div>
                 </div>
               </div>
-
-              {col.stages.map((stage) => {
-                const stageItems = sortByNewestFirst(items.filter((f) => f.stage === stage));
-                return (
-                  <div key={stage} className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between px-1">
-                      <span className="text-sm font-bold text-foreground">
-                        {STAGE_LABELS[stage]}
-                      </span>
-                      <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-foreground">
-                        {stageItems.length}
-                      </span>
-                    </div>
-                    <div className="flex max-h-[28rem] min-h-[120px] flex-col gap-2.5 overflow-y-auto rounded-xl bg-muted/30 p-2">
-                      {stageItems.length === 0 ? (
-                        <p className="flex flex-1 items-center justify-center px-2 py-8 text-center text-xs text-muted-foreground">
-                          No one here yet
-                        </p>
-                      ) : (
-                        stageItems.map((item) => (
-                          <LeadCard
-                            key={item.id}
-                            item={item}
-                            selected={selectedId === item.id}
-                            onSelect={() => onSelect(item.id)}
-                            canArchive={canArchive}
-                            canRequestArchive={canRequestArchive}
-                            onArchiveClick={
-                              onArchive
-                                ? () =>
-                                    setArchiveDlg({
-                                      id: item.id,
-                                      contactName: item.contactName,
-                                      mode: 'archive',
-                                    })
-                                : undefined
-                            }
-                            onDndClick={
-                              onRequestArchive
-                                ? () =>
-                                    setArchiveDlg({
-                                      id: item.id,
-                                      contactName: item.contactName,
-                                      mode: 'dnd',
-                                    })
-                                : undefined
-                            }
-                            onApproveClick={
-                              onApproveArchive
-                                ? () =>
-                                    void onApproveArchive(
-                                      item.id,
-                                      item.archiveRequestReason || 'Approved archive request',
-                                    )
-                                : undefined
-                            }
-                            onDeclineClick={
-                              onDeclineArchive
-                                ? () =>
-                                    setArchiveDlg({
-                                      id: item.id,
-                                      contactName: item.contactName,
-                                      mode: 'decline',
-                                    })
-                                : undefined
-                            }
-                          />
-                        ))
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
             </div>
+          );
+        })}
+      </div>
+
+      <div className="space-y-8">
+        {phaseColumns.map((col) => {
+          const phaseItems = sortByNewestFirst(
+            items.filter((f) => col.stages.includes(f.stage)),
+          );
+          return (
+            <section key={col.id} className="space-y-3" data-phase={col.id}>
+              <div className="flex items-center gap-2 px-0.5">
+                <span className={cn('h-2.5 w-2.5 rounded-full', col.dotClass)} />
+                <h4 className={cn('font-heading text-sm font-bold', col.titleClass)}>
+                  Phase {col.step}: {col.title}
+                </h4>
+                <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-foreground">
+                  {phaseItems.length}
+                </span>
+              </div>
+
+              {phaseItems.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-10 text-center text-sm text-muted-foreground">
+                  No one in this phase yet
+                </p>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {phaseItems.map((item) => (
+                    <LeadCard
+                      key={item.id}
+                      item={item}
+                      selected={selectedId === item.id}
+                      onSelect={() => onSelect(item.id)}
+                      pipeline={pipeline}
+                      labels={labels}
+                      shorts={shorts}
+                      {...cardActions(item)}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
           );
         })}
       </div>

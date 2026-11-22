@@ -1,8 +1,25 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { FollowUpAutomationTrigger, FollowUpStage } from '@prisma/client';
+import { FollowUpAutomationTrigger } from '@prisma/client';
 import { FollowUpService } from './follow-up.service';
 import { FollowUpAutomationService } from './follow-up-automation.service';
+import { PipelineResolveService } from './pipeline-resolve.service';
+import {
+  PipelineDefinitionService,
+  type AddStageInput,
+  type PatchStageInput,
+} from './pipeline-definition.service';
+import { PipelineMergeService } from './pipeline-merge.service';
 import { ChurchId, CurrentUser, AuthUser } from '../auth/current-user.decorator';
 import { MemberAdmin, ModuleGate, Roles } from '../auth/decorators';
 
@@ -14,11 +31,166 @@ export class FollowUpController {
   constructor(
     private readonly followUpService: FollowUpService,
     private readonly automation: FollowUpAutomationService,
+    private readonly pipelineResolve: PipelineResolveService,
+    private readonly pipelineDefinition: PipelineDefinitionService,
+    private readonly pipelineMerge: PipelineMergeService,
   ) {}
 
+  @Get('pipeline')
+  @ApiOperation({
+    summary:
+      'Resolve membership pipeline for this church (active definition, else preferred/base template)',
+  })
+  resolvePipeline(@ChurchId() churchId: string) {
+    return this.pipelineResolve.resolveForChurch(churchId);
+  }
+
+  @Get('pipeline/templates')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({ summary: 'List system pipeline templates and preferred base (pre-fork)' })
+  listPipelineTemplates(@ChurchId() churchId: string) {
+    return this.pipelineDefinition.listTemplates(churchId);
+  }
+
+  @Put('pipeline/base-template')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({
+    summary: 'Select base system template used before fork (rejected if already forked)',
+  })
+  setPipelineBaseTemplate(
+    @ChurchId() churchId: string,
+    @Body() body: { templateKey: string },
+  ) {
+    return this.pipelineDefinition.setBaseTemplate(churchId, body.templateKey);
+  }
+
+  @Post('pipeline/discard')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({
+    summary: 'Deactivate church definition so a base system template can be selected again',
+  })
+  discardPipelineDefinition(@ChurchId() churchId: string) {
+    return this.pipelineDefinition.discardDefinition(churchId);
+  }
+
+  @Post('pipeline/fork')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({
+    summary:
+      'Fork selected/preferred system template into a church-owned definition (idempotent if already forked)',
+  })
+  forkPipeline(
+    @ChurchId() churchId: string,
+    @Body() body?: { templateKey?: string },
+  ) {
+    return this.pipelineDefinition.fork(churchId, body?.templateKey);
+  }
+
+  @Patch('pipeline')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({ summary: 'Rename the active church pipeline definition' })
+  renamePipeline(
+    @ChurchId() churchId: string,
+    @Body() body: { name: string },
+  ) {
+    return this.pipelineDefinition.renameDefinition(churchId, body.name);
+  }
+
+  @Patch('pipeline/stages/:key')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({
+    summary:
+      'Update a forked stage (label, order, color, entry/enabled). Cannot change archive/SLA flags or disable in-use stages.',
+  })
+  patchPipelineStage(
+    @ChurchId() churchId: string,
+    @Param('key') key: string,
+    @Body() body: PatchStageInput,
+  ) {
+    return this.pipelineDefinition.patchStage(churchId, key, body);
+  }
+
+  @Post('pipeline/stages')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({ summary: 'Add a custom stage to the forked church definition' })
+  addPipelineStage(@ChurchId() churchId: string, @Body() body: AddStageInput) {
+    return this.pipelineDefinition.addStage(churchId, body);
+  }
+
+  @Get('pipeline/updates')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({
+    summary: 'Template updates available for forked church + stage diff',
+  })
+  pipelineUpdates(@ChurchId() churchId: string) {
+    return this.pipelineMerge.getUpdates(churchId);
+  }
+
+  @Post('pipeline/updates/dismiss')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({ summary: 'Dismiss current template update notice until the next bump' })
+  dismissPipelineUpdates(@ChurchId() churchId: string) {
+    return this.pipelineMerge.dismissUpdates(churchId);
+  }
+
+  @Post('pipeline/merge')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({
+    summary:
+      'Merge system template into church definition (preserves custom stages; conflicts need resolveConflicts)',
+  })
+  mergePipeline(
+    @ChurchId() churchId: string,
+    @Body()
+    body?: { resolveConflicts?: Record<string, 'keep_church' | 'take_template'> },
+  ) {
+    return this.pipelineMerge.merge(churchId, body?.resolveConflicts ?? {});
+  }
+
+  @Post('pipeline/templates/:key/resync')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({
+    summary:
+      'Resync system template from seed (QA only — requires PIPELINE_QA_TOOLS=true; mutates shared templates)',
+  })
+  resyncPipelineTemplate(@Param('key') key: string) {
+    return this.pipelineMerge.resyncTemplate(key);
+  }
+
+  @Post('pipeline/templates/:key/bump')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({
+    summary:
+      'Bump system template version (QA only — requires PIPELINE_QA_TOOLS=true; mutates shared templates)',
+  })
+  bumpPipelineTemplate(
+    @Param('key') key: string,
+    @Body()
+    body?: {
+      name?: string;
+      description?: string;
+      stages?: Array<{
+        key: string;
+        label?: string;
+        shortLabel?: string;
+        sortOrder?: number;
+        phaseKey?: string;
+        phaseStep?: number;
+        phaseTitle?: string;
+        colorToken?: string | null;
+        isEntry?: boolean;
+        blocksArchive?: boolean;
+        graduatesSla?: boolean;
+        isEnabled?: boolean;
+      }>;
+    },
+  ) {
+    return this.pipelineMerge.bumpTemplate(key, body);
+  }
+
   @Get('stats')
-  getStats(@ChurchId() churchId: string) {
-    return this.followUpService.getStats(churchId);
+  getStats(@ChurchId() churchId: string, @CurrentUser() user: AuthUser) {
+    return this.followUpService.getStats(churchId, user.userId);
   }
 
   @Get('automation-rules')
@@ -36,7 +208,7 @@ export class FollowUpController {
       id?: string;
       name: string;
       trigger: FollowUpAutomationTrigger;
-      stage?: FollowUpStage | null;
+      stage?: string | null;
       delayHours: number;
       channel: string;
       message?: string;
@@ -48,8 +220,8 @@ export class FollowUpController {
   }
 
   @Get('assignees')
-  listAssignees(@ChurchId() churchId: string) {
-    return this.followUpService.listAssignees(churchId);
+  listAssignees(@ChurchId() churchId: string, @CurrentUser() user: AuthUser) {
+    return this.followUpService.listAssignees(churchId, user.userId);
   }
 
   @Get('templates')
@@ -58,11 +230,14 @@ export class FollowUpController {
   }
 
   @Post('export-check')
-  @Roles('ADMIN', 'PASTOR', 'LEADER')
   @ApiOperation({
-    summary: 'Authorize church outreach PDF export (Admin, Pastor, or Leader)',
+    summary: 'Authorize Establishment directory PDF export (managers only)',
   })
-  exportCheck() {
+  async exportCheck(@ChurchId() churchId: string, @CurrentUser() user: AuthUser) {
+    const access = await this.followUpService.getAccess(churchId, user.userId);
+    if (access.mode !== 'manager') {
+      throw new ForbiddenException('Only Establishment managers can export the directory');
+    }
     return { ok: true };
   }
 
@@ -76,7 +251,7 @@ export class FollowUpController {
   }
 
   @Post('pastoral-notes')
-  @Roles('ADMIN', 'PASTOR', 'LEADER')
+  @Roles('ADMIN', 'PASTOR')
   addNote(
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
@@ -85,7 +260,7 @@ export class FollowUpController {
       isConfidential?: boolean;
       memberId?: string;
       followUpId?: string;
-      stageAtTime?: FollowUpStage;
+      stageAtTime?: string;
       kind?: string;
     },
   ) {
@@ -93,7 +268,7 @@ export class FollowUpController {
   }
 
   @Get('pastoral-notes')
-  @Roles('ADMIN', 'PASTOR', 'LEADER')
+  @Roles('ADMIN', 'PASTOR')
   getNotes(
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
@@ -107,6 +282,7 @@ export class FollowUpController {
   @ApiOperation({ summary: 'Active leads with next-action dates for calendar view' })
   calendar(
     @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
@@ -118,38 +294,61 @@ export class FollowUpController {
     if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
       return this.followUpService.listCalendar(
         churchId,
+        user.userId,
         new Date(now.getFullYear(), now.getMonth(), 1),
         new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59),
       );
     }
-    return this.followUpService.listCalendar(churchId, fromDate, toDate);
+    return this.followUpService.listCalendar(churchId, user.userId, fromDate, toDate);
   }
 
   @Get()
   list(
     @ChurchId() churchId: string,
-    @Query('stage') stage?: FollowUpStage,
+    @CurrentUser() user: AuthUser,
+    @Query('stage') stage?: string,
     @Query('assignedToId') assignedToId?: string,
     @Query('archived') archived?: string,
   ) {
-    return this.followUpService.list(churchId, stage, assignedToId, {
+    return this.followUpService.list(churchId, user.userId, stage, assignedToId, {
       archived: archived === '1' || archived === 'true',
     });
   }
 
   @Post()
-  create(@ChurchId() churchId: string, @Body() body: Record<string, unknown>) {
-    return this.followUpService.create(churchId, body as Parameters<FollowUpService['create']>[1]);
+  create(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.followUpService.create(
+      churchId,
+      body as Parameters<FollowUpService['create']>[1],
+      user.userId,
+    );
   }
 
   @Get(':id')
-  getOne(@ChurchId() churchId: string, @Param('id') id: string) {
-    return this.followUpService.getOne(churchId, id);
+  getOne(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.followUpService.getOne(churchId, id, user.userId);
+  }
+
+  @Get(':id/stage-audit')
+  @ApiOperation({ summary: 'Stage-change audit log (Establishment managers)' })
+  listStageAudits(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.followUpService.listStageAudits(churchId, id, user.userId);
   }
 
   @Post(':id/archive')
-  @Roles('ADMIN', 'PASTOR', 'LEADER')
-  @ApiOperation({ summary: 'Archive lead (no restore; email re-contact only)' })
+  @ApiOperation({ summary: 'Archive lead (Establishment managers; no restore)' })
   archive(
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
@@ -160,7 +359,7 @@ export class FollowUpController {
   }
 
   @Post(':id/archive-request')
-  @ApiOperation({ summary: 'Outreach member DND — request archive with required comment' })
+  @ApiOperation({ summary: 'Worker DND — request archive with required comment' })
   requestArchive(
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
@@ -171,8 +370,7 @@ export class FollowUpController {
   }
 
   @Post(':id/archive-request/approve')
-  @Roles('ADMIN', 'PASTOR', 'LEADER')
-  @ApiOperation({ summary: 'Approve pending archive request' })
+  @ApiOperation({ summary: 'Approve pending archive request (managers)' })
   approveArchiveRequest(
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
@@ -188,7 +386,6 @@ export class FollowUpController {
   }
 
   @Post(':id/archive-request/decline')
-  @Roles('ADMIN', 'PASTOR', 'LEADER')
   declineArchiveRequest(
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
@@ -199,8 +396,7 @@ export class FollowUpController {
   }
 
   @Post(':id/recontact')
-  @Roles('ADMIN', 'PASTOR', 'LEADER')
-  @ApiOperation({ summary: 'Email an archived lead (no pipeline restore)' })
+  @ApiOperation({ summary: 'Email an archived lead (managers; no pipeline restore)' })
   recontact(
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
@@ -216,10 +412,11 @@ export class FollowUpController {
   @Patch(':id')
   update(
     @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body() body: Record<string, unknown>,
   ) {
-    return this.followUpService.update(churchId, id, body as Parameters<FollowUpService['update']>[2]);
+    return this.followUpService.update(churchId, id, body, user.userId);
   }
 
   @Patch(':id/stage')
@@ -229,7 +426,7 @@ export class FollowUpController {
     @Param('id') id: string,
     @Body()
     body: {
-      stage: FollowUpStage;
+      stage: string;
       notes?: string;
       whatWasDone?: string;
       whatNext?: string;
@@ -240,26 +437,32 @@ export class FollowUpController {
   }
 
   @Get(':id/reminders')
-  listReminders(@ChurchId() churchId: string, @Param('id') id: string) {
-    return this.followUpService.listReminders(churchId, id);
+  listReminders(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.followUpService.listReminders(churchId, id, user.userId);
   }
 
   @Post(':id/reminders')
   scheduleReminder(
     @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body() body: { remindAt: string; channel: string; message: string; templateId?: string },
   ) {
-    return this.followUpService.scheduleReminder(churchId, id, body);
+    return this.followUpService.scheduleReminder(churchId, id, body, user.userId);
   }
 
   @Post(':id/send-template')
   sendTemplate(
     @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body() body: { templateId: string },
   ) {
-    return this.followUpService.sendTemplateNow(churchId, id, body.templateId);
+    return this.followUpService.sendTemplateNow(churchId, id, body.templateId, user.userId);
   }
 
   @Post(':id/link-member')

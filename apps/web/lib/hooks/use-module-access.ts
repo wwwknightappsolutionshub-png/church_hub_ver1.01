@@ -9,12 +9,17 @@ import {
   isPlatformAdminRole,
   isPlatformRole,
 } from '@/lib/session-role';
+import {
+  ESTABLISHMENT_ACCESS_NONE,
+  type EstablishmentAccess,
+} from '@/lib/establishment-access';
 
 export interface ModuleAccess extends AuthMeResponse {
   churchId?: string | null;
   churchName?: string | null;
   churchSlug?: string | null;
   canAccessFollowUp?: boolean;
+  establishmentAccess?: EstablishmentAccess;
   canAccessServiceUnitHub?: boolean;
   canAccessDepartmentTools?: boolean;
   canAccessMyProfile?: boolean;
@@ -38,9 +43,19 @@ export interface ModuleAccess extends AuthMeResponse {
 }
 
 export function useModuleAccess() {
-  const { data, isLoading } = useApiQuery<ModuleAccess>(['auth-me'], '/auth/me', {
-    staleTime: 60_000,
-  });
+  const { data, isLoading, isError, isFetched, failureReason } = useApiQuery<ModuleAccess>(
+    ['auth-me'],
+    '/auth/me',
+    {
+      staleTime: 60_000,
+      // No session → fail fast; avoid endless retry/spin when demo 2FA left tokens empty.
+      retry: (count, err) => {
+        const status = err.response?.status;
+        if (status === 401 || status === 403) return false;
+        return count < 1;
+      },
+    },
+  );
 
   const userRoles = data?.userRoles ?? data?.user?.userRoles ?? [];
   const pastorOrAdmin =
@@ -55,9 +70,16 @@ export function useModuleAccess() {
   const hasPlatformPermission = (key: string) =>
     isPlatformAdmin || platformPermissions.includes(key);
 
+  const establishmentAccess: EstablishmentAccess =
+    data?.establishmentAccess ?? ESTABLISHMENT_ACCESS_NONE;
+
   return {
-    isLoading,
-    canAccessFollowUp: data?.canAccessFollowUp ?? false,
+    isLoading: isLoading && !isError,
+    isError,
+    isFetched,
+    authFailureStatus: failureReason?.response?.status ?? null,
+    canAccessFollowUp: data?.canAccessFollowUp ?? establishmentAccess.mode !== 'none',
+    establishmentAccess,
     canAccessServiceUnitHub: data?.canAccessServiceUnitHub ?? false,
     canAccessDepartmentTools: data?.canAccessDepartmentTools ?? false,
     canAccessMyProfile: data?.canAccessMyProfile ?? false,

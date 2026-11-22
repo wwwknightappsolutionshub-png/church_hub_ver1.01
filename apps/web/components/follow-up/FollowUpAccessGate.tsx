@@ -20,7 +20,7 @@ export function FollowUpAccessGate({ children }: { children: React.ReactNode }) 
     return (
       <div className="mx-auto max-w-lg p-8 text-center">
         <Lock className="mx-auto h-12 w-12 text-muted-foreground/50" />
-        <h2 className="mt-4 font-heading text-xl font-bold">Outreach access restricted</h2>
+        <h2 className="mt-4 font-heading text-xl font-bold">Establishment access restricted</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           This module is for church staff and members of Outreach, Harvesters Squad (evangelism),
           Prayer Squad, or Winning Foundation School. Join one of those service units from the hub to

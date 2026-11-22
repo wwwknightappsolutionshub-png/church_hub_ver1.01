@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
-import { hasAuthToken } from '@/lib/auth-login';
+import {
+  hasAuthToken,
+  isLogin2faChallenge,
+  isLoginSuccess,
+} from '@/lib/auth-login';
 import { loginWithDemoCredentials } from '@/lib/auth-login-demo';
 import { api, clearAuthTokens } from '@/lib/api';
 
@@ -31,12 +35,19 @@ export function useEnsureAuth() {
 
     if (demoModeEnabled()) {
       const result = await loginWithDemoCredentials();
-      if (result.ok) {
+      // 2FA challenges also return ok:true — they are NOT a session.
+      if (isLoginSuccess(result) && hasAuthToken()) {
         setAuthenticated(true);
         setReady(true);
         return;
       }
-      setAuthHint(result.message);
+      if (isLogin2faChallenge(result)) {
+        setAuthHint(
+          'Demo admin requires email 2FA. Open Sign in, enter admin@demo.church, then the code from email.',
+        );
+      } else if (!result.ok) {
+        setAuthHint(result.message);
+      }
     } else {
       setAuthHint('Demo auto-login is disabled (NEXT_PUBLIC_DEMO_MODE=false).');
     }

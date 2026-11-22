@@ -17,6 +17,8 @@ interface ProgressStageDialogProps {
   open: boolean;
   contactName: string;
   nextStage: string;
+  /** Resolved pipeline label; falls back to static STAGE_SHORT/LABELS. */
+  nextStageLabel?: string;
   submitting?: boolean;
   onClose: () => void;
   onSubmit: (values: ProgressFormValues) => void | Promise<void>;
@@ -26,6 +28,7 @@ export function ProgressStageDialog({
   open,
   contactName,
   nextStage,
+  nextStageLabel,
   submitting,
   onClose,
   onSubmit,
@@ -44,7 +47,8 @@ export function ProgressStageDialog({
 
   if (!open) return null;
 
-  const stageLabel = STAGE_SHORT[nextStage] ?? STAGE_LABELS[nextStage] ?? nextStage;
+  const stageLabel =
+    nextStageLabel ?? STAGE_SHORT[nextStage] ?? STAGE_LABELS[nextStage] ?? nextStage;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

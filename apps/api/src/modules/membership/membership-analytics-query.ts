@@ -1,9 +1,9 @@
 import {
-  FollowUpStage,
   MemberGender,
   MemberStatus,
   OutreachConvertStage,
 } from '@prisma/client';
+import { FOLLOW_UP_STAGE_ORDER } from '../follow-up/follow-up.constants';
 import type { AnalyticsAgeBandKey } from './membership-analytics.util';
 import {
   ANALYTICS_AGE_BANDS,
@@ -20,7 +20,7 @@ export interface MembershipAnalyticsQuery {
   dateTo: Date | null;
   compare: boolean;
   status: MemberStatus | null;
-  followUpStage: FollowUpStage | null;
+  followUpStage: string | null;
   outreachStage: OutreachConvertStage | null;
   serviceUnitId: string | null;
   provinceId: string | null;
@@ -32,7 +32,7 @@ export interface MembershipAnalyticsQuery {
 }
 
 const MEMBER_STATUSES = new Set<string>(Object.values(MemberStatus));
-const FOLLOW_UP_STAGES = new Set<string>(Object.values(FollowUpStage));
+const FOLLOW_UP_STAGES = new Set<string>(FOLLOW_UP_STAGE_ORDER);
 const OUTREACH_STAGES = new Set<string>(Object.values(OutreachConvertStage));
 const GENDERS = new Set<string>(Object.values(MemberGender));
 const AGE_KEYS = new Set<string>(ANALYTICS_AGE_BANDS.map((b) => b.key));
@@ -75,7 +75,7 @@ export function parseMembershipAnalyticsQuery(
     dateTo,
     compare: raw.compare === '1' || raw.compare === 'true',
     status: asEnum<MemberStatus>(raw.status, MEMBER_STATUSES),
-    followUpStage: asEnum<FollowUpStage>(raw.followUpStage, FOLLOW_UP_STAGES),
+    followUpStage: asEnum<string>(raw.followUpStage, FOLLOW_UP_STAGES),
     outreachStage: asEnum<OutreachConvertStage>(raw.outreachStage, OUTREACH_STAGES),
     serviceUnitId: raw.serviceUnitId?.trim() || null,
     provinceId: raw.provinceId?.trim() || null,

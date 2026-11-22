@@ -122,7 +122,11 @@ function MockModuleContent({
     );
   }
 
-  if (href.includes('follow-up') || href.includes('outreach')) {
+  if (
+    href.includes('follow-up') ||
+    href.includes('establishment') ||
+    href.includes('outreach')
+  ) {
     return (
       <MockOutreachEvangelismFlow
         reduceMotion={reduceMotion}
@@ -281,7 +285,9 @@ export function DemoTourMockDashboard({ onExit, reduceMotion }: Props) {
     const travelMs = reduceMotion ? 0 : TOUR_CURSOR_TRAVEL_MS;
     const clickMs = reduceMotion ? 0 : TOUR_CLICK_MS;
     const isOutreach =
-      current.href.includes('follow-up') || current.href.includes('outreach');
+      current.href.includes('follow-up') ||
+      current.href.includes('establishment') ||
+      current.href.includes('outreach');
     if (!isOutreach) {
       setOutreachCaption(null);
     }
@@ -436,7 +442,10 @@ export function DemoTourMockDashboard({ onExit, reduceMotion }: Props) {
             </p>
             <h2 className="mt-1 font-heading text-lg font-bold">{current.label}</h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              {outreachCaption && current.href.includes('follow-up')
+              {outreachCaption &&
+              (current.href.includes('follow-up') ||
+                current.href.includes('establishment') ||
+                current.href.includes('outreach'))
                 ? outreachCaption
                 : tourCaptionForNav(current)}
             </p>

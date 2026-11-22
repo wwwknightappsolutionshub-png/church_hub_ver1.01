@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   OutreachCaptureBaseSchema,
   PublicOutreachRegisterSchema,
+  refineGdprConsent,
   refineInternationalAddress,
   sanitizeText,
 } from '@church-hub/shared-types';
@@ -29,10 +30,11 @@ export const outreachCaptureObjectSchema = OutreachCaptureBaseSchema.extend({
   addressCountry: optionalAddressLine(100),
 });
 
-/** Full capture payload with international address refinement. */
-export const outreachCaptureSchema = outreachCaptureObjectSchema.superRefine(
-  refineInternationalAddress,
-);
+/** Full capture payload with international address + GDPR consent. */
+export const outreachCaptureSchema = outreachCaptureObjectSchema.superRefine((data, ctx) => {
+  refineInternationalAddress(data, ctx);
+  refineGdprConsent(data, ctx);
+});
 
 export const outreachSyncItemSchema = z.object({
   clientId: z.string().min(8).max(64),

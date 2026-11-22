@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -48,6 +49,7 @@ const EMPTY_FORM: Partial<FormData> = {
   pickupAddress: '',
   busPickupNotes: '',
   photoConsent: false,
+  gdprConsent: false,
   photoUrl: undefined,
   latitude: undefined,
   longitude: undefined,
@@ -488,6 +490,36 @@ function OutreachCaptureFormInner({
             />
             <Input placeholder="Bus notes (e.g. Sunday 9am)" {...register('busPickupNotes')} />
           </>
+        )}
+      </div>
+
+      <div className="rounded-lg border border-border p-4 space-y-2">
+        <label className="flex items-start gap-2 text-sm font-medium">
+          <input
+            type="checkbox"
+            {...register('gdprConsent')}
+            className="mt-0.5 rounded"
+            aria-invalid={!!errors.gdprConsent}
+          />
+          <span>
+            I confirm this contact has consented to the church storing and processing their
+            personal data for pastoral follow-up, in line with our{' '}
+            <Link
+              href="/legal/privacy-policy"
+              target="_blank"
+              className="font-medium text-primary hover:underline"
+            >
+              Privacy Policy
+            </Link>
+            .
+          </span>
+        </label>
+        {errors.gdprConsent ? (
+          <p className="text-xs text-destructive" role="alert">
+            {errors.gdprConsent.message ?? 'GDPR consent is required to save this contact'}
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground">Required under UK GDPR before saving.</p>
         )}
       </div>
 

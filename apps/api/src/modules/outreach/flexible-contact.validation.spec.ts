@@ -91,6 +91,7 @@ describe('flexible outreach contact validation', () => {
         firstName: 'Ada',
         phone: '+234 801 234 5678',
         postcode: '100001',
+        gdprConsent: true,
       });
       expect(missing.success).toBe(false);
 
@@ -101,6 +102,7 @@ describe('flexible outreach contact validation', () => {
         addressCity: 'Lagos',
         addressCountry: 'Nigeria',
         addressPostal: '100001',
+        gdprConsent: true,
       });
       expect(parsed.success).toBe(true);
       if (parsed.success) {
@@ -114,12 +116,22 @@ describe('flexible outreach contact validation', () => {
         firstName: 'Ada',
         phone: '07123 456789',
         postcode: 'DA1 1AA',
+        gdprConsent: true,
       });
       expect(parsed.success).toBe(true);
       if (parsed.success) {
         expect(parsed.data.phone).toBe('+447123456789');
         expect(parsed.data.postcode).toBe('DA1 1AA');
       }
+    });
+
+    it('requires GDPR consent', () => {
+      const denied = OutreachCaptureSchema.safeParse({
+        firstName: 'Ada',
+        phone: '07123 456789',
+        gdprConsent: false,
+      });
+      expect(denied.success).toBe(false);
     });
   });
 });

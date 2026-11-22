@@ -4,6 +4,10 @@ import { PrismaService } from '../../prisma/prisma.module';
 import { MemberStatus } from '@prisma/client';
 import {
   CHURCH_STAFF_USER_ROLES,
+  ESTABLISHMENT_MANAGER_MEMBER_ROLES,
+  ESTABLISHMENT_MANAGER_UNIT_NAMES,
+  ESTABLISHMENT_VIEW_ONLY_UNIT_NAMES,
+  ESTABLISHMENT_WORKER_UNIT_NAMES,
   FOLLOW_UP_ACCESS_UNIT_NAMES,
   FOLLOW_UP_MEMBER_ROLES,
   PROFILE_ACCESS_ROLES,
@@ -18,6 +22,11 @@ import {
   type PlatformPermissionKey,
 } from '../platform/platform-permissions.catalog';
 import { isUnitDeputyRole } from '../service-units/service-unit-leader-roles';
+import {
+  ESTABLISHMENT_ACCESS_NONE,
+  establishmentAccessFromMode,
+  type EstablishmentAccess,
+} from './establishment-access.types';
 
 export interface UserMemberContext {
   userId: string;
@@ -128,31 +137,216 @@ export class ModuleAccessService {
   }
 
   async canAccessFollowUp(ctx: UserMemberContext): Promise<boolean> {
-    if (this.isChurchStaff(ctx)) return true;
+    const access = await this.resolveEstablishmentAccess(ctx);
+    return access.mode !== 'none';
+  }
+
+  /**
+   * Establishment access matrix (Phase 2):
+   * - manager: Admin/Pastor, Follow-up Unit Leader, Harvesters Unit Leader
+   * - worker: Follow-up / Harvesters / WFS members (assigned-only mutate)
+   * - viewOnly: Prayer Squad
+   * - wsfLeader: cell branch leaders — read-only, WSF-scoped contacts
+   * - none: e.g. UserRole LEADER with no relevant unit
+   */
+  async resolveEstablishmentAccess(ctx: UserMemberContext): Promise<EstablishmentAccess> {
+    const wsfBranchIds = await this.listWsfBranchIdsForUser(ctx);
+
+    if (this.isChurchStaff(ctx)) {
+      return establishmentAccessFromMode('manager', wsfBranchIds);
+    }
+
+    if (
+      ctx.memberRoles.some((r) =>
+        ESTABLISHMENT_MANAGER_MEMBER_ROLES.includes(
+          r as (typeof ESTABLISHMENT_MANAGER_MEMBER_ROLES)[number],
+        ),
+      )
+    ) {
+      return establishmentAccessFromMode('manager', wsfBranchIds);
+    }
+
+    const unitFlags = ctx.memberId
+      ? await this.resolveEstablishmentUnitFlags(ctx)
+      : {
+          isManagerUnitLeader: false,
+          isWorkerUnit: false,
+          isViewOnlyUnit: false,
+        };
+
+    if (unitFlags.isManagerUnitLeader) {
+      return establishmentAccessFromMode('manager', wsfBranchIds);
+    }
+
+    if (unitFlags.isWorkerUnit) {
+      return establishmentAccessFromMode('worker');
+    }
 
     if (
       ctx.memberRoles.some((r) =>
         FOLLOW_UP_MEMBER_ROLES.includes(r as (typeof FOLLOW_UP_MEMBER_ROLES)[number]),
       )
     ) {
-      return true;
+      // EVANGELIST (and similar) without manager unit leadership → worker
+      return establishmentAccessFromMode('worker');
     }
 
-    if (!ctx.memberId) return false;
+    if (unitFlags.isViewOnlyUnit) {
+      return establishmentAccessFromMode('viewOnly');
+    }
 
+    if (wsfBranchIds.length > 0) {
+      return establishmentAccessFromMode('wsfLeader', wsfBranchIds);
+    }
+
+    return ESTABLISHMENT_ACCESS_NONE;
+  }
+
+  private async resolveEstablishmentUnitFlags(ctx: UserMemberContext) {
     const units = await this.prisma.serviceUnit.findMany({
       where: {
         churchId: ctx.churchId,
         name: { in: [...FOLLOW_UP_ACCESS_UNIT_NAMES] },
         OR: [
-          { members: { some: { memberId: ctx.memberId } } },
-          { leaders: { some: { memberId: ctx.memberId } } },
+          { members: { some: { memberId: ctx.memberId! } } },
+          { leaders: { some: { memberId: ctx.memberId! } } },
         ],
       },
-      select: { id: true },
+      select: {
+        id: true,
+        name: true,
+        leaders: {
+          where: { memberId: ctx.memberId! },
+          select: { isUnitAdmin: true, role: true },
+        },
+      },
     });
 
-    return units.length > 0;
+    let isManagerUnitLeader = false;
+    let isWorkerUnit = false;
+    let isViewOnlyUnit = false;
+
+    for (const unit of units) {
+      const name = unit.name;
+      const isManagerUnit = ESTABLISHMENT_MANAGER_UNIT_NAMES.includes(
+        name as (typeof ESTABLISHMENT_MANAGER_UNIT_NAMES)[number],
+      );
+      const isWorkerName = ESTABLISHMENT_WORKER_UNIT_NAMES.includes(
+        name as (typeof ESTABLISHMENT_WORKER_UNIT_NAMES)[number],
+      );
+      const isViewOnlyName = ESTABLISHMENT_VIEW_ONLY_UNIT_NAMES.includes(
+        name as (typeof ESTABLISHMENT_VIEW_ONLY_UNIT_NAMES)[number],
+      );
+
+      const leadership = unit.leaders[0];
+      const isPrimaryLeader =
+        !!leadership &&
+        (leadership.isUnitAdmin || !isUnitDeputyRole(leadership.role));
+
+      if (isManagerUnit && isPrimaryLeader) {
+        isManagerUnitLeader = true;
+      }
+      if (isWorkerName) {
+        isWorkerUnit = true;
+      }
+      if (isViewOnlyName) {
+        isViewOnlyUnit = true;
+      }
+    }
+
+    return { isManagerUnitLeader, isWorkerUnit, isViewOnlyUnit };
+  }
+
+  /** WSF cell branches this user leads (primary or deputy). */
+  async listWsfBranchIdsForUser(ctx: UserMemberContext): Promise<string[]> {
+    const [led, deputy] = await Promise.all([
+      this.prisma.cellBranch.findMany({
+        where: { churchId: ctx.churchId, leaderUserId: ctx.userId },
+        select: { id: true },
+      }),
+      this.prisma.cellLeadershipDeputy.findMany({
+        where: {
+          churchId: ctx.churchId,
+          userId: ctx.userId,
+          branchId: { not: null },
+        },
+        select: { branchId: true },
+      }),
+    ]);
+    return [
+      ...new Set([
+        ...led.map((b) => b.id),
+        ...deputy.map((d) => d.branchId!).filter(Boolean),
+      ]),
+    ];
+  }
+
+  /**
+   * Prisma where-clause fragment for Establishment list/get scoping.
+   * Returns null when the caller may see all church contacts (manager).
+   * Returns `{ id: 'impossible' }` style empty when mode is none (caller should 403 first).
+   */
+  buildEstablishmentListScope(
+    access: EstablishmentAccess,
+    userId: string,
+  ): Record<string, unknown> | null {
+    switch (access.mode) {
+      case 'manager':
+        return null;
+      case 'worker':
+        return { assignedToId: userId };
+      case 'viewOnly':
+        return { assignedToId: { not: null } };
+      case 'wsfLeader':
+        if (!access.wsfBranchIds.length) {
+          return { id: '__no_wsf_scope__' };
+        }
+        return { wsfCellBranchId: { in: access.wsfBranchIds } };
+      case 'none':
+      default:
+        return { id: '__no_establishment_access__' };
+    }
+  }
+
+  canViewEstablishmentRecord(
+    access: EstablishmentAccess,
+    userId: string,
+    row: { assignedToId: string | null; wsfCellBranchId?: string | null },
+  ): boolean {
+    switch (access.mode) {
+      case 'manager':
+        return true;
+      case 'worker':
+        return row.assignedToId === userId;
+      case 'viewOnly':
+        return row.assignedToId != null;
+      case 'wsfLeader':
+        return (
+          !!row.wsfCellBranchId && access.wsfBranchIds.includes(row.wsfCellBranchId)
+        );
+      default:
+        return false;
+    }
+  }
+
+  canMutateEstablishmentRecord(
+    access: EstablishmentAccess,
+    userId: string,
+    row: { assignedToId: string | null },
+  ): boolean {
+    if (!access.canMutate) return false;
+    if (access.mode === 'manager') return true;
+    if (access.mode === 'worker') return row.assignedToId === userId;
+    return false;
+  }
+
+  async getEstablishmentAccessForUser(
+    userId: string,
+    churchId: string,
+  ): Promise<EstablishmentAccess> {
+    const ctx = await this.resolveContext(userId, churchId);
+    if (!ctx) return ESTABLISHMENT_ACCESS_NONE;
+    return this.resolveEstablishmentAccess(ctx);
   }
 
   async canViewServiceUnit(ctx: UserMemberContext, serviceUnitId: string): Promise<boolean> {
@@ -275,6 +469,7 @@ export class ModuleAccessService {
       platformPermissions,
       canManageStaff: false,
       canAccessFollowUp: false,
+      establishmentAccess: ESTABLISHMENT_ACCESS_NONE,
       canAccessServiceUnitHub: false,
       canAccessMyProfile: false,
       canAccessDepartmentTools: true,
@@ -311,6 +506,7 @@ export class ModuleAccessService {
         platformPermissions: [] as string[],
         canManageStaff: false,
         canAccessFollowUp: false,
+        establishmentAccess: ESTABLISHMENT_ACCESS_NONE,
         canAccessServiceUnitHub: false,
         canAccessMyProfile: false,
         canAccessDepartmentTools: false,
@@ -337,6 +533,7 @@ export class ModuleAccessService {
         platformPermissions: [] as string[],
         canManageStaff: false,
         canAccessFollowUp: false,
+        establishmentAccess: ESTABLISHMENT_ACCESS_NONE,
         canAccessServiceUnitHub: false,
         canAccessMyProfile: false,
         canAccessDepartmentTools: false,
@@ -355,6 +552,8 @@ export class ModuleAccessService {
       };
     }
 
+    const establishmentAccess = await this.resolveEstablishmentAccess(ctx);
+
     return {
       isPlatformAdmin: false,
       isPlatformOperator: false,
@@ -366,7 +565,8 @@ export class ModuleAccessService {
       memberRoles: ctx.memberRoles,
       isChurchStaff: this.isChurchStaff(ctx),
       canManageCommunications: this.isChurchStaff(ctx),
-      canAccessFollowUp: await this.canAccessFollowUp(ctx),
+      canAccessFollowUp: establishmentAccess.mode !== 'none',
+      establishmentAccess,
       canAccessServiceUnitHub: this.canAccessServiceUnitHub(ctx),
       canAccessMyProfile: this.canAccessMyProfile(ctx),
       canAccessDepartmentTools: this.canAccessDepartmentTools(ctx),

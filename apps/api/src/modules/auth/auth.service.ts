@@ -345,11 +345,18 @@ export class AuthService {
     await this.clearLoginFailures(emailKey);
 
     const roleNames = user!.roles.map((r) => r.role.name);
-    if (userRequiresLogin2fa(roleNames)) {
+    if (userRequiresLogin2fa(roleNames) && !this.shouldSkipLogin2fa()) {
       return this.startLogin2faChallenge(user!);
     }
 
     return this.completeLoginSession(user!);
+  }
+
+  /** Local/dev only — never honor in production even if env is mis-set. */
+  private shouldSkipLogin2fa(): boolean {
+    if (process.env.NODE_ENV === 'production') return false;
+    const flag = (process.env.AUTH_SKIP_LOGIN_2FA ?? '').trim().toLowerCase();
+    return flag === '1' || flag === 'true' || flag === 'yes';
   }
 
   /** Verify email OTP from password or magic-link challenge; then issue tokens. */
@@ -704,7 +711,7 @@ export class AuthService {
     }
 
     const roleNames = user.roles.map((r) => r.role.name);
-    if (userRequiresLogin2fa(roleNames)) {
+    if (userRequiresLogin2fa(roleNames) && !this.shouldSkipLogin2fa()) {
       return this.startLogin2faChallenge(user);
     }
 
@@ -1007,8 +1014,9 @@ export class AuthService {
       label: 'Login 2FA',
     });
 
-    if (process.env.NODE_ENV !== 'production' && !this.email.isConfigured('auth')) {
-      this.logger.log(`[login-2fa] issued for ${user.email} (code redacted)`);
+    if (process.env.NODE_ENV !== 'production') {
+      // Local DX: email often isn't delivered — surface the code in API logs only.
+      this.logger.warn(`[login-2fa] DEV code for ${user.email}: ${otp}`);
     }
 
     return {

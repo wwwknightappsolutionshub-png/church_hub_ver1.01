@@ -1,7 +1,14 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { FollowUpStage } from '@prisma/client';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import {
   CreateFollowUpSchema,
+  UpdateFollowUpSchema,
   optionalEmailSchema,
   optionalPhoneSchema,
 } from '@church-hub/shared-types';
@@ -16,12 +23,28 @@ import {
 } from './follow-up.constants';
 import { FollowUpTeamNotifyService } from './follow-up-team-notify.service';
 import { FollowUpAutomationService } from './follow-up-automation.service';
+import { ModuleAccessService } from '../access/module-access.service';
+import type { EstablishmentAccess } from '../access/establishment-access.types';
+import {
+  assignmentSlaCutoff,
+  assignmentStaleWhereBranches,
+  dueAtFromProgress,
+  dueTodayProgressWindow,
+} from './follow-up-assignment-sla';
+import { PipelineResolveService } from './pipeline-resolve.service';
+import {
+  entryStageKey,
+  graduatedStageKeys,
+  isArchiveBlockedStageKey,
+  type StageFlagRow,
+} from './pipeline-stage-flags';
 
 const followUpInclude = {
   member: { select: { id: true, firstName: true, lastName: true, email: true } },
   assignedTo: { select: { id: true, firstName: true, lastName: true, email: true } },
   archivedBy: { select: { id: true, firstName: true, lastName: true } },
   archiveRequestedBy: { select: { id: true, firstName: true, lastName: true } },
+  wsfCellBranch: { select: { id: true, name: true } },
   reminders: { orderBy: { remindAt: 'asc' as const } },
 };
 
@@ -36,22 +59,80 @@ export class FollowUpService {
     private readonly email: EmailAdapter,
     private readonly teamNotify: FollowUpTeamNotifyService,
     private readonly automation: FollowUpAutomationService,
+    private readonly moduleAccess: ModuleAccessService,
+    private readonly pipelineResolve: PipelineResolveService,
   ) {}
+
+  private async pipelineFlags(churchId: string): Promise<StageFlagRow[]> {
+    const pipeline = await this.pipelineResolve.resolveForChurch(churchId);
+    return pipeline.stages.map((s) => ({
+      key: s.key,
+      isEntry: s.isEntry,
+      blocksArchive: s.blocksArchive,
+      graduatesSla: s.graduatesSla,
+      isEnabled: s.isEnabled,
+    }));
+  }
+
+  private async assertStageInPipeline(churchId: string, stage: string): Promise<StageFlagRow[]> {
+    const flags = await this.pipelineFlags(churchId);
+    const allowed = flags.filter((s) => s.isEnabled).map((s) => s.key);
+    if (!allowed.includes(stage)) {
+      throw new BadRequestException(`Unknown or disabled pipeline stage: ${stage}`);
+    }
+    return flags;
+  }
+
+  async getAccess(churchId: string, userId: string): Promise<EstablishmentAccess> {
+    return this.moduleAccess.getEstablishmentAccessForUser(userId, churchId);
+  }
+
+  private async requireAccess(churchId: string, userId: string): Promise<EstablishmentAccess> {
+    const access = await this.getAccess(churchId, userId);
+    if (access.mode === 'none') {
+      throw new ForbiddenException('Establishment access denied');
+    }
+    return access;
+  }
+
+  private scopedWhere(
+    churchId: string,
+    access: EstablishmentAccess,
+    userId: string,
+    extra: Prisma.FollowUpWhereInput = {},
+  ): Prisma.FollowUpWhereInput {
+    const scope = this.moduleAccess.buildEstablishmentListScope(access, userId);
+    return {
+      churchId,
+      ...(scope ?? {}),
+      ...extra,
+    };
+  }
 
   async list(
     churchId: string,
-    stage?: FollowUpStage,
+    actorUserId: string,
+    stage?: string,
     assignedToId?: string,
     opts?: { archived?: boolean },
   ) {
+    const access = await this.requireAccess(churchId, actorUserId);
     const archived = opts?.archived === true;
+
+    // Workers cannot broaden via assignedToId query; managers may filter.
+    let assigneeFilter = assignedToId;
+    if (access.mode === 'worker') {
+      assigneeFilter = actorUserId;
+    } else if (access.mode === 'viewOnly' || access.mode === 'wsfLeader') {
+      assigneeFilter = undefined;
+    }
+
     return this.prisma.followUp.findMany({
-      where: {
-        churchId,
+      where: this.scopedWhere(churchId, access, actorUserId, {
         ...(stage ? { stage } : {}),
-        ...(assignedToId ? { assignedToId } : {}),
+        ...(assigneeFilter ? { assignedToId: assigneeFilter } : {}),
         ...(archived ? { archivedAt: { not: null } } : { archivedAt: null }),
-      },
+      }),
       include: followUpInclude,
       orderBy: archived
         ? [{ archivedAt: 'desc' }, { createdAt: 'desc' }]
@@ -61,17 +142,19 @@ export class FollowUpService {
 
   async listCalendar(
     churchId: string,
+    actorUserId: string,
     from: Date,
     to: Date,
   ) {
+    const access = await this.requireAccess(churchId, actorUserId);
     const items = await this.prisma.followUp.findMany({
-      where: {
-        churchId,
+      where: this.scopedWhere(churchId, access, actorUserId, {
         archivedAt: null,
         dueAt: { gte: from, lte: to },
-      },
+      }),
       include: {
         assignedTo: { select: { id: true, firstName: true, lastName: true } },
+        wsfCellBranch: { select: { id: true, name: true } },
       },
       orderBy: { dueAt: 'asc' },
     });
@@ -85,11 +168,12 @@ export class FollowUpService {
       contactPhone: f.contactPhone,
       contactEmail: f.contactEmail,
       assignedTo: f.assignedTo,
+      wsfCellBranch: f.wsfCellBranch,
       archiveRequestedAt: f.archiveRequestedAt,
     }));
   }
 
-  async getOne(churchId: string, id: string) {
+  async getOne(churchId: string, id: string, actorUserId?: string) {
     const row = await this.prisma.followUp.findFirst({
       where: { id, churchId },
       include: {
@@ -101,58 +185,143 @@ export class FollowUpService {
       },
     });
     if (!row) throw new NotFoundException('Follow-up not found');
+
+    if (actorUserId) {
+      const access = await this.requireAccess(churchId, actorUserId);
+      if (
+        !this.moduleAccess.canViewEstablishmentRecord(access, actorUserId, {
+          assignedToId: row.assignedToId,
+          wsfCellBranchId: row.wsfCellBranchId,
+        })
+      ) {
+        throw new ForbiddenException('You cannot view this Establishment contact');
+      }
+      const isStaff = await this.userIsStaff(actorUserId);
+      return {
+        ...row,
+        pastoralNotes: row.pastoralNotes.filter(
+          (n) => isStaff || !n.isConfidential || n.authorId === actorUserId,
+        ),
+      };
+    }
     return row;
   }
 
-  async getStats(churchId: string) {
+  /** Assignees must be active users in the same church (blocks cross-tenant assignment). */
+  private async assertAssigneeInChurch(churchId: string, assignedToId: string | null | undefined) {
+    if (!assignedToId) return;
+    const user = await this.prisma.user.findFirst({
+      where: { id: assignedToId, churchId, isActive: true },
+      select: { id: true },
+    });
+    if (!user) {
+      throw new BadRequestException('Assignee must be an active user in this church');
+    }
+  }
+
+  async getStats(churchId: string, actorUserId: string) {
+    const access = await this.requireAccess(churchId, actorUserId);
+    const base = this.scopedWhere(churchId, access, actorUserId, { archivedAt: null });
+
     const grouped = await this.prisma.followUp.groupBy({
       by: ['stage'],
-      where: { churchId, archivedAt: null },
+      where: base,
       _count: { id: true },
     });
-    const byStage = Object.fromEntries(
-      FOLLOW_UP_STAGE_ORDER.map((s) => [s, grouped.find((g) => g.stage === s)?._count.id ?? 0]),
-    ) as Record<FollowUpStage, number>;
 
-    const [pending, overdue, remindersDue, archived, archiveRequested] = await Promise.all([
+    const now = new Date();
+
+    /** Graduated stages from resolved pipeline flags (fallback: winners_default). */
+    const pipelineFlags = await this.pipelineFlags(churchId);
+    const stageKeysForStats = [
+      ...new Set([
+        ...pipelineFlags.filter((s) => s.isEnabled).map((s) => s.key),
+        ...FOLLOW_UP_STAGE_ORDER,
+        ...grouped.map((g) => g.stage),
+      ]),
+    ];
+    const byStage = Object.fromEntries(
+      stageKeysForStats.map((s) => [s, grouped.find((g) => g.stage === s)?._count.id ?? 0]),
+    ) as Record<string, number>;
+    const graduatedStages = graduatedStageKeys(pipelineFlags);
+    const slaCutoff = assignmentSlaCutoff(now);
+    const dueTodayWindow = dueTodayProgressWindow(now);
+
+    const [
+      assigned,
+      pending,
+      overdue,
+      dueToday,
+      graduated,
+      remindersDue,
+      archived,
+      archiveRequested,
+    ] = await Promise.all([
+      this.prisma.followUp.count({ where: base }),
       this.prisma.followUp.count({
         where: {
-          churchId,
-          archivedAt: null,
-          stage: { notIn: ['JOINED_GROUP', 'ENLISTED_FOR_BAPTISM'] },
+          ...base,
+          stage: { notIn: graduatedStages },
         },
       }),
       this.prisma.followUp.count({
         where: {
-          churchId,
-          archivedAt: null,
-          stage: { notIn: ['JOINED_GROUP', 'ENLISTED_FOR_BAPTISM'] },
-          dueAt: { lt: new Date() },
+          ...base,
+          stage: { notIn: graduatedStages },
+          OR: [{ dueAt: { lt: now } }, ...assignmentStaleWhereBranches(slaCutoff)],
+        },
+      }),
+      this.prisma.followUp.count({
+        where: {
+          ...base,
+          stage: { notIn: graduatedStages },
+          lastProgressAt: { gte: dueTodayWindow.from, lte: dueTodayWindow.to },
+        },
+      }),
+      this.prisma.followUp.count({
+        where: {
+          ...base,
+          stage: { in: graduatedStages },
         },
       }),
       this.prisma.followUpReminder.count({
         where: {
           sentAt: null,
           remindAt: { lte: new Date(Date.now() + 24 * 60 * 60 * 1000) },
-          followUp: { churchId, archivedAt: null },
+          followUp: this.scopedWhere(churchId, access, actorUserId, { archivedAt: null }),
         },
       }),
       this.prisma.followUp.count({
-        where: { churchId, archivedAt: { not: null } },
+        where: this.scopedWhere(churchId, access, actorUserId, {
+          archivedAt: { not: null },
+        }),
       }),
       this.prisma.followUp.count({
-        where: {
-          churchId,
+        where: this.scopedWhere(churchId, access, actorUserId, {
           archivedAt: null,
           archiveRequestedAt: { not: null },
-        },
+        }),
       }),
     ]);
 
-    return { byStage, pending, overdue, remindersDue, archived, archiveRequested };
+    return {
+      byStage,
+      assigned,
+      pending,
+      overdue,
+      dueToday,
+      graduated,
+      remindersDue,
+      archived,
+      archiveRequested,
+      accessMode: access.mode,
+    };
   }
 
-  async listAssignees(churchId: string) {
+  async listAssignees(churchId: string, actorUserId: string) {
+    const access = await this.requireAccess(churchId, actorUserId);
+    if (!access.canAssign) return [];
+
     return this.prisma.user.findMany({
       where: {
         churchId,
@@ -175,15 +344,29 @@ export class FollowUpService {
       contactName: string;
       contactPhone?: string;
       contactEmail?: string;
-      stage?: FollowUpStage;
+      stage?: string;
       assignedToId?: string;
       dueAt?: string;
       notes?: string;
       referredBy?: string;
       scheduleReminder?: boolean;
       reminderChannel?: string;
+      wsfCellBranchId?: string | null;
     },
+    actorUserId?: string,
   ) {
+    if (actorUserId) {
+      const access = await this.requireAccess(churchId, actorUserId);
+      if (!access.canCreate) {
+        throw new ForbiddenException('Only Establishment managers can create contacts');
+      }
+      if (data.assignedToId && !access.canAssign) {
+        throw new ForbiddenException('You cannot assign Establishment contacts');
+      }
+      if (data.wsfCellBranchId && !access.canAssignWsf) {
+        throw new ForbiddenException('You cannot assign contacts to a WSF');
+      }
+    }
     const contact = CreateFollowUpSchema.safeParse({
       memberId: data.memberId,
       contactName: data.contactName,
@@ -198,6 +381,22 @@ export class FollowUpService {
       throw new BadRequestException(contact.error.issues[0]?.message ?? 'Invalid follow-up details');
     }
 
+    if (data.wsfCellBranchId) {
+      const branch = await this.prisma.cellBranch.findFirst({
+        where: { id: data.wsfCellBranchId, churchId },
+        select: { id: true },
+      });
+      if (!branch) throw new BadRequestException('WSF cell branch not found');
+    }
+
+    const assignedToId = contact.data.assignedToId ?? data.assignedToId;
+    await this.assertAssigneeInChurch(churchId, assignedToId);
+    const flags = await this.pipelineFlags(churchId);
+    const stage = contact.data.stage ?? entryStageKey(flags);
+    await this.assertStageInPipeline(churchId, stage);
+    const assignedNow = assignedToId ? new Date() : null;
+    const explicitDue = data.dueAt ? new Date(data.dueAt) : undefined;
+
     const followUp = await this.prisma.followUp.create({
       data: {
         churchId,
@@ -205,9 +404,17 @@ export class FollowUpService {
         contactName: contact.data.contactName,
         contactPhone: contact.data.contactPhone,
         contactEmail: contact.data.contactEmail,
-        stage: contact.data.stage ?? 'NEW_LEAD',
-        assignedToId: contact.data.assignedToId ?? data.assignedToId,
-        dueAt: data.dueAt ? new Date(data.dueAt) : undefined,
+        // Managers may set stage via create; default NEW_LEAD. Stage changes after create use updateStage (audited).
+        stage,
+        assignedToId,
+        assignedAt: assignedNow,
+        stageAtAssignment: assignedToId ? stage : null,
+        assignmentStaleNotifiedAt: null,
+        lastProgressAt: assignedNow,
+        wsfCellBranchId: data.wsfCellBranchId ?? undefined,
+        dueAt:
+          explicitDue ??
+          (assignedNow ? dueAtFromProgress(assignedNow) : undefined),
         notes: contact.data.notes,
         referredBy: data.referredBy?.trim() || null,
       },
@@ -224,32 +431,146 @@ export class FollowUpService {
 
     await this.automation.onFollowUpEvent(churchId, followUp.id, 'NEW_LEAD');
 
-    return this.getOne(churchId, followUp.id);
+    if (followUp.assignedToId && actorUserId) {
+      try {
+        await this.teamNotify.notifyAssigneeOnAssignment({
+          churchId,
+          followUpId: followUp.id,
+          contactName: followUp.contactName,
+          assignedToId: followUp.assignedToId,
+          assignedByUserId: actorUserId,
+        });
+      } catch (err) {
+        this.logger.warn(
+          `Assignment notify failed for ${followUp.id}: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+
+    return this.getOne(churchId, followUp.id, actorUserId);
   }
 
   async update(
     churchId: string,
     id: string,
-    data: Partial<{
-      contactName: string;
-      contactPhone: string;
-      contactEmail: string;
-      assignedToId: string | null;
-      dueAt: string | null;
-      notes: string;
-      memberId: string | null;
-    }>,
+    raw: Record<string, unknown>,
+    actorUserId: string,
   ) {
-    await this.getOne(churchId, id);
-    const { dueAt, ...rest } = data;
-    return this.prisma.followUp.update({
+    const parsed = UpdateFollowUpSchema.safeParse(raw);
+    if (!parsed.success) {
+      throw new BadRequestException(
+        parsed.error.issues[0]?.message ?? 'Invalid Establishment update payload',
+      );
+    }
+    const data = parsed.data;
+
+    const existing = await this.getOne(churchId, id, actorUserId);
+    const access = await this.requireAccess(churchId, actorUserId);
+
+    const assigning =
+      data.assignedToId !== undefined && data.assignedToId !== existing.assignedToId;
+    const assigningWsf =
+      data.wsfCellBranchId !== undefined &&
+      data.wsfCellBranchId !== existing.wsfCellBranchId;
+
+    if (assigning && !access.canAssign) {
+      throw new ForbiddenException('You cannot assign Establishment contacts');
+    }
+    if (assigningWsf && !access.canAssignWsf) {
+      throw new ForbiddenException('You cannot assign contacts to a WSF');
+    }
+
+    if (
+      !assigning &&
+      !assigningWsf &&
+      !this.moduleAccess.canMutateEstablishmentRecord(access, actorUserId, existing)
+    ) {
+      throw new ForbiddenException('You cannot edit this Establishment contact');
+    }
+    if (
+      (assigning || assigningWsf) &&
+      access.mode !== 'manager' &&
+      !this.moduleAccess.canMutateEstablishmentRecord(access, actorUserId, existing)
+    ) {
+      // Managers assign any; workers never reach here due to canAssign checks.
+      throw new ForbiddenException('You cannot edit this Establishment contact');
+    }
+
+    if (data.wsfCellBranchId) {
+      const branch = await this.prisma.cellBranch.findFirst({
+        where: { id: data.wsfCellBranchId, churchId },
+        select: { id: true },
+      });
+      if (!branch) throw new BadRequestException('WSF cell branch not found');
+    }
+
+    await this.assertAssigneeInChurch(churchId, data.assignedToId);
+
+    let dueAt: Date | null | undefined = undefined;
+    if (data.dueAt === null || data.dueAt === '') dueAt = null;
+    else if (typeof data.dueAt === 'string') {
+      const parsedDue = new Date(data.dueAt);
+      if (Number.isNaN(parsedDue.getTime())) {
+        throw new BadRequestException('Invalid due date');
+      }
+      dueAt = parsedDue;
+    }
+
+    const progressNow = new Date();
+    const assignmentClock =
+      data.assignedToId === undefined
+        ? {}
+        : data.assignedToId
+          ? {
+              assignedToId: data.assignedToId,
+              assignedAt: progressNow,
+              stageAtAssignment: existing.stage,
+              assignmentStaleNotifiedAt: null,
+              lastProgressAt: progressNow,
+              ...(dueAt === undefined ? { dueAt: dueAtFromProgress(progressNow) } : {}),
+            }
+          : {
+              assignedToId: null,
+              assignedAt: null,
+              stageAtAssignment: null,
+              assignmentStaleNotifiedAt: null,
+              lastProgressAt: null,
+            };
+
+    const updated = await this.prisma.followUp.update({
       where: { id },
       data: {
-        ...rest,
-        dueAt: dueAt === null ? null : dueAt ? new Date(dueAt) : undefined,
+        ...(data.contactName !== undefined ? { contactName: data.contactName } : {}),
+        ...(data.contactPhone !== undefined ? { contactPhone: data.contactPhone ?? null } : {}),
+        ...(data.contactEmail !== undefined ? { contactEmail: data.contactEmail ?? null } : {}),
+        ...assignmentClock,
+        ...(data.wsfCellBranchId !== undefined ? { wsfCellBranchId: data.wsfCellBranchId } : {}),
+        ...(data.notes !== undefined ? { notes: data.notes } : {}),
+        ...(data.nextAction !== undefined ? { nextAction: data.nextAction } : {}),
+        ...(dueAt !== undefined ? { dueAt } : {}),
       },
       include: followUpInclude,
     });
+
+    if (assigning && updated.assignedToId) {
+      try {
+        await this.teamNotify.notifyAssigneeOnAssignment({
+          churchId,
+          followUpId: id,
+          contactName: updated.contactName,
+          assignedToId: updated.assignedToId,
+          assignedByUserId: actorUserId,
+        });
+      } catch (err) {
+        this.logger.warn(
+          `Assignment notify failed for ${id}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+
+    return updated;
   }
 
   async linkMember(
@@ -275,7 +596,8 @@ export class FollowUpService {
       include: followUpInclude,
     });
 
-    if (updated.stage === 'JOINED_GROUP' && !updated.archivedAt) {
+    const flags = await this.pipelineFlags(churchId);
+    if (isArchiveBlockedStageKey(updated.stage, flags) && !updated.archivedAt) {
       return this.completeJoinedGroupAsMember(churchId, followUpId, actorId ?? null);
     }
     return updated;
@@ -313,20 +635,22 @@ export class FollowUpService {
       include: followUpInclude,
     });
 
-    if (updated.stage === 'JOINED_GROUP' && !updated.archivedAt) {
+    const flags = await this.pipelineFlags(churchId);
+    if (isArchiveBlockedStageKey(updated.stage, flags) && !updated.archivedAt) {
       return this.completeJoinedGroupAsMember(churchId, followUpId, actorId ?? null);
     }
     return updated;
   }
 
-  /** Leave Joined Group after conversion to Membership (bypasses archive block). */
+  /** Leave archive-blocked stage after conversion to Membership (bypasses archive block). */
   private async completeJoinedGroupAsMember(
     churchId: string,
     id: string,
     actorId: string | null,
   ) {
     const existing = await this.prisma.followUp.findFirst({ where: { id, churchId } });
-    if (!existing || existing.stage !== 'JOINED_GROUP' || existing.archivedAt) {
+    const flags = await this.pipelineFlags(churchId);
+    if (!existing || !isArchiveBlockedStageKey(existing.stage, flags) || existing.archivedAt) {
       return this.getOne(churchId, id);
     }
 
@@ -375,7 +699,7 @@ export class FollowUpService {
     id: string,
     authorId: string,
     data: {
-      stage: FollowUpStage;
+      stage: string;
       notes?: string;
       whatWasDone?: string;
       whatNext?: string;
@@ -387,6 +711,15 @@ export class FollowUpService {
     if (existing.archivedAt) {
       throw new BadRequestException('Archived leads cannot progress in the pipeline');
     }
+
+    const access = await this.requireAccess(churchId, authorId);
+    if (
+      !this.moduleAccess.canMutateEstablishmentRecord(access, authorId, existing)
+    ) {
+      throw new ForbiddenException('You cannot update this Establishment contact');
+    }
+
+    const flags = await this.assertStageInPipeline(churchId, data.stage);
 
     const whatWasDone = data.whatWasDone?.trim() ?? '';
     const whatNext = data.whatNext?.trim() ?? '';
@@ -413,9 +746,14 @@ export class FollowUpService {
     const progressNote = progressNoteParts.join('\n\n');
 
     const enteringJoinedGroup =
-      data.stage === 'JOINED_GROUP' && existing.stage !== 'JOINED_GROUP';
+      isArchiveBlockedStageKey(data.stage, flags) &&
+      !isArchiveBlockedStageKey(existing.stage, flags);
     const leavingJoinedGroup =
-      existing.stage === 'JOINED_GROUP' && data.stage !== 'JOINED_GROUP';
+      isArchiveBlockedStageKey(existing.stage, flags) &&
+      !isArchiveBlockedStageKey(data.stage, flags);
+
+    const stageChanged = existing.stage !== data.stage;
+    const progressNow = stageChanged ? new Date() : null;
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const row = await tx.followUp.update({
@@ -423,8 +761,18 @@ export class FollowUpService {
         data: {
           stage: data.stage,
           notes: data.notes ?? (progressNote || existing.notes),
-          ...(dueAt !== undefined ? { dueAt } : {}),
+          ...(dueAt !== undefined
+            ? { dueAt }
+            : progressNow
+              ? { dueAt: dueAtFromProgress(progressNow) }
+              : {}),
           ...(whatNext ? { nextAction: whatNext } : {}),
+          ...(stageChanged && progressNow
+            ? {
+                assignmentStaleNotifiedAt: null,
+                lastProgressAt: progressNow,
+              }
+            : {}),
           ...(enteringJoinedGroup
             ? { completedAt: new Date(), joinedGroupDay6NotifiedAt: null }
             : leavingJoinedGroup
@@ -449,6 +797,19 @@ export class FollowUpService {
         });
       }
 
+      if (stageChanged) {
+        await tx.followUpStageAudit.create({
+          data: {
+            churchId,
+            followUpId: id,
+            actorId: authorId,
+            fromStage: existing.stage,
+            toStage: data.stage,
+            note: progressNote || data.notes?.trim() || null,
+          },
+        });
+      }
+
       return row;
     });
 
@@ -459,6 +820,23 @@ export class FollowUpService {
     await this.automation.onFollowUpEvent(churchId, id, { stage: data.stage });
 
     return updated;
+  }
+
+  /** Managers only — stage-change audit trail for a contact. */
+  async listStageAudits(churchId: string, followUpId: string, actorUserId: string) {
+    const access = await this.requireAccess(churchId, actorUserId);
+    if (access.mode !== 'manager') {
+      throw new ForbiddenException('Only Establishment managers can view stage audit history');
+    }
+    await this.getOne(churchId, followUpId, actorUserId);
+
+    return this.prisma.followUpStageAudit.findMany({
+      where: { churchId, followUpId },
+      include: {
+        actor: { select: { id: true, firstName: true, lastName: true, email: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   /** In-app (+ queue) reminder for assignee and unit leaders when next action is due. */
@@ -506,8 +884,17 @@ export class FollowUpService {
     churchId: string,
     followUpId: string,
     data: { remindAt: string; channel: string; message: string; templateId?: string },
+    actorUserId?: string,
   ) {
-    const followUp = await this.getOne(churchId, followUpId);
+    const followUp = await this.getOne(churchId, followUpId, actorUserId);
+    if (actorUserId) {
+      const access = await this.requireAccess(churchId, actorUserId);
+      if (
+        !this.moduleAccess.canMutateEstablishmentRecord(access, actorUserId, followUp)
+      ) {
+        throw new ForbiddenException('You cannot schedule reminders for this contact');
+      }
+    }
     const remindAt = new Date(data.remindAt);
     if (Number.isNaN(remindAt.getTime())) throw new BadRequestException('Invalid remindAt');
 
@@ -582,37 +969,18 @@ export class FollowUpService {
         where: { churchId, archivedAt: null, OR: orConditions },
       });
       if (existing) {
-        const referredBy = data.referredBy?.trim() || null;
-        const noteExtra = [
-          referredBy && !existing.referredBy ? `Referred by: ${referredBy}.` : null,
-          data.notes?.trim() || null,
-        ]
-          .filter(Boolean)
-          .join(' ');
-
-        const updated = await this.prisma.followUp.update({
-          where: { id: existing.id },
-          data: {
-            ...(referredBy && !existing.referredBy ? { referredBy } : {}),
-            ...(noteExtra
-              ? {
-                  notes: existing.notes
-                    ? `${existing.notes} ${noteExtra}`.trim()
-                    : noteExtra,
-                }
-              : {}),
-          },
-          include: followUpInclude,
-        });
-
+        // Duplicate match: link capture only — do not append capturer-supplied notes
+        // onto pipeline contacts the capturer may not be allowed to edit.
         if (data.outreachContactId) {
           await this.prisma.outreachContact.update({
             where: { id: data.outreachContactId },
-            data: { followUpId: updated.id },
+            data: { followUpId: existing.id },
           });
         }
-
-        return updated;
+        return this.prisma.followUp.findFirstOrThrow({
+          where: { id: existing.id, churchId },
+          include: followUpInclude,
+        });
       }
     }
 
@@ -632,11 +1000,12 @@ export class FollowUpService {
     if (data.referredBy?.trim()) noteParts.push(`Referred by: ${data.referredBy.trim()}.`);
     if (data.notes?.trim()) noteParts.push(data.notes.trim());
 
+    const flags = await this.pipelineFlags(churchId);
     const followUp = await this.create(churchId, {
       contactName,
       contactPhone: phone,
       contactEmail: email,
-      stage: 'NEW_LEAD',
+      stage: entryStageKey(flags),
       assignedToId,
       notes: noteParts.join(' '),
       referredBy: data.referredBy,
@@ -653,6 +1022,15 @@ export class FollowUpService {
         assignedToId: followUp.assignedToId,
         evangelistName,
       });
+      if (followUp.assignedToId) {
+        await this.teamNotify.notifyAssigneeOnAssignment({
+          churchId,
+          followUpId: followUp.id,
+          contactName,
+          assignedToId: followUp.assignedToId,
+          assignedByUserId: data.capturedByUserId ?? null,
+        });
+      }
     } catch (err) {
       // Non-fatal — lead is already in the pipeline
       console.warn(
@@ -671,8 +1049,8 @@ export class FollowUpService {
     return followUp;
   }
 
-  async listReminders(churchId: string, followUpId: string) {
-    await this.getOne(churchId, followUpId);
+  async listReminders(churchId: string, followUpId: string, actorUserId: string) {
+    await this.getOne(churchId, followUpId, actorUserId);
     return this.prisma.followUpReminder.findMany({
       where: { followUpId },
       orderBy: { remindAt: 'asc' },
@@ -711,8 +1089,15 @@ export class FollowUpService {
     churchId: string,
     followUpId: string,
     templateId: string,
+    actorUserId: string,
   ) {
-    const followUp = await this.getOne(churchId, followUpId);
+    const followUp = await this.getOne(churchId, followUpId, actorUserId);
+    const access = await this.requireAccess(churchId, actorUserId);
+    if (
+      !this.moduleAccess.canMutateEstablishmentRecord(access, actorUserId, followUp)
+    ) {
+      throw new ForbiddenException('You cannot message this Establishment contact');
+    }
     const tpl = await this.prisma.followUpTemplate.findFirst({
       where: { id: templateId, churchId, isActive: true },
     });
@@ -754,7 +1139,7 @@ export class FollowUpService {
       isConfidential?: boolean;
       memberId?: string;
       followUpId?: string;
-      stageAtTime?: FollowUpStage;
+      stageAtTime?: string;
       kind?: string;
     },
   ) {
@@ -792,10 +1177,16 @@ export class FollowUpService {
     const existing = await this.prisma.followUp.findFirst({ where: { id, churchId } });
     if (!existing) throw new NotFoundException('Follow-up not found');
     if (existing.archivedAt) throw new BadRequestException('This lead is already archived');
-    if (existing.stage === 'JOINED_GROUP') {
+    const archiveFlags = await this.pipelineFlags(churchId);
+    if (isArchiveBlockedStageKey(existing.stage, archiveFlags)) {
       throw new BadRequestException(
-        'Joined Group contacts cannot be archived. Convert them to Members within 7 days.',
+        'This pipeline stage cannot be archived. Convert the contact to a Member within 7 days.',
       );
+    }
+
+    const access = await this.requireAccess(churchId, actorId);
+    if (!access.canArchive) {
+      throw new ForbiddenException('Only Establishment managers can archive contacts');
     }
 
     const trimmed = reason.trim();
@@ -850,10 +1241,21 @@ export class FollowUpService {
     const existing = await this.prisma.followUp.findFirst({ where: { id, churchId } });
     if (!existing) throw new NotFoundException('Follow-up not found');
     if (existing.archivedAt) throw new BadRequestException('This lead is already archived');
-    if (existing.stage === 'JOINED_GROUP') {
+    const requestFlags = await this.pipelineFlags(churchId);
+    if (isArchiveBlockedStageKey(existing.stage, requestFlags)) {
       throw new BadRequestException(
-        'Joined Group contacts cannot be archived. Convert them to Members within 7 days.',
+        'This pipeline stage cannot be archived. Convert the contact to a Member within 7 days.',
       );
+    }
+
+    const access = await this.requireAccess(churchId, actorId);
+    if (!access.canRequestArchive) {
+      throw new ForbiddenException('You cannot request archive for Establishment contacts');
+    }
+    if (
+      !this.moduleAccess.canMutateEstablishmentRecord(access, actorId, existing)
+    ) {
+      throw new ForbiddenException('You can only request archive on contacts assigned to you');
     }
 
     const trimmed = reason.trim();
@@ -920,6 +1322,11 @@ export class FollowUpService {
       throw new BadRequestException('No pending archive request');
     }
 
+    const access = await this.requireAccess(churchId, actorId);
+    if (!access.canArchive) {
+      throw new ForbiddenException('Only Establishment managers can decline archive requests');
+    }
+
     const updated = await this.prisma.$transaction(async (tx) => {
       const row = await tx.followUp.update({
         where: { id },
@@ -965,6 +1372,11 @@ export class FollowUpService {
     if (!followUp) throw new NotFoundException('Follow-up not found');
     if (!followUp.archivedAt) {
       throw new BadRequestException('Only archived leads can be re-contacted this way');
+    }
+
+    const access = await this.requireAccess(churchId, actorId);
+    if (access.mode !== 'manager') {
+      throw new ForbiddenException('Only Establishment managers can re-contact archived leads');
     }
     if (!followUp.contactEmail && !followUp.contactPhone) {
       throw new BadRequestException('No email or phone on this archived lead');

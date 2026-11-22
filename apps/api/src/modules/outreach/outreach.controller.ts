@@ -48,15 +48,14 @@ export class OutreachController {
 
   @Get('stats')
   @ApiBearerAuth()
-  @ModuleGate('followUp')
+  @ApiOperation({ summary: 'Outreach stats (all church users)' })
   getStats(@ChurchId() churchId: string) {
     return this.outreachService.getStats(churchId);
   }
 
   @Post('capture')
   @ApiBearerAuth()
-  @ModuleGate('followUp')
-  @ApiOperation({ summary: 'Capture outreach contact (online)' })
+  @ApiOperation({ summary: 'Capture outreach contact (online) — all church users' })
   capture(
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
@@ -70,8 +69,7 @@ export class OutreachController {
 
   @Post('sync')
   @ApiBearerAuth()
-  @ModuleGate('followUp')
-  @ApiOperation({ summary: 'Sync offline capture queue' })
+  @ApiOperation({ summary: 'Sync offline capture queue — all church users' })
   sync(
     @ChurchId() churchId: string,
     @ZodBody(outreachSyncSchema) body: z.infer<typeof outreachSyncSchema>,
@@ -81,7 +79,6 @@ export class OutreachController {
 
   @Get('sync/queue')
   @ApiBearerAuth()
-  @ModuleGate('followUp')
   getSyncQueue(@ChurchId() churchId: string) {
     return this.outreachService.getSyncQueue(churchId);
   }
@@ -111,14 +108,14 @@ export class OutreachController {
 
   @Post('contacts/:id/welcome')
   @ApiBearerAuth()
-  @ModuleGate('followUp')
+  @Roles('ADMIN', 'PASTOR', 'LEADER')
   resendWelcome(@ChurchId() churchId: string, @Param('id') id: string) {
     return this.outreachService.sendWelcomeMessage(churchId, id);
   }
 
   @Get('contacts')
   @ApiBearerAuth()
-  @ModuleGate('followUp')
+  @ApiOperation({ summary: 'List outreach contacts — all church users' })
   listContacts(
     @ChurchId() churchId: string,
     @Query('evangelistId') evangelistId?: string,
@@ -163,14 +160,12 @@ export class OutreachController {
 
   @Get('qr/team')
   @ApiBearerAuth()
-  @ModuleGate('followUp')
   listTeamQr(@ChurchId() churchId: string) {
     return this.outreachService.listTeamQrCodes(churchId);
   }
 
   @Get('qr/me')
   @ApiBearerAuth()
-  @ModuleGate('followUp')
   @ApiOperation({ summary: 'Get or create the stable church-wide Team QR' })
   myQr(
     @ChurchId() churchId: string,
@@ -182,7 +177,6 @@ export class OutreachController {
 
   @Get('qr/church')
   @ApiBearerAuth()
-  @ModuleGate('followUp')
   @ApiOperation({ summary: 'Stable church-level Team QR (same as /qr/me)' })
   churchQr(@ChurchId() churchId: string, @Query('origin') origin?: string) {
     return this.outreachService.getOrCreateChurchQr(churchId, this.appBaseUrl(origin));

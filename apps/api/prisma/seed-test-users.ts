@@ -52,8 +52,15 @@ export async function seedTestUsers(
         firstName:
           account.key === 'choiradmin'
             ? 'Daniel'
-            : account.label.split('(')[0].trim().split(' ')[0] || 'Demo',
-        lastName: account.key === 'choiradmin' ? 'Morrison' : 'User',
+            : account.key === 'harvester'
+              ? 'Hannah'
+              : account.label.split('(')[0].trim().split(' ')[0] || 'Demo',
+        lastName:
+          account.key === 'choiradmin'
+            ? 'Morrison'
+            : account.key === 'harvester'
+              ? 'Harvester'
+              : 'User',
       },
       create: {
         churchId,
@@ -62,8 +69,15 @@ export async function seedTestUsers(
         firstName:
           account.key === 'choiradmin'
             ? 'Daniel'
-            : account.label.split('(')[0].trim().split(' ')[0] || 'Demo',
-        lastName: account.key === 'choiradmin' ? 'Morrison' : 'User',
+            : account.key === 'harvester'
+              ? 'Hannah'
+              : account.label.split('(')[0].trim().split(' ')[0] || 'Demo',
+        lastName:
+          account.key === 'choiradmin'
+            ? 'Morrison'
+            : account.key === 'harvester'
+              ? 'Harvester'
+              : 'User',
         isActive: true,
       },
     });
@@ -94,7 +108,7 @@ export async function seedTestUsers(
     const unitId =
       account.key === 'choiradmin'
         ? choirUnit?.id
-        : account.key === 'evangelist'
+        : account.key === 'evangelist' || account.key === 'harvester'
           ? harvestersUnit?.id
           : followUpUnit?.id;
     if (unitId) {

@@ -137,6 +137,22 @@ export const TEST_ACCOUNTS: TestAccountDetail[] = [
     ],
   },
   {
+    key: 'harvester',
+    label: 'Harvesters Worker',
+    email: 'harvester@demo.church',
+    userRole: 'MEMBER',
+    memberRoles: ['ADULT'],
+    serviceUnits: ['Harvesters Squad (member)'],
+    description:
+      'Harvesters Squad field worker — Establishment worker mode (assigned contacts only), outreach capture.',
+    testFocus: [
+      'Establishment worker dashboard (assigned-only)',
+      'Outreach capture',
+      'Harvesters Squad unit hub',
+      'No manager tabs / no assign to others',
+    ],
+  },
+  {
     key: 'driver',
     label: 'Bus Driver',
     email: 'driver@demo.church',

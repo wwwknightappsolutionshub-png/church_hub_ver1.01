@@ -155,6 +155,8 @@ export default function LoginPage() {
         userRoles?: string[];
         unitAdminUnitIds?: string[];
         unitDeputyUnitIds?: string[];
+        canAccessFollowUp?: boolean;
+        establishmentAccess?: { mode?: string | null } | null;
         mustChangePassword?: boolean;
       }>('/auth/me');
       if (data.mustChangePassword) {

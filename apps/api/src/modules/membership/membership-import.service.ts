@@ -4,7 +4,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
-  FollowUpStage,
   MemberRoleType,
   MemberStatus,
   MembershipImportJobStatus,
@@ -12,6 +11,7 @@ import {
   MembershipImportRowAction,
   Prisma,
 } from '@prisma/client';
+import { FOLLOW_UP_STAGE_ORDER } from '../follow-up/follow-up.constants';
 import {
   MembershipImportColumnMappingSchema,
   MembershipImportOptionsSchema,
@@ -596,16 +596,9 @@ export class MembershipImportService {
     return roles.length ? roles : undefined;
   }
 
-  private parseFollowUpStage(v?: string): FollowUpStage | undefined {
+  private parseFollowUpStage(v?: string): string | undefined {
     if (!v) return undefined;
     const s = v.trim().toUpperCase().replace(/\s+/g, '_');
-    const allowed: FollowUpStage[] = [
-      'NEW_LEAD',
-      'CONTACTED',
-      'VISITED',
-      'ATTENDED',
-      'JOINED_GROUP',
-    ];
-    return allowed.includes(s as FollowUpStage) ? (s as FollowUpStage) : undefined;
+    return FOLLOW_UP_STAGE_ORDER.includes(s) ? s : undefined;
   }
 }

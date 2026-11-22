@@ -3,10 +3,13 @@ import { MemberStatus, OutreachConvertStage } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.module';
 import { BusService } from '../bus/bus.service';
 import { MembershipActivityService } from '../membership/membership-activity.service';
+import { PipelineResolveService } from '../follow-up/pipeline-resolve.service';
 import {
-  CONVERT_TO_FOLLOW_UP_STAGE,
-  OUTREACH_CONVERT_PIPELINE,
-} from './outreach.constants';
+  archiveBlockedStageKeys,
+  mapOutreachConvertToFollowUpStage,
+  type StageFlagRow,
+} from '../follow-up/pipeline-stage-flags';
+import { OUTREACH_CONVERT_PIPELINE } from './outreach.constants';
 import { decryptOutreachContactFields } from './outreach-pii.crypto';
 
 @Injectable()
@@ -15,7 +18,19 @@ export class OutreachPipelineService {
     private readonly prisma: PrismaService,
     private readonly bus: BusService,
     private readonly activity: MembershipActivityService,
+    private readonly pipelineResolve: PipelineResolveService,
   ) {}
+
+  private async stageFlags(churchId: string): Promise<StageFlagRow[]> {
+    const pipeline = await this.pipelineResolve.resolveForChurch(churchId);
+    return pipeline.stages.map((s) => ({
+      key: s.key,
+      isEntry: s.isEntry,
+      blocksArchive: s.blocksArchive,
+      graduatesSla: s.graduatesSla,
+      isEnabled: s.isEnabled,
+    }));
+  }
 
   private decryptContact<T extends Record<string, unknown>>(row: T): T {
     return {
@@ -82,7 +97,8 @@ export class OutreachPipelineService {
     });
 
     if (contact.followUpId) {
-      const followStage = CONVERT_TO_FOLLOW_UP_STAGE[stage];
+      const flags = await this.stageFlags(churchId);
+      const followStage = mapOutreachConvertToFollowUpStage(stage, flags);
       if (followStage) {
         await this.prisma.followUp.update({
           where: { id: contact.followUpId },
@@ -137,11 +153,16 @@ export class OutreachPipelineService {
     });
 
     if (contact.followUpId) {
+      const flags = await this.stageFlags(churchId);
+      const convertedStage =
+        archiveBlockedStageKeys(flags)[0] ??
+        mapOutreachConvertToFollowUpStage('CONVERTED', flags) ??
+        'JOINED_GROUP';
       await this.prisma.followUp.update({
         where: { id: contact.followUpId },
         data: {
           memberId: member.id,
-          stage: 'JOINED_GROUP',
+          stage: convertedStage,
           completedAt: new Date(),
         },
       });

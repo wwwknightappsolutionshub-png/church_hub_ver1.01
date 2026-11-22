@@ -1,0 +1,20 @@
+[
+  {
+    "stage": "NEW_LEAD"
+  },
+  {
+    "stage": "CONTACTED"
+  },
+  {
+    "stage": "VISITED"
+  },
+  {
+    "stage": "ATTENDED"
+  },
+  {
+    "stage": "JOINED_GROUP"
+  },
+  {
+    "stage": "ENLISTED_FOR_BAPTISM"
+  }
+]

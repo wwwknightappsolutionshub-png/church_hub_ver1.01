@@ -25,6 +25,7 @@ export interface AuthMeResponse {
     status: string;
   } | null;
   canAccessFollowUp?: boolean;
+  establishmentAccess?: import('@/lib/establishment-access').EstablishmentAccess;
   canAccessServiceUnitHub?: boolean;
   canAccessMyProfile?: boolean;
   memberRoles: string[];

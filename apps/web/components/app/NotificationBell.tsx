@@ -180,9 +180,12 @@ export function NotificationBell() {
                         } else if (
                           n.type === 'FOLLOW_UP_ARCHIVE_REQUEST' ||
                           n.type === 'FOLLOW_UP_REMINDER' ||
-                          n.type === 'FOLLOW_UP_NEW_LEAD'
+                          n.type === 'FOLLOW_UP_NEW_LEAD' ||
+                          n.type === 'FOLLOW_UP_ASSIGNED' ||
+                          n.type === 'FOLLOW_UP_ASSIGNMENT_OVERDUE' ||
+                          n.type === 'FOLLOW_UP_JOINED_GROUP_DAY6'
                         ) {
-                          router.push('/dashboard/follow-up');
+                          router.push('/dashboard/establishment');
                         }
                       }}
                     >

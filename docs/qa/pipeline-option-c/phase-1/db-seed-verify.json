@@ -1,0 +1,79 @@
+{
+  "at": "2026-11-22T08:16:43.321Z",
+  "tables": [
+    {
+      "table_name": "pipeline_definitions"
+    },
+    {
+      "table_name": "pipeline_stages"
+    },
+    {
+      "table_name": "pipeline_template_stages"
+    },
+    {
+      "table_name": "pipeline_templates"
+    }
+  ],
+  "migration": [
+    {
+      "migration_name": "20261122081000_pipeline_option_c_phase1",
+      "finished_at": "2026-11-22T08:12:53.947Z"
+    }
+  ],
+  "seeded": {
+    "id": "3deaf33d-b26a-4e83-8e93-105620db38be",
+    "key": "winners_default",
+    "version": 1,
+    "stageCount": 6
+  },
+  "stages": [
+    {
+      "key": "NEW_LEAD",
+      "label": "New Contacts",
+      "isEntry": true,
+      "blocksArchive": false,
+      "graduatesSla": false,
+      "phaseKey": "outreach"
+    },
+    {
+      "key": "CONTACTED",
+      "label": "Contacted",
+      "isEntry": false,
+      "blocksArchive": false,
+      "graduatesSla": false,
+      "phaseKey": "outreach"
+    },
+    {
+      "key": "VISITED",
+      "label": "Attended Service",
+      "isEntry": false,
+      "blocksArchive": false,
+      "graduatesSla": false,
+      "phaseKey": "engagement"
+    },
+    {
+      "key": "ATTENDED",
+      "label": "Engrafted In WSF",
+      "isEntry": false,
+      "blocksArchive": false,
+      "graduatesSla": false,
+      "phaseKey": "engagement"
+    },
+    {
+      "key": "JOINED_GROUP",
+      "label": "Joined Group",
+      "isEntry": false,
+      "blocksArchive": true,
+      "graduatesSla": true,
+      "phaseKey": "belonging"
+    },
+    {
+      "key": "ENLISTED_FOR_BAPTISM",
+      "label": "Enlisted for Baptism",
+      "isEntry": false,
+      "blocksArchive": false,
+      "graduatesSla": true,
+      "phaseKey": "belonging"
+    }
+  ]
+}

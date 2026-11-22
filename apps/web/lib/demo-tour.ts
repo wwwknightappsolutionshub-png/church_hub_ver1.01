@@ -23,8 +23,10 @@ export const DEMO_TOUR_INTRO_HOLD_MS = 4200;
 const STEP_CAPTIONS: Record<string, string> = {
   '/dashboard':
     'Leadership dashboard — attendance trends, church calendar, and live activity in one view.',
-  '/dashboard/follow-up':
-    'Outreach pipeline — assign contacts, track discipleship stages, and automate follow-ups.',
+  '/dashboard/establishment':
+    'Establishment — assign contacts, track discipleship stages, and automate follow-ups.',
+  '/dashboard/outreach':
+    'Outreach — capture new contacts in the field and keep your team in sync.',
   '/dashboard/ministry-cells':
     'Ministry & cells — branch structure, weekly attendance, and provincial roll-ups.',
   '/dashboard/membership/members':

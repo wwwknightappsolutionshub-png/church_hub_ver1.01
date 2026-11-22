@@ -5,7 +5,12 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ChevronDown, Lock, X } from 'lucide-react';
 import { LogoutButton } from '@/components/app/LogoutButton';
-import { MOBILE_TAB_HREFS, type DashboardNavItem } from '@/lib/member-nav';
+import {
+  MEMBER_COMMUNITY_NAV,
+  MEMBER_WORK_NAV,
+  MOBILE_TAB_HREFS,
+  type DashboardNavItem,
+} from '@/lib/member-nav';
 import { cn } from '@/lib/utils';
 
 interface MobileMoreMenuProps {
@@ -16,8 +21,44 @@ interface MobileMoreMenuProps {
   staffNav: DashboardNavItem[];
   staffCommunityNav: DashboardNavItem[];
   isChurchStaff: boolean;
-  /** When true (church admin / pastor), Community starts collapsed. */
+  /** When true, Community starts collapsed. Defaults to true. */
   communityCollapsedByDefault?: boolean;
+}
+
+function ModuleTile({
+  item,
+  active,
+  locked,
+  onClose,
+}: {
+  item: DashboardNavItem;
+  active: boolean;
+  locked?: boolean;
+  onClose: () => void;
+}) {
+  const Icon = item.icon;
+  const className = cn(
+    'flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3 text-center transition',
+    locked && 'opacity-50',
+    active && !locked
+      ? 'bg-primary/10 text-primary'
+      : 'bg-muted/50 text-foreground hover:bg-muted',
+  );
+  if (locked) {
+    return (
+      <div className={className} title="Membership required">
+        <Lock className="h-4 w-4 shrink-0" />
+        <Icon className="h-5 w-5 shrink-0" />
+        <span className="text-[10px] font-medium leading-tight">{item.label}</span>
+      </div>
+    );
+  }
+  return (
+    <Link href={item.href} onClick={onClose} className={className}>
+      <Icon className="h-5 w-5 shrink-0" />
+      <span className="text-[10px] font-medium leading-tight">{item.label}</span>
+    </Link>
+  );
 }
 
 export function MobileMoreMenu({
@@ -28,7 +69,7 @@ export function MobileMoreMenu({
   staffNav,
   staffCommunityNav,
   isChurchStaff,
-  communityCollapsedByDefault = false,
+  communityCollapsedByDefault = true,
 }: MobileMoreMenuProps) {
   const pathname = usePathname();
   const [communityOpen, setCommunityOpen] = useState(!communityCollapsedByDefault);
@@ -40,8 +81,18 @@ export function MobileMoreMenu({
 
   if (!open) return null;
 
-  const moreMember = allMemberNav.filter((item) => !MOBILE_TAB_HREFS.has(item.href));
   const allowedHrefs = new Set(memberNav.map((m) => m.href));
+  const workHrefs = new Set(MEMBER_WORK_NAV.map((m) => m.href));
+  const communityHrefs = new Set(MEMBER_COMMUNITY_NAV.map((m) => m.href));
+
+  const moreMemberWork = allMemberNav.filter(
+    (item) => workHrefs.has(item.href) && !MOBILE_TAB_HREFS.has(item.href),
+  );
+  const moreMemberCommunity = allMemberNav.filter(
+    (item) => communityHrefs.has(item.href) && !MOBILE_TAB_HREFS.has(item.href),
+  );
+
+  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <div className="fixed inset-0 z-[60] xl:hidden" role="dialog" aria-modal="true" aria-label="More modules">
@@ -70,27 +121,14 @@ export function MobileMoreMenu({
                 Leadership
               </p>
               <div className="mb-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
-                {staffNav.map((item) => {
-                  const Icon = item.icon;
-                  const active =
-                    pathname === item.href || pathname.startsWith(`${item.href}/`);
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={onClose}
-                      className={cn(
-                        'flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3 text-center transition',
-                        active
-                          ? 'bg-primary/10 text-primary'
-                          : 'bg-muted/50 text-foreground hover:bg-muted',
-                      )}
-                    >
-                      <Icon className="h-5 w-5 shrink-0" />
-                      <span className="text-[10px] font-medium leading-tight">{item.label}</span>
-                    </Link>
-                  );
-                })}
+                {staffNav.map((item) => (
+                  <ModuleTile
+                    key={item.href}
+                    item={item}
+                    active={isActive(item.href)}
+                    onClose={onClose}
+                  />
+                ))}
               </div>
             </>
           )}
@@ -115,62 +153,66 @@ export function MobileMoreMenu({
                 </button>
                 {communityOpen ? (
                   <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                    {staffCommunityNav.map((item) => {
-                      const Icon = item.icon;
-                      const active =
-                        pathname === item.href || pathname.startsWith(`${item.href}/`);
-                      return (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          onClick={onClose}
-                          className={cn(
-                            'flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3 text-center transition',
-                            active
-                              ? 'bg-primary/10 text-primary'
-                              : 'bg-muted/50 text-foreground hover:bg-muted',
-                          )}
-                        >
-                          <Icon className="h-5 w-5 shrink-0" />
-                          <span className="text-[10px] font-medium leading-tight">{item.label}</span>
-                        </Link>
-                      );
-                    })}
+                    {staffCommunityNav.map((item) => (
+                      <ModuleTile
+                        key={item.href}
+                        item={item}
+                        active={isActive(item.href)}
+                        onClose={onClose}
+                      />
+                    ))}
                   </div>
                 ) : null}
               </>
             )
           ) : (
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-              {moreMember.map((item) => {
-                const Icon = item.icon;
-                const active =
-                  pathname === item.href || pathname.startsWith(`${item.href}/`);
-                const locked = !allowedHrefs.has(item.href);
-                const className = cn(
-                  'flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3 text-center transition',
-                  locked && 'opacity-50',
-                  active && !locked
-                    ? 'bg-primary/10 text-primary'
-                    : 'bg-muted/50 text-foreground hover:bg-muted',
-                );
-                if (locked) {
-                  return (
-                    <div key={item.href} className={className} title="Membership required">
-                      <Lock className="h-4 w-4 shrink-0" />
-                      <Icon className="h-5 w-5 shrink-0" />
-                      <span className="text-[10px] font-medium leading-tight">{item.label}</span>
+            <>
+              {moreMemberWork.length > 0 ? (
+                <div className="mb-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                  {moreMemberWork.map((item) => (
+                    <ModuleTile
+                      key={item.href}
+                      item={item}
+                      active={isActive(item.href)}
+                      locked={!allowedHrefs.has(item.href)}
+                      onClose={onClose}
+                    />
+                  ))}
+                </div>
+              ) : null}
+              {moreMemberCommunity.length > 0 ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setCommunityOpen((o) => !o)}
+                    className="mb-2 flex w-full items-center justify-between px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+                    aria-expanded={communityOpen}
+                  >
+                    <span>Community</span>
+                    <ChevronDown
+                      className={cn(
+                        'h-3.5 w-3.5 transition-transform',
+                        communityOpen ? 'rotate-0' : '-rotate-90',
+                      )}
+                      aria-hidden
+                    />
+                  </button>
+                  {communityOpen ? (
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                      {moreMemberCommunity.map((item) => (
+                        <ModuleTile
+                          key={item.href}
+                          item={item}
+                          active={isActive(item.href)}
+                          locked={!allowedHrefs.has(item.href)}
+                          onClose={onClose}
+                        />
+                      ))}
                     </div>
-                  );
-                }
-                return (
-                  <Link key={item.href} href={item.href} onClick={onClose} className={className}>
-                    <Icon className="h-5 w-5 shrink-0" />
-                    <span className="text-[10px] font-medium leading-tight">{item.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
+                  ) : null}
+                </>
+              ) : null}
+            </>
           )}
 
           <div className="mt-4 border-t border-border pt-3">

@@ -37,9 +37,9 @@ test.describe('Membership primary flows (Phase 10)', () => {
     });
   });
 
-  test('follow-up board loads', async ({ page }) => {
-    await page.goto('/dashboard/follow-up');
-    await expect(page.getByText(/Outreach|Pipeline/i).first()).toBeVisible({
+  test('establishment board loads', async ({ page }) => {
+    await page.goto('/dashboard/establishment');
+    await expect(page.getByText(/Establishment|Pipeline/i).first()).toBeVisible({
       timeout: 20_000,
     });
   });

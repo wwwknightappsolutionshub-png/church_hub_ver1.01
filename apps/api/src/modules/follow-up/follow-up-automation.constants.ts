@@ -1,9 +1,9 @@
-import { FollowUpAutomationTrigger, FollowUpStage } from '@prisma/client';
+import { FollowUpAutomationTrigger } from '@prisma/client';
 
 export const DEFAULT_FOLLOW_UP_AUTOMATION_RULES: Array<{
   name: string;
   trigger: FollowUpAutomationTrigger;
-  stage?: FollowUpStage;
+  stage?: string;
   delayHours: number;
   channel: string;
   message: string;

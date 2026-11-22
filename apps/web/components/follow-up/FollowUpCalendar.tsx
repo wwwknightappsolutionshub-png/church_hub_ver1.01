@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { STAGE_LABELS, formatDue } from '@/lib/follow-up';
+import { stageLabelMap, type ResolvedPipeline } from '@/lib/pipeline-definition';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -21,6 +22,7 @@ interface CalendarLead {
 interface FollowUpCalendarProps {
   onSelect: (id: string) => void;
   selectedId: string | null;
+  pipeline?: ResolvedPipeline | null;
 }
 
 function monthRange(year: number, month: number) {
@@ -29,10 +31,13 @@ function monthRange(year: number, month: number) {
   return { from: from.toISOString(), to: to.toISOString() };
 }
 
-export function FollowUpCalendar({ onSelect, selectedId }: FollowUpCalendarProps) {
+export function FollowUpCalendar({ onSelect, selectedId, pipeline }: FollowUpCalendarProps) {
   const today = new Date();
   const [cursor, setCursor] = useState({ year: today.getFullYear(), month: today.getMonth() });
   const range = monthRange(cursor.year, cursor.month);
+  const labels = Object.keys(stageLabelMap(pipeline)).length
+    ? stageLabelMap(pipeline)
+    : STAGE_LABELS;
 
   const { data, isLoading } = useApiQuery<CalendarLead[]>(
     ['follow-up-calendar', String(cursor.year), String(cursor.month)],
@@ -156,7 +161,7 @@ export function FollowUpCalendar({ onSelect, selectedId }: FollowUpCalendarProps
                               : 'bg-sky-100 text-sky-950 dark:bg-sky-950 dark:text-sky-100',
                             selectedId === item.id && 'ring-1 ring-primary',
                           )}
-                          title={`${item.contactName}: ${item.nextAction || STAGE_LABELS[item.stage]}`}
+                          title={`${item.contactName}: ${item.nextAction || labels[item.stage] || STAGE_LABELS[item.stage] || item.stage}`}
                         >
                           {item.contactName}
                         </button>
@@ -191,7 +196,7 @@ export function FollowUpCalendar({ onSelect, selectedId }: FollowUpCalendarProps
                     <div>
                       <p className="font-medium">{item.contactName}</p>
                       <p className="text-xs text-muted-foreground">
-                        {STAGE_LABELS[item.stage] ?? item.stage}
+                        {labels[item.stage] ?? STAGE_LABELS[item.stage] ?? item.stage}
                         {item.nextAction ? ` · ${item.nextAction}` : ''}
                       </p>
                     </div>

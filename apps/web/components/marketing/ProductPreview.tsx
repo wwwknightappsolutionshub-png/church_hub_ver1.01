@@ -38,8 +38,8 @@ const previewModules: {
 }[] = [
   { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
   { id: 'membership', icon: Users, label: 'Membership', path: '/dashboard/membership' },
-  { id: 'follow-up', icon: HeartHandshake, label: 'Follow-up', path: '/dashboard/follow-up' },
-  { id: 'evangelism', icon: Megaphone, label: 'Evangelism', path: '/dashboard/outreach' },
+  { id: 'follow-up', icon: HeartHandshake, label: 'Establishment', path: '/dashboard/establishment' },
+  { id: 'evangelism', icon: Megaphone, label: 'Outreach', path: '/dashboard/outreach' },
   { id: 'youth', icon: Sparkles, label: 'Youth', path: '/dashboard/youth' },
   { id: 'bus', icon: Bus, label: 'Bus Ministry', path: '/dashboard/bus' },
 ];

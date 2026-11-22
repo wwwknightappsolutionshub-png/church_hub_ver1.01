@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { establishmentAccessFromMode } from '../access/establishment-access.types';
 import { FollowUpService } from './follow-up.service';
 
 describe('FollowUpService archive flow', () => {
@@ -43,6 +44,33 @@ describe('FollowUpService archive flow', () => {
     getEvangelistDisplayName: jest.fn(),
   };
   const automation = { onFollowUpEvent: jest.fn(), processOverdueRules: jest.fn() };
+  const moduleAccess = {
+    getEstablishmentAccessForUser: jest.fn().mockImplementation(async (userId: string) => {
+      // u-2 exercises worker archive-request path; others are managers.
+      if (userId === 'u-2') return establishmentAccessFromMode('worker');
+      return establishmentAccessFromMode('manager');
+    }),
+    canViewEstablishmentRecord: jest.fn().mockReturnValue(true),
+    canMutateEstablishmentRecord: jest.fn().mockReturnValue(true),
+    buildEstablishmentListScope: jest.fn(),
+  };
+
+  const pipelineResolve = {
+    resolveForChurch: jest.fn().mockResolvedValue({
+      source: 'template',
+      templateKey: 'winners_default',
+      stages: [
+        { key: 'NEW_LEAD', isEntry: true, blocksArchive: false, graduatesSla: false, isEnabled: true },
+        {
+          key: 'JOINED_GROUP',
+          isEntry: false,
+          blocksArchive: true,
+          graduatesSla: true,
+          isEnabled: true,
+        },
+      ],
+    }),
+  };
 
   const service = new FollowUpService(
     prisma as never,
@@ -51,6 +79,8 @@ describe('FollowUpService archive flow', () => {
     email as never,
     teamNotify as never,
     automation as never,
+    moduleAccess as never,
+    pipelineResolve as never,
   );
 
   beforeEach(() => {

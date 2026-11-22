@@ -1,4 +1,4 @@
-import { FollowUpStage, OutreachConvertStage } from '@prisma/client';
+import { OutreachConvertStage } from '@prisma/client';
 
 export const DEFAULT_WELCOME_SMS =
   'Welcome {{name}}! Thank you for connecting with {{church}}. We are praying for you and look forward to staying in touch. God bless you!';
@@ -24,11 +24,4 @@ export const OUTREACH_CONVERT_PIPELINE: OutreachConvertStage[] = [
   'ARCHIVED',
 ];
 
-/** Map convert stage to follow-up stage when advancing pipeline. */
-export const CONVERT_TO_FOLLOW_UP_STAGE: Partial<Record<OutreachConvertStage, FollowUpStage>> = {
-  CAPTURED: 'NEW_LEAD',
-  CONTACTED: 'CONTACTED',
-  VISITED: 'VISITED',
-  READY_FOR_MEMBERSHIP: 'ATTENDED',
-  CONVERTED: 'JOINED_GROUP',
-};
+/** Follow-up stage mapping lives in `mapOutreachConvertToFollowUpStage` (resolved flags). */

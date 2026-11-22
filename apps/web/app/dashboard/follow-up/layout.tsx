@@ -1,5 +1,4 @@
-import { FollowUpAccessGate } from '@/components/follow-up/FollowUpAccessGate';
-
-export default function FollowUpLayout({ children }: { children: React.ReactNode }) {
-  return <FollowUpAccessGate>{children}</FollowUpAccessGate>;
+/** Layout kept so nested legacy paths still resolve before redirect. */
+export default function FollowUpLegacyLayout({ children }: { children: React.ReactNode }) {
+  return children;
 }

@@ -19,14 +19,13 @@ export const MemberRoleSchema = z.enum([
 ]);
 export type MemberRole = z.infer<typeof MemberRoleSchema>;
 
-export const FollowUpStageSchema = z.enum([
-  'NEW_LEAD',
-  'CONTACTED',
-  'VISITED',
-  'ATTENDED',
-  'JOINED_GROUP',
-  'ENLISTED_FOR_BAPTISM',
-]);
+/** Pipeline stage key — validated against the church's resolved pipeline at the API layer. */
+export const FollowUpStageSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z][A-Za-z0-9_]*$/, 'Invalid pipeline stage key');
 export type FollowUpStage = z.infer<typeof FollowUpStageSchema>;
 
 export const RideStatusSchema = z.enum([

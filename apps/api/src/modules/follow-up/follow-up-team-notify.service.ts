@@ -3,6 +3,10 @@ import { PrismaService } from '../../prisma/prisma.module';
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
 import { SmsAdapter } from '../notifications/adapters/sms.adapter';
 import { trySendWhatsApp } from '../notifications/try-send-whatsapp';
+import {
+  ESTABLISHMENT_MANAGER_UNIT_NAMES,
+} from '../access/access.constants';
+import { ASSIGNMENT_STAGE_SLA_HOURS } from './follow-up-assignment-sla';
 
 const TEAM_ROLES = ['ADMIN', 'PASTOR', 'LEADER'] as const;
 
@@ -114,7 +118,7 @@ export class FollowUpTeamNotifyService {
       .join('\n');
 
     const title = `New outreach lead: ${params.contactName}`;
-    const body = `A fast capture was added to Follow-Up as Fresh Contact.\n\n${contactLines}\n\nOpen the pipeline: ${appUrl}/dashboard/follow-up`;
+    const body = `A fast capture was added to Establishment as New Contact.\n\n${contactLines}\n\nOpen Establishment: ${appUrl}/dashboard/establishment`;
 
     await Promise.all(
       team.map(async (user) => {
@@ -184,7 +188,7 @@ export class FollowUpTeamNotifyService {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3001';
 
     const title = `Archive requested: ${params.contactName}`;
-    const body = `${params.requesterName} requested this lead be archived (DND).\n\nReason: ${params.reason}\n\nReview in Outreach: ${appUrl}/dashboard/follow-up`;
+    const body = `${params.requesterName} requested this lead be archived (DND).\n\nReason: ${params.reason}\n\nReview in Establishment: ${appUrl}/dashboard/establishment`;
 
     await Promise.all(
       team.map(async (user) => {
@@ -256,8 +260,8 @@ export class FollowUpTeamNotifyService {
 
     const title = `Convert to Member: ${params.contactName}`;
     const body = params.hasMemberLink
-      ? `${params.contactName} has been in Joined Group for 6 days and leaves this phase tomorrow.\n\nConfirm their Membership status in Outreach: ${appUrl}/dashboard/follow-up`
-      : `${params.contactName} has been in Joined Group for 6 days. Update their status to Members before day 7 (they leave this phase automatically).\n\nOpen Outreach: ${appUrl}/dashboard/follow-up`;
+      ? `${params.contactName} has been in Joined Group for 6 days and leaves this phase tomorrow.\n\nConfirm their Membership status in Establishment: ${appUrl}/dashboard/establishment`
+      : `${params.contactName} has been in Joined Group for 6 days. Update their status to Members before day 7 (they leave this phase automatically).\n\nOpen Establishment: ${appUrl}/dashboard/establishment`;
 
     await Promise.all(
       team.map(async (user) => {
@@ -294,6 +298,183 @@ export class FollowUpTeamNotifyService {
 
     this.logger.log(
       `Notified ${team.length} leader(s) of Joined Group day-6 for ${params.followUpId}`,
+    );
+  }
+
+  /** Unit admins on Follow-up / Harvesters; falls back to church ADMIN/PASTOR. */
+  async resolveEstablishmentUnitLeaderUserIds(churchId: string): Promise<string[]> {
+    const unitLeaders = await this.prisma.serviceUnitLeader.findMany({
+      where: {
+        isUnitAdmin: true,
+        serviceUnit: {
+          churchId,
+          name: { in: [...ESTABLISHMENT_MANAGER_UNIT_NAMES] },
+        },
+        member: { userId: { not: null } },
+      },
+      select: { member: { select: { userId: true } } },
+    });
+    const fromUnits = [
+      ...new Set(
+        unitLeaders
+          .map((row) => row.member.userId)
+          .filter((id): id is string => !!id),
+      ),
+    ];
+    if (fromUnits.length > 0) return fromUnits;
+
+    const staff = await this.prisma.user.findMany({
+      where: {
+        churchId,
+        isActive: true,
+        roles: { some: { role: { name: { in: ['ADMIN', 'PASTOR'] } } } },
+      },
+      select: { id: true },
+    });
+    return staff.map((u) => u.id);
+  }
+
+  /**
+   * 72h assignment SLA breach — in-app to unit leaders; email reminder to assignee.
+   */
+  async notifyAssignmentStageOverdue(params: {
+    churchId: string;
+    followUpId: string;
+    contactName: string;
+    assignedToId: string;
+  }): Promise<void> {
+    const church = await this.prisma.church.findUnique({
+      where: { id: params.churchId },
+      select: { name: true },
+    });
+    const churchName = church?.name ?? 'Your church';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3001';
+    const hours = ASSIGNMENT_STAGE_SLA_HOURS;
+
+    const leaderIds = await this.resolveEstablishmentUnitLeaderUserIds(params.churchId);
+    const title = `Overdue: ${params.contactName}`;
+    const leaderBody = `${params.contactName} has had no stage update for ${hours}+ hours since assignment.\n\nOpen Establishment: ${appUrl}/dashboard/establishment`;
+
+    await Promise.all(
+      leaderIds.map(async (userId) => {
+        await this.prisma.notification.create({
+          data: {
+            churchId: params.churchId,
+            userId,
+            title,
+            body: leaderBody,
+            type: 'FOLLOW_UP_ASSIGNMENT_OVERDUE',
+            data: {
+              followUpId: params.followUpId,
+              assignedToId: params.assignedToId,
+              channel: 'push',
+            },
+          },
+        });
+      }),
+    );
+
+    const assignee = await this.prisma.user.findFirst({
+      where: { id: params.assignedToId, churchId: params.churchId, isActive: true },
+      select: { id: true, firstName: true, email: true },
+    });
+    if (assignee?.email) {
+      await this.email.send({
+        to: assignee.email,
+        subject: `[${churchName}] Reminder: update stage for ${params.contactName}`,
+        body: `Hi ${assignee.firstName},\n\n${params.contactName} was assigned to you more than ${hours} hours ago and the Establishment stage has not changed yet.\n\nPlease update the contact status in Establishment:\n${appUrl}/dashboard/establishment\n`,
+        churchId: params.churchId,
+      });
+    } else if (!assignee) {
+      this.logger.warn(
+        `Assignment overdue email skipped — assignee ${params.assignedToId} missing`,
+      );
+    } else {
+      this.logger.warn(
+        `Assignment overdue email skipped — assignee ${assignee.id} has no email`,
+      );
+    }
+
+    this.logger.log(
+      `Assignment overdue alerts for ${params.followUpId}: ${leaderIds.length} leader(s), assignee email=${!!assignee?.email}`,
+    );
+  }
+
+  /**
+   * Phase 4 — notify the assignee when a contact is assigned / reassigned to them.
+   * In-app always; email + WhatsApp when configured contact details exist.
+   */
+  async notifyAssigneeOnAssignment(params: {
+    churchId: string;
+    followUpId: string;
+    contactName: string;
+    assignedToId: string;
+    assignedByUserId?: string | null;
+  }): Promise<void> {
+    const assignee = await this.prisma.user.findFirst({
+      where: { id: params.assignedToId, churchId: params.churchId, isActive: true },
+      select: { id: true, firstName: true, lastName: true, email: true, phone: true },
+    });
+    if (!assignee) {
+      this.logger.warn(
+        `Assignment notify skipped — assignee ${params.assignedToId} not found in church ${params.churchId}`,
+      );
+      return;
+    }
+
+    let assignerLabel = 'a leader';
+    if (params.assignedByUserId) {
+      const assigner = await this.prisma.user.findFirst({
+        where: { id: params.assignedByUserId, churchId: params.churchId },
+        select: { firstName: true, lastName: true },
+      });
+      if (assigner) {
+        assignerLabel = `${assigner.firstName} ${assigner.lastName}`.trim();
+      }
+    }
+
+    const church = await this.prisma.church.findUnique({
+      where: { id: params.churchId },
+      select: { name: true },
+    });
+    const churchName = church?.name ?? 'Your church';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3001';
+
+    const title = `Assigned: ${params.contactName}`;
+    const body = `${assignerLabel} assigned ${params.contactName} to you in Establishment.\n\nOpen: ${appUrl}/dashboard/establishment`;
+
+    await this.prisma.notification.create({
+      data: {
+        churchId: params.churchId,
+        userId: assignee.id,
+        title,
+        body,
+        type: 'FOLLOW_UP_ASSIGNED',
+        data: {
+          followUpId: params.followUpId,
+          assignedToId: assignee.id,
+          assignedByUserId: params.assignedByUserId ?? null,
+        },
+      },
+    });
+
+    if (assignee.email) {
+      await this.email.send({
+        to: assignee.email,
+        subject: `[${churchName}] ${title}`,
+        body: `Hi ${assignee.firstName},\n\n${body}`,
+        churchId: params.churchId,
+      });
+    }
+    await trySendWhatsApp(this.sms, this.logger, {
+      to: assignee.phone,
+      body: `Hi ${assignee.firstName},\n\n${body}`,
+      churchId: params.churchId,
+      label: 'Establishment assignment',
+    });
+
+    this.logger.log(
+      `Assignment notification sent to ${assignee.id} for follow-up ${params.followUpId}`,
     );
   }
 }
