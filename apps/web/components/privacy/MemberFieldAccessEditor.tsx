@@ -59,7 +59,7 @@ function canSelectVisibility(floor: FieldVisibility, option: FieldVisibility): b
 
 type Props = {
   /** React-query key fragment */
-  queryKey: unknown[];
+  queryKey: string[];
   catalogUrl: string;
   saveUrl: string;
   canWrite: boolean;
