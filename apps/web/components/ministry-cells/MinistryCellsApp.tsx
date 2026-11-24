@@ -31,13 +31,17 @@ import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import {
   EnterpriseHero,
   EnterpriseShell,
-  EnterpriseTabNav,
 } from '@/components/layout/EnterpriseModuleShell';
+import { cn } from '@/lib/utils';
 import { BranchLeaderSelect } from '@/components/ministry-cells/BranchLeaderSelect';
 import {
   CellBranchDetailPanel,
 } from '@/components/ministry-cells/CellBranchDetailPanel';
-import { CellBranchesList, CollapsibleCellCardsSection } from '@/components/ministry-cells/CellBranchesList';
+import {
+  BranchesSetupEmpty,
+  CellBranchesList,
+  CollapsibleCellCardsSection,
+} from '@/components/ministry-cells/CellBranchesList';
 import { MINISTRY_CELLS_DESKTOP_MQ } from '@/components/ministry-cells/layout';
 import { MinistryCellsAnalyticsPanel } from '@/components/ministry-cells/MinistryCellsAnalyticsPanel';
 import { MinistryCellsKpiStrip } from '@/components/ministry-cells/MinistryCellsKpiStrip';
@@ -72,8 +76,10 @@ export function MinistryCellsApp() {
   const [selectedProvinceId, setSelectedProvinceId] = useState<string | null>(null);
   const [selectedProvinceName, setSelectedProvinceName] = useState<string | null>(null);
   const [branchSearch, setBranchSearch] = useState('');
+  const [directoryScope, setDirectoryScope] = useState<'all' | 'mapped' | 'unmapped'>('all');
   const searchParams = useSearchParams();
   const [showCreateBranch, setShowCreateBranch] = useState(false);
+  const [showCreateProvince, setShowCreateProvince] = useState(false);
   const [createLeaderId, setCreateLeaderId] = useState('');
   const [editBranchOpen, setEditBranchOpen] = useState(false);
   const [editName, setEditName] = useState('');
@@ -190,6 +196,11 @@ export function MinistryCellsApp() {
       openIncidents: number;
       prayerCount: number;
       messageCount: number;
+    }[];
+    attendanceTrend?: {
+      branchId: string;
+      weekStart: string;
+      presentCount: number;
     }[];
   }>(['ministry-cells', 'analytics', analyticsQuery], analyticsQuery, {
     enabled: tab === 'analytics' && !!ctx?.canViewAnalytics,
@@ -382,6 +393,19 @@ export function MinistryCellsApp() {
     [searchFilteredBranches],
   );
 
+  const directoryCells = useMemo(() => {
+    if (selectedProvinceId) return mappedCells;
+    if (directoryScope === 'mapped') return mappedCells;
+    if (directoryScope === 'unmapped') return unmappedCells;
+    return searchFilteredBranches;
+  }, [
+    selectedProvinceId,
+    directoryScope,
+    mappedCells,
+    unmappedCells,
+    searchFilteredBranches,
+  ]);
+
   if (loading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
@@ -395,7 +419,11 @@ export function MinistryCellsApp() {
       <Card className="border-destructive/40 shadow-sm">
         <CardContent className="flex flex-col items-center gap-4 px-4 py-12 text-center">
           <AlertTriangle className="h-10 w-10 text-destructive" />
-          <p className="text-sm text-muted-foreground">{apiError(error)}</p>
+          <p className="text-sm text-muted-foreground">
+            {ctx?.role === 'none' && !error
+              ? 'Ministry/Cells is limited to church Admin, Pastor, Provincial Leader, and assigned cell roles.'
+              : apiError(error)}
+          </p>
           <Button variant="outline" className="h-11" onClick={() => invalidate()}>
             <RefreshCw className="mr-2 h-4 w-4" />
             Retry
@@ -405,21 +433,28 @@ export function MinistryCellsApp() {
     );
   }
 
-  const tabs = [
-    { id: 'branches' as const, label: 'Branches', icon: Network },
-    ...(ctx.role === 'provincialLeader' && ctx.leaderProvinceId
-      ? [{ id: 'province' as const, label: 'Province attendance', icon: BarChart3 }]
-      : []),
-    ...(ctx.canViewAnalytics && ctx.role !== 'provincialLeader'
-      ? [{ id: 'analytics' as const, label: 'Analytics', icon: BarChart3 }]
-      : []),
-  ];
+  const isCellWorkspace = ctx.role === 'cellLeader';
+  const tabs = isCellWorkspace
+    ? []
+    : [
+        { id: 'branches' as const, label: 'All Cells', icon: Network },
+        ...(ctx.canViewAnalytics
+          ? [{ id: 'analytics' as const, label: 'Performance Analytics', icon: BarChart3 }]
+          : []),
+        ...(ctx.role === 'provincialLeader' && ctx.leaderProvinceId
+          ? [{ id: 'province' as const, label: 'Province attendance', icon: BarChart3 }]
+          : []),
+      ];
 
   const showBranchDetail = Boolean(selectedBranchId && branchDetail && detailProps);
   const useDesktopLayout = layoutReady && isDesktopLayout;
-  const showMobileOverlay = showBranchDetail && layoutReady && !isDesktopLayout;
-  const showWorkspace = showBranchDetail && (useDesktopLayout || showMobileOverlay);
-  const showBranchGrid = !showWorkspace || (useDesktopLayout && !showBranchDetail);
+  const showMobileOverlay =
+    showBranchDetail && layoutReady && !isDesktopLayout && !isCellWorkspace;
+  const showWorkspace =
+    Boolean(isCellWorkspace && showBranchDetail) ||
+    (showBranchDetail && (useDesktopLayout || showMobileOverlay));
+  const showBranchGrid =
+    !isCellWorkspace && (!showWorkspace || (useDesktopLayout && !showBranchDetail));
   const branchOptions = branches.map((b) => ({ id: b.id, name: b.name }));
 
   const workspaceProps = detailProps
@@ -427,60 +462,96 @@ export function MinistryCellsApp() {
         ...detailProps,
         branchOptions,
         onSwitchBranch: setSelectedBranchId,
+        ...(isCellWorkspace ? { onClose: undefined as undefined } : {}),
       }
     : null;
 
   return (
-    <div className="space-y-3 sm:space-y-4">
-      <EnterpriseTabNav
-        ariaLabel="Ministry/Cells views"
-        tabs={tabs.map((t) => ({ id: t.id, label: t.label }))}
-        active={tab}
-        onChange={(id) => setTab(id as MinistryCellsTab)}
+    <EnterpriseShell>
+      <EnterpriseHero
+        eyebrow="Ministry"
+        title="Ministry/Cells"
+        description={MODULE_DESCRIPTIONS.ministryCells}
+        badge={
+          isCellWorkspace ? undefined : (
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            <nav
+              className="flex flex-wrap items-center justify-end gap-1.5"
+              aria-label="Ministry/Cells views"
+            >
+              {tabs.map((t) => {
+                const active = tab === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setTab(t.id)}
+                    aria-pressed={active}
+                    className={cn(
+                      'inline-flex min-h-9 items-center rounded-md px-3 text-sm font-medium transition',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50',
+                      active
+                        ? 'bg-white text-slate-900 shadow-sm'
+                        : 'bg-white/10 text-white/85 hover:bg-white/18 hover:text-white',
+                    )}
+                  >
+                    {t.label}
+                  </button>
+                );
+              })}
+            </nav>
+            {ctx.canManage ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                className="h-9 border-0 bg-amber-400/90 text-slate-900 hover:bg-amber-300"
+                disabled={digestBusy}
+                onClick={() => void sendCellDigest()}
+              >
+                {digestBusy ? (
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                ) : (
+                  <Mail className="mr-1.5 h-4 w-4 shrink-0" />
+                )}
+                Push Reports
+              </Button>
+            ) : null}
+          </div>
+          )
+        }
       />
 
+      <div className="w-full space-y-3 px-4 py-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:space-y-4 sm:px-6 sm:py-5 md:px-8">
       {tab === 'branches' && (
-        <div className="space-y-4">
-          {!showWorkspace && (
-            <div className="flex flex-row items-stretch gap-2 sm:gap-3">
-              <MinistryCellsKpiStrip branches={branches} className="min-w-0 flex-1" />
-              {ctx.canManage && (
-                <>
-                  <Button
-                    asChild
-                    size="sm"
-                    variant="outline"
-                    className="h-auto min-h-[3.25rem] shrink-0 self-stretch rounded-xl px-3 text-xs sm:px-4 sm:text-sm"
-                  >
-                    <Link href="/dashboard/ministry-cells/ministers">
-                      <Users className="mr-1.5 h-4 w-4 shrink-0" />
-                      <span className="whitespace-nowrap">Cell Ministers</span>
-                    </Link>
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="h-auto min-h-[3.25rem] shrink-0 self-stretch rounded-xl px-3 text-xs sm:px-4 sm:text-sm"
-                    disabled={digestBusy}
-                    onClick={() => void sendCellDigest()}
-                  >
-                    {digestBusy ? (
-                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Mail className="mr-1.5 h-4 w-4 shrink-0" />
-                    )}
-                    <span className="whitespace-nowrap">Send digest</span>
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="h-auto min-h-[3.25rem] shrink-0 self-stretch rounded-xl px-3 text-xs sm:px-4 sm:text-sm"
-                    onClick={() => setShowCreateBranch(true)}
-                  >
-                    <Plus className="mr-1.5 h-4 w-4 shrink-0 sm:mr-2" />
-                    <span className="whitespace-nowrap">Add New Cell</span>
-                  </Button>
-                </>
-              )}
+        <div className="space-y-5">
+          {!isCellWorkspace && !showWorkspace && (
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <MinistryCellsKpiStrip branches={branches} className="min-w-0" />
+                {ctx.canManage && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button asChild size="sm" variant="outline" className="h-9">
+                      <Link href="/dashboard/ministry-cells/ministers">
+                        <Users className="mr-1.5 h-4 w-4 shrink-0" />
+                        Cell Ministers
+                      </Link>
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-9"
+                      onClick={() => setShowCreateProvince(true)}
+                    >
+                      <Plus className="mr-1.5 h-4 w-4 shrink-0" />
+                      Province
+                    </Button>
+                    <Button size="sm" className="h-9" onClick={() => setShowCreateBranch(true)}>
+                      <Plus className="mr-1.5 h-4 w-4 shrink-0" />
+                      Add New Cell
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -589,85 +660,143 @@ export function MinistryCellsApp() {
             />
           )}
 
-          {showWorkspace && workspaceProps && useDesktopLayout && (
-            <CellBranchDetailPanel {...workspaceProps} onClose={() => setSelectedBranchId(null)} />
+          {isCellWorkspace && workspaceProps ? (
+            <CellBranchDetailPanel {...workspaceProps} />
+          ) : null}
+
+          {!isCellWorkspace && showWorkspace && workspaceProps && useDesktopLayout && (
+            <CellBranchDetailPanel
+              {...workspaceProps}
+              onClose={() => setSelectedBranchId(null)}
+            />
           )}
 
-          {showMobileOverlay && workspaceProps && (
+          {!isCellWorkspace && showMobileOverlay && workspaceProps && (
             <div className="fixed inset-0 z-40 flex flex-col bg-background">
               <div className="flex-1 overflow-y-auto px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))]">
-                <CellBranchDetailPanel {...workspaceProps} onClose={() => setSelectedBranchId(null)} />
+                <CellBranchDetailPanel
+                  {...workspaceProps}
+                  onClose={() => setSelectedBranchId(null)}
+                />
               </div>
             </div>
           )}
 
+          {isCellWorkspace && !workspaceProps ? (
+            <p className="py-8 text-sm text-muted-foreground">
+              Loading your cell workspace…
+            </p>
+          ) : null}
+
           {ctx.canManage && !showWorkspace && (
-            <div className="space-y-6 border-t border-border/60 pt-4">
-              <div>
-                <h3 className="mb-2 text-sm font-semibold">Provinces & provincial leaders</h3>
+            <div className="space-y-4">
+              <div className="flex flex-col gap-3 border-y border-border/60 py-3 lg:flex-row lg:items-center lg:justify-between">
                 <ProvincesSetupPanel
+                  variant="bar"
+                  hideCreateChip
                   onChanged={invalidate}
                   selectedProvinceId={selectedProvinceId}
                   onSelectProvince={(province) => {
                     setSelectedProvinceId(province?.id ?? null);
                     setSelectedProvinceName(province?.name ?? null);
                   }}
+                  createOpen={showCreateProvince}
+                  onCreateOpenChange={setShowCreateProvince}
                 />
-              </div>
-
-              {showBranchGrid ? (
-                <div className="space-y-4">
-                  <div className="relative">
+                <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center lg:justify-end">
+                  {!selectedProvinceId ? (
+                    <div
+                      className="inline-flex h-9 shrink-0 items-center gap-0.5"
+                      role="group"
+                      aria-label="Directory scope"
+                    >
+                      {(
+                        [
+                          ['all', 'All'],
+                          ['mapped', 'Mapped'],
+                          ['unmapped', 'Unmapped'],
+                        ] as const
+                      ).map(([value, label]) => (
+                        <button
+                          key={value}
+                          type="button"
+                          className={
+                            directoryScope === value
+                              ? 'rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white'
+                              : 'rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+                          }
+                          onClick={() => setDirectoryScope(value)}
+                          aria-pressed={directoryScope === value}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Showing {selectedProvinceName ?? 'province'}
+                    </p>
+                  )}
+                  <div className="relative w-full min-w-0 sm:w-56">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                       value={branchSearch}
                       onChange={(e) => setBranchSearch(e.target.value)}
-                      placeholder="Search cell name or postcode…"
-                      className="h-10 rounded-xl border-border/80 bg-background pl-9 shadow-sm"
+                      placeholder="Search name or postcode…"
+                      className="h-9 border-border/70 bg-background pl-9"
                       aria-label="Search cell branches by name or postcode"
                     />
                   </div>
+                </div>
+              </div>
 
+              {showBranchGrid ? (
+                <div className="min-w-0">
                   <CollapsibleCellCardsSection
-                    key={selectedProvinceId ?? 'mapped-all'}
+                    key={selectedProvinceId ?? directoryScope}
                     title={
                       selectedProvinceId
-                        ? `Cells in ${selectedProvinceName ?? 'province'}`
-                        : 'Mapped cells'
+                        ? selectedProvinceName ?? 'Province cells'
+                        : directoryScope === 'mapped'
+                          ? 'Mapped cells'
+                          : directoryScope === 'unmapped'
+                            ? 'Unmapped cells'
+                            : 'Cells'
                     }
-                    description={
-                      selectedProvinceId
-                        ? 'Showing cells mapped to the selected province. Clear the province selection to see all mapped cells.'
-                        : 'Select a province above to focus on its cells. Unmapped cells are listed separately below.'
-                    }
-                    branches={mappedCells}
+                    branches={directoryCells}
                     selectedBranchId={selectedBranchId}
                     onSelectBranch={setSelectedBranchId}
                     emptyMessage={
                       selectedProvinceId
                         ? 'No cells mapped to this province yet.'
-                        : 'No mapped cells yet. Map cells from the Unmapped section below.'
+                        : directoryScope === 'unmapped'
+                          ? 'All cells are mapped to a province.'
+                          : branchSearch.trim()
+                            ? 'No cells match that search.'
+                            : 'No cells yet. Add a new cell to get started.'
                     }
-                    defaultCollapsed
+                    emptyAction={
+                      <BranchesSetupEmpty
+                        filtered={
+                          Boolean(selectedProvinceId) ||
+                          directoryScope !== 'all' ||
+                          Boolean(branchSearch.trim())
+                        }
+                        onAddCell={() => setShowCreateBranch(true)}
+                        onCreateProvince={() => setShowCreateProvince(true)}
+                      />
+                    }
+                    defaultCollapsed={false}
                     showMapControls
                     onMapChanged={invalidate}
+                    compact
                   />
-
-                  {!selectedProvinceId ? (
-                    <CollapsibleCellCardsSection
-                      title="Unmapped cells"
-                      description="Cells not yet assigned to a province. Map them using the control under each card."
-                      branches={unmappedCells}
-                      selectedBranchId={selectedBranchId}
-                      onSelectBranch={setSelectedBranchId}
-                      emptyMessage="All cells are mapped to a province."
-                      defaultCollapsed
-                      showMapControls
-                      onMapChanged={invalidate}
-                    />
-                  ) : null}
                 </div>
-              ) : null}
+              ) : (
+                <p className="py-8 text-sm text-muted-foreground">
+                  Open a cell from the directory to manage it.
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -686,14 +815,13 @@ export function MinistryCellsApp() {
         </div>
       )}
 
-      {tab === 'analytics' && ctx.canViewAnalytics && ctx.role !== 'provincialLeader' && (
+      {tab === 'analytics' && ctx.canViewAnalytics && (
         <MinistryCellsAnalyticsPanel
           branches={branches}
           analyticsFrom={analyticsFrom}
           analyticsTo={analyticsTo}
           filterBranchId={filterBranchId}
           filterLocation={filterLocation}
-          canSendDigest={ctx.canManage}
           onAnalyticsFrom={setAnalyticsFrom}
           onAnalyticsTo={setAnalyticsTo}
           onFilterBranchId={setFilterBranchId}
@@ -702,7 +830,8 @@ export function MinistryCellsApp() {
           loading={analyticsLoading}
         />
       )}
-    </div>
+      </div>
+    </EnterpriseShell>
   );
 }
 
@@ -728,16 +857,5 @@ export function MinistryCellsPageShell() {
     );
   }
 
-  return (
-    <EnterpriseShell>
-      <EnterpriseHero
-        eyebrow="Ministry"
-        title="Ministry/Cells"
-        description={MODULE_DESCRIPTIONS.ministryCells}
-      />
-      <div className="w-full px-4 py-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-5 md:px-8">
-        <MinistryCellsApp />
-      </div>
-    </EnterpriseShell>
-  );
+  return <MinistryCellsApp />;
 }

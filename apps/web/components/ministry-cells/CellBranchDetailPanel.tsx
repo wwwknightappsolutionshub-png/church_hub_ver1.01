@@ -118,9 +118,9 @@ export function CellBranchDetailPanel({
   const canAssignDeputies =
     !!ctx.canAssignDeputies &&
     (ctx.canManage ||
-      (!ctx.isDeputy &&
-        ctx.role === 'cellLeader' &&
-        ctx.leaderBranchId === selectedBranchId));
+      (ctx.role === 'cellLeader' &&
+        (ctx.leaderBranchId === selectedBranchId ||
+          (ctx.deputyBranchIds ?? []).includes(selectedBranchId))));
 
   const sections: { id: WorkspaceSection; label: string }[] = [
     { id: 'overview', label: 'Overview' },
@@ -332,38 +332,45 @@ export function CellBranchDetailPanel({
       </div>
 
       <div className={cn(section !== 'weekly' && 'hidden')} aria-hidden={section !== 'weekly'}>
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Weekly reporting</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <BranchWeeklyAttendancePanel
-              branchId={selectedBranchId}
-              canManage={ctx.canManage || ctx.role === 'cellLeader'}
-              onChanged={onChanged}
-            />
-            {forms.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
-                <select
-                  className="h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm sm:max-w-xs"
-                  value={reportFormId}
-                  onChange={(e) => onReportFormId(e.target.value)}
-                  aria-label="Report form"
-                >
-                  <option value="">Select report form</option>
-                  {forms.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.name}
-                    </option>
-                  ))}
-                </select>
-                <Button type="button" className="h-10" onClick={onSubmitReport} disabled={!reportFormId}>
-                  Send report
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          <BranchWeeklyAttendancePanel
+            branchId={selectedBranchId}
+            canManage={ctx.canManage || ctx.role === 'cellLeader'}
+            onChanged={onChanged}
+          />
+          {forms.length > 0 && (
+            <Card className="shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">Extra report form</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    className="h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm sm:max-w-xs"
+                    value={reportFormId}
+                    onChange={(e) => onReportFormId(e.target.value)}
+                    aria-label="Report form"
+                  >
+                    <option value="">Select report form</option>
+                    {forms.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    type="button"
+                    className="h-10"
+                    onClick={onSubmitReport}
+                    disabled={!reportFormId}
+                  >
+                    Send report
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
 
       <div className={cn(section !== 'connect' && 'hidden')} aria-hidden={section !== 'connect'}>

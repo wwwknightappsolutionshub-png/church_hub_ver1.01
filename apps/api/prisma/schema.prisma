@@ -105,6 +105,7 @@ model Church {
   familyPropertyDefinitions  FamilyPropertyDefinition[]
   memberActivityLogs       MemberActivityLog[]
   securityAuditLogs        SecurityAuditLog[]
+  memberFieldAccessPolicies MemberFieldAccessPolicy[]
   classEnrollments         ClassEnrollment[]
   attendanceRecords        AttendanceRecord[]
   followUpAutomationRules  FollowUpAutomationRule[]
@@ -288,6 +289,46 @@ model SecurityAuditLog {
   @@map("security_audit_logs")
 }
 
+enum MemberFieldPolicyScope {
+  PLATFORM_GLOBAL
+  PLATFORM_TENANT
+  CHURCH
+}
+
+enum MemberFieldVisibility {
+  VISIBLE
+  RESTRICTED
+  HIDDEN
+}
+
+enum MemberFieldEditability {
+  EDITABLE
+  READ_ONLY
+  LOCKED
+}
+
+/// Configurable member/family field access. Hardcoded privacy floor always wins when stricter.
+model MemberFieldAccessPolicy {
+  id          String                  @id @default(uuid())
+  /// Unique key: scope:tenantKey:fieldKey (tenantKey=global|churchId)
+  policyKey   String                  @unique
+  scope       MemberFieldPolicyScope
+  churchId    String?
+  fieldKey    String
+  visibility  MemberFieldVisibility   @default(VISIBLE)
+  editability MemberFieldEditability  @default(EDITABLE)
+  updatedById String?
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  church    Church? @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  updatedBy User?   @relation("MemberFieldPolicyUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([scope, churchId])
+  @@index([churchId, fieldKey])
+  @@map("member_field_access_policies")
+}
+
 enum ClassEnrollmentStatus {
   ENROLLED
   IN_PROGRESS
@@ -402,6 +443,7 @@ model User {
   communityHubComments     CommunityHubComment[]
   memberActivitiesAuthored MemberActivityLog[] @relation("MemberActivityActor")
   securityAuditsAuthored   SecurityAuditLog[]  @relation("SecurityAuditActor")
+  memberFieldPoliciesUpdated MemberFieldAccessPolicy[] @relation("MemberFieldPolicyUpdater")
   attendanceRecorded       AttendanceRecord[]  @relation("AttendanceRecordedBy")
   membershipImportsUploaded MembershipImportJob[] @relation("MembershipImportUploader")
   outreachImportsUploaded   OutreachImportJob[]    @relation("OutreachImportUploader")

@@ -25,14 +25,33 @@ export class MembershipActivityService {
     });
   }
 
-  async listForMember(churchId: string, memberId: string, limit = 50) {
-    return this.prisma.memberActivityLog.findMany({
+  async listForMember(
+    churchId: string,
+    memberId: string,
+    limit = 50,
+    opts?: { includeActorEmail?: boolean },
+  ) {
+    const rows = await this.prisma.memberActivityLog.findMany({
       where: { churchId, memberId },
       orderBy: { createdAt: 'desc' },
       take: limit,
       include: {
-        actor: { select: { id: true, firstName: true, lastName: true, email: true } },
+        actor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            ...(opts?.includeActorEmail ? { email: true } : {}),
+          },
+        },
       },
     });
+    if (opts?.includeActorEmail) return rows;
+    return rows.map((r) => ({
+      ...r,
+      actor: r.actor
+        ? { id: r.actor.id, firstName: r.actor.firstName, lastName: r.actor.lastName }
+        : null,
+    }));
   }
 }

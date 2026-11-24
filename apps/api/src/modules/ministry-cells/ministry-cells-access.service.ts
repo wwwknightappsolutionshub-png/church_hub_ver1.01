@@ -142,8 +142,15 @@ export class MinistryCellsAccessService {
   async assertCanAccess(user: AuthUser, churchId: string) {
     await this.assertModuleEnabled(churchId);
     const ctx = await this.resolveRole(user, churchId);
-    if (ctx.role === 'none') {
-      throw new ForbiddenException('You do not have access to Ministry/Cells');
+    if (
+      ctx.role !== 'admin' &&
+      ctx.role !== 'pastor' &&
+      ctx.role !== 'provincialLeader' &&
+      ctx.role !== 'cellLeader'
+    ) {
+      throw new ForbiddenException(
+        'Ministry/Cells access requires church leadership or an assigned cell role',
+      );
     }
     return ctx;
   }
@@ -187,8 +194,8 @@ export class MinistryCellsAccessService {
   }
 
   /**
-   * Assign Assistant/Secretary: church staff, or the primary (non-deputy) leader of the scope.
-   * Deputies cannot assign other deputies or change primary leaders.
+   * Assign Assistant/Secretary on a branch: church staff, primary cell minister,
+   * or that branch’s Assistant/Secretary. Province assign remains primary leader / staff only.
    */
   async assertCanAssignDeputies(
     user: AuthUser,
@@ -197,11 +204,6 @@ export class MinistryCellsAccessService {
   ) {
     const ctx = await this.assertCanAccess(user, churchId);
     if (ctx.role === 'admin' || ctx.role === 'pastor') return ctx;
-    if (ctx.isDeputy) {
-      throw new ForbiddenException(
-        'Assistants and Secretaries cannot assign leadership roles',
-      );
-    }
     if (scope.branchId) {
       const branch = await this.prisma.cellBranch.findFirst({
         where: { id: scope.branchId, churchId },
@@ -209,11 +211,17 @@ export class MinistryCellsAccessService {
       });
       if (!branch) throw new NotFoundException('Branch not found');
       if (branch.leaderUserId === user.userId) return ctx;
+      if (ctx.deputyBranchIds.includes(scope.branchId)) return ctx;
       throw new ForbiddenException(
-        'Only the cell leader or church staff can assign Assistant or Secretary',
+        'Only the cell minister, Assistant, Secretary, or church staff can assign Assistant or Secretary',
       );
     }
     if (scope.provinceId) {
+      if (ctx.isDeputy) {
+        throw new ForbiddenException(
+          'Province Assistants and Secretaries cannot assign leadership roles',
+        );
+      }
       const province = await this.prisma.cellProvince.findFirst({
         where: { id: scope.provinceId, churchId },
         select: { leaderUserId: true },

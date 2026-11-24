@@ -391,7 +391,10 @@ export class ModuleAccessService {
     return ctx.userRoles.includes('PASTOR');
   }
 
-  /** Church admin, pastor, assigned provincial/cell leader, or WSF Assistant/Secretary. */
+  /**
+   * Ministry/Cells: church staff, provincial leaders (incl. province deputies),
+   * and cell branch ministers / Assistants / Secretaries.
+   */
   async canAccessMinistryCells(ctx: UserMemberContext): Promise<boolean> {
     if (this.isChurchStaff(ctx)) return true;
     if (ctx.userRoles.includes('PROVINCIAL_LEADER')) {
@@ -401,16 +404,30 @@ export class ModuleAccessService {
       });
       if (province) return true;
     }
-    const branch = await this.prisma.cellBranch.findFirst({
+    const provinceDeputy = await this.prisma.cellLeadershipDeputy.findFirst({
+      where: { churchId: ctx.churchId, userId: ctx.userId, scope: 'PROVINCE' },
+      select: { id: true },
+    });
+    if (provinceDeputy) return true;
+    return this.isCellBranchWorkspaceUser(ctx);
+  }
+
+  /**
+   * Cell Minister / Assistant / Secretary only (not Admin/Pastor).
+   * Used for post-login landing on the branch workspace.
+   */
+  async isCellBranchWorkspaceUser(ctx: UserMemberContext): Promise<boolean> {
+    if (this.isChurchStaff(ctx)) return false;
+    const branchLeader = await this.prisma.cellBranch.findFirst({
       where: { churchId: ctx.churchId, leaderUserId: ctx.userId },
       select: { id: true },
     });
-    if (branch) return true;
-    const deputy = await this.prisma.cellLeadershipDeputy.findFirst({
-      where: { churchId: ctx.churchId, userId: ctx.userId },
+    if (branchLeader) return true;
+    const branchDeputy = await this.prisma.cellLeadershipDeputy.findFirst({
+      where: { churchId: ctx.churchId, userId: ctx.userId, scope: 'BRANCH' },
       select: { id: true },
     });
-    return !!deputy;
+    return !!branchDeputy;
   }
 
   private async userRoleNames(userId: string): Promise<string[]> {
@@ -481,6 +498,7 @@ export class ModuleAccessService {
       canManageCommunications: false,
       canAccessSermonNote: false,
       canAccessMinistryCells: false,
+      isCellBranchWorkspaceUser: false,
       unitMembershipIds: [] as string[],
       unitAdminUnitIds: [] as string[],
       unitDeputyUnitIds: [] as string[],
@@ -518,6 +536,7 @@ export class ModuleAccessService {
         canManageCommunications: false,
         canAccessSermonNote: false,
         canAccessMinistryCells: false,
+        isCellBranchWorkspaceUser: false,
         unitMembershipIds: [] as string[],
         unitAdminUnitIds: [] as string[],
         unitDeputyUnitIds: [] as string[],
@@ -545,6 +564,7 @@ export class ModuleAccessService {
         canManageCommunications: false,
         canAccessSermonNote: false,
         canAccessMinistryCells: false,
+        isCellBranchWorkspaceUser: false,
         unitMembershipIds: [] as string[],
         unitAdminUnitIds: [] as string[],
         unitDeputyUnitIds: [] as string[],
@@ -553,6 +573,7 @@ export class ModuleAccessService {
     }
 
     const establishmentAccess = await this.resolveEstablishmentAccess(ctx);
+    const isCellBranchWorkspaceUser = await this.isCellBranchWorkspaceUser(ctx);
 
     return {
       isPlatformAdmin: false,
@@ -572,6 +593,7 @@ export class ModuleAccessService {
       canAccessDepartmentTools: this.canAccessDepartmentTools(ctx),
       canAccessSermonNote: await this.canAccessSermonNote(ctx),
       canAccessMinistryCells: await this.canAccessMinistryCells(ctx),
+      isCellBranchWorkspaceUser,
       unitMembershipIds: ctx.unitMembershipIds,
       unitAdminUnitIds: ctx.unitAdminUnitIds,
       unitDeputyUnitIds: ctx.unitDeputyUnitIds,

@@ -32,6 +32,16 @@ import { MinistryCellsService } from './ministry-cells.service';
 import { ChurchId, CurrentUser, AuthUser } from '../auth/current-user.decorator';
 import { Roles } from '../auth/decorators';
 import { AssignCellDeputyDto } from './dto/cell-deputy.dto';
+import {
+  EmailAnalyticsReportSchema,
+  type EmailAnalyticsReportInput,
+} from './dto/email-analytics-report.dto';
+import {
+  RecordCellAttendanceSchema,
+  UpdateCellAttendanceSchema,
+  type RecordCellAttendanceInput,
+  type UpdateCellAttendanceInput,
+} from './dto/cell-attendance.dto';
 
 @ApiTags('ministry-cells')
 @ApiBearerAuth()
@@ -400,21 +410,7 @@ export class MinistryCellsController {
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
-    @Body()
-    body: {
-      weekStart?: string;
-      meetingDate?: string;
-      presentCount?: number;
-      absentCount?: number;
-      maleCount?: number;
-      femaleCount?: number;
-      boysCount?: number;
-      girlsCount?: number;
-      testifiersCount?: number;
-      firstTimersCount?: number;
-      notes?: string;
-      meetingId?: string;
-    },
+    @ZodBody(RecordCellAttendanceSchema) body: RecordCellAttendanceInput,
   ) {
     return this.service.recordAttendance(user, churchId, id, body);
   }
@@ -434,20 +430,7 @@ export class MinistryCellsController {
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Param('attendanceId') attendanceId: string,
-    @Body()
-    body: {
-      weekStart?: string;
-      meetingDate?: string;
-      presentCount?: number;
-      absentCount?: number;
-      maleCount?: number;
-      femaleCount?: number;
-      boysCount?: number;
-      girlsCount?: number;
-      testifiersCount?: number;
-      firstTimersCount?: number;
-      notes?: string;
-    },
+    @ZodBody(UpdateCellAttendanceSchema) body: UpdateCellAttendanceInput,
   ) {
     return this.service.updateAttendance(user, churchId, id, attendanceId, body);
   }
@@ -584,8 +567,9 @@ export class MinistryCellsController {
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
     @Query('branchId') branchId?: string,
+    @Query('search') search?: string,
   ) {
-    return this.service.listAvailableMembers(user, churchId, branchId);
+    return this.service.listAvailableMembers(user, churchId, branchId, search);
   }
 
   @Get('analytics')
@@ -605,6 +589,25 @@ export class MinistryCellsController {
       location,
       from,
       to,
+    });
+  }
+
+  @Post('analytics/email-report')
+  @Roles('ADMIN', 'PASTOR', 'PROVINCIAL_LEADER')
+  @ApiOperation({
+    summary:
+      'Email a filtered Ministry/Cells analytics report to Admin/Pastor (and the requester)',
+  })
+  emailAnalyticsReport(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @ZodBody(EmailAnalyticsReportSchema) body: EmailAnalyticsReportInput,
+  ) {
+    return this.service.emailAnalyticsReport(user, churchId, {
+      from: body.from,
+      to: body.to,
+      branchId: body.branchId,
+      location: body.location,
     });
   }
 }

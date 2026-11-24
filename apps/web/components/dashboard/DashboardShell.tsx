@@ -124,6 +124,7 @@ function DesktopSidebar({
     canAccessMyProfile,
     canAccessSermonNote,
     canAccessMinistryCells,
+    isCellBranchWorkspaceUser,
     canManageStaff,
     userRoles,
     isPlatformOperator,
@@ -250,6 +251,7 @@ function DesktopSidebar({
           unitDeputyUnitIds,
           canAccessFollowUp,
           establishmentMode: establishmentAccess.mode,
+          isCellBranchWorkspaceUser,
         });
 
   const collapsed = !expanded;
@@ -448,6 +450,7 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
     canAccessMyProfile,
     canAccessSermonNote,
     canAccessMinistryCells,
+    isCellBranchWorkspaceUser,
     canManageStaff,
     userRoles,
     isPlatformOperator,
@@ -567,6 +570,7 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
           unitDeputyUnitIds,
           canAccessFollowUp,
           establishmentMode: establishmentAccess.mode,
+          isCellBranchWorkspaceUser,
         });
 
   useEffect(() => {

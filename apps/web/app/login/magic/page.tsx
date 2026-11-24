@@ -48,6 +48,7 @@ export default function MagicLoginPage() {
         unitDeputyUnitIds?: string[];
         canAccessFollowUp?: boolean;
         establishmentAccess?: { mode?: string | null } | null;
+        isCellBranchWorkspaceUser?: boolean;
         mustChangePassword?: boolean;
       }>('/auth/me');
       if (data.mustChangePassword) {

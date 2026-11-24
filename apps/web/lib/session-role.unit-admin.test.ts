@@ -50,6 +50,18 @@ describe('unit admin login routing', () => {
     expect(postLoginPath('church_admin', { unitAdminUnitIds: ['x'] })).toBe('/dashboard');
   });
 
+  it('lands cell minister / assistant / secretary on ministry-cells workspace', () => {
+    expect(
+      postLoginPath('member', { isCellBranchWorkspaceUser: true }),
+    ).toBe('/dashboard/ministry-cells');
+    expect(
+      memberHomePath({
+        isCellBranchWorkspaceUser: true,
+        unitAdminUnitIds: ['harvesters'],
+      }),
+    ).toBe('/dashboard/ministry-cells');
+  });
+
   it('lands a deputy-only assistant on their unit detail', () => {
     expect(unitAdminHomePath([], ['unit-media'])).toBe('/dashboard/service-units/unit-media');
     expect(

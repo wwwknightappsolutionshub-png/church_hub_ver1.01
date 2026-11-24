@@ -41,6 +41,7 @@ import {
   requireCellPostcode,
 } from './cell-province.util';
 import type { AssignCellDeputyDto } from './dto/cell-deputy.dto';
+import { MemberPrivacyService } from '../member-privacy/member-privacy.service';
 
 const branchInclude = {
   leader: { select: { id: true, firstName: true, lastName: true, email: true } },
@@ -87,12 +88,29 @@ export class MinistryCellsService {
     private readonly commQueue: CommunicationsQueueService,
     private readonly email: EmailAdapter,
     private readonly sms: SmsAdapter,
+    private readonly memberPrivacy: MemberPrivacyService,
   ) {}
 
   async getContext(user: AuthUser, churchId: string) {
     await this.access.assertModuleEnabled(churchId);
     const ctx = await this.access.resolveRole(user, churchId);
+    if (ctx.role === 'none') {
+      return {
+        role: 'none' as const,
+        leaderBranchId: null,
+        leaderProvinceId: null,
+        isDeputy: false,
+        deputyRole: null,
+        deputyBranchIds: [] as string[],
+        deputyProvinceIds: [] as string[],
+        canManage: false,
+        canAssignDeputies: false,
+        canViewAnalytics: false,
+      };
+    }
     const canManage = ctx.role === 'admin' || ctx.role === 'pastor';
+    const isHubLeader =
+      ctx.role === 'admin' || ctx.role === 'pastor' || ctx.role === 'provincialLeader';
     return {
       role: ctx.role,
       leaderBranchId: ctx.leaderBranchId,
@@ -102,10 +120,13 @@ export class MinistryCellsService {
       deputyBranchIds: ctx.deputyBranchIds,
       deputyProvinceIds: ctx.deputyProvinceIds,
       canManage,
-      /** Primary leaders (not deputies) or church staff can assign Assistant/Secretary. */
-      canAssignDeputies: canManage || (!ctx.isDeputy && (ctx.role === 'cellLeader' || ctx.role === 'provincialLeader')),
-      canViewAnalytics:
-        ctx.role === 'admin' || ctx.role === 'pastor' || ctx.role === 'provincialLeader',
+      /** Branch cell roles (minister / assistant / secretary) and hub staff/province primary. */
+      canAssignDeputies:
+        canManage ||
+        ctx.role === 'cellLeader' ||
+        (!ctx.isDeputy && ctx.role === 'provincialLeader'),
+      /** Hub analytics only — cell workspace users stay on their branch. */
+      canViewAnalytics: isHubLeader,
     };
   }
 
@@ -152,9 +173,18 @@ export class MinistryCellsService {
       churchId,
       branches.map((b) => b.id),
     );
-    return branches.map((b) =>
-      this.mapBranchListRow(b, latestByBranch.get(b.id) ?? null),
-    );
+    const viewer = await this.memberPrivacy.resolveViewerFromDb(user, churchId);
+    const rows = [];
+    for (const b of branches) {
+      const mapped = this.mapBranchListRow(b, latestByBranch.get(b.id) ?? null);
+      const members = await this.memberPrivacy.projectMemberList(
+        churchId,
+        viewer,
+        mapped.members as unknown as Record<string, unknown>[],
+      );
+      rows.push({ ...mapped, members });
+    }
+    return rows;
   }
 
   /**
@@ -428,23 +458,36 @@ export class MinistryCellsService {
           }
         : null,
       deputies: await this.listDeputiesForScope(churchId, { branchId }),
-      members: branch.members.map((m) => ({
-        id: m.member.id,
-        firstName: m.member.firstName,
-        lastName: m.member.lastName,
-        email: m.member.email,
-        phone: m.member.phone,
-        status: m.member.status,
-        family: m.member.family
-          ? { id: m.member.family.id, name: m.member.family.name }
-          : null,
-        joinedAt: m.joinedAt,
-      })),
+      members: await this.projectBranchMembers(
+        user,
+        churchId,
+        branch.members.map((m) => ({
+          id: m.member.id,
+          firstName: m.member.firstName,
+          lastName: m.member.lastName,
+          email: m.member.email,
+          phone: m.member.phone,
+          status: m.member.status,
+          family: m.member.family
+            ? { id: m.member.family.id, name: m.member.family.name }
+            : null,
+          joinedAt: m.joinedAt,
+        })),
+      ),
       memberCount: branch.members.length,
       latestAttendance,
       openIncidents,
       openPrayers,
     };
+  }
+
+  private async projectBranchMembers(
+    user: AuthUser,
+    churchId: string,
+    members: Record<string, unknown>[],
+  ) {
+    const viewer = await this.memberPrivacy.resolveViewerFromDb(user, churchId);
+    return this.memberPrivacy.projectMemberList(churchId, viewer, members);
   }
 
   async listBranchDeputies(user: AuthUser, churchId: string, branchId: string) {
@@ -768,18 +811,20 @@ export class MinistryCellsService {
   ) {
     await this.access.assertBranchAccess(user, churchId, branchId);
     await this.getBranchOrThrow(churchId, branchId);
-    const firstName = String(data.firstName ?? '').trim();
-    const lastName = String(data.lastName ?? '').trim();
+    const viewer = await this.memberPrivacy.resolveViewerFromDb(user, churchId);
+    const sanitized = this.memberPrivacy.sanitizeOpsMemberWritePayload(viewer, data);
+    const firstName = String(sanitized.firstName ?? '').trim();
+    const lastName = String(sanitized.lastName ?? '').trim();
     if (!firstName || !lastName) {
       throw new BadRequestException('First name and last name are required');
     }
     const created = await this.membership.createMember(churchId, {
-      ...(data as Parameters<MembershipService['createMember']>[1]),
+      ...(sanitized as Parameters<MembershipService['createMember']>[1]),
       firstName,
       lastName,
       cellBranchId: branchId,
-      startOnboarding: data.startOnboarding === true,
-      requireContactFields: data.requireContactFields !== false,
+      startOnboarding: sanitized.startOnboarding === true,
+      requireContactFields: sanitized.requireContactFields !== false,
     });
     const row = await this.prisma.cellBranchMember.findUnique({
       where: { churchId_memberId: { churchId, memberId: created.id } },
@@ -787,7 +832,11 @@ export class MinistryCellsService {
     if (!row) {
       await this.addMember(user, churchId, branchId, created.id);
     }
-    return created;
+    return this.memberPrivacy.projectMember(
+      churchId,
+      viewer,
+      created as unknown as Record<string, unknown>,
+    );
   }
 
   async getRegistryCatalog(user: AuthUser, churchId: string) {
@@ -993,11 +1042,21 @@ export class MinistryCellsService {
   }
 
   private nonNegInt(value: unknown, field: string): number {
-    const n = Number(value ?? 0);
-    if (!Number.isFinite(n) || n < 0) {
-      throw new BadRequestException(`${field} must be a non-negative number`);
+    if (value === null || value === undefined || value === '') return 0;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!/^\d+$/.test(trimmed)) {
+        throw new BadRequestException(`${field} must be a whole number`);
+      }
+      return Number(trimmed);
     }
-    return Math.floor(n);
+    if (typeof value === 'number') {
+      if (!Number.isInteger(value) || value < 0) {
+        throw new BadRequestException(`${field} must be a non-negative whole number`);
+      }
+      return value;
+    }
+    throw new BadRequestException(`${field} must be a whole number`);
   }
 
   private startOfWeek(date: Date): Date {
@@ -1069,9 +1128,7 @@ export class MinistryCellsService {
         meetingDate,
         presentCount,
         absentCount:
-          body.absentCount != null && Number.isFinite(body.absentCount)
-            ? Math.floor(body.absentCount)
-            : null,
+          body.absentCount != null ? this.nonNegInt(body.absentCount, 'absentCount') : null,
         maleCount,
         femaleCount,
         boysCount,
@@ -1945,17 +2002,192 @@ export class MinistryCellsService {
     };
   }
 
-  async listAvailableMembers(user: AuthUser, churchId: string, branchId?: string) {
+  /**
+   * Email a filtered analytics report (branch comparison + totals) to
+   * one Admin + one Pastor, and the requesting user when not already included.
+   */
+  async emailAnalyticsReport(
+    user: AuthUser,
+    churchId: string,
+    filters: {
+      branchId?: string;
+      location?: string;
+      from?: string;
+      to?: string;
+    },
+  ) {
+    const data = await this.getAnalytics(user, churchId, filters);
+    const church = await this.prisma.church.findFirst({
+      where: { id: churchId },
+      select: { name: true },
+    });
+    const churchName = church?.name ?? 'Church';
+    const fromLabel =
+      data.from instanceof Date
+        ? data.from.toISOString().slice(0, 10)
+        : String(filters.from ?? '');
+    const toLabel =
+      data.to instanceof Date
+        ? data.to.toISOString().slice(0, 10)
+        : String(filters.to ?? '');
+    const rangeLabel = `${fromLabel} → ${toLabel}`;
+    const subject = `${churchName} — Ministry/Cells analytics (${rangeLabel})`;
+
+    const branchFilterLabel = filters.branchId
+      ? data.branchMetrics.find((m) => m.branchId === filters.branchId)?.name ??
+        'Selected branch'
+      : 'All branches';
+    const locationFilterLabel = filters.location?.trim() || 'All locations';
+    const filterBits = `Branch: ${branchFilterLabel} · Location: ${locationFilterLabel}`;
+
+    const totalsLine = Object.entries(data.totals)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(' · ');
+
+    const tableRows = data.branchMetrics
+      .map(
+        (m) =>
+          `<tr>
+            <td style="padding:8px;border:1px solid #ddd">${escapeHtml(m.name)}</td>
+            <td style="padding:8px;border:1px solid #ddd">${escapeHtml(m.leader ?? '—')}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right">${m.memberCount}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right">${m.avgAttendance}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right">${m.reportCompliance}%</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right">${m.incidentCount}</td>
+            <td style="padding:8px;border:1px solid #ddd;text-align:right">${m.prayerCount}</td>
+            <td style="padding:8px;border:1px solid #ddd">${escapeHtml(m.location ?? '—')}</td>
+          </tr>`,
+      )
+      .join('');
+
+    const html = `
+      <p>Ministry/Cells analytics for <strong>${escapeHtml(churchName)}</strong>.</p>
+      <p style="color:#555;font-size:13px">Range: ${escapeHtml(rangeLabel)}<br/>${escapeHtml(filterBits)}<br/>${escapeHtml(totalsLine)}</p>
+      <table style="border-collapse:collapse;width:100%;font-family:sans-serif;font-size:13px">
+        <thead>
+          <tr style="background:#f5f5f5">
+            <th style="padding:8px;border:1px solid #ddd;text-align:left">Branch</th>
+            <th style="padding:8px;border:1px solid #ddd;text-align:left">Leader</th>
+            <th style="padding:8px;border:1px solid #ddd;text-align:right">Members</th>
+            <th style="padding:8px;border:1px solid #ddd;text-align:right">Avg att.</th>
+            <th style="padding:8px;border:1px solid #ddd;text-align:right">Compliance</th>
+            <th style="padding:8px;border:1px solid #ddd;text-align:right">Incidents</th>
+            <th style="padding:8px;border:1px solid #ddd;text-align:right">Prayers</th>
+            <th style="padding:8px;border:1px solid #ddd;text-align:left">Location</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${
+            tableRows ||
+            `<tr><td colspan="8" style="padding:8px;border:1px solid #ddd">No branches in this filter</td></tr>`
+          }
+        </tbody>
+      </table>
+      <p style="color:#666;font-size:12px;margin-top:16px">Generated from Church Hub Ministry/Cells Analytics.</p>
+    `;
+
+    const text = [
+      `Ministry/Cells analytics for ${churchName}`,
+      `Range: ${rangeLabel}`,
+      filterBits,
+      totalsLine,
+      '',
+      'Branch | Leader | Members | Avg att. | Compliance | Incidents | Prayers | Location',
+      ...data.branchMetrics.map(
+        (m) =>
+          `${m.name} | ${m.leader ?? '—'} | ${m.memberCount} | ${m.avgAttendance} | ${m.reportCompliance}% | ${m.incidentCount} | ${m.prayerCount} | ${m.location ?? '—'}`,
+      ),
+    ].join('\n');
+
+    type AnalyticsRecipient = {
+      id: string;
+      email: string;
+      phone?: string | null;
+      role: 'ADMIN' | 'PASTOR' | 'REQUESTER';
+    };
+    const leadership = await findOneAdminAndOnePastor(this.prisma, churchId);
+    const recipients: AnalyticsRecipient[] = [...leadership];
+    const already = new Set(recipients.map((r) => r.email.toLowerCase()));
+    const me = await this.prisma.user.findFirst({
+      where: { id: user.userId, churchId, isActive: true },
+      select: { id: true, email: true, phone: true },
+    });
+    if (me?.email && !already.has(me.email.toLowerCase())) {
+      recipients.push({
+        id: me.id,
+        email: me.email,
+        phone: me.phone,
+        role: 'REQUESTER',
+      });
+    }
+
+    let emailed = 0;
+    for (const recipient of recipients) {
+      await this.email.send({
+        to: recipient.email,
+        subject,
+        body: text,
+        html,
+        churchId,
+        purpose: 'reports',
+      });
+      await this.prisma.notification.create({
+        data: {
+          churchId,
+          userId: recipient.id,
+          title: subject,
+          body: text.slice(0, 2000),
+          type: 'DEPARTMENT_WEEKLY_REPORT',
+          data: {
+            analyticsReport: true,
+            from: fromLabel,
+            to: toLabel,
+            role: recipient.role,
+          } as Prisma.InputJsonValue,
+        },
+      });
+      emailed++;
+    }
+
+    return {
+      rangeLabel,
+      branches: data.branchMetrics.length,
+      recipients: recipients.map((r) => ({ role: r.role, email: r.email })),
+      emailed,
+    };
+  }
+
+  async listAvailableMembers(
+    user: AuthUser,
+    churchId: string,
+    branchId?: string,
+    search?: string,
+  ) {
     await this.access.assertCanAccess(user, churchId);
+    const viewer = await this.memberPrivacy.resolveViewerFromDb(user, churchId);
     const assignedElsewhere = await this.prisma.cellBranchMember.findMany({
       where: branchId ? { churchId, NOT: { branchId } } : { churchId },
       select: { memberId: true },
     });
     const excludeIds = assignedElsewhere.map((a) => a.memberId);
-    return this.prisma.member.findMany({
+    const q = search?.trim();
+    // Ops roles: name-only search (never email). Leadership may still search name.
+    const nameFilter = q
+      ? {
+          OR: [
+            { firstName: { contains: q, mode: 'insensitive' as const } },
+            { lastName: { contains: q, mode: 'insensitive' as const } },
+            ...(viewer.isLeadership
+              ? [{ email: { contains: q, mode: 'insensitive' as const } }]
+              : []),
+          ],
+        }
+      : {};
+    const rows = await this.prisma.member.findMany({
       where: {
         churchId,
         ...(excludeIds.length > 0 ? { id: { notIn: excludeIds } } : {}),
+        ...nameFilter,
       },
       select: {
         id: true,
@@ -1968,6 +2200,11 @@ export class MinistryCellsService {
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
       take: 500,
     });
+    return this.memberPrivacy.projectMemberList(
+      churchId,
+      viewer,
+      rows as unknown as Record<string, unknown>[],
+    );
   }
 
   async listLeaderCandidates(user: AuthUser, churchId: string) {

@@ -12,6 +12,8 @@ import {
 } from './membership.constants';
 import { SecurityAuditService } from '../../common/security/security-audit.service';
 import { runWithTenantContextAsync } from '../../prisma/tenant-context';
+import { MemberPrivacyService } from '../member-privacy/member-privacy.service';
+import type { AuthUser } from '../auth/current-user.decorator';
 import { MembershipActivityService } from './membership-activity.service';
 import { MembershipRegistryService } from './membership-registry.service';
 
@@ -45,6 +47,7 @@ export class MembershipService {
     private readonly activity: MembershipActivityService,
     private readonly registry: MembershipRegistryService,
     private readonly securityAudit: SecurityAuditService,
+    private readonly memberPrivacy: MemberPrivacyService,
   ) {}
 
   getCatalog() {
@@ -609,6 +612,16 @@ export class MembershipService {
     });
     if (!family) throw new NotFoundException('Family not found');
     return family;
+  }
+
+  async getFamilyForViewer(churchId: string, familyId: string, viewerUser: AuthUser) {
+    const family = await this.getFamily(churchId, familyId);
+    const viewer = await this.memberPrivacy.resolveViewerFromDb(viewerUser, churchId);
+    return this.memberPrivacy.projectFamily(
+      churchId,
+      viewer,
+      family as unknown as Record<string, unknown>,
+    );
   }
 
   async updateFamily(

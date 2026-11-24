@@ -4,10 +4,11 @@ import { MinistryCellsService } from './ministry-cells.service';
 import { MinistryCellsAccessService } from './ministry-cells-access.service';
 import { MinistryCellsDigestScheduler } from './ministry-cells-digest.scheduler';
 import { MembershipModule } from '../membership/membership.module';
+import { MemberPrivacyModule } from '../member-privacy/member-privacy.module';
 import { CommunicationsModule } from '../communications/communications.module';
 
 @Module({
-  imports: [MembershipModule, CommunicationsModule],
+  imports: [MembershipModule, MemberPrivacyModule, CommunicationsModule],
   controllers: [MinistryCellsController],
   providers: [
     MinistryCellsService,

@@ -230,8 +230,10 @@ export class FollowUpController {
   }
 
   @Post('export-check')
+  @Roles('PASTOR')
   @ApiOperation({
-    summary: 'Authorize Establishment directory PDF export (managers only)',
+    summary:
+      'Authorize Establishment directory PDF export (Church Pastor only — bulk unmasked PII)',
   })
   async exportCheck(@ChurchId() churchId: string, @CurrentUser() user: AuthUser) {
     const access = await this.followUpService.getAccess(churchId, user.userId);
@@ -251,7 +253,8 @@ export class FollowUpController {
   }
 
   @Post('pastoral-notes')
-  @Roles('ADMIN', 'PASTOR')
+  @Roles('PASTOR')
+  @ApiOperation({ summary: 'Add pastoral note (Church Pastor only)' })
   addNote(
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
@@ -268,7 +271,8 @@ export class FollowUpController {
   }
 
   @Get('pastoral-notes')
-  @Roles('ADMIN', 'PASTOR')
+  @Roles('PASTOR')
+  @ApiOperation({ summary: 'List pastoral notes (Church Pastor only)' })
   getNotes(
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
@@ -279,15 +283,15 @@ export class FollowUpController {
   }
 
   @Get('pastoral-notes/trash')
-  @Roles('ADMIN', 'PASTOR')
-  @ApiOperation({ summary: 'List soft-deleted pastoral notes' })
+  @Roles('PASTOR')
+  @ApiOperation({ summary: 'List soft-deleted pastoral notes (Church Pastor only)' })
   listDeletedNotes(@ChurchId() churchId: string) {
     return this.followUpService.listDeletedPastoralNotes(churchId);
   }
 
   @Post('pastoral-notes/:id/restore')
-  @Roles('ADMIN', 'PASTOR')
-  @ApiOperation({ summary: 'Restore a soft-deleted pastoral note' })
+  @Roles('PASTOR')
+  @ApiOperation({ summary: 'Restore a soft-deleted pastoral note (Church Pastor only)' })
   restoreNote(
     @ChurchId() churchId: string,
     @Param('id') id: string,
@@ -297,8 +301,8 @@ export class FollowUpController {
   }
 
   @Delete('pastoral-notes/:id')
-  @Roles('ADMIN', 'PASTOR')
-  @ApiOperation({ summary: 'Soft-delete a pastoral note' })
+  @Roles('PASTOR')
+  @ApiOperation({ summary: 'Soft-delete a pastoral note (Church Pastor only)' })
   softDeleteNote(
     @ChurchId() churchId: string,
     @Param('id') id: string,

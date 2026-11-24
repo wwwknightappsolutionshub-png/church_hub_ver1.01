@@ -11,6 +11,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { ChurchesModule } from './modules/churches/churches.module';
 import { AccessModule } from './modules/access/access.module';
 import { MembershipModule } from './modules/membership/membership.module';
+import { MemberPrivacyModule } from './modules/member-privacy/member-privacy.module';
 import { FollowUpModule } from './modules/follow-up/follow-up.module';
 import { PastoralCareModule } from './modules/pastoral-care/pastoral-care.module';
 import { OutreachModule } from './modules/outreach/outreach.module';
@@ -85,6 +86,7 @@ const redisEnabled = process.env.REDIS_ENABLED !== 'false';
     NotificationsModule.forRoot(),
     ChurchesModule,
     MembershipModule,
+    MemberPrivacyModule,
     FollowUpModule,
     PastoralCareModule,
     OutreachModule,

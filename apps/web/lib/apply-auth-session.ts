@@ -18,6 +18,8 @@ export type AuthMeRouting = {
   unitDeputyUnitIds?: string[];
   canAccessFollowUp?: boolean;
   establishmentAccess?: { mode?: string | null } | null;
+  /** Cell Minister / Assistant / Secretary — land on branch workspace. */
+  isCellBranchWorkspaceUser?: boolean;
 };
 
 /** Call after tokens are stored — sets slug, role bucket, returns dashboard path. */
@@ -37,6 +39,7 @@ export async function applyAuthSessionFromApi(): Promise<string> {
     unitDeputyUnitIds: data.unitDeputyUnitIds,
     canAccessFollowUp: data.canAccessFollowUp,
     establishmentMode: data.establishmentAccess?.mode,
+    isCellBranchWorkspaceUser: data.isCellBranchWorkspaceUser,
   });
 }
 
@@ -53,5 +56,6 @@ export function applyAuthSessionFromMe(me: AuthMeRouting): string {
     unitDeputyUnitIds: me.unitDeputyUnitIds,
     canAccessFollowUp: me.canAccessFollowUp,
     establishmentMode: me.establishmentAccess?.mode,
+    isCellBranchWorkspaceUser: me.isCellBranchWorkspaceUser,
   });
 }

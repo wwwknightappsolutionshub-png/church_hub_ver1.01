@@ -33,6 +33,7 @@ import {
   type SettingsNavItem,
 } from '@/components/settings/SettingsSection';
 import { TenantBackupRequestPanel } from '@/components/backups/TenantBackupRequestPanel';
+import { MemberFieldAccessEditor } from '@/components/privacy/MemberFieldAccessEditor';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
@@ -256,6 +257,7 @@ export default function SettingsPage() {
       ? [
           { id: 'settings-pipeline', label: 'Pipeline' },
           { id: 'settings-privacy', label: 'Privacy' },
+          { id: 'settings-field-access', label: 'Field access' },
         ]
       : []),
     ...(isChurchStaff ? [{ id: 'settings-backup', label: 'Backup' }] : []),
@@ -483,6 +485,23 @@ export default function SettingsPage() {
                     Request erasure
                   </Button>
                 </div>
+              </SettingsSection>
+            ) : null}
+
+            {activeId === 'settings-field-access' && showLeadershipPrivacySession ? (
+              <SettingsSection
+                id="settings-field-access"
+                index={sectionIndex['settings-field-access']}
+                title="Member field access"
+                description="Tighten what Cell Ministers, deputies, and Leaders can see. Hardcoded privacy floor cannot be loosened."
+                icon={<Shield className="h-4 w-4" aria-hidden />}
+              >
+                <MemberFieldAccessEditor
+                  queryKey={['member-privacy-catalog']}
+                  catalogUrl="/member-privacy/catalog"
+                  saveUrl="/member-privacy/church-policies"
+                  canWrite={showLeadershipPrivacySession}
+                />
               </SettingsSection>
             ) : null}
 

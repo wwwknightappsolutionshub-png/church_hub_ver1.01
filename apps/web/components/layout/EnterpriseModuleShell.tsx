@@ -85,7 +85,7 @@ export function EnterpriseHero({
         ) : null}
         <div
           className={cn(
-            'flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between',
+            'flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between',
             showEyebrow && 'mt-2',
           )}
         >
@@ -98,7 +98,11 @@ export function EnterpriseHero({
             </p>
             {actions && <div className="mt-2.5 flex flex-wrap gap-2">{actions}</div>}
           </div>
-          {badge ? <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">{badge}</div> : null}
+          {badge ? (
+            <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end sm:pt-0.5">
+              {badge}
+            </div>
+          ) : null}
         </div>
       </div>
     </header>

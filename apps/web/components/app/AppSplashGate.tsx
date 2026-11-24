@@ -15,15 +15,17 @@ export function AppSplashGate({ children }: AppSplashGateProps) {
 
   useEffect(() => {
     const start = Date.now();
-    const done = () => {
-      const elapsed = Date.now() - start;
-      const wait = Math.max(0, MIN_SPLASH_MS - elapsed);
-      window.setTimeout(() => {
-        setExiting(true);
-        window.setTimeout(() => setVisible(false), 480);
-      }, wait);
+    let exitTimer = 0;
+    let hideTimer = 0;
+    const elapsed = () => Math.max(0, MIN_SPLASH_MS - (Date.now() - start));
+    exitTimer = window.setTimeout(() => {
+      setExiting(true);
+      hideTimer = window.setTimeout(() => setVisible(false), 480);
+    }, elapsed());
+    return () => {
+      window.clearTimeout(exitTimer);
+      window.clearTimeout(hideTimer);
     };
-    done();
   }, []);
 
   return (

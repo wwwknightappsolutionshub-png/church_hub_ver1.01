@@ -13,6 +13,7 @@ import { MembershipAnalyticsService } from './membership-analytics.service';
 import { parseMembershipAnalyticsQuery } from './membership-analytics-query';
 import { MembershipCelebrationsService } from './membership-celebrations.service';
 import { MembershipFamilyMapService } from './membership-family-map.service';
+import { MemberPrivacyService } from '../member-privacy/member-privacy.service';
 import { AuthUser, ChurchId, CurrentUser } from '../auth/current-user.decorator';
 import { MemberAdmin, MemberCreate, Roles } from '../auth/decorators';
 
@@ -30,6 +31,7 @@ export class MembershipController {
     private readonly membershipAnalytics: MembershipAnalyticsService,
     private readonly membershipCelebrations: MembershipCelebrationsService,
     private readonly membershipFamilyMap: MembershipFamilyMapService,
+    private readonly memberPrivacy: MemberPrivacyService,
   ) {}
 
   @Get('catalog')
@@ -75,12 +77,24 @@ export class MembershipController {
 
   @Post('members')
   @MemberCreate()
-  createMember(@ChurchId() churchId: string, @Body() body: Record<string, unknown>) {
-    return this.membershipService.createMember(
+  async createMember(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Body() body: Record<string, unknown>,
+  ) {
+    const viewer = await this.memberPrivacy.resolveViewerFromDb(user, churchId);
+    const sanitized = this.memberPrivacy.sanitizeOpsMemberWritePayload(viewer, {
+      ...body,
+      startOnboarding: body.startOnboarding ?? false,
+    });
+    const created = await this.membershipService.createMember(
       churchId,
-      { ...body, startOnboarding: body.startOnboarding ?? false } as Parameters<
-        MembershipService['createMember']
-      >[1],
+      sanitized as Parameters<MembershipService['createMember']>[1],
+    );
+    return this.memberPrivacy.projectMember(
+      churchId,
+      viewer,
+      created as unknown as Record<string, unknown>,
     );
   }
 
@@ -271,8 +285,12 @@ export class MembershipController {
 
   @Get('families/:id')
   @Roles('ADMIN', 'PASTOR', 'LEADER')
-  getFamily(@ChurchId() churchId: string, @Param('id') id: string) {
-    return this.membershipService.getFamily(churchId, id);
+  getFamily(
+    @ChurchId() churchId: string,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.membershipService.getFamilyForViewer(churchId, id, user);
   }
 
   @Patch('families/:id')
@@ -297,8 +315,15 @@ export class MembershipController {
 
   @Get('members/:id/activity')
   @Roles('ADMIN', 'PASTOR', 'LEADER')
-  listMemberActivity(@ChurchId() churchId: string, @Param('id') id: string) {
-    return this.membershipActivity.listForMember(churchId, id);
+  async listMemberActivity(
+    @ChurchId() churchId: string,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const viewer = await this.memberPrivacy.resolveViewerFromDb(user, churchId);
+    return this.membershipActivity.listForMember(churchId, id, 50, {
+      includeActorEmail: viewer.isLeadership,
+    });
   }
 
   @Get('class-enrollments')
@@ -516,8 +541,9 @@ export class MembershipController {
   @Get('celebrations')
   @Roles('ADMIN', 'PASTOR', 'LEADER')
   @ApiOperation({ summary: 'Upcoming birthdays and special anniversaries' })
-  getCelebrations(
+  async getCelebrations(
     @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
     @Query('days') days?: string,
     @Query('birthdaysPage') birthdaysPage?: string,
     @Query('birthdaysLimit') birthdaysLimit?: string,
@@ -527,12 +553,29 @@ export class MembershipController {
     const windowDays = Math.min(90, Math.max(7, parseInt(days ?? '30', 10) || 30));
     const parsePage = (v?: string) => Math.max(1, parseInt(v ?? '1', 10) || 1);
     const parseLimit = (v?: string) => Math.min(50, Math.max(1, parseInt(v ?? '8', 10) || 8));
-    return this.membershipCelebrations.getCelebrations(churchId, windowDays, {
+    const data = await this.membershipCelebrations.getCelebrations(churchId, windowDays, {
       birthdaysPage: parsePage(birthdaysPage),
       birthdaysLimit: parseLimit(birthdaysLimit),
       anniversariesPage: parsePage(anniversariesPage),
       anniversariesLimit: parseLimit(anniversariesLimit),
     });
+    const viewer = await this.memberPrivacy.resolveViewerFromDb(user, churchId);
+    if (viewer.isLeadership) return data;
+    const birthdays = await this.memberPrivacy.projectMemberList(
+      churchId,
+      viewer,
+      data.birthdays.items as unknown as Record<string, unknown>[],
+    );
+    const anniversaries = await this.memberPrivacy.projectMemberList(
+      churchId,
+      viewer,
+      data.anniversaries.items as unknown as Record<string, unknown>[],
+    );
+    return {
+      ...data,
+      birthdays: { ...data.birthdays, items: birthdays },
+      anniversaries: { ...data.anniversaries, items: anniversaries },
+    };
   }
 
   @Get('family-map')

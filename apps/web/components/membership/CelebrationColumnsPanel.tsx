@@ -9,6 +9,7 @@ import type {
   MembershipCelebrationsDto,
 } from '@church-hub/shared-types';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
+import { displayPrivacyValue, isRestrictedMarker } from '@/lib/member-privacy';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -281,8 +282,12 @@ export function CelebrationColumnsPanel({ days = 30, compact }: Props) {
                 <p className="font-semibold text-slate-900 dark:text-slate-50">
                   {b.firstName} {b.lastName}
                 </p>
-                {b.email ? (
-                  <p className="truncate text-xs text-muted-foreground">{b.email}</p>
+                {b.email && !isRestrictedMarker(b.email) ? (
+                  <p className="truncate text-xs text-muted-foreground">
+                    {displayPrivacyValue(b.email)}
+                  </p>
+                ) : isRestrictedMarker(b.email) ? (
+                  <p className="truncate text-xs text-muted-foreground">Restricted</p>
                 ) : null}
                 {b.age != null ? (
                   <p className="mt-1 text-xs font-medium text-amber-800 dark:text-amber-200">

@@ -5,8 +5,12 @@ import { createPortal } from 'react-dom';
 import { Loader2, Users, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { RequestMemberAccessButton } from '@/components/privacy/RequestMemberAccessButton';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
+import { useModuleAccess } from '@/lib/hooks/use-module-access';
+import { displayPrivacyValue } from '@/lib/member-privacy';
 import { STATUS_LABELS, STATUS_VARIANT } from '@/lib/membership';
+import { isChurchLeadershipRole } from '@/lib/session-role';
 import { cn } from '@/lib/utils';
 
 export interface BranchListMember {
@@ -14,8 +18,8 @@ export interface BranchListMember {
   firstName: string;
   lastName: string;
   name: string;
-  email?: string | null;
-  phone?: string | null;
+  email?: string | null | { restricted: true; label: string };
+  phone?: string | null | { restricted: true; label: string };
   status?: string;
   family?: { id: string; name: string } | null;
   joinedAt?: string;
@@ -29,8 +33,8 @@ interface BranchDetailMembersResponse {
     id: string;
     firstName: string;
     lastName: string;
-    email?: string | null;
-    phone?: string | null;
+    email?: string | null | { restricted: true; label: string };
+    phone?: string | null | { restricted: true; label: string };
     status?: string;
     family?: { id: string; name: string } | null;
     joinedAt?: string;
@@ -62,6 +66,8 @@ export function CellBranchMembersSheet({
   memberCount: number;
   onClose: () => void;
 }) {
+  const { userRoles } = useModuleAccess();
+  const isLeadership = isChurchLeadershipRole(userRoles);
   const { data, isLoading, isError } = useApiQuery<BranchDetailMembersResponse>(
     ['ministry-cells', 'branch', branchId, 'members-sheet'],
     `/ministry-cells/branches/${branchId}`,
@@ -107,6 +113,11 @@ export function CellBranchMembersSheet({
               <p className="text-sm text-muted-foreground">
                 {count} member{count === 1 ? '' : 's'} in this cell branch
               </p>
+              {!isLeadership ? (
+                <div className="mt-2">
+                  <RequestMemberAccessButton />
+                </div>
+              ) : null}
             </div>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
@@ -146,10 +157,10 @@ export function CellBranchMembersSheet({
                     <td className="px-4 py-3 font-medium">{m.name}</td>
                     <td className="px-4 py-3 text-muted-foreground">{m.family?.name ?? '—'}</td>
                     <td className="hidden max-w-[200px] truncate px-4 py-3 text-muted-foreground sm:table-cell">
-                      {m.email ?? '—'}
+                      {displayPrivacyValue(m.email)}
                     </td>
                     <td className="hidden whitespace-nowrap px-4 py-3 text-muted-foreground md:table-cell">
-                      {m.phone ?? '—'}
+                      {displayPrivacyValue(m.phone)}
                     </td>
                     <td className="px-4 py-3">
                       {m.status ? (

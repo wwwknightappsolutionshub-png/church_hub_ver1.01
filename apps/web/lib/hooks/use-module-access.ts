@@ -33,6 +33,7 @@ export interface ModuleAccess extends AuthMeResponse {
   canManageCommunications?: boolean;
   canAccessSermonNote?: boolean;
   canAccessMinistryCells?: boolean;
+  isCellBranchWorkspaceUser?: boolean;
   userRoles?: string[];
   unitMembershipIds?: string[];
   unitAdminUnitIds?: string[];
@@ -51,9 +52,11 @@ export function useModuleAccess() {
       // No session → fail fast; avoid endless retry/spin when demo 2FA left tokens empty.
       retry: (count, err) => {
         const status = err.response?.status;
-        if (status === 401 || status === 403) return false;
+        if (status === 401 || status === 403 || status === 429) return false;
+        if (status && status >= 500) return false;
         return count < 1;
       },
+      refetchOnWindowFocus: false,
     },
   );
 
@@ -91,6 +94,7 @@ export function useModuleAccess() {
     canManageCommunications: data?.canManageCommunications ?? data?.isChurchStaff ?? false,
     canAccessSermonNote: data?.canAccessSermonNote === true,
     canAccessMinistryCells: data?.canAccessMinistryCells === true || pastorOrAdmin,
+    isCellBranchWorkspaceUser: data?.isCellBranchWorkspaceUser === true,
     /** Owner only */
     isPlatformAdmin,
     /** Owner or custom platform role */

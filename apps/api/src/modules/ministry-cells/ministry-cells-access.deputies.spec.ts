@@ -43,12 +43,23 @@ describe('MinistryCellsAccessService deputies', () => {
     expect(ctx.deputyProvinceIds).toEqual(['p1']);
   });
 
-  it('blocks deputies from assigning other deputies', async () => {
+  it('allows branch Assistant to assign deputies on their branch', async () => {
     prisma.cellLeadershipDeputy.findMany.mockResolvedValue([
       { scope: 'BRANCH', branchId: 'b1', provinceId: null, role: 'ASSISTANT' },
     ]);
+    prisma.cellBranch.findFirst.mockResolvedValue({ leaderUserId: 'u-other' });
     await expect(
       service.assertCanAssignDeputies(user as never, 'c1', { branchId: 'b1' }),
+    ).resolves.toMatchObject({ role: 'cellLeader', isDeputy: true });
+  });
+
+  it('blocks branch Assistant from assigning on another branch', async () => {
+    prisma.cellLeadershipDeputy.findMany.mockResolvedValue([
+      { scope: 'BRANCH', branchId: 'b1', provinceId: null, role: 'ASSISTANT' },
+    ]);
+    prisma.cellBranch.findFirst.mockResolvedValue({ leaderUserId: 'u-other' });
+    await expect(
+      service.assertCanAssignDeputies(user as never, 'c1', { branchId: 'b2' }),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 

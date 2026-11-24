@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Loader2, Trash2, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import { displayPrivacyValue, isRestrictedMarker } from '@/lib/member-privacy';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { LazyCongregantEditorForm } from '@/lib/membership-lazy';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,7 @@ interface BranchMember {
   id: string;
   firstName: string;
   lastName: string;
-  email: string | null;
+  email: string | null | { restricted: true; label: string };
   joinedAt: string;
 }
 
@@ -22,7 +23,7 @@ interface AvailableMember {
   id: string;
   firstName: string;
   lastName: string;
-  email: string | null;
+  email: string | null | { restricted: true; label: string };
   status: string;
 }
 
@@ -67,10 +68,12 @@ export function BranchMembersPanel({
   const filtered = search.trim()
     ? available.filter((m) => {
         const q = search.trim().toLowerCase();
+        const email =
+          typeof m.email === 'string' ? m.email.toLowerCase() : '';
         return (
           m.firstName.toLowerCase().includes(q) ||
           m.lastName.toLowerCase().includes(q) ||
-          m.email?.toLowerCase().includes(q)
+          (email && email.includes(q))
         );
       })
     : available;
@@ -155,7 +158,7 @@ export function BranchMembersPanel({
                 setSearch(e.target.value);
                 setSelectedMemberId('');
               }}
-              placeholder="Name or email"
+              placeholder="Search by name"
             />
           </div>
           {isLoading ? (
@@ -169,12 +172,20 @@ export function BranchMembersPanel({
               onChange={(e) => setSelectedMemberId(e.target.value)}
             >
               <option value="">Select a member…</option>
-              {filtered.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.firstName} {m.lastName}
-                  {m.email ? ` · ${m.email}` : ''} · {m.status.replace(/_/g, ' ')}
-                </option>
-              ))}
+              {filtered.map((m) => {
+                const emailLabel =
+                  typeof m.email === 'string'
+                    ? m.email
+                    : isRestrictedMarker(m.email)
+                      ? null
+                      : null;
+                return (
+                  <option key={m.id} value={m.id}>
+                    {m.firstName} {m.lastName}
+                    {emailLabel ? ` · ${emailLabel}` : ''} · {m.status.replace(/_/g, ' ')}
+                  </option>
+                );
+              })}
             </select>
           )}
           {noSearchMatch && (
@@ -228,7 +239,11 @@ export function BranchMembersPanel({
               <span className="font-medium">
                 {m.firstName} {m.lastName}
               </span>
-              {m.email && <span className="ml-2 text-xs text-muted-foreground">{m.email}</span>}
+              {m.email != null && (
+                <span className="ml-2 text-xs text-muted-foreground">
+                  {displayPrivacyValue(m.email, '')}
+                </span>
+              )}
             </div>
             {canManage && (
               <Button

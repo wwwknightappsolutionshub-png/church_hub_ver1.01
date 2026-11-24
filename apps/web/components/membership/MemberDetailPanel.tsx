@@ -22,6 +22,7 @@ import {
   phoneFormatError,
 } from '@/lib/contact-validation';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
+import { displayPrivacyValue } from '@/lib/member-privacy';
 import { isChurchLeadershipRole } from '@/lib/session-role';
 import {
   MEMBER_STATUSES,
@@ -409,13 +410,13 @@ export function MemberDetailPanel({
         <section>
           <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Contact</h3>
           <dl className="mt-2 space-y-1 text-sm">
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-3">
               <dt className="text-muted-foreground">Email</dt>
-              <dd>{member.email ?? '—'}</dd>
+              <dd className="text-right">{displayPrivacyValue(member.email)}</dd>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-3">
               <dt className="text-muted-foreground">Phone</dt>
-              <dd>{member.phone ?? '—'}</dd>
+              <dd className="text-right">{displayPrivacyValue(member.phone)}</dd>
             </div>
             {(member.address || member.city) && (
               <div className="flex justify-between">

@@ -20,7 +20,9 @@ export type SecurityAuditAction =
   | 'AUTHZ_DENIED'
   | 'AUTHZ_ABUSE_DETECTED'
   | 'AUDIT_LOG_EXPORTED'
-  | 'AUDIT_ARCHIVE_COMPLETED';
+  | 'AUDIT_ARCHIVE_COMPLETED'
+  | 'MEMBER_FIELD_POLICY_CHANGED'
+  | 'MEMBER_PRIVACY_ACCESS_REQUESTED';
 
 export type SecurityAuditTargetType =
   | 'PastoralNote'

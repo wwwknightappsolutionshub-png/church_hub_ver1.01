@@ -10,9 +10,12 @@ import { apiErrorMessage } from '@/lib/api-errors';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { PlatformConsoleShell } from '@/components/platform/PlatformConsoleShell';
+import { MemberFieldAccessEditor } from '@/components/privacy/MemberFieldAccessEditor';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 type DsarRow = {
   id: string;
@@ -33,6 +36,10 @@ type DsarRow = {
   } | null;
 };
 
+type TenantRow = { id: string; name: string; slug: string };
+
+type Tab = 'dsar' | 'field-global' | 'field-tenant';
+
 export default function PlatformPrivacyPage() {
   const router = useRouter();
   const qc = useQueryClient();
@@ -40,16 +47,30 @@ export default function PlatformPrivacyPage() {
   const canAccess = isPlatformOperator && hasPlatformPermission('platform.privacy:read');
   const canWrite = hasPlatformPermission('platform.privacy:write');
   const [statusFilter, setStatusFilter] = useState('');
+  const [tab, setTab] = useState<Tab>('dsar');
+  const [tenantId, setTenantId] = useState('');
 
   const { data: rows = [], isLoading } = useApiQuery<DsarRow[]>(
     ['platform-dsar', statusFilter],
     `/platform/privacy/dsar${statusFilter ? `?status=${statusFilter}` : ''}`,
-    { enabled: canAccess },
+    { enabled: canAccess && tab === 'dsar' },
+  );
+
+  const { data: tenants = [] } = useApiQuery<TenantRow[]>(
+    ['platform-tenants-brief'],
+    '/platform/churches',
+    { enabled: canAccess && tab === 'field-tenant' },
   );
 
   useEffect(() => {
     if (!accessLoading && !canAccess) router.replace('/dashboard/platform');
   }, [accessLoading, canAccess, router]);
+
+  useEffect(() => {
+    if (tab === 'field-tenant' && !tenantId && tenants[0]?.id) {
+      setTenantId(tenants[0].id);
+    }
+  }, [tab, tenantId, tenants]);
 
   const updateMutation = useMutation({
     mutationFn: async (payload: {
@@ -82,146 +103,239 @@ export default function PlatformPrivacyPage() {
 
   return (
     <PlatformConsoleShell
-      title="Privacy requests"
-      description="Data subject access and erasure requests (DSAR). Complete erasure anonymizes the linked account."
+      title="Privacy"
+      description="DSAR queue and member field access floors across tenants."
     >
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <select
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="">All statuses</option>
-          <option value="OPEN">Open</option>
-          <option value="IN_PROGRESS">In progress</option>
-          <option value="COMPLETED">Completed</option>
-          <option value="REJECTED">Rejected</option>
-        </select>
-        <Badge variant="outline">{rows.length} requests</Badge>
+      <div className="mb-6 flex flex-wrap gap-2">
+        {(
+          [
+            ['dsar', 'DSAR queue'],
+            ['field-global', 'Field access (global)'],
+            ['field-tenant', 'Field access (per tenant)'],
+          ] as const
+        ).map(([id, label]) => (
+          <Button
+            key={id}
+            type="button"
+            size="sm"
+            variant={tab === id ? 'default' : 'outline'}
+            className={cn(tab === id && 'pointer-events-none')}
+            onClick={() => setTab(id)}
+          >
+            {label}
+          </Button>
+        ))}
       </div>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">DSAR queue</CardTitle>
-          <CardDescription>
-            {isLoading ? 'Loading…' : 'Newest first. Erasure permanently anonymizes PII.'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="border-b text-xs uppercase text-muted-foreground">
-              <tr>
-                <th className="px-2 py-2 font-semibold">Type</th>
-                <th className="px-2 py-2 font-semibold">Requester</th>
-                <th className="px-2 py-2 font-semibold">Church</th>
-                <th className="px-2 py-2 font-semibold">Status</th>
-                <th className="px-2 py-2 font-semibold">Created</th>
-                <th className="px-2 py-2 font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id} className="border-b last:border-0">
-                  <td className="px-2 py-3 font-medium">{r.type}</td>
-                  <td className="px-2 py-3">
-                    <div>{r.requesterName ?? '—'}</div>
-                    <div className="text-xs text-muted-foreground">{r.requesterEmail}</div>
-                  </td>
-                  <td className="px-2 py-3">{r.church?.name ?? '—'}</td>
-                  <td className="px-2 py-3">
-                    <Badge variant="outline">{r.status}</Badge>
-                    {r.user?.anonymizedAt ? (
-                      <span className="ml-2 text-xs text-muted-foreground">anonymized</span>
-                    ) : null}
-                  </td>
-                  <td className="px-2 py-3 text-xs text-muted-foreground">
-                    {new Date(r.createdAt).toLocaleString()}
-                  </td>
-                  <td className="px-2 py-3">
-                    {canWrite ? (
-                      <div className="flex flex-wrap gap-1.5">
-                        {r.status === 'OPEN' ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={updateMutation.isPending}
-                            onClick={() =>
-                              updateMutation.mutate({ id: r.id, status: 'IN_PROGRESS' })
-                            }
-                          >
-                            Start
-                          </Button>
+      {tab === 'dsar' ? (
+        <>
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <select
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="">All statuses</option>
+              <option value="OPEN">Open</option>
+              <option value="IN_PROGRESS">In progress</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="REJECTED">Rejected</option>
+            </select>
+            <Badge variant="outline">{rows.length} requests</Badge>
+          </div>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">DSAR queue</CardTitle>
+              <CardDescription>
+                {isLoading ? 'Loading…' : 'Newest first. Erasure permanently anonymizes PII.'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-left text-sm">
+                <thead className="border-b text-xs uppercase text-muted-foreground">
+                  <tr>
+                    <th className="px-2 py-2 font-semibold">Type</th>
+                    <th className="px-2 py-2 font-semibold">Requester</th>
+                    <th className="px-2 py-2 font-semibold">Church</th>
+                    <th className="px-2 py-2 font-semibold">Status</th>
+                    <th className="px-2 py-2 font-semibold">Created</th>
+                    <th className="px-2 py-2 font-semibold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r.id} className="border-b last:border-0">
+                      <td className="px-2 py-3 font-medium">{r.type}</td>
+                      <td className="px-2 py-3">
+                        <div>{r.requesterName ?? '—'}</div>
+                        <div className="text-xs text-muted-foreground">{r.requesterEmail}</div>
+                      </td>
+                      <td className="px-2 py-3">{r.church?.name ?? '—'}</td>
+                      <td className="px-2 py-3">
+                        <Badge variant="outline">{r.status}</Badge>
+                        {r.user?.anonymizedAt ? (
+                          <span className="ml-2 text-xs text-muted-foreground">anonymized</span>
                         ) : null}
-                        {r.type === 'ERASURE' && r.status !== 'COMPLETED' && r.user && !r.user.anonymizedAt ? (
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            disabled={updateMutation.isPending}
-                            onClick={() => {
-                              if (
-                                !window.confirm(
-                                  `Anonymize ${r.requesterEmail}? This cannot be undone.`,
-                                )
-                              ) {
-                                return;
-                              }
-                              updateMutation.mutate({ id: r.id, executeErasure: true });
-                            }}
-                          >
-                            {updateMutation.isPending ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              'Erase & complete'
-                            )}
-                          </Button>
-                        ) : null}
-                        {r.type !== 'ERASURE' &&
-                        r.status !== 'COMPLETED' &&
-                        r.status !== 'REJECTED' ? (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            disabled={updateMutation.isPending}
-                            onClick={() =>
-                              updateMutation.mutate({ id: r.id, status: 'COMPLETED' })
-                            }
-                          >
-                            Complete
-                          </Button>
-                        ) : null}
-                        {r.type === 'ERASURE' &&
-                        r.status !== 'COMPLETED' &&
-                        r.status !== 'REJECTED' &&
-                        r.user?.anonymizedAt ? (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            disabled={updateMutation.isPending}
-                            onClick={() =>
-                              updateMutation.mutate({ id: r.id, status: 'COMPLETED' })
-                            }
-                          >
-                            Mark complete
-                          </Button>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">View only</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {!rows.length && !isLoading ? (
-                <tr>
-                  <td colSpan={6} className="px-2 py-8 text-center text-muted-foreground">
-                    No privacy requests yet.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </CardContent>
-      </Card>
+                      </td>
+                      <td className="px-2 py-3 text-xs text-muted-foreground">
+                        {new Date(r.createdAt).toLocaleString()}
+                      </td>
+                      <td className="px-2 py-3">
+                        {canWrite ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {r.status === 'OPEN' ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={updateMutation.isPending}
+                                onClick={() =>
+                                  updateMutation.mutate({ id: r.id, status: 'IN_PROGRESS' })
+                                }
+                              >
+                                Start
+                              </Button>
+                            ) : null}
+                            {r.type === 'ERASURE' &&
+                            r.status !== 'COMPLETED' &&
+                            r.user &&
+                            !r.user.anonymizedAt ? (
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                disabled={updateMutation.isPending}
+                                onClick={() => {
+                                  if (
+                                    !window.confirm(
+                                      `Anonymize ${r.requesterEmail}? This cannot be undone.`,
+                                    )
+                                  ) {
+                                    return;
+                                  }
+                                  updateMutation.mutate({ id: r.id, executeErasure: true });
+                                }}
+                              >
+                                {updateMutation.isPending ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  'Erase & complete'
+                                )}
+                              </Button>
+                            ) : null}
+                            {r.type !== 'ERASURE' &&
+                            r.status !== 'COMPLETED' &&
+                            r.status !== 'REJECTED' ? (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                disabled={updateMutation.isPending}
+                                onClick={() =>
+                                  updateMutation.mutate({ id: r.id, status: 'COMPLETED' })
+                                }
+                              >
+                                Complete
+                              </Button>
+                            ) : null}
+                            {r.type === 'ERASURE' &&
+                            r.status !== 'COMPLETED' &&
+                            r.status !== 'REJECTED' &&
+                            r.user?.anonymizedAt ? (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                disabled={updateMutation.isPending}
+                                onClick={() =>
+                                  updateMutation.mutate({ id: r.id, status: 'COMPLETED' })
+                                }
+                              >
+                                Mark complete
+                              </Button>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">View only</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {!rows.length && !isLoading ? (
+                    <tr>
+                      <td colSpan={6} className="px-2 py-8 text-center text-muted-foreground">
+                        No privacy requests yet.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        </>
+      ) : null}
+
+      {tab === 'field-global' ? (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Global field access</CardTitle>
+            <CardDescription>
+              Platform-wide tighten-only overrides on the hardcoded member privacy floor.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <MemberFieldAccessEditor
+              queryKey={['platform-member-privacy', 'PLATFORM_GLOBAL']}
+              catalogUrl="/platform/member-privacy/catalog?scope=PLATFORM_GLOBAL"
+              saveUrl="/platform/member-privacy/policies?scope=PLATFORM_GLOBAL"
+              canWrite={canWrite}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {tab === 'field-tenant' ? (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Per-tenant field access</CardTitle>
+            <CardDescription>
+              Tighten further for a single church. Cannot loosen global or hardcoded floors.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="block min-w-[16rem] flex-1 text-xs">
+                <span className="mb-1 block text-muted-foreground">Tenant</span>
+                <select
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={tenantId}
+                  onChange={(e) => setTenantId(e.target.value)}
+                >
+                  <option value="">Select church…</option>
+                  {tenants.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} ({t.slug})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <Input
+                className="max-w-xs"
+                placeholder="Or paste churchId"
+                value={tenantId}
+                onChange={(e) => setTenantId(e.target.value.trim())}
+              />
+            </div>
+            {tenantId ? (
+              <MemberFieldAccessEditor
+                queryKey={['platform-member-privacy', 'PLATFORM_TENANT', tenantId]}
+                catalogUrl={`/platform/member-privacy/catalog?scope=PLATFORM_TENANT&churchId=${encodeURIComponent(tenantId)}`}
+                saveUrl={`/platform/member-privacy/policies?scope=PLATFORM_TENANT&churchId=${encodeURIComponent(tenantId)}`}
+                canWrite={canWrite}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">Select a tenant to edit field access.</p>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
     </PlatformConsoleShell>
   );
 }

@@ -45,9 +45,9 @@ export function isLeaderRole(roles: string[] | undefined): boolean {
   return (roles ?? []).includes('LEADER');
 }
 
-/** Admin, Pastor, or Follow-up / unit Leader — may export outreach directory PDFs. */
+/** Church Pastor only — bulk unmasked PII directory export. */
 export function canExportOutreachDirectory(roles: string[] | undefined): boolean {
-  return isChurchLeadershipRole(roles) || isLeaderRole(roles);
+  return isPastorRole(roles);
 }
 
 /** Admin / Pastor / Unit Leader may archive immediately. */
@@ -120,7 +120,11 @@ export function memberHomePath(opts?: {
   unitDeputyUnitIds?: string[];
   canAccessFollowUp?: boolean;
   establishmentMode?: string | null;
+  isCellBranchWorkspaceUser?: boolean;
 }): string {
+  if (opts?.isCellBranchWorkspaceUser) {
+    return '/dashboard/ministry-cells';
+  }
   if (
     (opts?.unitAdminUnitIds ?? []).length > 0 ||
     (opts?.unitDeputyUnitIds ?? []).length > 0
@@ -144,6 +148,7 @@ export function postLoginPath(
     unitDeputyUnitIds?: string[];
     canAccessFollowUp?: boolean;
     establishmentMode?: string | null;
+    isCellBranchWorkspaceUser?: boolean;
   },
 ): string {
   switch (bucket) {
