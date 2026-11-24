@@ -158,18 +158,18 @@ corepack prepare pnpm@9.14.2 --activate 2>/dev/null || true
 echo "==> pnpm install"
 pnpm install --frozen-lockfile --prod=false
 
-echo "==> Build shared-types + API"
-export NODE_ENV=production
-# Nest/Next production builds OOMs on smaller VPS heaps without this.
-export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=4096}"
-pnpm --filter @church-hub/shared-types build
-pnpm --filter @church-hub/api exec prisma generate
-pnpm --filter @church-hub/api build
-
-echo "==> Stop web before Next build (PM2 reload does not restart stopped apps)"
+echo "==> Stop web before heavy builds (frees RAM on small VPS)"
 if pm2 describe church-hub-web >/dev/null 2>&1; then
   pm2 stop church-hub-web 2>/dev/null || true
 fi
+
+echo "==> Build shared-types + API"
+export NODE_ENV=production
+# Force heap size — nested pnpm/nest often ignore inherited NODE_OPTIONS alone.
+export NODE_OPTIONS="--max-old-space-size=4096"
+pnpm --filter @church-hub/shared-types build
+pnpm --filter @church-hub/api exec prisma generate
+pnpm --filter @church-hub/api build
 
 echo "==> Build web (NEXT_PUBLIC_* from .env)"
 pnpm --filter @church-hub/web build
