@@ -104,6 +104,7 @@ model Church {
   memberPropertyDefinitions  MemberPropertyDefinition[]
   familyPropertyDefinitions  FamilyPropertyDefinition[]
   memberActivityLogs       MemberActivityLog[]
+  securityAuditLogs        SecurityAuditLog[]
   classEnrollments         ClassEnrollment[]
   attendanceRecords        AttendanceRecord[]
   followUpAutomationRules  FollowUpAutomationRule[]
@@ -264,6 +265,27 @@ model MemberActivityLog {
   @@map("member_activity_logs")
 }
 
+/// Append-only security / compliance audit trail. No update/delete APIs.
+model SecurityAuditLog {
+  id         String   @id @default(uuid())
+  churchId   String?
+  actorId    String?
+  action     String
+  targetType String
+  targetId   String?
+  ip         String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  church Church? @relation(fields: [churchId], references: [id], onDelete: SetNull)
+  actor  User?   @relation("SecurityAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([churchId, createdAt])
+  @@index([action, createdAt])
+  @@index([targetType, targetId])
+  @@map("security_audit_logs")
+}
+
 enum ClassEnrollmentStatus {
   ENROLLED
   IN_PROGRESS
@@ -377,6 +399,7 @@ model User {
   communityHubLikes        CommunityHubLike[]
   communityHubComments     CommunityHubComment[]
   memberActivitiesAuthored MemberActivityLog[] @relation("MemberActivityActor")
+  securityAuditsAuthored   SecurityAuditLog[]  @relation("SecurityAuditActor")
   attendanceRecorded       AttendanceRecord[]  @relation("AttendanceRecordedBy")
   membershipImportsUploaded MembershipImportJob[] @relation("MembershipImportUploader")
   outreachImportsUploaded   OutreachImportJob[]    @relation("OutreachImportUploader")
@@ -1005,6 +1028,8 @@ model Member {
   specialOccasionDate  DateTime?
   bornAgain              Boolean?
   baptizedInHolySpirit Boolean?
+  /// Soft-delete timestamp; null = active. Hard delete reserved for GDPR erasure.
+  deletedAt         DateTime?
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
@@ -1145,6 +1170,7 @@ model Member {
 
   @@index([churchId, status])
   @@index([churchId, lastName, firstName])
+  @@index([churchId, deletedAt])
   @@map("members")
 }
 
@@ -1348,12 +1374,15 @@ model PastoralNote {
   memberId       String?
   followUpId     String?
   authorId       String
+  /// AES-256-GCM ciphertext (v1: envelope) or legacy plaintext until backfill.
   content        String
   isConfidential Boolean  @default(true)
   /// Pipeline stage when the note was written (for journey timeline).
   stageAtTime    String?
   /// NOTE | STAGE_PROGRESS | ARCHIVE_REQUEST | ARCHIVE | ARCHIVE_DECLINED | RECONTACT
   kind           String   @default("NOTE")
+  /// Soft-delete timestamp; null = active.
+  deletedAt      DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -1364,6 +1393,7 @@ model PastoralNote {
 
   @@index([memberId])
   @@index([followUpId])
+  @@index([churchId, deletedAt])
   @@map("pastoral_notes")
 }
 

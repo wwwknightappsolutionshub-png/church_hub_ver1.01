@@ -13,6 +13,12 @@ import {
   optionalPhoneSchema,
 } from '@church-hub/shared-types';
 import { PrismaService } from '../../prisma/prisma.module';
+import {
+  encryptPastoralNoteContent,
+  mapPastoralNoteRow,
+} from '../../common/crypto/pastoral-notes.crypto';
+import { SecurityAuditService } from '../../common/security/security-audit.service';
+import { runWithTenantContextAsync } from '../../prisma/tenant-context';
 import { NotificationsQueueService } from '../notifications/notifications-queue.service';
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
 import { SmsAdapter } from '../notifications/adapters/sms.adapter';
@@ -61,6 +67,7 @@ export class FollowUpService {
     private readonly automation: FollowUpAutomationService,
     private readonly moduleAccess: ModuleAccessService,
     private readonly pipelineResolve: PipelineResolveService,
+    private readonly securityAudit: SecurityAuditService,
   ) {}
 
   private async pipelineFlags(churchId: string): Promise<StageFlagRow[]> {
@@ -197,14 +204,16 @@ export class FollowUpService {
         throw new ForbiddenException('You cannot view this Establishment contact');
       }
       const isStaff = await this.userIsStaff(actorUserId);
-      return {
-        ...row,
-        pastoralNotes: row.pastoralNotes.filter(
-          (n) => isStaff || !n.isConfidential || n.authorId === actorUserId,
-        ),
-      };
+      const pastoralNotes = row.pastoralNotes
+        .filter((n) => isStaff || !n.isConfidential || n.authorId === actorUserId)
+        .map((n) => mapPastoralNoteRow(n));
+      await this.auditPastoralReads(churchId, actorUserId, pastoralNotes);
+      return { ...row, pastoralNotes };
     }
-    return row;
+    return {
+      ...row,
+      pastoralNotes: row.pastoralNotes.map((n) => mapPastoralNoteRow(n)),
+    };
   }
 
   /** Assignees must be active users in the same church (blocks cross-tenant assignment). */
@@ -1153,19 +1162,32 @@ export class FollowUpService {
       if (!stageAtTime) stageAtTime = fu.stage;
     }
 
-    return this.prisma.pastoralNote.create({
+    const created = await this.prisma.pastoralNote.create({
       data: {
         churchId,
         authorId,
         memberId: data.memberId,
         followUpId: data.followUpId,
-        content: data.content,
+        content: encryptPastoralNoteContent(data.content),
         isConfidential: data.isConfidential ?? true,
         stageAtTime: stageAtTime ?? null,
         kind: data.kind ?? 'NOTE',
       },
       include: { author: { select: { id: true, firstName: true, lastName: true } } },
     });
+    await this.securityAudit.append({
+      churchId,
+      actorId: authorId,
+      action: 'CREATE_PASTORAL_NOTE',
+      targetType: 'PastoralNote',
+      targetId: created.id,
+      metadata: {
+        memberId: data.memberId ?? null,
+        followUpId: data.followUpId ?? null,
+        isConfidential: created.isConfidential,
+      },
+    });
+    return mapPastoralNoteRow(created);
   }
 
   async archive(
@@ -1443,7 +1465,81 @@ export class FollowUpService {
     });
 
     const isStaff = await this.userIsStaff(requesterId);
-    return notes.filter((n) => isStaff || !n.isConfidential || n.authorId === requesterId);
+    const visible = notes
+      .filter((n) => isStaff || !n.isConfidential || n.authorId === requesterId)
+      .map((n) => mapPastoralNoteRow(n));
+    await this.auditPastoralReads(churchId, requesterId, visible);
+    return visible;
+  }
+
+  async softDeletePastoralNote(churchId: string, id: string, actorId: string) {
+    const note = await this.prisma.pastoralNote.findFirst({ where: { id, churchId } });
+    if (!note) throw new NotFoundException('Pastoral note not found');
+    await this.prisma.pastoralNote.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+    await this.securityAudit.append({
+      churchId,
+      actorId,
+      action: 'SOFT_DELETE_PASTORAL_NOTE',
+      targetType: 'PastoralNote',
+      targetId: id,
+    });
+    return { success: true };
+  }
+
+  async restorePastoralNote(churchId: string, id: string, actorId: string) {
+    return runWithTenantContextAsync({ includeDeleted: true }, async () => {
+      const note = await this.prisma.pastoralNote.findFirst({
+        where: { id, churchId, deletedAt: { not: null } },
+      });
+      if (!note) throw new NotFoundException('Deleted pastoral note not found');
+      await this.prisma.pastoralNote.update({
+        where: { id },
+        data: { deletedAt: null },
+      });
+      await this.securityAudit.append({
+        churchId,
+        actorId,
+        action: 'RESTORE_PASTORAL_NOTE',
+        targetType: 'PastoralNote',
+        targetId: id,
+      });
+      return mapPastoralNoteRow(
+        await this.prisma.pastoralNote.findFirstOrThrow({ where: { id, churchId } }),
+      );
+    });
+  }
+
+  async listDeletedPastoralNotes(churchId: string) {
+    return runWithTenantContextAsync({ includeDeleted: true }, async () => {
+      const notes = await this.prisma.pastoralNote.findMany({
+        where: { churchId, deletedAt: { not: null } },
+        include: { author: { select: { id: true, firstName: true, lastName: true } } },
+        orderBy: { deletedAt: 'desc' },
+      });
+      return notes.map((n) => mapPastoralNoteRow(n));
+    });
+  }
+
+  private async auditPastoralReads(
+    churchId: string,
+    actorId: string,
+    notes: Array<{ id: string; isConfidential: boolean }>,
+  ) {
+    const confidential = notes.filter((n) => n.isConfidential);
+    await Promise.all(
+      confidential.map((n) =>
+        this.securityAudit.append({
+          churchId,
+          actorId,
+          action: 'READ_PASTORAL_NOTE',
+          targetType: 'PastoralNote',
+          targetId: n.id,
+        }),
+      ),
+    );
   }
 
   private async userIsStaff(userId: string) {

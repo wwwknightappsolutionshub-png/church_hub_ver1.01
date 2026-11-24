@@ -2,7 +2,10 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { validateEnv } from './config/env.validation';
+import { TenantContextInterceptor } from './common/interceptors/tenant-context.interceptor';
+import { SecurityAuditModule } from './common/security/security-audit.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ChurchesModule } from './modules/churches/churches.module';
@@ -53,6 +56,10 @@ const redisEnabled = process.env.REDIS_ENABLED !== 'false';
       // Root .env first so empty SMTP_* in apps/api/.env cannot block Hostinger settings.
       // Nest only assigns keys that are not already set on process.env.
       envFilePath: ['../../.env', '../.env', '.env'],
+      validate: (config) => {
+        validateEnv(config as Record<string, unknown>);
+        return config;
+      },
     }),
     ThrottlerModule.forRoot([
       {
@@ -70,6 +77,7 @@ const redisEnabled = process.env.REDIS_ENABLED !== 'false';
         ]
       : []),
     PrismaModule,
+    SecurityAuditModule,
     AccessModule,
     HealthModule,
     UploadsModule,
@@ -107,6 +115,9 @@ const redisEnabled = process.env.REDIS_ENABLED !== 'false';
     MarketingInboundModule,
     GeoModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_INTERCEPTOR, useClass: TenantContextInterceptor },
+  ],
 })
 export class AppModule {}

@@ -13,7 +13,8 @@ describe('PastoralCareService', () => {
     carePrayerRequest: { findFirst: jest.fn(), count: jest.fn() },
   };
 
-  const service = new PastoralCareService(prisma as never);
+  const securityAudit = { append: jest.fn().mockResolvedValue(null) };
+  const service = new PastoralCareService(prisma as never, securityAudit as never);
 
   beforeEach(() => jest.clearAllMocks());
 

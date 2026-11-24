@@ -10,6 +10,8 @@ import {
   ONBOARDING_COMPLETE_STEP,
   ONBOARDING_STEPS,
 } from './membership.constants';
+import { SecurityAuditService } from '../../common/security/security-audit.service';
+import { runWithTenantContextAsync } from '../../prisma/tenant-context';
 import { MembershipActivityService } from './membership-activity.service';
 import { MembershipRegistryService } from './membership-registry.service';
 
@@ -42,6 +44,7 @@ export class MembershipService {
     private readonly prisma: PrismaService,
     private readonly activity: MembershipActivityService,
     private readonly registry: MembershipRegistryService,
+    private readonly securityAudit: SecurityAuditService,
   ) {}
 
   getCatalog() {
@@ -815,17 +818,75 @@ export class MembershipService {
       churchId,
       id,
       'MEMBER_DELETED',
-      `Member removed: ${member.firstName} ${member.lastName}`,
+      `Member soft-deleted: ${member.firstName} ${member.lastName}`,
       { actorUserId },
     );
-    await this.prisma.$transaction([
-      this.prisma.followUp.updateMany({
-        where: { churchId, memberId: id },
-        data: { memberId: null },
+    await this.prisma.member.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+    await this.securityAudit.append({
+      churchId,
+      actorId: actorUserId ?? null,
+      action: 'SOFT_DELETE_MEMBER',
+      targetType: 'Member',
+      targetId: id,
+    });
+    return { success: true, softDeleted: true };
+  }
+
+  async restoreMember(churchId: string, id: string, actorUserId?: string) {
+    return runWithTenantContextAsync({ includeDeleted: true }, async () => {
+      const member = await this.prisma.member.findFirst({
+        where: { id, churchId, deletedAt: { not: null } },
+      });
+      if (!member) throw new NotFoundException('Deleted member not found');
+      await this.prisma.member.update({
+        where: { id },
+        data: { deletedAt: null },
+      });
+      await this.securityAudit.append({
+        churchId,
+        actorId: actorUserId ?? null,
+        action: 'RESTORE_MEMBER',
+        targetType: 'Member',
+        targetId: id,
+      });
+      return this.getMember(churchId, id);
+    });
+  }
+
+  async listDeletedMembers(churchId: string) {
+    return runWithTenantContextAsync({ includeDeleted: true }, async () =>
+      this.prisma.member.findMany({
+        where: { churchId, deletedAt: { not: null } },
+        orderBy: { deletedAt: 'desc' },
+        take: 200,
       }),
-      this.prisma.member.delete({ where: { id } }),
-    ]);
-    return { success: true };
+    );
+  }
+
+  /** GDPR / verified erasure only — hard delete after soft-delete window or DSAR. */
+  async hardDeleteMemberForGdpr(churchId: string, id: string, actorUserId?: string) {
+    return runWithTenantContextAsync({ includeDeleted: true }, async () => {
+      const member = await this.prisma.member.findFirst({ where: { id, churchId } });
+      if (!member) throw new NotFoundException('Member not found');
+      await this.prisma.$transaction([
+        this.prisma.followUp.updateMany({
+          where: { churchId, memberId: id },
+          data: { memberId: null },
+        }),
+        this.prisma.member.delete({ where: { id } }),
+      ]);
+      await this.securityAudit.append({
+        churchId,
+        actorId: actorUserId ?? null,
+        action: 'GDPR_ERASURE',
+        targetType: 'Member',
+        targetId: id,
+      });
+      return { success: true, hardDeleted: true };
+    });
   }
 
   async getUsheringWeeklyAttendanceFlow(churchId: string, weeks = 6) {

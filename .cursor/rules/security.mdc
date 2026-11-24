@@ -1,0 +1,60 @@
+---
+description: Church_Hub enterprise security, multi-tenancy, encryption, audit, and lifecycle rules. Mandatory for every feature, bugfix, and module edit.
+alwaysApply: true
+---
+
+# Church_Hub Security Governance
+
+Live multi-tenant SaaS. Prefer zero downtime, zero data loss, and no breaking API/UI contracts. Prefer additive migrations, dual-read crypto, feature flags, and automated IDOR tests.
+
+## 1. Multi-Tenant Isolation (Zero-Trust)
+
+- Every church-scoped model MUST include `churchId`.
+- Tenant scoping MUST go through the centralized Prisma tenant extension AND (when enabled) PostgreSQL RLS via `app.current_church_id`.
+- FORBIDDEN on tenant-scoped models: `prisma.<model>.findUnique({ where: { id } })` (or equivalent) without also validating `churchId` ownership.
+- Platform / system jobs that intentionally cross tenants MUST use an explicit bypass path that is audited and never used from church JWT request handlers.
+- Any new tenant-data endpoint or service MUST ship an automated cross-tenant IDOR regression test (Church A cannot read/mutate Church B).
+
+## 2. Confidential Data & Encryption
+
+- `PastoralNote.content` and sensitive outreach PII MUST be encrypted at the application layer with AES-256-GCM before persistence (reuse `secret-box.ts` / `outreach-pii.crypto.ts` patterns).
+- Reads MUST support dual-read: encrypted envelope vs legacy plaintext, until backfill completes.
+- Hardcoded fallback encryption keys/secrets are FORBIDDEN.
+- Missing required secrets when `NODE_ENV=production` MUST fail fast on boot.
+- Never log decrypted pastoral content or raw PII.
+
+## 3. Authentication, RBAC & Session Lifecycle
+
+- Controllers are deny-by-default: `JwtAuthGuard`, `RolesGuard`, `ModuleAccessGuard` (plus existing specialized guards).
+- Frontend hiding is never sufficient authorization.
+- Any mutation that sets `isActive: false`, downgrades/replaces roles, or resets passwords MUST immediately revoke that user’s active refresh tokens.
+- Request auth MUST reject inactive users (and must not rely solely on JWT claims for authorization decisions).
+
+## 4. Immutable Audit Trail & Sensitive Read Logging
+
+- Mutations on members, staff roles, church settings, and pastoral notes MUST emit append-only audit entries including at least: `actorId`, `churchId`, `action`, `targetType`, `targetId`, `timestamp` (and `ip` when available).
+- Viewing confidential pastoral notes MUST emit `READ_PASTORAL_NOTE`.
+- Audit log tables/services MUST NOT expose `update` or `delete` APIs. Immutability is a product requirement, not optional.
+
+## 5. Safe Lifecycle (Soft Deletes & GDPR)
+
+- `Member` and `PastoralNote` default to soft-delete via `deletedAt`, with a recovery window.
+- Standard list/get queries exclude soft-deleted rows unless an explicit restore/admin path is used.
+- Hard delete / anonymization is restricted to verified GDPR erasure workflows only.
+- Soft-delete uniqueness stays app-level for Member email (no new unique index without migration approval). Soft-deleted members may be re-created with the same email. Restore is Admin + Pastor. Default recovery window: 30 days (`BACKUP_SOFT_DELETE_RETENTION_DAYS`); purge job opt-in / off by default.
+
+## 6. API & Edge Hardening
+
+- Swagger/OpenAPI (`/api/docs`) MUST be disabled when `NODE_ENV=production` (or equivalently gated so it is unreachable in prod).
+- New endpoints MUST have explicit DTO validation (`class-validator` and/or Zod) and appropriate rate limiting (`@Throttle` / global throttler).
+- Do not weaken Helmet/CORS defaults without a documented threat-model reason.
+
+## 7. Definition of Done (every PR / edit touching tenant data)
+
+- [ ] Tenant scope enforced (extension and/or explicit `churchId` checks)
+- [ ] No plaintext write of pastoral notes / outreach PII
+- [ ] Access-revoking mutations revoke refresh tokens
+- [ ] Audit emission for mutations; `READ_PASTORAL_NOTE` for confidential reads
+- [ ] Soft-delete semantics preserved where applicable
+- [ ] Cross-tenant IDOR automated test added or updated
+- [ ] Existing suites green; no intentional API contract breakage

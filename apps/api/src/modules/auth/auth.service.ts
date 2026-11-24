@@ -873,6 +873,15 @@ export class AuthService {
     return { success: true };
   }
 
+  /** Revoke all active refresh tokens for a user (role change, deactivate, password reset). */
+  async revokeRefreshTokensForUser(userId: string) {
+    const result = await this.prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    return { revoked: result.count };
+  }
+
   async updateAccount(
     userId: string,
     data: Partial<{

@@ -7,7 +7,20 @@ function encryptionKey(keyMaterial?: string): Buffer {
     keyMaterial?.trim() ||
     process.env.INTEGRATION_SECRETS_KEY?.trim() ||
     process.env.JWT_ACCESS_SECRET?.trim() ||
-    'church-hub-dev-integration-secret-change-me';
+    '';
+
+  if (!raw) {
+    const isProd = (process.env.NODE_ENV ?? '').toLowerCase() === 'production';
+    if (isProd) {
+      throw new Error(
+        'Encryption key missing: set INTEGRATION_SECRETS_KEY (or JWT_ACCESS_SECRET) in production',
+      );
+    }
+    throw new Error(
+      'Encryption key missing: set INTEGRATION_SECRETS_KEY, JWT_ACCESS_SECRET, or pass keyMaterial (dev)',
+    );
+  }
+
   return createHash('sha256').update(raw).digest();
 }
 

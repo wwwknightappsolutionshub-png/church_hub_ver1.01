@@ -100,9 +100,27 @@ export class MembershipController {
     );
   }
 
+  @Get('members-trash')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({ summary: 'List soft-deleted members (Admin / Pastor trash)' })
+  listDeletedMembers(@ChurchId() churchId: string) {
+    return this.membershipService.listDeletedMembers(churchId);
+  }
+
+  @Post('members/:id/restore')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({ summary: 'Restore a soft-deleted member (Admin / Pastor)' })
+  restoreMember(
+    @ChurchId() churchId: string,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.membershipService.restoreMember(churchId, id, user.userId);
+  }
+
   @Delete('members/:id')
   @Roles('ADMIN', 'PASTOR')
-  @ApiOperation({ summary: 'Remove a member record (Admin or Pastor only)' })
+  @ApiOperation({ summary: 'Soft-delete a member record (Admin or Pastor only)' })
   deleteMember(
     @ChurchId() churchId: string,
     @Param('id') id: string,

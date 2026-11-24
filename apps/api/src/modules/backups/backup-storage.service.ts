@@ -6,6 +6,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Readable } from 'stream';
 import { BackupCryptoService, downloadFileName, sha256Hex } from './backup-crypto.service';
+import { BackupOffsiteService } from './backup-offsite.service';
 
 @Injectable()
 export class BackupStorageService implements OnModuleInit {
@@ -16,6 +17,7 @@ export class BackupStorageService implements OnModuleInit {
   constructor(
     private readonly config: ConfigService,
     private readonly crypto: BackupCryptoService,
+    private readonly offsite: BackupOffsiteService,
   ) {}
 
   async onModuleInit() {
@@ -96,6 +98,17 @@ export class BackupStorageService implements OnModuleInit {
     await writeFile(abs, toStore, { mode: 0o600 });
     await chmod(dirname(abs), 0o700).catch(() => undefined);
     await chmod(abs, 0o600).catch(() => undefined);
+
+    if (this.offsite.isEnabled) {
+      try {
+        await this.offsite.uploadArtifact(storageKey, abs);
+      } catch (err) {
+        this.logger.warn(
+          `Off-site upload failed for ${storageKey}: ${err instanceof Error ? err.message : err}`,
+        );
+      }
+    }
+
     return {
       byteSize: toStore.length,
       checksumSha256,

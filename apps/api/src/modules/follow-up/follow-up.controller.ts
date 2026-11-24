@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   Param,
@@ -275,6 +276,35 @@ export class FollowUpController {
     @Query('followUpId') followUpId?: string,
   ) {
     return this.followUpService.getPastoralNotes(churchId, user.userId, { memberId, followUpId });
+  }
+
+  @Get('pastoral-notes/trash')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({ summary: 'List soft-deleted pastoral notes' })
+  listDeletedNotes(@ChurchId() churchId: string) {
+    return this.followUpService.listDeletedPastoralNotes(churchId);
+  }
+
+  @Post('pastoral-notes/:id/restore')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({ summary: 'Restore a soft-deleted pastoral note' })
+  restoreNote(
+    @ChurchId() churchId: string,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.followUpService.restorePastoralNote(churchId, id, user.userId);
+  }
+
+  @Delete('pastoral-notes/:id')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({ summary: 'Soft-delete a pastoral note' })
+  softDeleteNote(
+    @ChurchId() churchId: string,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.followUpService.softDeletePastoralNote(churchId, id, user.userId);
   }
 
   @Get('calendar')

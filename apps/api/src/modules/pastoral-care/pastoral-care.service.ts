@@ -4,11 +4,19 @@ import {
   CounselingCaseStatus,
   CounselingCategory,
 } from '@prisma/client';
+import {
+  encryptPastoralNoteContent,
+  mapPastoralNoteRow,
+} from '../../common/crypto/pastoral-notes.crypto';
+import { SecurityAuditService } from '../../common/security/security-audit.service';
 import { PrismaService } from '../../prisma/prisma.module';
 
 @Injectable()
 export class PastoralCareService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly securityAudit: SecurityAuditService,
+  ) {}
 
   // ─── Counseling cases ─────────────────────────────────────
 
@@ -183,17 +191,25 @@ export class PastoralCareService {
     if (!data.memberId && !data.followUpId) {
       throw new NotFoundException('memberId or followUpId required');
     }
-    return this.prisma.pastoralNote.create({
+    const created = await this.prisma.pastoralNote.create({
       data: {
         churchId,
         authorId,
         memberId: data.memberId,
         followUpId: data.followUpId,
-        content: data.content,
+        content: encryptPastoralNoteContent(data.content),
         isConfidential: data.isConfidential ?? true,
       },
       include: { author: { select: { id: true, firstName: true, lastName: true } } },
     });
+    await this.securityAudit.append({
+      churchId,
+      actorId: authorId,
+      action: 'CREATE_PASTORAL_NOTE',
+      targetType: 'PastoralNote',
+      targetId: created.id,
+    });
+    return mapPastoralNoteRow(created);
   }
 
   async listNotes(
@@ -211,7 +227,23 @@ export class PastoralCareService {
       orderBy: { createdAt: 'desc' },
     });
     const isStaff = await this.userIsStaff(requesterId);
-    return notes.filter((n) => isStaff || !n.isConfidential || n.authorId === requesterId);
+    const visible = notes
+      .filter((n) => isStaff || !n.isConfidential || n.authorId === requesterId)
+      .map((n) => mapPastoralNoteRow(n));
+    await Promise.all(
+      visible
+        .filter((n) => n.isConfidential)
+        .map((n) =>
+          this.securityAudit.append({
+            churchId,
+            actorId: requesterId,
+            action: 'READ_PASTORAL_NOTE',
+            targetType: 'PastoralNote',
+            targetId: n.id,
+          }),
+        ),
+    );
+    return visible;
   }
 
   async getStats(churchId: string) {

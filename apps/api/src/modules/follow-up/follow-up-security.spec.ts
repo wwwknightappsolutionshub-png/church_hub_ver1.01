@@ -100,6 +100,7 @@ describe('Establishment security hardenings', () => {
       { onFollowUpEvent: jest.fn() } as never,
       moduleAccess as never,
       pipelineResolve as never,
+      { append: jest.fn() } as never,
     );
 
     beforeEach(() => {
@@ -185,6 +186,7 @@ describe('Establishment security hardenings', () => {
       {} as never,
       moduleAccess as never,
       pipelineResolve as never,
+      { append: jest.fn() } as never,
     );
 
     it('hides confidential notes from non-staff viewers', async () => {

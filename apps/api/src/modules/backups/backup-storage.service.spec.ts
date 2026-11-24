@@ -22,7 +22,12 @@ async function makeStorage(opts: {
   } as ConfigService;
   const crypto = new BackupCryptoService(config);
   await crypto.onModuleInit();
-  const storage = new BackupStorageService(config, crypto);
+  const offsite = {
+    isEnabled: false,
+    uploadArtifact: jest.fn(),
+    onModuleInit: () => undefined,
+  };
+  const storage = new BackupStorageService(config, crypto, offsite as never);
   await storage.onModuleInit();
   return { storage, crypto };
 }
@@ -119,7 +124,8 @@ describe('BackupStorageService production secret', () => {
     } as ConfigService;
     const crypto = new BackupCryptoService(config);
     await crypto.onModuleInit();
-    const storage = new BackupStorageService(config, crypto);
+    const offsite = { isEnabled: false, uploadArtifact: jest.fn() };
+    const storage = new BackupStorageService(config, crypto, offsite as never);
     await expect(storage.onModuleInit()).rejects.toThrow(/BACKUP_DOWNLOAD_SECRET/);
     await rm(root, { recursive: true, force: true });
   });

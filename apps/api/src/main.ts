@@ -49,19 +49,29 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api/v1');
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('Church_Hub API')
-    .setDescription('Church community management platform API')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document);
+  const isProd = (process.env.NODE_ENV ?? '').toLowerCase() === 'production';
+  const swaggerEnabled =
+    !isProd || process.env.ENABLE_SWAGGER === 'true' || process.env.ENABLE_SWAGGER === '1';
+
+  if (swaggerEnabled) {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('Church_Hub API')
+      .setDescription('Church community management platform API')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/docs', app, document);
+  }
 
   const port = process.env.API_PORT ?? 4000;
   await app.listen(port);
   logger.log(`Church_Hub API running on http://localhost:${port}`);
-  logger.log(`Swagger docs at http://localhost:${port}/api/docs`);
+  if (swaggerEnabled) {
+    logger.log(`Swagger docs at http://localhost:${port}/api/docs`);
+  } else {
+    logger.log('Swagger docs disabled in production');
+  }
 }
 
 bootstrap();

@@ -63,11 +63,14 @@ See [deploy/AAPANEL-church-hub.wazconnect.com.md](./deploy/AAPANEL-church-hub.wa
 
 ## Security
 
-- JWT access + refresh token rotation
+Enterprise engineering rules live in [`.cursor/rules/security.mdc`](../.cursor/rules/security.mdc) (`alwaysApply`).
+
+- JWT access + refresh token rotation (revoke on role/password/deactivate)
 - RBAC with role/permission tables
-- Helmet security headers
+- Helmet security headers; Swagger disabled in production
 - Input validation via Zod + class-validator
-- Multi-tenant ready via `churchId` scoping
+- Multi-tenant scoping via `churchId` (+ optional Postgres RLS)
+- Pastoral notes / outreach PII encrypted at rest (AES-256-GCM)
 
 ## Offline Sync
 

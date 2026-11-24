@@ -20,6 +20,7 @@ import {
   UpdateChurchStaffDto,
 } from './dto/church-staff.dto';
 import { detachUserReferences } from '../../common/detach-user-references';
+import { SecurityAuditService } from '../../common/security/security-audit.service';
 
 @Injectable()
 export class ChurchStaffService {
@@ -31,6 +32,7 @@ export class ChurchStaffService {
     private readonly email: EmailAdapter,
     private readonly auth: AuthService,
     private readonly sms: SmsAdapter,
+    private readonly securityAudit: SecurityAuditService,
   ) {}
 
   private async roleIds(names: string[]) {
@@ -346,6 +348,42 @@ export class ChurchStaffService {
       await this.prisma.userRole.createMany({
         data: roles.map((r) => ({ userId: id, roleId: r.id })),
       });
+    }
+
+    const shouldRevokeSessions =
+      Boolean(dto.password) ||
+      dto.isActive === false ||
+      Boolean(dto.roles?.length);
+    if (shouldRevokeSessions) {
+      await this.auth.revokeRefreshTokensForUser(id);
+      if (dto.password) {
+        await this.securityAudit.append({
+          churchId,
+          actorId: actorUserId,
+          action: 'STAFF_PASSWORD_CHANGED',
+          targetType: 'User',
+          targetId: id,
+        });
+      }
+      if (dto.isActive === false) {
+        await this.securityAudit.append({
+          churchId,
+          actorId: actorUserId,
+          action: 'STAFF_DEACTIVATED',
+          targetType: 'User',
+          targetId: id,
+        });
+      }
+      if (dto.roles?.length) {
+        await this.securityAudit.append({
+          churchId,
+          actorId: actorUserId,
+          action: 'STAFF_ROLE_CHANGED',
+          targetType: 'User',
+          targetId: id,
+          metadata: { roles: dto.roles },
+        });
+      }
     }
 
     if (dto.firstName || dto.lastName || dto.email) {

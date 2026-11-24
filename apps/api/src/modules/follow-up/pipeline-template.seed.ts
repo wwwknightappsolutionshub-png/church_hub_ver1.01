@@ -1,4 +1,6 @@
-import type { PrismaClient } from '@prisma/client';
+/** Accepts PrismaClient or Nest PrismaService (extended client). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type PipelineSeedPrisma = any;
 
 /** System template key for the Winners Chapel default journey (Phase 0 baseline). */
 export const WINNERS_DEFAULT_PIPELINE_KEY = 'winners_default';
@@ -127,7 +129,7 @@ export const SIMPLE_VISITOR_STAGES: PipelineStageSeed[] = WINNERS_DEFAULT_STAGES
 ).map((s, idx) => ({ ...s, sortOrder: idx + 1 }));
 
 async function upsertTemplateWithStages(
-  prisma: PrismaClient,
+  prisma: PipelineSeedPrisma,
   opts: {
     key: string;
     name: string;
@@ -183,7 +185,7 @@ async function upsertTemplateWithStages(
  * Safe to re-run from seed or Phase 1 QA scripts.
  */
 export async function ensureWinnersDefaultPipelineTemplate(
-  prisma: PrismaClient,
+  prisma: PipelineSeedPrisma,
 ): Promise<{ id: string; key: string; version: number; stageCount: number }> {
   return upsertTemplateWithStages(prisma, {
     key: WINNERS_DEFAULT_PIPELINE_KEY,
@@ -196,7 +198,7 @@ export async function ensureWinnersDefaultPipelineTemplate(
 
 /** Idempotent upsert of `simple_visitor` (4-stage subset of winners keys). */
 export async function ensureSimpleVisitorPipelineTemplate(
-  prisma: PrismaClient,
+  prisma: PipelineSeedPrisma,
 ): Promise<{ id: string; key: string; version: number; stageCount: number }> {
   return upsertTemplateWithStages(prisma, {
     key: SIMPLE_VISITOR_PIPELINE_KEY,
@@ -208,7 +210,7 @@ export async function ensureSimpleVisitorPipelineTemplate(
 }
 
 /** Ensure all Phase 6 system templates exist. */
-export async function ensureSystemPipelineTemplates(prisma: PrismaClient) {
+export async function ensureSystemPipelineTemplates(prisma: PipelineSeedPrisma) {
   const winners = await ensureWinnersDefaultPipelineTemplate(prisma);
   const simple = await ensureSimpleVisitorPipelineTemplate(prisma);
   return { winners, simple };
@@ -219,7 +221,7 @@ export async function ensureSystemPipelineTemplates(prisma: PrismaClient) {
  * Used by Phase 8 regression / admin repair after QA bumps.
  */
 export async function resyncSystemPipelineTemplateFromSeed(
-  prisma: PrismaClient,
+  prisma: PipelineSeedPrisma,
   templateKey: string,
 ): Promise<{ id: string; key: string; version: number; stageCount: number }> {
   const catalog: Record<

@@ -11,6 +11,7 @@ import {
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { randomBytes, randomUUID } from 'crypto';
+import { decryptPastoralNoteContent } from '../../common/crypto/pastoral-notes.crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PlatformCmsService } from './platform-cms.service';
 import { RecordConsentDto, UpdateDsarDto } from './dto/platform-cms.dto';
@@ -183,9 +184,9 @@ export class PlatformPrivacyService {
       sentInApp,
       receivedInApp,
     ] = await Promise.all([
-      memberId
+      memberId && user.churchId
         ? this.prisma.pastoralNote.findMany({
-            where: { memberId },
+            where: { memberId, churchId: user.churchId },
             orderBy: { createdAt: 'desc' },
             take: 200,
             select: {
@@ -289,7 +290,10 @@ export class PlatformPrivacyService {
       consents: user.consentRecords,
       priorRequests: user.dsarRequests,
       notifications: user.notifications,
-      pastoralNotes,
+      pastoralNotes: pastoralNotes.map((n) => ({
+        ...n,
+        content: decryptPastoralNoteContent(n.content),
+      })),
       attendance,
       communications: {
         chatMessages,
