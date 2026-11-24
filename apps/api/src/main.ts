@@ -84,5 +84,6 @@ async function bootstrap() {
 
 function isProdEnv() {
   return (process.env.NODE_ENV ?? '').toLowerCase() === 'production';
+}
 
 bootstrap();

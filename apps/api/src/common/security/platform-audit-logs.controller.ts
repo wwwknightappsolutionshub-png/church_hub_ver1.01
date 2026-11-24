@@ -62,7 +62,7 @@ export class PlatformAuditLogsController {
           targetType: query.targetType,
           ip: query.ip,
           search: query.search,
-          take: query.take ?? 5000,
+          take: query.exportTake ?? query.take ?? 5000,
         },
         format,
       ),

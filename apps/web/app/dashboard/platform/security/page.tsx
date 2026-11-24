@@ -73,7 +73,7 @@ export default function PlatformSecurityAuditPage() {
     try {
       const exportParams = new URLSearchParams(params);
       exportParams.set('format', 'csv');
-      exportParams.set('take', '5000');
+      exportParams.set('exportTake', '5000');
       const res = await api.post(`/platform/audit-logs/export?${exportParams.toString()}`, null, {
         responseType: 'blob',
       });

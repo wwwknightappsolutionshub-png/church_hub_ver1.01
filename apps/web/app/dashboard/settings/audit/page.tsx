@@ -104,7 +104,7 @@ export default function AuditLogsSettingsPage() {
     try {
       const exportParams = new URLSearchParams(params);
       exportParams.set('format', 'csv');
-      exportParams.set('take', '5000');
+      exportParams.set('exportTake', '5000');
       const res = await api.post(`/audit-logs/export?${exportParams.toString()}`, null, {
         responseType: 'blob',
       });

@@ -56,12 +56,13 @@ export class AuditLogExportDto extends AuditLogQueryDto {
   @IsIn(['csv', 'json'])
   format?: 'csv' | 'json';
 
+  /** Export row cap (service hard-caps at 5000; query DTO max 100 does not apply here). */
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(5000)
-  take?: number;
+  exportTake?: number;
 }
 
 export class ActivityLogQueryDto {

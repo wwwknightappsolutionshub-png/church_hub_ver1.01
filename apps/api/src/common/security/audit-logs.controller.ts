@@ -62,7 +62,7 @@ export class AuditLogsController {
         actorId: query.actorId,
         targetType: query.targetType,
         search: query.search,
-        take: query.take ?? 5000,
+        take: query.exportTake ?? query.take ?? 5000,
       },
       format,
     );
