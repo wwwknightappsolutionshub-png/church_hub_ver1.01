@@ -5,6 +5,8 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { AuthzDenialService } from '../../common/security/authz-denial.service';
+import { resolveClientIp } from '../../common/security/client-ip';
 import { ModuleAccessService } from '../access/module-access.service';
 import { MODULE_GATE_KEY, type ModuleGateType } from './decorators';
 
@@ -30,6 +32,7 @@ export class ModuleAccessGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
     private readonly moduleAccess: ModuleAccessService,
+    private readonly authzDenial: AuthzDenialService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -42,6 +45,7 @@ export class ModuleAccessGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const user = request.user;
     if (!user?.userId || !user?.churchId) {
+      this.deny(request, user, gate, 'Authentication required');
       throw new ForbiddenException('Authentication required');
     }
 
@@ -71,8 +75,32 @@ export class ModuleAccessGuard implements CanActivate {
     }
 
     if (!allowed) {
+      this.deny(request, user, gate, GATE_MESSAGES[gate]);
       throw new ForbiddenException(GATE_MESSAGES[gate]);
     }
     return true;
+  }
+
+  private deny(
+    request: {
+      ip?: string;
+      socket?: { remoteAddress?: string };
+      method?: string;
+      url?: string;
+      originalUrl?: string;
+    },
+    user: { userId?: string; churchId?: string } | undefined,
+    gate: ModuleGateType | string,
+    reason: string,
+  ) {
+    this.authzDenial.recordDenial({
+      actorId: user?.userId ?? null,
+      churchId: user?.churchId ?? null,
+      ip: resolveClientIp(request),
+      route: `${request.method ?? 'GET'} ${request.originalUrl ?? request.url ?? ''}`,
+      reason,
+      required: gate,
+      gate: 'ModuleAccessGuard',
+    });
   }
 }

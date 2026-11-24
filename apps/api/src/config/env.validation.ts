@@ -27,6 +27,13 @@ const EnvSchema = z
     BACKUP_SOFT_DELETE_RETENTION_DAYS: z.string().optional(),
     ENABLE_DB_RLS: boolish,
     ENABLE_SOFT_DELETE_PURGE: boolish,
+    AUDIT_ARCHIVE_ENABLED: boolish,
+    AUDIT_HOT_RETENTION_DAYS: z.string().optional(),
+    AUDIT_ARCHIVE_MIN_INTERVAL_DAYS: z.string().optional(),
+    AUTHZ_ABUSE_THRESHOLD: z.string().optional(),
+    AUTHZ_ABUSE_WINDOW_MINUTES: z.string().optional(),
+    AUTHZ_DENIED_DEDUPE_SECONDS: z.string().optional(),
+    TRUST_PROXY: z.string().optional(),
     S3_ENDPOINT: z.string().optional(),
     S3_BUCKET: z.string().optional(),
     S3_ACCESS_KEY: z.string().optional(),
@@ -46,16 +53,25 @@ const EnvSchema = z
       });
     }
 
-    if (env.BACKUP_OFFSITE_ENABLED) {
+    if (env.BACKUP_OFFSITE_ENABLED || env.AUDIT_ARCHIVE_ENABLED) {
       for (const key of ['S3_ENDPOINT', 'S3_BUCKET', 'S3_ACCESS_KEY', 'S3_SECRET_KEY'] as const) {
         if (!env[key]?.trim()) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: [key],
-            message: `${key} is required when BACKUP_OFFSITE_ENABLED=true`,
+            message: `${key} is required when BACKUP_OFFSITE_ENABLED or AUDIT_ARCHIVE_ENABLED is true`,
           });
         }
       }
+    }
+
+    if (env.AUDIT_ARCHIVE_ENABLED && !env.BACKUP_ENCRYPTION_KEY?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['BACKUP_ENCRYPTION_KEY'],
+        message:
+          'BACKUP_ENCRYPTION_KEY is required when AUDIT_ARCHIVE_ENABLED=true (JWT_ACCESS_SECRET must not be used for archive encryption)',
+      });
     }
   });
 

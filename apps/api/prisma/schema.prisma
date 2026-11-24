@@ -283,6 +283,8 @@ model SecurityAuditLog {
   @@index([churchId, createdAt])
   @@index([action, createdAt])
   @@index([targetType, targetId])
+  @@index([actorId, createdAt])
+  @@index([ip, createdAt])
   @@map("security_audit_logs")
 }
 
@@ -5256,11 +5258,17 @@ model PlatformBroadcast {
   createdByUserId String
   notificationCount Int    @default(0)
   createdAt       DateTime @default(now())
+  /// BROADCAST | RELEASE
+  kind            String   @default("BROADCAST")
+  /// FEATURE | SECURITY | IMPROVEMENT | MAINTENANCE (release notes)
+  category        String?
+  version         String?
 
   createdBy  User                        @relation("PlatformBroadcastSender", fields: [createdByUserId], references: [id], onDelete: Cascade)
   deliveries PlatformBroadcastDelivery[]
 
   @@index([createdAt])
+  @@index([kind, createdAt])
   @@map("platform_broadcasts")
 }
 

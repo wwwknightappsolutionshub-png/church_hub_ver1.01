@@ -32,6 +32,9 @@ interface BroadcastRow {
   sendEmail: boolean;
   notificationCount: number;
   createdAt: string;
+  kind?: string;
+  category?: string | null;
+  version?: string | null;
   createdBy: { firstName: string; lastName: string };
   deliveries: Array<{ church: { id: string; name: string } }>;
 }
@@ -77,6 +80,9 @@ export default function PlatformInboxInner() {
     body: '',
     sendEmail: false,
     churchIds: [] as string[],
+    kind: 'BROADCAST' as 'BROADCAST' | 'RELEASE',
+    category: '' as string,
+    version: '',
   });
   const [showBroadcast, setShowBroadcast] = useState(false);
 
@@ -176,11 +182,28 @@ export default function PlatformInboxInner() {
         body: broadcastForm.body.trim(),
         sendEmail: broadcastForm.sendEmail,
         churchIds: broadcastForm.churchIds.length ? broadcastForm.churchIds : undefined,
+        kind: broadcastForm.kind,
+        category: broadcastForm.kind === 'RELEASE' && broadcastForm.category
+          ? broadcastForm.category
+          : undefined,
+        version: broadcastForm.version.trim() || undefined,
       });
-      setBroadcastForm({ title: '', body: '', sendEmail: false, churchIds: [] });
+      setBroadcastForm({
+        title: '',
+        body: '',
+        sendEmail: false,
+        churchIds: [],
+        kind: 'BROADCAST',
+        category: '',
+        version: '',
+      });
       setShowBroadcast(false);
       void refetchBroadcasts();
-      toast.success('Broadcast sent to tenant staff');
+      toast.success(
+        broadcastForm.kind === 'RELEASE'
+          ? 'Release note published to tenants'
+          : 'Broadcast sent to tenant staff',
+      );
     } catch (err) {
       toast.error(apiErrorMessage(err, 'Could not send broadcast'));
     } finally {
@@ -388,9 +411,27 @@ export default function PlatformInboxInner() {
           {showBroadcast ? (
             <Card className="mb-4">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Broadcast to tenants</CardTitle>
+                <CardTitle className="text-base">Release notes & tenant broadcasts</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={broadcastForm.kind === 'BROADCAST' ? 'default' : 'outline'}
+                    onClick={() => setBroadcastForm({ ...broadcastForm, kind: 'BROADCAST' })}
+                  >
+                    Broadcast
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={broadcastForm.kind === 'RELEASE' ? 'default' : 'outline'}
+                    onClick={() => setBroadcastForm({ ...broadcastForm, kind: 'RELEASE' })}
+                  >
+                    Product release
+                  </Button>
+                </div>
                 <Input
                   placeholder="Title"
                   value={broadcastForm.title}
@@ -398,10 +439,38 @@ export default function PlatformInboxInner() {
                 />
                 <Textarea
                   rows={5}
-                  placeholder="Announcement for church admins and pastors…"
+                  placeholder={
+                    broadcastForm.kind === 'RELEASE'
+                      ? 'What’s new — feature / security update for all tenant users…'
+                      : 'Announcement for church admins and pastors…'
+                  }
                   value={broadcastForm.body}
                   onChange={(e) => setBroadcastForm({ ...broadcastForm, body: e.target.value })}
                 />
+                {broadcastForm.kind === 'RELEASE' ? (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      value={broadcastForm.category}
+                      onChange={(e) =>
+                        setBroadcastForm({ ...broadcastForm, category: e.target.value })
+                      }
+                    >
+                      <option value="">Category…</option>
+                      <option value="FEATURE">Feature</option>
+                      <option value="SECURITY">Security</option>
+                      <option value="IMPROVEMENT">Improvement</option>
+                      <option value="MAINTENANCE">Maintenance</option>
+                    </select>
+                    <Input
+                      placeholder="Version (e.g. 1.4.0)"
+                      value={broadcastForm.version}
+                      onChange={(e) =>
+                        setBroadcastForm({ ...broadcastForm, version: e.target.value })
+                      }
+                    />
+                  </div>
+                ) : null}
                 <label className="flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"
@@ -433,7 +502,7 @@ export default function PlatformInboxInner() {
                 </div>
                 <Button disabled={busy} onClick={() => void sendBroadcast()}>
                   <Send className="mr-1.5 h-4 w-4" />
-                  Send broadcast
+                  {broadcastForm.kind === 'RELEASE' ? 'Publish & push to tenants' : 'Send broadcast'}
                 </Button>
               </CardContent>
             </Card>
@@ -458,11 +527,16 @@ export default function PlatformInboxInner() {
                           {b.body}
                         </p>
                       </div>
-                      <Badge variant="secondary">{b.audience}</Badge>
+                      <div className="flex flex-wrap gap-1">
+                        <Badge variant="secondary">{b.kind ?? 'BROADCAST'}</Badge>
+                        {b.category ? <Badge variant="outline">{b.category}</Badge> : null}
+                        <Badge variant="secondary">{b.audience}</Badge>
+                      </div>
                     </div>
                     <p className="mt-2 text-[11px] text-muted-foreground">
                       {new Date(b.createdAt).toLocaleString()} · {b.notificationCount} in-app
-                      {b.sendEmail ? ' · email' : ''} ·{' '}
+                      {b.sendEmail ? ' · email' : ''}
+                      {b.version ? ` · ${b.version}` : ''} ·{' '}
                       {b.createdBy.firstName} {b.createdBy.lastName}
                     </p>
                   </div>

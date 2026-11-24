@@ -5,6 +5,8 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { AuthzDenialService } from '../../common/security/authz-denial.service';
+import { resolveClientIp } from '../../common/security/client-ip';
 import { ModuleAccessService } from '../access/module-access.service';
 import { FOLLOW_UP_ACCESS_KEY, MODULE_GATE_KEY } from './decorators';
 
@@ -13,6 +15,7 @@ export class FollowUpAccessGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
     private readonly moduleAccess: ModuleAccessService,
+    private readonly authzDenial: AuthzDenialService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -31,6 +34,7 @@ export class FollowUpAccessGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const user = request.user;
     if (!user?.userId || !user?.churchId) {
+      this.deny(request, user, 'Authentication required');
       throw new ForbiddenException('Authentication required');
     }
 
@@ -39,10 +43,33 @@ export class FollowUpAccessGuard implements CanActivate {
       user.churchId,
     );
     if (!allowed) {
-      throw new ForbiddenException(
-        'Follow-Up access requires church staff, evangelism/follow-up unit membership, or an approved discipleship role',
-      );
+      const reason =
+        'Follow-Up access requires church staff, evangelism/follow-up unit membership, or an approved discipleship role';
+      this.deny(request, user, reason);
+      throw new ForbiddenException(reason);
     }
     return true;
+  }
+
+  private deny(
+    request: {
+      ip?: string;
+      socket?: { remoteAddress?: string };
+      method?: string;
+      url?: string;
+      originalUrl?: string;
+    },
+    user: { userId?: string; churchId?: string } | undefined,
+    reason: string,
+  ) {
+    this.authzDenial.recordDenial({
+      actorId: user?.userId ?? null,
+      churchId: user?.churchId ?? null,
+      ip: resolveClientIp(request),
+      route: `${request.method ?? 'GET'} ${request.originalUrl ?? request.url ?? ''}`,
+      reason,
+      required: 'followUp',
+      gate: 'FollowUpAccessGuard',
+    });
   }
 }

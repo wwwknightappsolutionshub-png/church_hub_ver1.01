@@ -105,6 +105,61 @@ export class BackupOffsiteService implements OnModuleInit {
 
     return { etag: res.headers.get('etag') ?? undefined };
   }
+
+  /**
+   * HEAD the object and confirm it exists with the expected byte size
+   * before callers delete local/hot copies.
+   */
+  async verifyArtifact(
+    storageKey: string,
+    expectedBytes: number,
+  ): Promise<{ ok: boolean; reason?: string; etag?: string }> {
+    if (!this.enabled) return { ok: false, reason: 'offsite_disabled' };
+
+    const key = storageKey.replace(/^\/+/, '');
+    const url = new URL(`${this.endpoint}/${this.bucket}/${key}`);
+    const amzDate = new Date();
+    const dateStamp = amzDate.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+    const ymd = dateStamp.slice(0, 8);
+    const payloadHash = sha256Hex('');
+
+    const headers: Record<string, string> = {
+      host: url.host,
+      'x-amz-content-sha256': payloadHash,
+      'x-amz-date': dateStamp,
+    };
+
+    const signed = signAwsV4({
+      method: 'HEAD',
+      url,
+      headers,
+      bodyHash: payloadHash,
+      accessKey: this.accessKey,
+      secretKey: this.secretKey,
+      region: this.region,
+      service: 's3',
+      amzDate: dateStamp,
+      dateStamp: ymd,
+    });
+
+    const res = await fetch(url, {
+      method: 'HEAD',
+      headers: { ...headers, Authorization: signed },
+    });
+
+    if (!res.ok) {
+      return { ok: false, reason: `head_status_${res.status}` };
+    }
+    const len = parseInt(res.headers.get('content-length') ?? '', 10);
+    if (!Number.isFinite(len) || len !== expectedBytes) {
+      return {
+        ok: false,
+        reason: `size_mismatch expected=${expectedBytes} got=${len}`,
+        etag: res.headers.get('etag') ?? undefined,
+      };
+    }
+    return { ok: true, etag: res.headers.get('etag') ?? undefined };
+  }
 }
 
 function sha256Hex(data: Buffer | string) {

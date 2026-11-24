@@ -5,6 +5,8 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { AuthzDenialService } from '../../common/security/authz-denial.service';
+import { resolveClientIp } from '../../common/security/client-ip';
 import {
   PLATFORM_PERMISSION_KEY,
 } from '../auth/decorators';
@@ -16,6 +18,7 @@ export class PlatformPermissionGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly platformAccess: PlatformAccessService,
+    private readonly authzDenial: AuthzDenialService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -27,13 +30,36 @@ export class PlatformPermissionGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest();
     const userId = request.user?.userId as string | undefined;
-    if (!userId) throw new ForbiddenException('Authentication required');
-
-    await this.platformAccess.assertPlatformOperator(userId);
-
+    const churchId = request.user?.churchId as string | undefined;
     const keys = Array.isArray(required) ? required : [required];
-    for (const key of keys) {
-      await this.platformAccess.assertPermission(userId, key);
+
+    const deny = (reason: string) => {
+      this.authzDenial.recordDenial({
+        actorId: userId ?? null,
+        churchId: churchId ?? null,
+        ip: resolveClientIp(request),
+        route: `${request.method ?? 'GET'} ${request.originalUrl ?? request.url ?? ''}`,
+        reason,
+        required: keys,
+        gate: 'PlatformPermissionGuard',
+      });
+    };
+
+    if (!userId) {
+      deny('Authentication required');
+      throw new ForbiddenException('Authentication required');
+    }
+
+    try {
+      await this.platformAccess.assertPlatformOperator(userId);
+      for (const key of keys) {
+        await this.platformAccess.assertPermission(userId, key);
+      }
+    } catch (err) {
+      if (err instanceof ForbiddenException) {
+        deny(err.message);
+      }
+      throw err;
     }
     return true;
   }

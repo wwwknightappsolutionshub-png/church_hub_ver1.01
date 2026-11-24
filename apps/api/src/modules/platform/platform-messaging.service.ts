@@ -41,8 +41,9 @@ export class PlatformMessagingService {
     });
   }
 
-  async listBroadcasts() {
+  async listBroadcasts(opts?: { kind?: string }) {
     return this.prisma.platformBroadcast.findMany({
+      where: opts?.kind ? { kind: opts.kind } : undefined,
       orderBy: { createdAt: 'desc' },
       take: 50,
       include: {
@@ -61,11 +62,24 @@ export class PlatformMessagingService {
       body: string;
       churchIds?: string[];
       sendEmail?: boolean;
+      kind?: string;
+      category?: string;
+      version?: string;
     },
   ) {
     const title = input.title?.trim();
     const body = input.body?.trim();
     if (!title || !body) throw new BadRequestException('Title and body are required');
+
+    const kind = (input.kind ?? 'BROADCAST').toUpperCase() === 'RELEASE' ? 'RELEASE' : 'BROADCAST';
+    const category = input.category?.trim().toUpperCase() || null;
+    const version = input.version?.trim() || null;
+    if (
+      category &&
+      !['FEATURE', 'SECURITY', 'IMPROVEMENT', 'MAINTENANCE'].includes(category)
+    ) {
+      throw new BadRequestException('Invalid release category');
+    }
 
     let churches = await this.prisma.church.findMany({
       where: { isActive: true },
@@ -80,24 +94,37 @@ export class PlatformMessagingService {
 
     let notificationCount = 0;
     const notificationRows: Prisma.NotificationCreateManyInput[] = [];
+    const notifType = kind === 'RELEASE' ? 'PLATFORM_RELEASE' : 'PLATFORM_BROADCAST';
 
     for (const church of churches) {
-      const staff = await this.staffUserIdsForChurch(church.id);
-      for (const user of staff) {
+      const recipients =
+        kind === 'RELEASE'
+          ? await this.prisma.user.findMany({
+              where: { churchId: church.id, isActive: true },
+              select: { id: true, email: true, firstName: true },
+            })
+          : await this.staffUserIdsForChurch(church.id);
+      for (const user of recipients) {
         notificationRows.push({
           id: randomUUID(),
           churchId: church.id,
           userId: user.id,
           title,
           body,
-          type: 'PLATFORM_BROADCAST',
-          data: { source: 'platform', audience } as Prisma.InputJsonValue,
+          type: notifType,
+          data: {
+            source: 'platform',
+            audience,
+            kind,
+            category,
+            version,
+          } as Prisma.InputJsonValue,
         });
       }
-      notificationCount += staff.length;
+      notificationCount += recipients.length;
 
       if (input.sendEmail) {
-        for (const user of staff) {
+        for (const user of recipients) {
           try {
             await this.email.send({
               churchId: church.id,
@@ -126,6 +153,9 @@ export class PlatformMessagingService {
         sendEmail: !!input.sendEmail,
         createdByUserId: actorUserId,
         notificationCount,
+        kind,
+        category,
+        version,
         deliveries: {
           create: churches.map((c) => ({ churchId: c.id })),
         },
@@ -136,6 +166,33 @@ export class PlatformMessagingService {
     });
 
     return broadcast;
+  }
+
+  async unreadReleaseNotifications(userId: string, churchId: string) {
+    const items = await this.prisma.notification.findMany({
+      where: {
+        churchId,
+        userId,
+        readAt: null,
+        type: 'PLATFORM_RELEASE',
+      },
+      orderBy: { sentAt: 'desc' },
+      take: 20,
+    });
+    return { items, unread: items.length };
+  }
+
+  async dismissReleaseNotifications(userId: string, churchId: string) {
+    await this.prisma.notification.updateMany({
+      where: {
+        churchId,
+        userId,
+        readAt: null,
+        type: 'PLATFORM_RELEASE',
+      },
+      data: { readAt: new Date() },
+    });
+    return { success: true };
   }
 
   async listSupportThreads(opts: { churchId?: string; status?: string }) {

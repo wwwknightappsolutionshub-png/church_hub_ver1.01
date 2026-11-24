@@ -9,6 +9,7 @@ import {
   GitBranch,
   Loader2,
   LogOut,
+  ScrollText,
   Shield,
   User,
   UserCircle2,
@@ -258,6 +259,7 @@ export default function SettingsPage() {
         ]
       : []),
     ...(isChurchStaff ? [{ id: 'settings-backup', label: 'Backup' }] : []),
+    ...(showLeadershipPrivacySession ? [{ id: 'settings-audit', label: 'Audit logs' }] : []),
     ...(showLeadershipPrivacySession ? [{ id: 'settings-session', label: 'Session' }] : []),
     ...(canAccessMyProfile ? [{ id: 'settings-membership', label: 'Membership' }] : []),
   ];
@@ -491,6 +493,20 @@ export default function SettingsPage() {
                 index={sectionIndex['settings-backup']}
                 icon={<DatabaseBackup className="h-4 w-4" aria-hidden />}
               />
+            ) : null}
+
+            {activeId === 'settings-audit' && showLeadershipPrivacySession ? (
+              <SettingsSection
+                id="settings-audit"
+                index={sectionIndex['settings-audit']}
+                title="Audit & Activity Logs"
+                description="Security events, member activity, and follow-up stage history. Export CSV for GDPR accountability."
+                icon={<ScrollText className="h-4 w-4" aria-hidden />}
+              >
+                <Button variant="outline" asChild>
+                  <Link href="/dashboard/settings/audit">Open audit logs</Link>
+                </Button>
+              </SettingsSection>
             ) : null}
 
             {activeId === 'settings-session' && showLeadershipPrivacySession ? (

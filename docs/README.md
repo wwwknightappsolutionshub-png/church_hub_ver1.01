@@ -71,6 +71,8 @@ Enterprise engineering rules live in [`.cursor/rules/security.mdc`](../.cursor/r
 - Input validation via Zod + class-validator
 - Multi-tenant scoping via `churchId` (+ optional Postgres RLS)
 - Pastoral notes / outreach PII encrypted at rest (AES-256-GCM)
+- Phase 2 hardening: [docs/security/PHASE2-HARDENING.md](./security/PHASE2-HARDENING.md)
+- Phase 3 audit / abuse / releases: [docs/security/PHASE3-MONITORING.md](./security/PHASE3-MONITORING.md)
 
 ## Offline Sync
 

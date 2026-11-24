@@ -23,6 +23,7 @@ import { accountAvatarUrl, userDisplayName } from '@/lib/user-display';
 import { UserAvatar } from '@/components/app/UserAvatar';
 import { LogoutButton } from '@/components/app/LogoutButton';
 import { NotificationBell } from '@/components/app/NotificationBell';
+import { WhatsNewBanner } from '@/components/security/WhatsNewBanner';
 import { MobileTabBar } from '@/components/app/MobileTabBar';
 import { MobileMoreMenu } from '@/components/app/MobileMoreMenu';
 import {
@@ -55,6 +56,7 @@ const platformNavAll: (DashboardNavItem & { permission?: string })[] = [
   { href: '/dashboard/platform/integrations', label: 'Integrations', icon: Plug, exact: false, permission: 'platform.integrations:read' },
   { href: '/dashboard/platform/content', label: 'Legal & CMS', icon: FileText, exact: false, permission: 'platform.content:read' },
   { href: '/dashboard/platform/privacy', label: 'Privacy', icon: Shield, exact: false, permission: 'platform.privacy:read' },
+  { href: '/dashboard/platform/security', label: 'Security Audit', icon: Shield, exact: false, permission: 'platform.privacy:read' },
   { href: '/dashboard/platform/wisdom365', label: 'Wisdom365+', icon: Sparkles, exact: false, permission: 'platform.wisdom365:read' },
 ];
 
@@ -656,6 +658,7 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
           </header>
 
           <SkipToMain />
+          {!isPlatformOperator ? <WhatsNewBanner /> : null}
           <main
             id="main-content"
             tabIndex={-1}

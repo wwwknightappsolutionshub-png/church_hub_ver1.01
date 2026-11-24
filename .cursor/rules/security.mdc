@@ -49,7 +49,14 @@ Live multi-tenant SaaS. Prefer zero downtime, zero data loss, and no breaking AP
 - New endpoints MUST have explicit DTO validation (`class-validator` and/or Zod) and appropriate rate limiting (`@Throttle` / global throttler).
 - Do not weaken Helmet/CORS defaults without a documented threat-model reason.
 
-## 7. Definition of Done (every PR / edit touching tenant data)
+## 7. Product & Release Governance
+
+- Every new user-facing feature, security enhancement, or module release MUST include a corresponding `PlatformBroadcast` with `kind=RELEASE` (category/version as applicable) so tenants can be notified on login via What’s New, and Platform Owners can push to all tenants from Messaging.
+- Do not invent a parallel release/announcement table — extend `PlatformBroadcast` + `Notification`.
+- Authorization denials MUST append `AUTHZ_DENIED`; repeated denials in the abuse window MUST emit `AUTHZ_ABUSE_DETECTED` and alert church ADMIN/PASTOR (in-app + branded email).
+- Audit query/export APIs are read/export only — never expose update/delete on `SecurityAuditLog`. Exports MUST emit `AUDIT_LOG_EXPORTED`. Prefer cursor pagination and capped result sets.
+
+## 8. Definition of Done (every PR / edit touching tenant data)
 
 - [ ] Tenant scope enforced (extension and/or explicit `churchId` checks)
 - [ ] No plaintext write of pastoral notes / outreach PII
@@ -57,4 +64,5 @@ Live multi-tenant SaaS. Prefer zero downtime, zero data loss, and no breaking AP
 - [ ] Audit emission for mutations; `READ_PASTORAL_NOTE` for confidential reads
 - [ ] Soft-delete semantics preserved where applicable
 - [ ] Cross-tenant IDOR automated test added or updated
+- [ ] Release note / `PlatformBroadcast` kind=RELEASE when shipping user-facing or security changes (or explicitly deferred with owner approval)
 - [ ] Existing suites green; no intentional API contract breakage

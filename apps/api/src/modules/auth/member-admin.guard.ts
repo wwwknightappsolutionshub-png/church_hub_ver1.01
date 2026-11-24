@@ -5,6 +5,8 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { AuthzDenialService } from '../../common/security/authz-denial.service';
+import { resolveClientIp } from '../../common/security/client-ip';
 import { MembershipAccessService } from '../membership/membership-access.service';
 import { MEMBER_ADMIN_KEY, MEMBER_CREATE_KEY } from './decorators';
 
@@ -13,6 +15,7 @@ export class MemberAdminGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
     private readonly membershipAccess: MembershipAccessService,
+    private readonly authzDenial: AuthzDenialService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -30,6 +33,7 @@ export class MemberAdminGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const user = request.user;
     if (!user?.userId || !user?.churchId) {
+      this.deny(request, user, 'Authentication required', 'memberAuth');
       throw new ForbiddenException('Authentication required');
     }
 
@@ -39,9 +43,9 @@ export class MemberAdminGuard implements CanActivate {
         user.churchId,
       );
       if (!canCreate) {
-        throw new ForbiddenException(
-          'Adding congregants requires an active church account',
-        );
+        const reason = 'Adding congregants requires an active church account';
+        this.deny(request, user, reason, 'memberCreate');
+        throw new ForbiddenException(reason);
       }
       return true;
     }
@@ -52,11 +56,35 @@ export class MemberAdminGuard implements CanActivate {
     );
 
     if (!allowed) {
-      throw new ForbiddenException(
-        'Membership changes require Church Admin, Pastor, or a Member profile with the Admin role',
-      );
+      const reason =
+        'Membership changes require Church Admin, Pastor, or a Member profile with the Admin role';
+      this.deny(request, user, reason, 'memberAdmin');
+      throw new ForbiddenException(reason);
     }
 
     return true;
+  }
+
+  private deny(
+    request: {
+      ip?: string;
+      socket?: { remoteAddress?: string };
+      method?: string;
+      url?: string;
+      originalUrl?: string;
+    },
+    user: { userId?: string; churchId?: string } | undefined,
+    reason: string,
+    required: string,
+  ) {
+    this.authzDenial.recordDenial({
+      actorId: user?.userId ?? null,
+      churchId: user?.churchId ?? null,
+      ip: resolveClientIp(request),
+      route: `${request.method ?? 'GET'} ${request.originalUrl ?? request.url ?? ''}`,
+      reason,
+      required,
+      gate: 'MemberAdminGuard',
+    });
   }
 }

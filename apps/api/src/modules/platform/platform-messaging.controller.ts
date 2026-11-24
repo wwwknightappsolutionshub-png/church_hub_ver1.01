@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { IsArray, IsBoolean, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 import { Roles, RequirePlatformPermission } from '../auth/decorators';
 import { AuthUser, CurrentUser } from '../auth/current-user.decorator';
 import { PlatformMessagingService } from './platform-messaging.service';
@@ -24,6 +24,21 @@ class CreateBroadcastDto {
   @IsOptional()
   @IsBoolean()
   sendEmail?: boolean;
+
+  /** BROADCAST | RELEASE */
+  @IsOptional()
+  @IsIn(['BROADCAST', 'RELEASE', 'broadcast', 'release'])
+  kind?: string;
+
+  /** FEATURE | SECURITY | IMPROVEMENT | MAINTENANCE */
+  @IsOptional()
+  @IsIn(['FEATURE', 'SECURITY', 'IMPROVEMENT', 'MAINTENANCE'])
+  category?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  version?: string;
 }
 
 class CreateSupportThreadDto {
@@ -78,9 +93,17 @@ export class PlatformMessagingController {
   @Post('broadcasts')
   @Roles('PLATFORM_ADMIN')
   @RequirePlatformPermission('platform.messaging:write')
-  @ApiOperation({ summary: 'Broadcast notification to tenant staff' })
+  @ApiOperation({ summary: 'Broadcast notification / release note to tenant staff' })
   createBroadcast(@CurrentUser() user: AuthUser, @Body() body: CreateBroadcastDto) {
     return this.messaging.createBroadcast(user.userId, body);
+  }
+
+  @Get('releases')
+  @Roles('PLATFORM_ADMIN')
+  @RequirePlatformPermission('platform.messaging:read')
+  @ApiOperation({ summary: 'List product release broadcasts' })
+  listReleases() {
+    return this.messaging.listBroadcasts({ kind: 'RELEASE' });
   }
 
   @Get('support/threads')
@@ -193,6 +216,20 @@ export class UserNotificationsController {
   @Get('me')
   mine(@CurrentUser() user: AuthUser) {
     return this.messaging.myNotifications(user.userId, user.churchId);
+  }
+
+  @Get('whats-new')
+  @ApiOperation({ summary: 'Unread platform release notifications for What’s New banner' })
+  whatsNew(@CurrentUser() user: AuthUser) {
+    if (!user.churchId) return { items: [], unread: 0 };
+    return this.messaging.unreadReleaseNotifications(user.userId, user.churchId);
+  }
+
+  @Post('whats-new/dismiss')
+  @ApiOperation({ summary: 'Dismiss What’s New banner (marks release notifications read)' })
+  dismissWhatsNew(@CurrentUser() user: AuthUser) {
+    if (!user.churchId) return { success: false };
+    return this.messaging.dismissReleaseNotifications(user.userId, user.churchId);
   }
 
   @Patch(':id/read')

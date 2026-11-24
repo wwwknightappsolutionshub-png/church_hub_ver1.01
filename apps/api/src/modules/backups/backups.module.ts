@@ -9,6 +9,7 @@ import { TenantExportService } from './tenant-export.service';
 import { BackupsService } from './backups.service';
 import { BackupSchedulerService } from './backup-scheduler.service';
 import { SoftDeletePurgeScheduler } from './soft-delete-purge.scheduler';
+import { AuditArchiveScheduler } from './audit-archive.scheduler';
 import { BackupsProcessor } from './backups.processor';
 import { PlatformBackupsController } from './platform-backups.controller';
 import { TenantBackupsController } from './tenant-backups.controller';
@@ -31,9 +32,10 @@ export class BackupsModule {
         BackupsService,
         BackupSchedulerService,
         SoftDeletePurgeScheduler,
+        AuditArchiveScheduler,
         ...(redisEnabled ? [BackupsProcessor] : []),
       ],
-      exports: [BackupsService],
+      exports: [BackupsService, BackupOffsiteService],
     };
   }
 }

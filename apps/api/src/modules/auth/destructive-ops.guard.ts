@@ -5,6 +5,8 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { AuthzDenialService } from '../../common/security/authz-denial.service';
+import { resolveClientIp } from '../../common/security/client-ip';
 import { PrismaService } from '../../prisma/prisma.module';
 import { IS_PUBLIC_KEY } from './decorators';
 import { ALLOW_MEMBER_OWNED_DELETE_KEY } from './destructive.decorators';
@@ -19,6 +21,7 @@ export class DestructiveOpsGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
     private prisma: PrismaService,
+    private readonly authzDenial: AuthzDenialService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -38,7 +41,10 @@ export class DestructiveOpsGuard implements CanActivate {
     if (allowMemberOwned) return true;
 
     const user = request.user;
-    if (!user?.userId) throw new ForbiddenException('Authentication required');
+    if (!user?.userId) {
+      this.deny(request, user, 'Authentication required');
+      throw new ForbiddenException('Authentication required');
+    }
 
     const userRoles = await this.prisma.userRole.findMany({
       where: { userId: user.userId },
@@ -51,6 +57,30 @@ export class DestructiveOpsGuard implements CanActivate {
     if (userRoles.some((ur) => ur.role.scope === 'PLATFORM')) return true;
     if (roleNames.includes('ADMIN') || roleNames.includes('PASTOR')) return true;
 
-    throw new ForbiddenException('Only Pastor or Admin may delete church data.');
+    const reason = 'Only Pastor or Admin may delete church data.';
+    this.deny(request, user, reason);
+    throw new ForbiddenException(reason);
+  }
+
+  private deny(
+    request: {
+      ip?: string;
+      socket?: { remoteAddress?: string };
+      method?: string;
+      url?: string;
+      originalUrl?: string;
+    },
+    user: { userId?: string; churchId?: string } | undefined,
+    reason: string,
+  ) {
+    this.authzDenial.recordDenial({
+      actorId: user?.userId ?? null,
+      churchId: user?.churchId ?? null,
+      ip: resolveClientIp(request),
+      route: `${request.method ?? 'DELETE'} ${request.originalUrl ?? request.url ?? ''}`,
+      reason,
+      required: ['ADMIN', 'PASTOR'],
+      gate: 'DestructiveOpsGuard',
+    });
   }
 }

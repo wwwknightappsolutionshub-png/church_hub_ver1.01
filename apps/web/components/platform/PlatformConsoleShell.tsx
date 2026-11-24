@@ -81,6 +81,12 @@ const PLATFORM_NAV: PlatformNavItem[] = [
     permission: 'platform.privacy:read',
   },
   {
+    href: '/dashboard/platform/security',
+    label: 'Security Audit',
+    icon: Shield,
+    permission: 'platform.privacy:read',
+  },
+  {
     href: '/dashboard/platform/backups',
     label: 'Backups',
     icon: Database,

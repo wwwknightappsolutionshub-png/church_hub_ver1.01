@@ -21,6 +21,14 @@ async function bootstrap() {
   });
   app.useBodyParser('urlencoded', { limit: '12mb', extended: true });
 
+  // Trust reverse-proxy hops so req.ip is the real client (never parse raw XFF in app code).
+  // TRUST_PROXY: number of hops (default 1 in production), or "false" to disable.
+  const trustProxyRaw = (process.env.TRUST_PROXY ?? (isProdEnv() ? '1' : 'false')).toLowerCase();
+  if (trustProxyRaw !== 'false' && trustProxyRaw !== '0' && trustProxyRaw !== 'off') {
+    const hops = parseInt(trustProxyRaw, 10);
+    app.set('trust proxy', Number.isFinite(hops) && hops > 0 ? hops : 1);
+  }
+
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: 'cross-origin' },
@@ -49,7 +57,7 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api/v1');
 
-  const isProd = (process.env.NODE_ENV ?? '').toLowerCase() === 'production';
+  const isProd = isProdEnv();
   const swaggerEnabled =
     !isProd || process.env.ENABLE_SWAGGER === 'true' || process.env.ENABLE_SWAGGER === '1';
 
@@ -73,5 +81,8 @@ async function bootstrap() {
     logger.log('Swagger docs disabled in production');
   }
 }
+
+function isProdEnv() {
+  return (process.env.NODE_ENV ?? '').toLowerCase() === 'production';
 
 bootstrap();

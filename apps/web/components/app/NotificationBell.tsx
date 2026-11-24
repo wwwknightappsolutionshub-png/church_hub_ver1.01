@@ -175,8 +175,13 @@ export function NotificationBell() {
                         setOpen(false);
                         if (n.type === 'PLATFORM_SUPPORT' && n.data?.threadId) {
                           router.push(`/dashboard/support?thread=${n.data.threadId}`);
-                        } else if (n.type === 'PLATFORM_BROADCAST') {
-                          router.push('/dashboard/support');
+                        } else if (
+                          n.type === 'PLATFORM_BROADCAST' ||
+                          n.type === 'PLATFORM_RELEASE'
+                        ) {
+                          router.push('/dashboard');
+                        } else if (n.type === 'SECURITY_ALERT') {
+                          router.push('/dashboard/settings/audit');
                         } else if (
                           n.type === 'FOLLOW_UP_ARCHIVE_REQUEST' ||
                           n.type === 'FOLLOW_UP_REMINDER' ||
