@@ -51,7 +51,7 @@ export default function PlatformSecurityAuditPage() {
   );
 
   const queryKey = useMemo(
-    () => ['platform-audit', churchId, action, ip, search, cursor],
+    () => ['platform-audit', churchId, action, ip, search, cursor ?? ''],
     [churchId, action, ip, search, cursor],
   );
 

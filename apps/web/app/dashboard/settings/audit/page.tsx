@@ -75,7 +75,7 @@ export default function AuditLogsSettingsPage() {
   const [exporting, setExporting] = useState(false);
 
   const queryKey = useMemo(
-    () => ['audit-logs', tab, action, search, dateFrom, dateTo, cursor],
+    () => ['audit-logs', tab, action, search, dateFrom, dateTo, cursor ?? ''],
     [tab, action, search, dateFrom, dateTo, cursor],
   );
 
