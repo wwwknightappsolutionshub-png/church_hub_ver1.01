@@ -3,6 +3,8 @@ import { Prisma } from '@prisma/client';
 /**
  * Clear Restrict FKs that point at users so a user row (or church cascade) can delete.
  * Prisma default onDelete is Restrict for several author/assignee fields.
+ *
+ * Callers with Prisma `$extends` interactive transactions should cast: `tx as never`.
  */
 export async function detachUserReferences(
   tx: Prisma.TransactionClient,

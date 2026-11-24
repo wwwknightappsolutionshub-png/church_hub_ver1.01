@@ -441,7 +441,7 @@ export class ChurchStaffService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      await detachUserReferences(tx, [id]);
+      await detachUserReferences(tx as never, [id]);
       await tx.user.delete({ where: { id } });
     });
 

@@ -361,7 +361,7 @@ export class PlatformService {
 
           // Detach Restrict FKs, then delete church (cascades users + tenant data).
           // Do NOT delete users first — that is what hits Restrict and fails purge.
-          await this.detachUsersForChurchPurge(tx, userIds);
+          await this.detachUsersForChurchPurge(tx as never, userIds);
           await tx.church.delete({ where: { id: churchId } });
         },
         { timeout: 120_000 },

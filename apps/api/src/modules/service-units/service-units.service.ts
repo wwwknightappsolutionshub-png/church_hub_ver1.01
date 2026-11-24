@@ -1066,7 +1066,7 @@ export class ServiceUnitsService {
 
     return this.prisma.$transaction(
       async (tx) => {
-        await this.reassignUnitDataToUncategorized(tx, churchId, id, uncategorized.id);
+        await this.reassignUnitDataToUncategorized(tx as never, churchId, id, uncategorized.id);
         return tx.serviceUnit.update({
           where: { id },
           data: { isActive: false },
