@@ -160,6 +160,8 @@ pnpm install --frozen-lockfile --prod=false
 
 echo "==> Build shared-types + API"
 export NODE_ENV=production
+# Nest/Next production builds OOMs on smaller VPS heaps without this.
+export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=4096}"
 pnpm --filter @church-hub/shared-types build
 pnpm --filter @church-hub/api exec prisma generate
 pnpm --filter @church-hub/api build
