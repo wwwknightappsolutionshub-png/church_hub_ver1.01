@@ -1,14 +1,40 @@
 /**
  * Idempotent batch encrypt of legacy plaintext PastoralNote.content rows.
  *
- * Usage (from apps/api):
+ * Usage (from apps/api or repo root):
  *   pnpm exec ts-node scripts/encrypt-legacy-pastoral-notes.ts [--dry-run] [--batch=200]
  *
  * Requires DATABASE_URL and PASTORAL_NOTES_KEY (or non-prod fallbacks).
+ * Loads repo-root `.env` automatically when those vars are unset.
  */
+import { existsSync, readFileSync } from 'fs';
+import { resolve } from 'path';
 import { PrismaClient } from '@prisma/client';
 import { isEncryptedSecret } from '../src/common/crypto/secret-box';
 import { encryptPastoralNoteContent } from '../src/common/crypto/pastoral-notes.crypto';
+
+function loadEnvFile(path: string) {
+  if (!existsSync(path)) return;
+  for (const line of readFileSync(path, 'utf8').split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq <= 0) continue;
+    const key = trimmed.slice(0, eq).trim();
+    let val = trimmed.slice(eq + 1).trim();
+    if (
+      (val.startsWith('"') && val.endsWith('"')) ||
+      (val.startsWith("'") && val.endsWith("'"))
+    ) {
+      val = val.slice(1, -1);
+    }
+    if (process.env[key] === undefined) process.env[key] = val;
+  }
+}
+
+// Prefer monorepo root .env (VPS: /www/wwwroot/.../ChurchApp/.env)
+loadEnvFile(resolve(__dirname, '../../../.env'));
+loadEnvFile(resolve(__dirname, '../../.env'));
 
 async function main() {
   const dryRun = process.argv.includes('--dry-run');
