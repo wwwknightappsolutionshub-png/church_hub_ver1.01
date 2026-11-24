@@ -1,11 +1,16 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import type { Request } from 'express';
 import { Public } from '../auth/decorators';
+import { AuthAccessGuard } from '../auth/auth-access.guard';
+import { AuthAccessScope } from '../auth/auth-access-scope.decorator';
+import { clientIpFromRequest } from '../auth/auth-client-ip.util';
 import { MarketingTrialService } from './marketing-trial.service';
 
 @ApiTags('marketing-trial')
 @Controller('marketing/trial-access')
+@UseGuards(AuthAccessGuard)
 export class MarketingTrialController {
   constructor(private readonly trials: MarketingTrialService) {}
 
@@ -33,10 +38,13 @@ export class MarketingTrialController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 12, ttl: 60_000 } })
+  @AuthAccessScope('trial-redeem')
+  @Throttle({ default: { limit: 8, ttl: 60_000 } })
   @Post('redeem')
   @ApiOperation({ summary: 'Redeem trial token + temporary password → register prefill' })
-  redeem(@Body() body: { token: string; password: string }) {
-    return this.trials.redeem(body.token, body.password);
+  redeem(@Req() req: Request, @Body() body: { token: string; password: string }) {
+    return this.trials.redeem(body.token, body.password, {
+      clientIp: clientIpFromRequest(req),
+    });
   }
 }

@@ -6,13 +6,16 @@ import {
   NotFoundException,
   Patch,
   Post,
+  Req,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { UpdateAccountDto } from './dto/update-account.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -37,9 +40,17 @@ import {
   parseTenantModulesFromSettings,
 } from '@church-hub/shared-types';
 import { parseDepartmentModuleSettings } from '../../common/department-module-settings';
+import { AuthAccessGuard } from './auth-access.guard';
+import { AuthAccessScope } from './auth-access-scope.decorator';
+import { clientIpFromRequest } from './auth-client-ip.util';
+
+function authCtx(req: Request) {
+  return { clientIp: clientIpFromRequest(req) };
+}
 
 @ApiTags('auth')
 @Controller('auth')
+@UseGuards(AuthAccessGuard)
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
@@ -62,6 +73,7 @@ export class AuthController {
   }
 
   @Public()
+  @AuthAccessScope('register-start')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('register/start')
   @ApiOperation({ summary: 'Start tenant signup — emails a 6-digit OTP' })
@@ -70,14 +82,16 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @AuthAccessScope('register-verify')
+  @Throttle({ default: { limit: 8, ttl: 60000 } })
   @Post('register/verify')
   @ApiOperation({ summary: 'Verify signup OTP and create church workspace' })
-  registerVerify(@Body() body: RegisterVerifyDto) {
-    return this.authService.verifyRegistration(body.registrationId, body.otp);
+  registerVerify(@Req() req: Request, @Body() body: RegisterVerifyDto) {
+    return this.authService.verifyRegistration(body.registrationId, body.otp, authCtx(req));
   }
 
   @Public()
+  @AuthAccessScope('register-start')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('register')
   @ApiOperation({
@@ -89,27 +103,30 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @AuthAccessScope('login')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('login')
   @ApiOperation({
     summary:
       'Login with email and password (ADMIN/PASTOR/PLATFORM_ADMIN receive email OTP challenge)',
   })
-  login(@Body() body: LoginDto) {
-    return this.authService.login(body.email, body.password);
+  login(@Req() req: Request, @Body() body: LoginDto) {
+    return this.authService.login(body.email, body.password, authCtx(req));
   }
 
   @Public()
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @AuthAccessScope('login-2fa')
+  @Throttle({ default: { limit: 8, ttl: 60000 } })
   @Post('login/2fa')
   @ApiOperation({
     summary: 'Verify login email OTP for ADMIN/PASTOR/PLATFORM_ADMIN and issue tokens',
   })
-  login2fa(@Body() body: Login2faVerifyDto) {
-    return this.authService.verifyLogin2fa(body.challengeId, body.otp);
+  login2fa(@Req() req: Request, @Body() body: Login2faVerifyDto) {
+    return this.authService.verifyLogin2fa(body.challengeId, body.otp, authCtx(req));
   }
 
   @Public()
+  @AuthAccessScope('forgot-password')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('forgot-password')
   @ApiOperation({ summary: 'Email a one-time password reset link' })
@@ -118,22 +135,25 @@ export class AuthController {
   }
 
   @Public()
+  @AuthAccessScope('reset-password')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('reset-password')
   @ApiOperation({ summary: 'Set a new password using a reset token from email' })
-  resetPassword(@Body() body: ResetPasswordDto) {
-    return this.authService.resetPasswordWithToken(body.token, body.newPassword);
+  resetPassword(@Req() req: Request, @Body() body: ResetPasswordDto) {
+    return this.authService.resetPasswordWithToken(body.token, body.newPassword, authCtx(req));
   }
 
   @Public()
-  @Throttle({ default: { limit: 15, ttl: 60000 } })
+  @AuthAccessScope('reset-validate')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('reset-password/validate')
   @ApiOperation({ summary: 'Validate a password reset/setup token without consuming it' })
-  validateResetPassword(@Body() body: PasswordResetTokenDto) {
-    return this.authService.validatePasswordResetToken(body.token);
+  validateResetPassword(@Req() req: Request, @Body() body: PasswordResetTokenDto) {
+    return this.authService.validatePasswordResetToken(body.token, authCtx(req));
   }
 
   @Public()
+  @AuthAccessScope('reset-resend')
   @Throttle({ default: { limit: 3, ttl: 60000 } })
   @Post('reset-password/resend')
   @ApiOperation({
@@ -144,6 +164,7 @@ export class AuthController {
   }
 
   @Public()
+  @AuthAccessScope('magic-link')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('magic-link')
   @ApiOperation({ summary: 'Email a one-time magic sign-in link' })
@@ -152,24 +173,29 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @AuthAccessScope('magic-consume')
+  @Throttle({ default: { limit: 8, ttl: 60000 } })
   @Post('magic-link/consume')
   @ApiOperation({
     summary:
       'Exchange a magic sign-in token for session tokens (or email OTP challenge for ADMIN/PASTOR/PLATFORM_ADMIN)',
   })
-  consumeMagicLink(@Body() body: ConsumeMagicLinkDto) {
-    return this.authService.consumeMagicLink(body.token);
+  consumeMagicLink(@Req() req: Request, @Body() body: ConsumeMagicLinkDto) {
+    return this.authService.consumeMagicLink(body.token, authCtx(req));
   }
 
   @Public()
+  @AuthAccessScope('refresh')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @Post('refresh')
   @ApiOperation({ summary: 'Refresh access token' })
-  refresh(@Body() body: RefreshTokenDto) {
-    return this.authService.refresh(body.refreshToken);
+  refresh(@Req() req: Request, @Body() body: RefreshTokenDto) {
+    return this.authService.refresh(body.refreshToken, authCtx(req));
   }
 
   @Public()
+  @AuthAccessScope('logout')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @Post('logout')
   @ApiOperation({ summary: 'Revoke refresh token' })
   logout(@Body() body: RefreshTokenDto) {

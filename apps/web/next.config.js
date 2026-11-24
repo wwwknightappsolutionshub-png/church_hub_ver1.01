@@ -2,6 +2,7 @@
 // Standalone is required for Docker (infra/docker/Dockerfile.web). On Windows without
 // Developer Mode, symlink creation fails during `next build` — use `pnpm build:local`.
 const nextConfig = {
+  poweredByHeader: false,
   reactStrictMode: true,
   transpilePackages: ['@church-hub/shared-types'],
   ...(process.env.NEXT_STANDALONE !== '0' ? { output: 'standalone' } : {}),

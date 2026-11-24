@@ -4,6 +4,7 @@ import {
   Logger,
   UnauthorizedException,
   ConflictException,
+  HttpException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -23,6 +24,8 @@ import { trySendWhatsApp } from '../notifications/try-send-whatsapp';
 import { RedisCacheService } from '../../common/cache/redis-cache.service';
 import { buildAuthLinkEmail } from './auth-link-email';
 import { userRequiresLogin2fa } from './login-2fa.constants';
+import { AuthAccessLimitService } from './auth-access-limit.service';
+import type { AuthRequestContext } from './auth-request-context';
 
 export interface JwtPayload {
   sub: string;
@@ -44,6 +47,8 @@ const GENERIC_LINK_SENT =
 const LOGIN_CLEAR_PASSWORD_AT = 3;
 /** Failed attempt that triggers an automatic password-reset email. */
 const LOGIN_AUTO_RESET_AT = 4;
+/** Account lockout after this many failures in the sliding window. */
+const LOGIN_ACCOUNT_LOCKOUT_AT = 8;
 /** Sliding window for counting failed logins (30 minutes). */
 const LOGIN_FAILURE_WINDOW_MS = 30 * 60 * 1000;
 /** Max password-link resends per user within the cooldown window. */
@@ -86,6 +91,7 @@ export class AuthService {
     private readonly email: EmailAdapter,
     private readonly sms: SmsAdapter,
     private readonly cache: RedisCacheService,
+    private readonly accessLimit: AuthAccessLimitService,
   ) {}
 
   private assertStrongPassword(password: string) {
@@ -181,7 +187,7 @@ export class AuthService {
   }
 
   /** Step 2: verify OTP and create the church workspace. */
-  async verifyRegistration(registrationId: string, otp: string) {
+  async verifyRegistration(registrationId: string, otp: string, ctx?: AuthRequestContext) {
     const key = `register:otp:${registrationId}`;
     const pending = await this.cache.get<PendingRegistration>(key);
     if (!pending) {
@@ -197,6 +203,7 @@ export class AuthService {
     if (!otpOk) {
       pending.attempts += 1;
       await this.cache.set(key, pending, REGISTER_OTP_TTL_SEC);
+      await this.accessLimit.recordFailure(ctx?.clientIp, 'register-verify', pending.email);
       throw new BadRequestException('Incorrect verification code');
     }
 
@@ -326,23 +333,26 @@ export class AuthService {
     return slug || 'church';
   }
 
-  async login(email: string, password: string) {
+  async login(email: string, password: string, ctx?: AuthRequestContext) {
     const emailKey = email.trim().toLowerCase();
+    await this.accessLimit.assertAccountNotLocked(emailKey);
+
     const user = await this.prisma.user.findFirst({
       where: { email: { equals: emailKey, mode: 'insensitive' }, isActive: true },
       include: { roles: { include: { role: { select: { name: true } } } } },
     });
 
     if (!user) {
-      await this.rejectFailedLogin(emailKey);
+      await this.rejectFailedLogin(emailKey, ctx?.clientIp);
     }
 
     const valid = await bcrypt.compare(password, user!.passwordHash);
     if (!valid) {
-      await this.rejectFailedLogin(emailKey);
+      await this.rejectFailedLogin(emailKey, ctx?.clientIp);
     }
 
     await this.clearLoginFailures(emailKey);
+    await this.accessLimit.recordSuccess(ctx?.clientIp, 'login', emailKey);
 
     const roleNames = user!.roles.map((r) => r.role.name);
     if (userRequiresLogin2fa(roleNames) && !this.shouldSkipLogin2fa()) {
@@ -360,7 +370,7 @@ export class AuthService {
   }
 
   /** Verify email OTP from password or magic-link challenge; then issue tokens. */
-  async verifyLogin2fa(challengeId: string, otp: string) {
+  async verifyLogin2fa(challengeId: string, otp: string, ctx?: AuthRequestContext) {
     const key = `login:2fa:${challengeId}`;
     const pending = await this.cache.get<PendingLogin2fa>(key);
     if (!pending) {
@@ -376,10 +386,12 @@ export class AuthService {
     if (!otpOk) {
       pending.attempts += 1;
       await this.cache.set(key, pending, LOGIN_2FA_TTL_SEC);
+      await this.accessLimit.recordFailure(ctx?.clientIp, 'login-2fa', pending.email);
       throw new BadRequestException('Incorrect verification code');
     }
 
     await this.cache.del(key);
+    await this.accessLimit.recordSuccess(ctx?.clientIp, 'login-2fa', pending.email);
 
     const user = await this.prisma.user.findFirst({
       where: { id: pending.userId, isActive: true },
@@ -396,13 +408,27 @@ export class AuthService {
    * on the 4th, emails a reset link (if the account exists) and resets the counter.
    * Client response stays generic — never reveals whether the account exists or a reset was sent.
    */
-  private async rejectFailedLogin(emailKey: string): Promise<never> {
+  private async rejectFailedLogin(emailKey: string, clientIp?: string): Promise<never> {
     const failedAttempts = await this.recordLoginFailure(emailKey);
+    await this.accessLimit.recordFailure(clientIp, 'login', emailKey);
     const clearPassword = failedAttempts >= LOGIN_CLEAR_PASSWORD_AT;
+
+    if (failedAttempts >= LOGIN_ACCOUNT_LOCKOUT_AT) {
+      await this.accessLimit.lockAccount(emailKey, 'login_failures');
+      throw new HttpException(
+        {
+          statusCode: 429,
+          message:
+            'Too many failed sign-in attempts for this account. Try again later or reset your password.',
+          code: 'ACCOUNT_LOCKED',
+          clearPassword: true,
+        },
+        429,
+      );
+    }
 
     if (failedAttempts >= LOGIN_AUTO_RESET_AT) {
       await this.requestPasswordReset(emailKey);
-      await this.clearLoginFailures(emailKey);
     }
 
     throw new UnauthorizedException({
@@ -535,7 +561,10 @@ export class AuthService {
    * Inspect a reset/setup token without consuming it (for countdown UX).
    * Non-valid states collapse to `unusable` so callers cannot fingerprint used vs expired.
    */
-  async validatePasswordResetToken(rawToken: string): Promise<{
+  async validatePasswordResetToken(
+    rawToken: string,
+    ctx?: AuthRequestContext,
+  ): Promise<{
     status: 'valid' | 'unusable';
     expiresAt?: string;
   }> {
@@ -549,6 +578,7 @@ export class AuthService {
       record.consumedAt ||
       record.expiresAt < new Date()
     ) {
+      await this.accessLimit.recordFailure(ctx?.clientIp, 'reset-validate');
       return { status: 'unusable' };
     }
     return { status: 'valid', expiresAt: record.expiresAt.toISOString() };
@@ -649,7 +679,7 @@ export class AuthService {
     return { success: true, message: GENERIC_LINK_SENT };
   }
 
-  async resetPasswordWithToken(token: string, newPassword: string) {
+  async resetPasswordWithToken(token: string, newPassword: string, ctx?: AuthRequestContext) {
     this.assertStrongPassword(newPassword);
     const passwordHash = await bcrypt.hash(newPassword, 12);
     const tokenHash = this.hashToken(token.trim());
@@ -690,18 +720,29 @@ export class AuthService {
         });
       });
     } catch (err) {
-      if (err instanceof BadRequestException) throw err;
+      if (err instanceof BadRequestException) {
+        await this.accessLimit.recordFailure(ctx?.clientIp, 'reset-password');
+        throw err;
+      }
       this.logger.warn(
         `Password reset transaction failed: ${err instanceof Error ? err.message : String(err)}`,
       );
+      await this.accessLimit.recordFailure(ctx?.clientIp, 'reset-password');
       throw new BadRequestException('Could not update password. Request a new link and try again.');
     }
 
+    await this.accessLimit.recordSuccess(ctx?.clientIp, 'reset-password');
     return { success: true, message: 'Password updated. You can sign in with your new password.' };
   }
 
-  async consumeMagicLink(token: string) {
-    const record = await this.consumeAuthLink(token, AuthLinkPurpose.MAGIC_LOGIN);
+  async consumeMagicLink(token: string, ctx?: AuthRequestContext) {
+    let record;
+    try {
+      record = await this.consumeAuthLink(token, AuthLinkPurpose.MAGIC_LOGIN);
+    } catch (err) {
+      await this.accessLimit.recordFailure(ctx?.clientIp, 'magic-consume');
+      throw err;
+    }
     const user = await this.prisma.user.findFirst({
       where: { id: record.userId, isActive: true },
       include: { roles: { include: { role: { select: { name: true } } } } },
@@ -834,7 +875,7 @@ export class AuthService {
     return record;
   }
 
-  async refresh(refreshToken: string) {
+  async refresh(refreshToken: string, ctx?: AuthRequestContext) {
     const tokenHash = this.hashToken(refreshToken);
     const stored = await this.prisma.refreshToken.findUnique({
       where: { tokenHash },
@@ -842,6 +883,7 @@ export class AuthService {
     });
 
     if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
+      await this.accessLimit.recordFailure(ctx?.clientIp, 'refresh');
       throw new UnauthorizedException('Invalid refresh token');
     }
 

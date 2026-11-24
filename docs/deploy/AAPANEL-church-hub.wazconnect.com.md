@@ -94,6 +94,14 @@ Optional — patch login/register cache headers:
 
 ---
 
+## Hide server / framework headers (Nginx)
+
+In the site **server { }** block (aaPanel → Website → config), add the contents of
+`infra/nginx/security-server-hardening.snippet.conf` (`server_tokens off;`, `proxy_hide_header X-Powered-By;`).
+Reload Nginx after editing. The API disables Express `X-Powered-By`; Next uses `poweredByHeader: false`.
+
+---
+
 ## Routine updates
 
 The deploy script **stops web, rebuilds standalone, delete+starts web, and exits with an error** if `:3003/login` is not healthy — do not run extra `pm2 start` afterward.

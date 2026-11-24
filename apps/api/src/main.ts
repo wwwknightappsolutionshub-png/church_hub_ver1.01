@@ -9,6 +9,7 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.disable('x-powered-by');
 
   app.useBodyParser('json', {
     limit: '12mb',
@@ -31,6 +32,7 @@ async function bootstrap() {
 
   app.use(
     helmet({
+      hidePoweredBy: true,
       crossOriginResourcePolicy: { policy: 'cross-origin' },
     }),
   );

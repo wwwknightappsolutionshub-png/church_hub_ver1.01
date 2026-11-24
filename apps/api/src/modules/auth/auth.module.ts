@@ -17,6 +17,8 @@ import { DestructiveOpsGuard } from './destructive-ops.guard';
 import { PlatformModule } from '../platform/platform.module';
 import { PlatformPermissionGuard } from '../platform/platform-permission.guard';
 import { CacheModule } from '../../common/cache/cache.module';
+import { AuthAccessLimitService } from './auth-access-limit.service';
+import { AuthAccessGuard } from './auth-access.guard';
 
 @Module({
   imports: [
@@ -38,6 +40,8 @@ import { CacheModule } from '../../common/cache/cache.module';
   controllers: [AuthController],
   providers: [
     AuthService,
+    AuthAccessLimitService,
+    AuthAccessGuard,
     JwtStrategy,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
@@ -47,6 +51,6 @@ import { CacheModule } from '../../common/cache/cache.module';
     { provide: APP_GUARD, useClass: ModuleAccessGuard },
     { provide: APP_GUARD, useClass: DestructiveOpsGuard },
   ],
-  exports: [AuthService],
+  exports: [AuthService, AuthAccessGuard, AuthAccessLimitService],
 })
 export class AuthModule {}

@@ -1,7 +1,9 @@
 # aaPanel → Website → church-hub.wazconnect.com → Configuration
 # Paste the location blocks into your site config (inside the server { } block).
+# Also paste infra/nginx/security-server-hardening.snippet.conf at the top of server { }.
 
     client_max_body_size 25m;
+    proxy_hide_header X-Powered-By;
 
     # Public images (login/register artwork, favicons, OG assets)
     # ^~ prevents aaPanel's static *.png/*.jpg rules from looking on disk (404).

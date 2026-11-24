@@ -12,6 +12,7 @@ import { PrismaService } from '../../prisma/prisma.module';
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
 import { buildMarketingTrialWelcomeEmail } from './marketing-trial-email';
 import { normalizeEmailKey, parseNameFromEmailLocalPart } from './parse-email-name';
+import { AuthAccessLimitService } from '../auth/auth-access-limit.service';
 
 const TRIAL_TTL_HOURS = 48;
 const EXISTING_ACCOUNT_MESSAGE =
@@ -25,6 +26,7 @@ export class MarketingTrialService {
     private readonly prisma: PrismaService,
     private readonly email: EmailAdapter,
     private readonly config: ConfigService,
+    private readonly accessLimit: AuthAccessLimitService,
   ) {}
 
   private hashToken(raw: string): string {
@@ -141,14 +143,25 @@ export class MarketingTrialService {
     };
   }
 
-  async redeem(rawToken: string, password: string) {
+  async redeem(
+    rawToken: string,
+    password: string,
+    ctx?: { clientIp?: string },
+  ) {
     if (!password?.trim()) {
       throw new BadRequestException('Enter the temporary password from your email');
     }
 
-    const lead = await this.findValidLead(rawToken);
+    let lead;
+    try {
+      lead = await this.findValidLead(rawToken);
+    } catch (err) {
+      await this.accessLimit.recordFailure(ctx?.clientIp, 'trial-redeem');
+      throw err;
+    }
     const ok = await bcrypt.compare(password, lead.passwordHash);
     if (!ok) {
+      await this.accessLimit.recordFailure(ctx?.clientIp, 'trial-redeem', lead.emailKey);
       throw new UnauthorizedException('Invalid temporary password');
     }
 
