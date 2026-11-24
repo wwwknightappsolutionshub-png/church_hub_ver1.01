@@ -1,5 +1,13 @@
-import { BadRequestException, ConflictException, forwardRef, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import {
+  BadRequestException,
+  ConflictException,
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { OutreachCaptureSource, Prisma } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import * as QRCode from 'qrcode';
 import { sanitizeEmail } from '@church-hub/shared-types';
@@ -26,6 +34,15 @@ import {
   decryptOutreachContactFields,
   encryptOutreachContactFields,
 } from './outreach-pii.crypto';
+import { OutreachDedupeService } from './outreach-dedupe.service';
+import { formatDuplicateMatchesForClient } from './outreach-dedupe.present';
+import { OutreachCampaignService } from './outreach-campaign.service';
+import { SecurityAuditService } from '../../common/security/security-audit.service';
+import {
+  type CaptureContactTrustOptions,
+  type OutreachCaptureInput,
+  stripUntrustedCaptureFlags,
+} from './outreach-capture.types';
 
 @Injectable()
 export class OutreachService {
@@ -39,6 +56,9 @@ export class OutreachService {
     private readonly emailTemplates: AutomationEmailTemplatesService,
     @Inject(forwardRef(() => OutreachSyncConflictService))
     private readonly syncConflicts: OutreachSyncConflictService,
+    private readonly dedupe: OutreachDedupeService,
+    private readonly campaigns: OutreachCampaignService,
+    private readonly audit: SecurityAuditService,
   ) {}
 
   private contactToPayload(contact: {
@@ -134,47 +154,63 @@ export class OutreachService {
 
   async captureContact(
     churchId: string,
-    data: {
-      firstName: string;
-      lastName?: string;
-      phone?: string;
-      email?: string;
-      evangelistId?: string;
-      qrCodeId?: string;
-      latitude?: number;
-      longitude?: number;
-      locationLabel?: string;
-      postcode?: string;
-      addressStreet?: string;
-      addressCity?: string;
-      addressState?: string;
-      addressCountry?: string;
-      addressPostal?: string;
-      photoConsent?: boolean;
-      gdprConsent?: boolean;
-      photoUrl?: string;
-      notes?: string;
-      voiceNotes?: string;
-      referredBy?: string;
-      needsBusPickup?: boolean;
-      pickupAddress?: string;
-      busPickupNotes?: string;
-      clientId?: string;
-      capturedAt?: string;
-      sendWelcome?: boolean;
-      capturedByUserId?: string;
-    },
+    data: OutreachCaptureInput,
+    trust: CaptureContactTrustOptions = {},
   ) {
-    if (!data.gdprConsent) {
+    const safe = stripUntrustedCaptureFlags(data);
+    const allowDuplicateOverride = trust.allowDuplicateOverride === true;
+    const capturedByUserId = trust.capturedByUserId;
+    const captureSource: OutreachCaptureSource = trust.captureSource ?? 'MANUAL';
+    const exposeDuplicatePii = trust.exposeDuplicatePii === true;
+    if (!safe.gdprConsent) {
       throw new BadRequestException('GDPR consent is required to save this contact');
     }
-    if (data.photoUrl && !data.photoConsent) {
+    if (safe.photoUrl && !safe.photoConsent) {
       throw new BadRequestException('Photo consent is required before uploading a photo');
     }
 
-    if (data.clientId) {
+    if (safe.evangelistId) {
+      const evangelist = await this.prisma.member.findFirst({
+        where: { id: safe.evangelistId, churchId },
+        select: { id: true },
+      });
+      if (!evangelist) {
+        throw new BadRequestException('Evangelist not found in this church');
+      }
+    }
+
+    const duplicateMatches = await this.dedupe.findActiveJourneyDuplicates(
+      churchId,
+      safe.phone,
+      safe.email,
+    );
+    if (duplicateMatches.length > 0 && !allowDuplicateOverride) {
+      throw new ConflictException({
+        code: 'DUPLICATE_JOURNEY',
+        message:
+          'An active Establishment journey already exists for this phone or email.',
+        matches: formatDuplicateMatchesForClient(duplicateMatches, exposeDuplicatePii),
+      });
+    }
+    if (duplicateMatches.length > 0 && allowDuplicateOverride && capturedByUserId) {
+      await this.audit.append({
+        churchId,
+        actorId: capturedByUserId,
+        action: 'OUTREACH_DEDUPE_OVERRIDE',
+        targetType: 'Other',
+        targetId: duplicateMatches[0]?.followUpId ?? null,
+        metadata: { matchCount: duplicateMatches.length },
+      });
+    }
+
+    const resolvedCampaignId = await this.campaigns.resolveCampaignForCapture(
+      churchId,
+      safe.campaignId,
+    );
+
+    if (safe.clientId) {
       const dup = await this.prisma.outreachContact.findUnique({
-        where: { clientId: data.clientId },
+        where: { clientId: safe.clientId },
       });
       if (dup) {
         // Global unique clientId — never return or mutate another tenant's capture.
@@ -182,11 +218,11 @@ export class OutreachService {
           throw new BadRequestException('Capture clientId is already in use');
         }
         const serverPayload = this.contactToPayload(dup);
-        const clientPayload = data as OutreachCapturePayload;
+        const clientPayload = safe as OutreachCapturePayload;
         if (outreachPayloadsConflict(serverPayload, clientPayload)) {
           await this.syncConflicts.recordConflict(
             churchId,
-            data.clientId,
+            safe.clientId,
             'OUTREACH_CAPTURE',
             serverPayload,
             clientPayload,
@@ -199,7 +235,7 @@ export class OutreachService {
           await this.prisma.syncQueueItem.updateMany({
             where: {
               churchId,
-              clientId: data.clientId,
+              clientId: safe.clientId,
               entityType: 'OUTREACH_CAPTURE',
             },
             data: { status: 'CONFLICT' },
@@ -207,16 +243,16 @@ export class OutreachService {
           throw new BadRequestException({
             message: 'Outreach capture conflict — resolve in sync conflicts',
             code: 'SYNC_CONFLICT',
-            clientId: data.clientId,
+            clientId: safe.clientId,
           });
         }
         return this.decryptContactRow(dup);
       }
     }
 
-    if (data.qrCodeId) {
+    if (safe.qrCodeId) {
       const qr = await this.prisma.evangelistQrCode.findFirst({
-        where: { id: data.qrCodeId, churchId, isActive: true },
+        where: { id: safe.qrCodeId, churchId, isActive: true },
         select: { id: true },
       });
       if (!qr) {
@@ -228,53 +264,56 @@ export class OutreachService {
       });
     }
 
-    const locationLabel = this.composeLocationLabel(data);
-    const addressPostal = data.addressPostal ?? data.postcode;
+    const locationLabel = this.composeLocationLabel(safe);
+    const addressPostal = safe.addressPostal ?? safe.postcode;
     const encrypted = encryptOutreachContactFields({
-      phone: data.phone,
-      email: data.email,
+      phone: safe.phone,
+      email: safe.email,
       locationLabel,
-      addressStreet: data.addressStreet,
-      addressCity: data.addressCity,
-      addressState: data.addressState,
-      addressCountry: data.addressCountry,
+      addressStreet: safe.addressStreet,
+      addressCity: safe.addressCity,
+      addressState: safe.addressState,
+      addressCountry: safe.addressCountry,
       addressPostal,
-      pickupAddress: data.pickupAddress,
-      busPickupNotes: data.busPickupNotes,
-      notes: data.notes,
-      voiceNotes: data.voiceNotes,
-      referredBy: data.referredBy?.trim() || null,
+      pickupAddress: safe.pickupAddress,
+      busPickupNotes: safe.busPickupNotes,
+      notes: safe.notes,
+      voiceNotes: safe.voiceNotes,
+      referredBy: safe.referredBy?.trim() || null,
     });
 
     const contact = await this.prisma.outreachContact.create({
       data: {
         churchId,
-        clientId: data.clientId ?? randomBytes(12).toString('hex'),
-        evangelistId: data.evangelistId,
-        qrCodeId: data.qrCodeId,
-        firstName: data.firstName,
-        lastName: data.lastName,
+        clientId: safe.clientId ?? randomBytes(12).toString('hex'),
+        evangelistId: safe.evangelistId,
+        qrCodeId: safe.qrCodeId,
+        campaignId: resolvedCampaignId,
+        captureSource,
+        capturedByUserId: capturedByUserId ?? null,
+        firstName: safe.firstName,
+        lastName: safe.lastName,
         phone: encrypted.phone,
         email: encrypted.email,
-        latitude: data.latitude,
-        longitude: data.longitude,
+        latitude: safe.latitude,
+        longitude: safe.longitude,
         locationLabel: encrypted.locationLabel,
         addressStreet: encrypted.addressStreet,
         addressCity: encrypted.addressCity,
         addressState: encrypted.addressState,
         addressCountry: encrypted.addressCountry,
         addressPostal: encrypted.addressPostal,
-        photoConsent: data.photoConsent ?? false,
+        photoConsent: safe.photoConsent ?? false,
         gdprConsent: true,
         gdprConsentAt: new Date(),
-        photoUrl: data.photoUrl,
+        photoUrl: safe.photoUrl,
         notes: encrypted.notes,
         voiceNotes: encrypted.voiceNotes,
         referredBy: encrypted.referredBy,
-        needsBusPickup: data.needsBusPickup ?? false,
+        needsBusPickup: safe.needsBusPickup ?? false,
         pickupAddress: encrypted.pickupAddress,
         busPickupNotes: encrypted.busPickupNotes,
-        capturedAt: data.capturedAt ? new Date(data.capturedAt) : new Date(),
+        capturedAt: safe.capturedAt ? new Date(safe.capturedAt) : new Date(),
         syncStatus: 'SYNCED',
         convertStage: 'CAPTURED',
       },
@@ -284,15 +323,15 @@ export class OutreachService {
     });
 
     await this.followUp.createFromOutreach(churchId, {
-      firstName: data.firstName,
-      lastName: data.lastName,
-      phone: data.phone,
-      email: data.email,
-      notes: [data.notes, data.voiceNotes].filter(Boolean).join(' '),
+      firstName: safe.firstName,
+      lastName: safe.lastName,
+      phone: safe.phone,
+      email: safe.email,
+      notes: [safe.notes, safe.voiceNotes].filter(Boolean).join(' '),
       outreachContactId: contact.id,
-      evangelistMemberId: data.evangelistId,
-      capturedByUserId: data.capturedByUserId,
-      referredBy: data.referredBy,
+      evangelistMemberId: safe.evangelistId,
+      capturedByUserId: capturedByUserId,
+      referredBy: safe.referredBy,
     }).catch((err) => {
       this.logger.warn(
         `Follow-up pipeline sync failed after outreach capture ${contact.id} (registration still saved): ${
@@ -303,7 +342,7 @@ export class OutreachService {
 
     // Immediate welcome SMS/WhatsApp is off by default — NEW_LEAD automation
     // sends WhatsApp + email. Opt in with sendWelcome: true (e.g. manual resend flows).
-    if (data.sendWelcome === true) {
+    if (safe.sendWelcome === true) {
       try {
         await this.sendWelcomeMessage(churchId, contact.id);
       } catch (err) {
@@ -423,6 +462,7 @@ export class OutreachService {
       payload: Record<string, unknown>;
       capturedAt: string;
     }>,
+    syncUserId?: string,
   ) {
     const results = [];
     for (const item of items) {
@@ -466,12 +506,15 @@ export class OutreachService {
 
       try {
         if (item.entityType === 'OUTREACH_CAPTURE') {
-          const payload = item.payload as Parameters<OutreachService['captureContact']>[1];
-          await this.captureContact(churchId, {
-            ...payload,
-            clientId: item.clientId,
-            capturedAt: item.capturedAt,
-          });
+          const payload = item.payload as OutreachCaptureInput;
+          await this.captureContact(
+            churchId,
+            { ...payload, clientId: item.clientId, capturedAt: item.capturedAt },
+            {
+              captureSource: 'SYNC',
+              capturedByUserId: syncUserId,
+            },
+          );
         }
         await this.prisma.syncQueueItem.update({
           where: { id: queueItem.id },
@@ -706,14 +749,18 @@ export class OutreachService {
 
     const evangelistId =
       qr.isChurchWide || !qr.memberId ? undefined : qr.memberId;
-    return this.captureContact(qr.churchId, {
-      ...data,
-      email: email || undefined,
-      qrCodeId: qr.id,
-      evangelistId,
-      referredBy: data.referredBy,
-      sendWelcome: false,
-    });
+    return this.captureContact(
+      qr.churchId,
+      {
+        ...data,
+        email: email || undefined,
+        qrCodeId: qr.id,
+        evangelistId,
+        referredBy: data.referredBy,
+        sendWelcome: false,
+      },
+      { captureSource: 'PUBLIC_QR' },
+    );
   }
 
   async listContacts(churchId: string, evangelistId?: string, convertStage?: string) {

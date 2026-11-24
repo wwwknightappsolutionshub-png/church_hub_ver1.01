@@ -22,7 +22,9 @@ export type SecurityAuditAction =
   | 'AUDIT_LOG_EXPORTED'
   | 'AUDIT_ARCHIVE_COMPLETED'
   | 'MEMBER_FIELD_POLICY_CHANGED'
-  | 'MEMBER_PRIVACY_ACCESS_REQUESTED';
+  | 'MEMBER_PRIVACY_ACCESS_REQUESTED'
+  | 'ANALYTICS_DIGEST_UPDATED'
+  | 'ANALYTICS_DIGEST_SENT';
 
 export type SecurityAuditTargetType =
   | 'PastoralNote'

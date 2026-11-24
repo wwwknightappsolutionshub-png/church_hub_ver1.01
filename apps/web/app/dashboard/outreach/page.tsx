@@ -13,6 +13,12 @@ import { OutreachImportWizard } from '@/components/outreach/OutreachImportWizard
 import { EvangelistQrPanel } from '@/components/outreach/EvangelistQrPanel';
 import { SyncQueuePanel } from '@/components/outreach/SyncQueuePanel';
 import { SyncConflictsPanel } from '@/components/outreach/SyncConflictsPanel';
+import { OutreachCampaignPanel } from '@/components/outreach/OutreachCampaignPanel';
+import { OutreachCommandCentrePanel } from '@/components/outreach/OutreachCommandCentrePanel';
+import { OutreachScorecardPanel } from '@/components/outreach/OutreachScorecardPanel';
+import { OutreachMapPanel } from '@/components/outreach/OutreachMapPanel';
+import { useModuleAccess } from '@/lib/hooks/use-module-access';
+import { isChurchLeadershipRole } from '@/lib/session-role';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,13 +34,22 @@ interface OutreachStats {
 
 export default function OutreachPage() {
   const queryClient = useQueryClient();
+  const { userRoles } = useModuleAccess();
+  const isLeader = isChurchLeadershipRole(userRoles);
   const [showImport, setShowImport] = useState(false);
+  const [campaignId, setCampaignId] = useState('');
+  const [dateFrom] = useState('');
+  const [dateTo] = useState('');
 
   const refreshData = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['outreach'] });
     queryClient.invalidateQueries({ queryKey: ['outreach-stats'] });
     queryClient.invalidateQueries({ queryKey: ['follow-up'] });
     queryClient.invalidateQueries({ queryKey: ['follow-up-stats'] });
+    queryClient.invalidateQueries({ queryKey: ['outreach-command-centre'] });
+    queryClient.invalidateQueries({ queryKey: ['outreach-scorecard'] });
+    queryClient.invalidateQueries({ queryKey: ['outreach-map'] });
+    queryClient.invalidateQueries({ queryKey: ['outreach-campaigns'] });
   }, [queryClient]);
 
   const { pendingCount, online, syncing, syncNow } = useOfflineSync(refreshData);
@@ -146,12 +161,41 @@ export default function OutreachPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <OutreachCaptureForm online={online} onSuccess={refreshData} />
+                <OutreachCaptureForm
+                  online={online}
+                  onSuccess={refreshData}
+                  campaignId={campaignId || undefined}
+                  canOverrideDuplicate={isLeader}
+                />
               </CardContent>
             </Card>
+            {isLeader ? (
+              <div className="grid gap-4 xl:grid-cols-2">
+                <OutreachCommandCentrePanel
+                  campaignId={campaignId}
+                  dateFrom={dateFrom}
+                  dateTo={dateTo}
+                />
+                <OutreachScorecardPanel
+                  campaignId={campaignId}
+                  dateFrom={dateFrom}
+                  dateTo={dateTo}
+                />
+                <div className="xl:col-span-2">
+                  <OutreachMapPanel campaignId={campaignId} dateFrom={dateFrom} dateTo={dateTo} />
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="space-y-4">
+            {isLeader ? (
+              <OutreachCampaignPanel
+                selectedCampaignId={campaignId}
+                onSelectCampaign={setCampaignId}
+                canManage={isLeader}
+              />
+            ) : null}
             <EvangelistQrPanel />
             <SyncQueuePanel
               online={online}

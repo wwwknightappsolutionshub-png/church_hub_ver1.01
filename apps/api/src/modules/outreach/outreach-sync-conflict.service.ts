@@ -1,6 +1,7 @@
 import { BadRequestException, forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, SyncConflictResolution } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.module';
+import type { OutreachCaptureInput } from './outreach-capture.types';
 import { OutreachService } from './outreach.service';
 import {
   mergeCapturePayloads,
@@ -100,11 +101,15 @@ export class OutreachSyncConflictService {
     }
 
     if (conflict.entityType === 'OUTREACH_CAPTURE') {
-      await this.outreach.captureContact(churchId, {
-        ...(applyPayload as Parameters<OutreachService['captureContact']>[1]),
-        clientId: conflict.clientId,
-        sendWelcome: false,
-      });
+      await this.outreach.captureContact(
+        churchId,
+        {
+          ...(applyPayload as OutreachCaptureInput),
+          clientId: conflict.clientId,
+          sendWelcome: false,
+        },
+        { capturedByUserId: userId, captureSource: 'SYNC' },
+      );
     }
 
     await this.prisma.syncQueueItem.updateMany({

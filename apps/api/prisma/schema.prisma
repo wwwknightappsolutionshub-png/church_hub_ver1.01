@@ -35,6 +35,7 @@ model Church {
   pipelineDefinitions PipelineDefinition[]
   pastoralNotes      PastoralNote[]
   outreachContacts   OutreachContact[]
+  outreachCampaigns  OutreachCampaign[]
   evangelistQrCodes  EvangelistQrCode[]
   syncQueueItems     SyncQueueItem[]
   syncConflicts      SyncConflict[]
@@ -447,6 +448,8 @@ model User {
   attendanceRecorded       AttendanceRecord[]  @relation("AttendanceRecordedBy")
   membershipImportsUploaded MembershipImportJob[] @relation("MembershipImportUploader")
   outreachImportsUploaded   OutreachImportJob[]    @relation("OutreachImportUploader")
+  outreachCampaignsCreated  OutreachCampaign[]    @relation("OutreachCampaignCreatedBy")
+  outreachCaptures            OutreachContact[]   @relation("OutreachCapturedBy")
   sermonNotesCreated        SermonNote[]          @relation("SermonNoteCreator")
   deptUnitFeedbacksAuthored DeptUnitFeedback[]    @relation("DeptUnitFeedbackUser")
   wisdom365Subscriptions  Wisdom365Subscription[] @relation("Wisdom365Subscriber")
@@ -1599,12 +1602,43 @@ enum OutreachConvertStage {
   ARCHIVED
 }
 
+enum OutreachCaptureSource {
+  MANUAL
+  SYNC
+  IMPORT
+  PUBLIC_QR
+}
+
+model OutreachCampaign {
+  id          String    @id @default(uuid())
+  churchId    String
+  name        String
+  description String?
+  startsAt    DateTime?
+  endsAt      DateTime?
+  isActive    Boolean   @default(true)
+  isDefault   Boolean   @default(false)
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  church    Church            @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  createdBy User?             @relation("OutreachCampaignCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  contacts  OutreachContact[]
+
+  @@index([churchId, isActive])
+  @@map("outreach_campaigns")
+}
+
 model OutreachContact {
   id            String   @id @default(uuid())
   churchId      String
   clientId      String?  @unique
   evangelistId  String?
   qrCodeId      String?
+  campaignId    String?
+  captureSource OutreachCaptureSource @default(MANUAL)
+  capturedByUserId String?
   firstName     String
   lastName      String?
   /// AES-GCM envelope (v1:…) when field-level encryption is on; legacy plaintext supported on read.
@@ -1643,6 +1677,8 @@ model OutreachContact {
   church     Church            @relation(fields: [churchId], references: [id], onDelete: Cascade)
   evangelist Member?           @relation("EvangelistMember", fields: [evangelistId], references: [id])
   qrCode     EvangelistQrCode? @relation(fields: [qrCodeId], references: [id])
+  campaign   OutreachCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  capturedBy User?             @relation("OutreachCapturedBy", fields: [capturedByUserId], references: [id], onDelete: SetNull)
   followUp   FollowUp?         @relation(fields: [followUpId], references: [id], onDelete: SetNull)
   member     Member?           @relation("OutreachConvertedMember", fields: [memberId], references: [id], onDelete: SetNull)
   syncConflicts SyncConflict[]
@@ -1650,7 +1686,9 @@ model OutreachContact {
 
   @@index([churchId, capturedAt])
   @@index([churchId, convertStage])
+  @@index([churchId, campaignId])
   @@index([evangelistId])
+  @@index([capturedByUserId])
   @@map("outreach_contacts")
 }
 

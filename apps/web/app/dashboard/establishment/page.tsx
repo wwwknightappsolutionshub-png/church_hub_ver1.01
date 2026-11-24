@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import type { AxiosError } from 'axios';
@@ -100,6 +101,7 @@ function followUpErrorMessage(err: AxiosError | null) {
 }
 
 function FollowUpPageContent() {
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { canManageMembers } = useMembershipAccess();
   const { userRoles, establishmentAccess } = useModuleAccess();
@@ -118,6 +120,11 @@ function FollowUpPageContent() {
     'pipeline',
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fid = searchParams.get('followUpId');
+    if (fid) setSelectedId(fid);
+  }, [searchParams]);
   const [showNew, setShowNew] = useState(false);
   const [assigneeFilter, setAssigneeFilter] = useState('');
   const [stageFilter, setStageFilter] = useState('NEW_LEAD');

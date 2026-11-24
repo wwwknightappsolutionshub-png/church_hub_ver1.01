@@ -222,27 +222,35 @@ export class OutreachImportService {
     for (const row of rows) {
       const mapped = row.mapped as Partial<OutreachImportMappedRow>;
       try {
-        const contact = await this.outreach.captureContact(churchId, {
-          firstName: mapped.firstName!,
-          lastName: mapped.lastName,
-          phone: mapped.phone!,
-          email: mapped.email,
-          referredBy: mapped.referredBy,
-          notes: mapped.notes,
-          postcode: mapped.postcode,
-          locationLabel: mapped.locationLabel,
-          addressStreet: mapped.addressStreet,
-          addressCity: mapped.addressCity,
-          addressState: mapped.addressState,
-          addressCountry: mapped.addressCountry,
-          addressPostal: mapped.addressPostal,
-          needsBusPickup: mapped.needsBusPickup,
-          pickupAddress: mapped.pickupAddress,
-          busPickupNotes: mapped.busPickupNotes,
-          photoConsent: false,
-          sendWelcome: false,
-          capturedByUserId: userId,
-        });
+        const contact = await this.outreach.captureContact(
+          churchId,
+          {
+            firstName: mapped.firstName!,
+            lastName: mapped.lastName,
+            phone: mapped.phone!,
+            email: mapped.email,
+            referredBy: mapped.referredBy,
+            notes: mapped.notes,
+            postcode: mapped.postcode,
+            locationLabel: mapped.locationLabel,
+            addressStreet: mapped.addressStreet,
+            addressCity: mapped.addressCity,
+            addressState: mapped.addressState,
+            addressCountry: mapped.addressCountry,
+            addressPostal: mapped.addressPostal,
+            needsBusPickup: mapped.needsBusPickup,
+            pickupAddress: mapped.pickupAddress,
+            busPickupNotes: mapped.busPickupNotes,
+            photoConsent: false,
+            sendWelcome: false,
+            gdprConsent: true,
+          },
+          {
+            capturedByUserId: userId,
+            captureSource: 'IMPORT',
+            allowDuplicateOverride: true,
+          },
+        );
         created++;
         await this.prisma.outreachImportJobRow.update({
           where: { id: row.id },

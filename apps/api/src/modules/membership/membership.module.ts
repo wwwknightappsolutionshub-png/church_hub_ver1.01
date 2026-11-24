@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { FollowUpModule } from '../follow-up/follow-up.module';
 import { MemberPrivacyModule } from '../member-privacy/member-privacy.module';
+import { SecurityAuditModule } from '../../common/security/security-audit.module';
 import { MembershipService } from './membership.service';
 import { MembershipController } from './membership.controller';
 import { MembershipImportController } from './membership-import.controller';
@@ -17,9 +18,10 @@ import { MembershipRegistryController } from './membership-registry.controller';
 import { MembershipCelebrationsService } from './membership-celebrations.service';
 import { MembershipFamilyMapService } from './membership-family-map.service';
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
+import { MembershipAnalyticsDigestService } from './membership-analytics-digest.service';
 
 @Module({
-  imports: [FollowUpModule, MemberPrivacyModule],
+  imports: [FollowUpModule, MemberPrivacyModule, SecurityAuditModule],
   controllers: [MembershipController, MembershipImportController, MembershipRegistryController],
   providers: [
     MembershipImportService,
@@ -35,6 +37,7 @@ import { EmailAdapter } from '../notifications/adapters/email.adapter';
     MembershipCelebrationsService,
     MembershipFamilyMapService,
     EmailAdapter,
+    MembershipAnalyticsDigestService,
   ],
   exports: [
     MembershipImportService,

@@ -50,6 +50,7 @@ describeE2e('Phase 6 — Outreach evangelism E2E', () => {
       .send({
         firstName: `Phase6Test${Date.now()}`,
         phone: '+44000009999',
+        gdprConsent: true,
         needsBusPickup: true,
         pickupAddress: 'Test Street',
         voiceNotes: 'Voice note test',

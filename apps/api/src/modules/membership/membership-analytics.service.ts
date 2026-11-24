@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   MemberGender,
   MemberStatus,
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.module';
+import { SecurityAuditService } from '../../common/security/security-audit.service';
 import {
   MembershipAnalyticsQuery,
   resolveAnalyticsRange,
@@ -23,10 +24,21 @@ import {
   SUNDAY_DEPARTMENT_CODES,
   type DateBucket,
 } from './membership-analytics.util';
+import {
+  assignmentSlaCutoff,
+  assignmentStaleWhereBranches,
+  GRADUATED_FOLLOW_UP_STAGES,
+} from '../follow-up/follow-up-assignment-sla';
+import {
+  sanitizeDigestRecipientEmails,
+  validateDigestHourUtc,
+  validateDigestWeekday,
+} from './membership-analytics-digest.util';
 
 const RETAINED_STATUSES: MemberStatus[] = ['NEW_MEMBER', 'ACTIVE_MEMBER', 'DISCIPLED'];
 const COMPLETED_STAGE = 'JOINED_GROUP';
 const SETTINGS_TARGETS_KEY = 'analyticsTargets';
+const SETTINGS_DIGEST_KEY = 'analyticsDigest';
 
 export interface AnalyticsTargets {
   retentionRate: number | null;
@@ -44,7 +56,10 @@ const DEFAULT_TARGETS: AnalyticsTargets = {
 
 @Injectable()
 export class MembershipAnalyticsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: SecurityAuditService,
+  ) {}
 
   async getDashboard(
     churchId: string,
@@ -214,6 +229,8 @@ export class MembershipAnalyticsService {
       followUpCompleteness,
       demographics,
       avgAttendance,
+      establishmentOps,
+      cellGrowth,
     ] = await Promise.all([
       this.prisma.member.count({ where: memberWhere }),
       this.prisma.member.count({
@@ -239,6 +256,8 @@ export class MembershipAnalyticsService {
       this.buildFollowUpCompleteness(churchId, query, range.months),
       this.buildDemographics(memberWhere),
       this.buildAverageAttendance(churchId, query, range.start, range.end),
+      this.buildEstablishmentOps(churchId),
+      this.buildCellGrowth(churchId, query, range.start, range.end),
     ]);
 
     return {
@@ -269,7 +288,170 @@ export class MembershipAnalyticsService {
         count: g._count.id,
       })),
       demographics,
+      establishmentOps,
+      cellGrowth,
     };
+  }
+
+  private async buildEstablishmentOps(churchId: string) {
+    const now = new Date();
+    const slaCutoff = assignmentSlaCutoff(now);
+    const base = { churchId, archivedAt: null };
+    const dayStart = new Date();
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date();
+    dayEnd.setHours(23, 59, 59, 999);
+
+    const [overdue, dueToday, archiveRequested, joinedGroupDay6] = await Promise.all([
+      this.prisma.followUp.count({
+        where: {
+          ...base,
+          stage: { notIn: [...GRADUATED_FOLLOW_UP_STAGES] },
+          OR: [{ dueAt: { lt: now } }, ...assignmentStaleWhereBranches(slaCutoff)],
+        },
+      }),
+      this.prisma.followUp.count({
+        where: {
+          ...base,
+          stage: { notIn: [...GRADUATED_FOLLOW_UP_STAGES] },
+          dueAt: { gte: dayStart, lte: dayEnd },
+        },
+      }),
+      this.prisma.followUp.count({
+        where: { ...base, archiveRequestedAt: { not: null } },
+      }),
+      this.prisma.followUp.count({
+        where: {
+          ...base,
+          stage: 'JOINED_GROUP',
+          joinedGroupDay6NotifiedAt: null,
+          createdAt: { lte: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000) },
+        },
+      }),
+    ]);
+
+    return { overdue, dueToday, archiveRequested, joinedGroupDay6 };
+  }
+
+  private async buildCellGrowth(
+    churchId: string,
+    query: MembershipAnalyticsQuery,
+    start: Date,
+    end: Date,
+  ) {
+    const branchWhere: Prisma.CellBranchWhereInput = { churchId };
+    if (query.provinceId) branchWhere.provinceId = query.provinceId;
+    if (query.branchId) branchWhere.id = query.branchId;
+
+    const branches = await this.prisma.cellBranch.findMany({
+      where: branchWhere,
+      select: { id: true, _count: { select: { members: true } } },
+    });
+    const branchIds = branches.map((b) => b.id);
+    if (branchIds.length === 0) {
+      return { activeBranches: 0, membersInCells: 0, weeklyAttendance: [] };
+    }
+
+    const attendance = await this.prisma.cellAttendance.findMany({
+      where: {
+        churchId,
+        branchId: { in: branchIds },
+        weekStart: { gte: start, lte: end },
+      },
+      select: { weekStart: true, presentCount: true },
+      orderBy: { weekStart: 'asc' },
+    });
+
+    const byWeek = new Map<string, number>();
+    for (const row of attendance) {
+      const key = row.weekStart.toISOString().slice(0, 10);
+      byWeek.set(key, (byWeek.get(key) ?? 0) + row.presentCount);
+    }
+
+    return {
+      activeBranches: branches.length,
+      membersInCells: branches.reduce((s, b) => s + b._count.members, 0),
+      weeklyAttendance: [...byWeek.entries()].map(([period, present]) => ({ period, present })),
+    };
+  }
+
+  async getDigestSettings(churchId: string) {
+    const church = await this.prisma.church.findUnique({
+      where: { id: churchId },
+      select: { settings: true },
+    });
+    const settings = (church?.settings as Record<string, unknown> | null) ?? {};
+    const raw = (settings[SETTINGS_DIGEST_KEY] as Record<string, unknown> | undefined) ?? {};
+    return {
+      enabled: raw.enabled === true,
+      recipientEmails: Array.isArray(raw.recipientEmails)
+        ? raw.recipientEmails.filter((e): e is string => typeof e === 'string')
+        : [],
+      weekday: typeof raw.weekday === 'number' ? raw.weekday : 1,
+      hourUtc: typeof raw.hourUtc === 'number' ? raw.hourUtc : 8,
+    };
+  }
+
+  async updateDigestSettings(
+    churchId: string,
+    body: {
+      enabled?: boolean;
+      recipientEmails?: string[];
+      weekday?: number;
+      hourUtc?: number;
+    },
+    actorId: string,
+  ) {
+    const church = await this.prisma.church.findUnique({
+      where: { id: churchId },
+      select: { settings: true },
+    });
+    if (!church) throw new NotFoundException('Church not found');
+    const settings = (church.settings as Record<string, unknown> | null) ?? {};
+    const current = await this.getDigestSettings(churchId);
+    const next = {
+      ...current,
+      ...(body.enabled !== undefined ? { enabled: body.enabled === true } : {}),
+      ...(body.recipientEmails !== undefined
+        ? { recipientEmails: sanitizeDigestRecipientEmails(body.recipientEmails) }
+        : {}),
+      ...(body.weekday !== undefined ? { weekday: validateDigestWeekday(body.weekday) } : {}),
+      ...(body.hourUtc !== undefined ? { hourUtc: validateDigestHourUtc(body.hourUtc) } : {}),
+    };
+    if (next.enabled && next.recipientEmails.length === 0) {
+      throw new BadRequestException('Add at least one recipient email before enabling the digest');
+    }
+    await this.prisma.church.update({
+      where: { id: churchId },
+      data: {
+        settings: {
+          ...settings,
+          [SETTINGS_DIGEST_KEY]: next,
+        } as Prisma.InputJsonValue,
+      },
+    });
+
+    await this.audit.append({
+      churchId,
+      actorId,
+      action: 'ANALYTICS_DIGEST_UPDATED',
+      targetType: 'Church',
+      targetId: churchId,
+      metadata: {
+        enabled: next.enabled,
+        recipientCount: next.recipientEmails.length,
+        weekday: next.weekday,
+        hourUtc: next.hourUtc,
+        fieldsChanged: {
+          enabled: body.enabled !== undefined,
+          recipientEmails: body.recipientEmails !== undefined,
+          weekday: body.weekday !== undefined,
+          hourUtc: body.hourUtc !== undefined,
+        },
+      },
+    });
+
+    return next;
   }
 
   private async buildComparison(

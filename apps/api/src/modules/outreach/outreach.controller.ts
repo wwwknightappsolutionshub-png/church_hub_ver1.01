@@ -1,6 +1,8 @@
 import {
+  BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -10,14 +12,19 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { OutreachConvertStage } from '@prisma/client';
+import { Throttle } from '@nestjs/throttler';
 import { OutreachService } from './outreach.service';
 import { OutreachPipelineService } from './outreach-pipeline.service';
 import { OutreachSyncConflictService } from './outreach-sync-conflict.service';
+import { OutreachCampaignService } from './outreach-campaign.service';
+import { OutreachDedupeService } from './outreach-dedupe.service';
+import { OutreachIntelligenceService } from './outreach-intelligence.service';
 import { Roles, ModuleGate, Public } from '../auth/decorators';
 import { ChurchId, CurrentUser, AuthUser } from '../auth/current-user.decorator';
 import { ZodBody } from '../../common/decorators/zod-body.decorator';
 import {
   outreachCaptureSchema,
+  outreachCampaignBodySchema,
   outreachSyncSchema,
   pipelineAdvanceSchema,
   publicRegisterSchema,
@@ -25,6 +32,13 @@ import {
 } from './outreach.schemas';
 import { resolveOutreachCaptureBaseUrl } from './outreach-capture-url.util';
 import type { z } from 'zod';
+import { formatDuplicateMatchesForClient } from './outreach-dedupe.present';
+
+const LEADER_ROLES = ['ADMIN', 'PASTOR', 'LEADER'] as const;
+
+function userCanOverrideDuplicate(user: AuthUser) {
+  return user.roles?.some((r) => LEADER_ROLES.includes(r as (typeof LEADER_ROLES)[number]));
+}
 
 @ApiTags('outreach')
 @Controller('outreach')
@@ -33,6 +47,9 @@ export class OutreachController {
     private readonly outreachService: OutreachService,
     private readonly pipeline: OutreachPipelineService,
     private readonly syncConflicts: OutreachSyncConflictService,
+    private readonly campaigns: OutreachCampaignService,
+    private readonly dedupe: OutreachDedupeService,
+    private readonly intelligence: OutreachIntelligenceService,
     private readonly config: ConfigService,
   ) {}
 
@@ -53,6 +70,119 @@ export class OutreachController {
     return this.outreachService.getStats(churchId);
   }
 
+  @Get('campaigns')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List outreach campaigns' })
+  listCampaigns(
+    @ChurchId() churchId: string,
+    @Query('activeOnly') activeOnly?: string,
+  ) {
+    return this.campaigns.list(churchId, activeOnly === '1' || activeOnly === 'true');
+  }
+
+  @Post('campaigns')
+  @ApiBearerAuth()
+  @Roles(...LEADER_ROLES)
+  @ModuleGate('followUp')
+  createCampaign(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @ZodBody(outreachCampaignBodySchema) body: z.infer<typeof outreachCampaignBodySchema>,
+  ) {
+    return this.campaigns.create(churchId, user.userId, body);
+  }
+
+  @Patch('campaigns/:id')
+  @ApiBearerAuth()
+  @Roles(...LEADER_ROLES)
+  @ModuleGate('followUp')
+  updateCampaign(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @ZodBody(outreachCampaignBodySchema.partial()) body: Partial<
+      z.infer<typeof outreachCampaignBodySchema>
+    >,
+  ) {
+    return this.campaigns.update(churchId, user.userId, id, body);
+  }
+
+  @Get('duplicates')
+  @ApiBearerAuth()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Check for active Establishment journey duplicates' })
+  async checkDuplicates(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Query('phone') phone?: string,
+    @Query('email') email?: string,
+  ) {
+    const phoneNorm = phone?.trim();
+    const emailNorm = email?.trim();
+    if (!phoneNorm && !emailNorm) {
+      throw new BadRequestException('Provide phone or email to check duplicates');
+    }
+    const matches = await this.dedupe.findActiveJourneyDuplicates(
+      churchId,
+      phoneNorm,
+      emailNorm,
+    );
+    const exposePii = userCanOverrideDuplicate(user) === true;
+    return { matches: formatDuplicateMatchesForClient(matches, exposePii) };
+  }
+
+  @Get('command-centre')
+  @ApiBearerAuth()
+  @Roles(...LEADER_ROLES)
+  @ModuleGate('followUp')
+  commandCentre(
+    @ChurchId() churchId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('campaignId') campaignId?: string,
+  ) {
+    return this.intelligence.commandCentre(churchId, from, to, campaignId);
+  }
+
+  @Get('team-scorecard')
+  @ApiBearerAuth()
+  @Roles(...LEADER_ROLES)
+  @ModuleGate('followUp')
+  teamScorecard(
+    @ChurchId() churchId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('campaignId') campaignId?: string,
+  ) {
+    return this.intelligence.teamScorecard(churchId, from, to, campaignId);
+  }
+
+  @Get('map-points')
+  @ApiBearerAuth()
+  @Roles(...LEADER_ROLES)
+  @ModuleGate('followUp')
+  mapPoints(
+    @ChurchId() churchId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('campaignId') campaignId?: string,
+    @Query('minLat') minLat?: string,
+    @Query('maxLat') maxLat?: string,
+    @Query('minLng') minLng?: string,
+    @Query('maxLng') maxLng?: string,
+  ) {
+    return this.intelligence.mapPoints(
+      churchId,
+      from,
+      to,
+      campaignId,
+      minLat != null ? Number(minLat) : undefined,
+      maxLat != null ? Number(maxLat) : undefined,
+      minLng != null ? Number(minLng) : undefined,
+      maxLng != null ? Number(maxLng) : undefined,
+    );
+  }
+
   @Post('capture')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Capture outreach contact (online) — all church users' })
@@ -61,9 +191,17 @@ export class OutreachController {
     @CurrentUser() user: AuthUser,
     @ZodBody(outreachCaptureSchema) body: z.infer<typeof outreachCaptureSchema>,
   ) {
-    return this.outreachService.captureContact(churchId, {
-      ...body,
+    const leader = userCanOverrideDuplicate(user);
+    const allowDuplicateOverride = body.allowDuplicateOverride === true && leader;
+    if (body.allowDuplicateOverride && !allowDuplicateOverride) {
+      throw new ForbiddenException('Only leaders can override duplicate journey blocks');
+    }
+    const { allowDuplicateOverride: _drop, ...captureBody } = body;
+    return this.outreachService.captureContact(churchId, captureBody, {
+      allowDuplicateOverride,
       capturedByUserId: user.userId,
+      captureSource: 'MANUAL',
+      exposeDuplicatePii: leader,
     });
   }
 
@@ -72,9 +210,10 @@ export class OutreachController {
   @ApiOperation({ summary: 'Sync offline capture queue — all church users' })
   sync(
     @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
     @ZodBody(outreachSyncSchema) body: z.infer<typeof outreachSyncSchema>,
   ) {
-    return this.outreachService.queueOfflineCapture(churchId, body.items);
+    return this.outreachService.queueOfflineCapture(churchId, body.items, user.userId);
   }
 
   @Get('sync/queue')
@@ -86,7 +225,7 @@ export class OutreachController {
   @Get('sync/conflicts')
   @ApiBearerAuth()
   @ModuleGate('followUp')
-  @Roles('ADMIN', 'PASTOR', 'LEADER')
+  @Roles(...LEADER_ROLES)
   @ApiOperation({ summary: 'List open offline sync conflicts' })
   listSyncConflicts(@ChurchId() churchId: string) {
     return this.syncConflicts.listOpenConflicts(churchId);
@@ -95,7 +234,7 @@ export class OutreachController {
   @Post('sync/conflicts/:id/resolve')
   @ApiBearerAuth()
   @ModuleGate('followUp')
-  @Roles('ADMIN', 'PASTOR', 'LEADER')
+  @Roles(...LEADER_ROLES)
   @ApiOperation({ summary: 'Resolve outreach sync conflict (client/server/merge)' })
   resolveSyncConflict(
     @ChurchId() churchId: string,
@@ -103,12 +242,18 @@ export class OutreachController {
     @CurrentUser() user: AuthUser,
     @ZodBody(resolveSyncConflictSchema) body: z.infer<typeof resolveSyncConflictSchema>,
   ) {
-    return this.syncConflicts.resolveConflict(churchId, id, user.userId, body.strategy, body.mergedPayload);
+    return this.syncConflicts.resolveConflict(
+      churchId,
+      id,
+      user.userId,
+      body.strategy,
+      body.mergedPayload,
+    );
   }
 
   @Post('contacts/:id/welcome')
   @ApiBearerAuth()
-  @Roles('ADMIN', 'PASTOR', 'LEADER')
+  @Roles(...LEADER_ROLES)
   resendWelcome(@ChurchId() churchId: string, @Param('id') id: string) {
     return this.outreachService.sendWelcomeMessage(churchId, id);
   }
@@ -127,7 +272,7 @@ export class OutreachController {
   @Get('pipeline')
   @ApiBearerAuth()
   @ModuleGate('followUp')
-  @Roles('ADMIN', 'PASTOR', 'LEADER')
+  @Roles(...LEADER_ROLES)
   @ApiOperation({ summary: 'Convert pipeline board data' })
   getPipeline(@ChurchId() churchId: string) {
     return this.pipeline.getPipeline(churchId);
@@ -136,7 +281,7 @@ export class OutreachController {
   @Patch('contacts/:id/pipeline')
   @ApiBearerAuth()
   @ModuleGate('followUp')
-  @Roles('ADMIN', 'PASTOR', 'LEADER')
+  @Roles(...LEADER_ROLES)
   advancePipeline(
     @ChurchId() churchId: string,
     @Param('id') id: string,
@@ -148,7 +293,7 @@ export class OutreachController {
   @Post('contacts/:id/convert-to-member')
   @ApiBearerAuth()
   @ModuleGate('followUp')
-  @Roles('ADMIN', 'PASTOR', 'LEADER')
+  @Roles(...LEADER_ROLES)
   @ApiOperation({ summary: 'Convert outreach contact to church member (+ bus ride if flagged)' })
   convertToMember(
     @ChurchId() churchId: string,

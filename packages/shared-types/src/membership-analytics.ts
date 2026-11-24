@@ -79,6 +79,26 @@ export interface MembershipAnalyticsDemographicsDto {
   byFamily: Array<{ key: string; label: string; count: number }>;
 }
 
+export interface MembershipAnalyticsEstablishmentOpsDto {
+  overdue: number;
+  dueToday: number;
+  archiveRequested: number;
+  joinedGroupDay6: number;
+}
+
+export interface MembershipAnalyticsCellGrowthDto {
+  activeBranches: number;
+  membersInCells: number;
+  weeklyAttendance: Array<{ period: string; present: number }>;
+}
+
+export interface AnalyticsDigestSettingsDto {
+  enabled: boolean;
+  recipientEmails: string[];
+  weekday: number;
+  hourUtc: number;
+}
+
 export interface MembershipAnalyticsDashboardDto {
   generatedAt: string;
   periodMonths: number;
@@ -110,4 +130,6 @@ export interface MembershipAnalyticsDashboardDto {
   demographics: MembershipAnalyticsDemographicsDto;
   targets: MembershipAnalyticsTargetsDto;
   targetStatus: MembershipAnalyticsTargetStatusDto[];
+  establishmentOps: MembershipAnalyticsEstablishmentOpsDto;
+  cellGrowth: MembershipAnalyticsCellGrowthDto;
 }

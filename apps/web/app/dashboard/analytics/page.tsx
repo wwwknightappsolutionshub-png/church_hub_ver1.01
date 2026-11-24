@@ -29,6 +29,9 @@ import { AnalyticsDemographicsPanel } from '@/components/membership/AnalyticsDem
 import { AnalyticsFiltersBar } from '@/components/membership/AnalyticsFiltersBar';
 import { AnalyticsKpiRail } from '@/components/membership/AnalyticsKpiRail';
 import { AnalyticsTargetsPanel } from '@/components/membership/AnalyticsTargetsPanel';
+import { AnalyticsEstablishmentOpsPanel } from '@/components/membership/AnalyticsEstablishmentOpsPanel';
+import { AnalyticsCellGrowthPanel } from '@/components/membership/AnalyticsCellGrowthPanel';
+import { AnalyticsDigestPanel } from '@/components/membership/AnalyticsDigestPanel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -237,21 +240,28 @@ export default function MembershipAnalyticsPage() {
             </AnalyticsTabPanel>
 
             <AnalyticsTabPanel tabId="trends" active={activeTab === 'trends'}>
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Operations
-                </p>
-                <h2 className="mb-3 font-heading text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-                  Attendance & pipeline trends
-                </h2>
-                <LazyAnalyticsOpsCharts dash={dash} />
+              <div className="space-y-5">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Operations
+                  </p>
+                  <h2 className="mb-3 font-heading text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-50">
+                    Attendance & pipeline trends
+                  </h2>
+                  <LazyAnalyticsOpsCharts dash={dash} />
+                </div>
+                {dash.cellGrowth ? <AnalyticsCellGrowthPanel cell={dash.cellGrowth} /> : null}
               </div>
             </AnalyticsTabPanel>
 
             <AnalyticsTabPanel tabId="insights" active={activeTab === 'insights'}>
               <div className="space-y-5">
+                {dash.establishmentOps ? (
+                  <AnalyticsEstablishmentOpsPanel ops={dash.establishmentOps} />
+                ) : null}
                 <AnalyticsDemographicsPanel demographics={dash.demographics} />
                 <AnalyticsTargetsPanel dash={dash} canEdit={canEditTargets} />
+                <AnalyticsDigestPanel canEdit={canEditTargets} />
               </div>
             </AnalyticsTabPanel>
           </>

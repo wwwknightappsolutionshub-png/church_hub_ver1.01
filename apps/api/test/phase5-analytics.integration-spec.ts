@@ -120,6 +120,17 @@ describeE2e('Phase 5 — Membership analytics E2E', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
     expect(dash.body.targets.retentionRate).toBe(0.5);
+    expect(dash.body.establishmentOps).toMatchObject({
+      overdue: expect.any(Number),
+      dueToday: expect.any(Number),
+      archiveRequested: expect.any(Number),
+      joinedGroupDay6: expect.any(Number),
+    });
+    expect(dash.body.cellGrowth).toMatchObject({
+      activeBranches: expect.any(Number),
+      membersInCells: expect.any(Number),
+      weeklyAttendance: expect.any(Array),
+    });
     expect(dash.body.targetStatus.some((t: { key: string }) => t.key === 'retentionRate')).toBe(
       true,
     );

@@ -11,6 +11,7 @@ export * from './communications-phase7';
 export * from './outreach';
 export * from './outreach-import';
 export * from './outreach-phase6';
+export * from './outreach-intelligence';
 export * from './follow-up';
 export * from './bus';
 export * from './youth';

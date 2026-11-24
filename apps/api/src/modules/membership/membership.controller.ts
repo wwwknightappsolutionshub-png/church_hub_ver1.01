@@ -634,6 +634,30 @@ export class MembershipController {
     return this.membershipAnalytics.updateTargets(churchId, body);
   }
 
+  @Get('analytics/digest-settings')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({ summary: 'Weekly analytics email digest settings' })
+  getAnalyticsDigestSettings(@ChurchId() churchId: string) {
+    return this.membershipAnalytics.getDigestSettings(churchId);
+  }
+
+  @Patch('analytics/digest-settings')
+  @Roles('ADMIN', 'PASTOR')
+  @ApiOperation({ summary: 'Update weekly analytics email digest (opt-in)' })
+  updateAnalyticsDigestSettings(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Body()
+    body: {
+      enabled?: boolean;
+      recipientEmails?: string[];
+      weekday?: number;
+      hourUtc?: number;
+    },
+  ) {
+    return this.membershipAnalytics.updateDigestSettings(churchId, body, user.userId);
+  }
+
   @Get('analytics/export')
   @Roles('ADMIN', 'PASTOR', 'LEADER')
   @ApiOperation({ summary: 'Export filtered analytics as CSV' })

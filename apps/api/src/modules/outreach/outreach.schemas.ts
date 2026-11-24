@@ -24,6 +24,8 @@ export const outreachCaptureObjectSchema = OutreachCaptureBaseSchema.extend({
     .optional(),
   clientId: z.string().min(8).max(64).optional(),
   sendWelcome: z.boolean().optional(),
+  campaignId: z.string().uuid().optional(),
+  allowDuplicateOverride: z.boolean().optional(),
   addressStreet: optionalAddressLine(200),
   addressCity: optionalAddressLine(100),
   addressState: optionalAddressLine(100),
@@ -67,3 +69,12 @@ export const pipelineAdvanceSchema = z.object({
 });
 
 export const publicRegisterSchema = PublicOutreachRegisterSchema;
+
+export const outreachCampaignBodySchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  description: z.string().max(500).optional(),
+  startsAt: z.string().datetime().optional(),
+  endsAt: z.string().datetime().optional(),
+  isActive: z.boolean().optional(),
+  isDefault: z.boolean().optional(),
+});

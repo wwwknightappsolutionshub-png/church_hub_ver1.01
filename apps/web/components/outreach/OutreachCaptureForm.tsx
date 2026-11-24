@@ -14,6 +14,7 @@ import {
 import { z } from 'zod';
 import { Loader2, WifiOff } from 'lucide-react';
 import { toast } from 'sonner';
+import type { AxiosError } from 'axios';
 import { api } from '@/lib/api';
 import {
   clearCachedForm,
@@ -62,6 +63,8 @@ interface OutreachCaptureFormProps {
   onSuccess: () => void;
   evangelistId?: string;
   qrCodeId?: string;
+  campaignId?: string;
+  canOverrideDuplicate?: boolean;
 }
 
 /** Remounts after each save so the form is blank for the next capture. */
@@ -81,8 +84,14 @@ function OutreachCaptureFormInner({
   onSuccess,
   evangelistId,
   qrCodeId,
+  campaignId,
+  canOverrideDuplicate,
   onReadyForNext,
 }: OutreachCaptureFormProps & { onReadyForNext: () => void }) {
+  const [duplicateBlock, setDuplicateBlock] = useState<{
+    matches: Array<{ followUpId: string; contactName: string; stage: string }>;
+    payload: FormData;
+  } | null>(null);
   const [postcodeHints, setPostcodeHints] = useState<string[]>([]);
   const [postcodeBusy, setPostcodeBusy] = useState(false);
   const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -221,17 +230,7 @@ function OutreachCaptureFormInner({
     onReadyForNext();
   };
 
-  const onSubmit = async (data: FormData) => {
-    const payload: FormData = {
-      ...data,
-      clientId: crypto.randomUUID(),
-      capturedAt: new Date().toISOString(),
-      evangelistId,
-      qrCodeId,
-      photoConsent: false,
-      photoUrl: undefined,
-    };
-
+  const submitCapture = async (payload: FormData, allowDuplicateOverride?: boolean) => {
     try {
       if (!navigator.onLine) {
         await queueOutreachCapture(payload as Record<string, unknown>);
@@ -239,14 +238,41 @@ function OutreachCaptureFormInner({
         await prepareNextCapture();
         return;
       }
-      await api.post('/outreach/capture', payload);
+      await api.post('/outreach/capture', {
+        ...payload,
+        ...(allowDuplicateOverride ? { allowDuplicateOverride: true } : {}),
+      });
+      setDuplicateBlock(null);
       toast.success('Successfully Added');
       await prepareNextCapture();
-    } catch {
+    } catch (err) {
+      const ax = err as AxiosError<{ code?: string; matches?: Array<{ followUpId: string; contactName: string; stage: string }> }>;
+      if (ax.response?.status === 409 && ax.response.data?.code === 'DUPLICATE_JOURNEY') {
+        setDuplicateBlock({
+          matches: ax.response.data.matches ?? [],
+          payload,
+        });
+        toast.error('Active Establishment journey already exists');
+        return;
+      }
       await queueOutreachCapture(payload as Record<string, unknown>);
       toast.info('Queued offline — will sync automatically');
       await prepareNextCapture();
     }
+  };
+
+  const onSubmit = async (data: FormData) => {
+    const payload: FormData = {
+      ...data,
+      clientId: crypto.randomUUID(),
+      capturedAt: new Date().toISOString(),
+      evangelistId,
+      qrCodeId,
+      campaignId,
+      photoConsent: false,
+      photoUrl: undefined,
+    };
+    await submitCapture(payload);
   };
 
   /** Chrome ignores autocomplete=off unless fields start read-only. */
@@ -264,6 +290,39 @@ function OutreachCaptureFormInner({
       data-bwignore
       noValidate
     >
+      {duplicateBlock ? (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+          <p className="font-medium text-destructive">Duplicate journey detected</p>
+          <ul className="mt-2 list-disc space-y-1 pl-4 text-muted-foreground">
+            {duplicateBlock.matches.map((m) => (
+              <li key={m.followUpId}>
+                {m.contactName} — stage {m.stage}{' '}
+                <Link
+                  href={`/dashboard/establishment?followUpId=${encodeURIComponent(m.followUpId)}`}
+                  className="text-primary hover:underline"
+                >
+                  Open
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setDuplicateBlock(null)}>
+              Cancel
+            </Button>
+            {canOverrideDuplicate ? (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void submitCapture(duplicateBlock.payload, true)}
+              >
+                Leader: capture anyway
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       {!online && (
         <div className="flex items-center gap-2 rounded-lg border border-amber-300/50 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
           <WifiOff className="h-4 w-4 shrink-0" />

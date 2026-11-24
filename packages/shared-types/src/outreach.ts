@@ -59,6 +59,8 @@ export const OutreachCaptureBaseSchema = z.object({
   busPickupNotes: z.string().max(1000).optional(),
   clientId: z.string().uuid().optional(),
   capturedAt: z.string().datetime().optional(),
+  campaignId: z.string().uuid().optional(),
+  allowDuplicateOverride: z.boolean().optional(),
 });
 
 /** Require street/city/country when phone is not UK E.164 (+44…). */

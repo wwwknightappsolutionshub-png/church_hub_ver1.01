@@ -74,10 +74,8 @@ export class AutomationSyncService {
       case 'OUTREACH_CAPTURE': {
         await this.outreach.captureContact(
           item.churchId,
-          {
-            ...(payload as Parameters<OutreachService['captureContact']>[1]),
-            clientId: item.clientId,
-          },
+          { ...(payload as Parameters<OutreachService['captureContact']>[1]), clientId: item.clientId },
+          { captureSource: 'SYNC' },
         );
         return;
       }
