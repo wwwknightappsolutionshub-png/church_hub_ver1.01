@@ -30,6 +30,9 @@ import {
 import { FollowUpTeamNotifyService } from './follow-up-team-notify.service';
 import { FollowUpAutomationService } from './follow-up-automation.service';
 import { ModuleAccessService } from '../access/module-access.service';
+import { ESTABLISHMENT_MANAGER_UNIT_NAMES, FOLLOW_UP_UNIT_NAME } from '../access/access.constants';
+import { isUnitDeputyRole } from '../service-units/service-unit-leader-roles';
+import { findOneAdminAndOnePastor } from '../notifications/report-digest.util';
 import type { EstablishmentAccess } from '../access/establishment-access.types';
 import {
   assignmentSlaCutoff,
@@ -177,6 +180,7 @@ export class FollowUpService {
       assignedTo: f.assignedTo,
       wsfCellBranch: f.wsfCellBranch,
       archiveRequestedAt: f.archiveRequestedAt,
+      journeyDiscontinuedAt: f.journeyDiscontinuedAt,
     }));
   }
 
@@ -596,12 +600,7 @@ export class FollowUpService {
 
     const updated = await this.prisma.followUp.update({
       where: { id: followUpId },
-      data: {
-        memberId: member.id,
-        contactName: `${member.firstName} ${member.lastName}`.trim(),
-        contactPhone: member.phone ?? undefined,
-        contactEmail: member.email ?? undefined,
-      },
+      data: { memberId: member.id },
       include: followUpInclude,
     });
 
@@ -1251,6 +1250,103 @@ export class FollowUpService {
       return row;
     });
 
+    if (existing.journeyDiscontinuedAt) {
+      await this.notifyLeadershipOfArchive(churchId, existing.contactName);
+    }
+
+    return updated;
+  }
+
+  async discontinueJourney(
+    churchId: string,
+    id: string,
+    actorId: string,
+    data: { whatWasDone?: string; whatNext?: string; dueAt?: string | null },
+  ) {
+    const existing = await this.prisma.followUp.findFirst({ where: { id, churchId } });
+    if (!existing) throw new NotFoundException('Follow-up not found');
+    if (existing.archivedAt) throw new BadRequestException('This lead is already archived');
+    if (existing.journeyDiscontinuedAt) {
+      throw new BadRequestException('This journey is already marked to discontinue');
+    }
+    const flags = await this.pipelineFlags(churchId);
+    if (isArchiveBlockedStageKey(existing.stage, flags)) {
+      throw new BadRequestException(
+        'This pipeline stage cannot be archived. Convert the contact to a Member within 7 days.',
+      );
+    }
+
+    const access = await this.requireAccess(churchId, actorId);
+    if (!this.moduleAccess.canMutateEstablishmentRecord(access, actorId, existing)) {
+      throw new ForbiddenException('You cannot update this Establishment contact');
+    }
+
+    const whatWasDone = data.whatWasDone?.trim() ?? '';
+    const whatNext = data.whatNext?.trim() ?? '';
+    if (whatWasDone.length < 3 || whatNext.length < 3) {
+      throw new BadRequestException('Describe what was done and what should happen next');
+    }
+    let dueAt: Date | null = null;
+    if (typeof data.dueAt === 'string' && data.dueAt.trim()) {
+      const parsed = new Date(data.dueAt);
+      if (Number.isNaN(parsed.getTime())) throw new BadRequestException('Invalid due date');
+      dueAt = parsed;
+    } else {
+      throw new BadRequestException('Choose when it should be done');
+    }
+
+    const note = [
+      'Discontinue Journey',
+      `What was done:\n${whatWasDone}`,
+      `What should be done next:\n${whatNext}`,
+      `When it should be done:\n${dueAt.toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      })}`,
+    ].join('\n\n');
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.followUp.update({
+        where: { id },
+        data: {
+          journeyDiscontinuedAt: new Date(),
+          archiveRequestedAt: new Date(),
+          archiveRequestedById: actorId,
+          archiveRequestReason: whatWasDone,
+          nextAction: whatNext,
+          dueAt,
+          notes: note,
+        },
+        include: followUpInclude,
+      });
+      await tx.pastoralNote.create({
+        data: {
+          churchId,
+          authorId: actorId,
+          followUpId: id,
+          memberId: existing.memberId,
+          content: encryptPastoralNoteContent(note),
+          isConfidential: false,
+          stageAtTime: existing.stage,
+          kind: 'ARCHIVE_REQUEST',
+        },
+      });
+      return row;
+    });
+
+    const church = await this.prisma.church.findFirst({
+      where: { id: churchId },
+      select: { name: true },
+    });
+    const churchName = (church?.name ?? 'our church').replace(/[<>]/g, '');
+    await this.sendDiscontinueFarewell(churchId, existing.contactEmail, existing.contactPhone, churchName);
+    await this.notifyUnitLeaderToConfirmArchive(
+      churchId,
+      id,
+      existing.contactName,
+      existing.assignedToId,
+    );
     return updated;
   }
 
@@ -1549,5 +1645,122 @@ export class FollowUpService {
     });
     const names = roles.map((r) => r.role.name);
     return names.includes('ADMIN') || names.includes('PASTOR') || names.includes('LEADER');
+  }
+
+  private async sendDiscontinueFarewell(
+    churchId: string,
+    email: string | null,
+    phone: string | null,
+    churchName: string,
+  ) {
+    const title = "Oh Wow, It's Disheartening To See You Leave";
+    const body = [
+      "We are so glad you fellowshipped with us though it's sad that you are leaving so soon but we are confident that the presence of God will not depart from you.",
+      'Thank you for the time you spent with us and we look forward to seeing you another time.',
+      'If you would like us to keep in touch when we have special events, do let us know and we will keep you posted when we have such events.',
+      `We pray that God bless you abundantly in Jesus name. With love from ${churchName}`,
+    ].join(' ');
+    if (email) {
+      await this.email.send({ to: email, subject: title, body, churchId });
+    }
+    if (phone) {
+      await trySendWhatsApp(this.sms, this.logger, {
+        to: phone,
+        body: `${title}\n\n${body}`,
+        churchId,
+        label: 'Discontinue journey',
+      });
+    }
+  }
+
+  private async notifyUnitLeaderToConfirmArchive(
+    churchId: string,
+    followUpId: string,
+    contactName: string,
+    assignedToId: string | null,
+  ) {
+    const leaderSelect = {
+      leaders: {
+        select: {
+          isUnitAdmin: true,
+          role: true,
+          member: { select: { userId: true } },
+        },
+      },
+    } as const;
+    const assignedScope = assignedToId
+      ? {
+          OR: [
+            { members: { some: { member: { userId: assignedToId } } } },
+            { leaders: { some: { member: { userId: assignedToId } } } },
+          ],
+        }
+      : {};
+    let units = await this.prisma.serviceUnit.findMany({
+      where: {
+        churchId,
+        isActive: true,
+        name: { in: [...ESTABLISHMENT_MANAGER_UNIT_NAMES] },
+        ...assignedScope,
+      },
+      select: leaderSelect,
+    });
+    if (units.length === 0) {
+      units = await this.prisma.serviceUnit.findMany({
+        where: { churchId, isActive: true, name: FOLLOW_UP_UNIT_NAME },
+        select: leaderSelect,
+      });
+    }
+    const userIds = new Set<string>();
+    for (const unit of units) {
+      for (const leader of unit.leaders) {
+        if ((leader.isUnitAdmin || !isUnitDeputyRole(leader.role)) && leader.member.userId) {
+          userIds.add(leader.member.userId);
+        }
+      }
+    }
+    const leaders = await this.prisma.user.findMany({
+      where: { id: { in: [...userIds] }, churchId, isActive: true },
+      select: { id: true },
+    });
+    const title = `Confirm archiving ${contactName}`;
+    const body = `${contactName} discontinued their membership journey. Confirm archiving so the contact moves to Archived leads.`;
+    await Promise.all(
+      leaders.map((leader) =>
+        this.prisma.notification.create({
+          data: {
+            churchId,
+            userId: leader.id,
+            title,
+            body,
+            type: 'FOLLOW_UP_ARCHIVE_REQUEST',
+            data: { followUpId, channel: 'in_app' },
+          },
+        }),
+      ),
+    );
+  }
+
+  private async notifyLeadershipOfArchive(churchId: string, contactName: string) {
+    const recipients = await findOneAdminAndOnePastor(this.prisma, churchId);
+    const title = 'A contact has been archived';
+    const body = `${contactName} has been archived.`;
+    await Promise.all(
+      recipients.map(async (staff) => {
+        await this.prisma.notification.create({
+          data: {
+            churchId,
+            userId: staff.id,
+            title,
+            body,
+            type: 'FOLLOW_UP_ARCHIVED',
+            data: { channel: 'in_app' },
+          },
+        });
+        if (staff.email) {
+          await this.email.send({ to: staff.email, subject: title, body, churchId });
+        }
+      }),
+    );
   }
 }

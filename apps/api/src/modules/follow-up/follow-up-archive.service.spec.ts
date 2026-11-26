@@ -72,6 +72,8 @@ describe('FollowUpService archive flow', () => {
     }),
   };
 
+  const securityAudit = { append: jest.fn() };
+
   const service = new FollowUpService(
     prisma as never,
     notifications as never,
@@ -81,6 +83,7 @@ describe('FollowUpService archive flow', () => {
     automation as never,
     moduleAccess as never,
     pipelineResolve as never,
+    securityAudit as never,
   );
 
   beforeEach(() => {

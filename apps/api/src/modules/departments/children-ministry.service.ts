@@ -4,6 +4,7 @@ import type { MembershipImportColumnMapping, MembershipImportOptions } from '@ch
 import { PrismaService } from '../../prisma/prisma.module';
 import { DepartmentAccessService } from './department-access.service';
 import { CommunicationsQueueService } from '../communications/communications-queue.service';
+import { brandPlainUpdate, loadChurchMailBrand } from '../communications/operational-email';
 import {
   applyCelebrationTemplate,
   CelebrationEmailTemplatesService,
@@ -734,16 +735,38 @@ export class ChildrenMinistryService {
       select: { id: true, email: true },
     });
 
+    const brand = await loadChurchMailBrand(this.prisma, churchId);
+    const headCountTitle = `Children's Church — Sunday head count (${date.toISOString().slice(0, 10)})`;
+    const emailHtml = brandPlainUpdate({
+      churchName: brand.name,
+      eyebrow: 'Quick report',
+      headline: 'Sunday head count',
+      subhead: date.toISOString().slice(0, 10),
+      plain: body,
+    });
     let notificationsQueued = 0;
     for (const staff of staffUsers) {
       await this.commQueue.enqueue(churchId, {
         kind: 'DEPARTMENT_WEEKLY_REPORT',
-        title: `Children's Church — Sunday head count (${date.toISOString().slice(0, 10)})`,
+        title: headCountTitle,
         body,
         channels: ['IN_APP'],
         serviceUnitId,
         targetUserId: staff.id,
         metadata: { reportId: report.id, serviceDate: date.toISOString().slice(0, 10) },
+      });
+      await this.commQueue.enqueue(churchId, {
+        kind: 'DEPARTMENT_WEEKLY_REPORT',
+        title: headCountTitle,
+        body,
+        channels: ['EMAIL'],
+        targetUserId: staff.id,
+        metadata: {
+          reportId: report.id,
+          serviceDate: date.toISOString().slice(0, 10),
+          emailPurpose: 'reports',
+          emailHtml,
+        },
       });
       await this.prisma.notification.create({
         data: {

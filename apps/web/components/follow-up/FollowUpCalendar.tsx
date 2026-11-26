@@ -17,6 +17,7 @@ interface CalendarLead {
   nextAction?: string | null;
   assignedTo?: { firstName: string; lastName: string } | null;
   archiveRequestedAt?: string | null;
+  journeyDiscontinuedAt?: string | null;
 }
 
 interface FollowUpCalendarProps {
@@ -156,8 +157,8 @@ export function FollowUpCalendar({ onSelect, selectedId, pipeline }: FollowUpCal
                           onClick={() => onSelect(item.id)}
                           className={cn(
                             'block w-full truncate rounded px-1 py-0.5 text-left text-[10px] font-medium',
-                            item.archiveRequestedAt
-                              ? 'bg-destructive/15 text-destructive'
+                            item.journeyDiscontinuedAt || item.archiveRequestedAt
+                              ? 'bg-red-100 text-red-900'
                               : 'bg-sky-100 text-sky-950 dark:bg-sky-950 dark:text-sky-100',
                             selectedId === item.id && 'ring-1 ring-primary',
                           )}

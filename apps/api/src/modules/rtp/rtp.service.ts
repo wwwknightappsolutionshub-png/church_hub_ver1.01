@@ -9,6 +9,17 @@ import { Prisma, RtpFieldType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.module';
 import { ModuleAccessService } from '../access/module-access.service';
 import { CommunicationsQueueService } from '../communications/communications-queue.service';
+import {
+  brandPlainUpdate,
+  escapeMailHtml,
+  formatMailAmount,
+  formatMailStamp,
+  loadChurchMailBrand,
+  mailDataTable,
+  mailKvTable,
+  mailLinkCell,
+  operationalEmailShell,
+} from '../communications/operational-email';
 
 const DEFAULT_FIELDS: Array<{
   fieldKey: string;
@@ -472,45 +483,89 @@ export class RtpService {
     return Math.round(total * 100) / 100;
   }
 
-  private buildTabularBody(
+  private buildSubmissionMail(
     fields: Array<{ fieldKey: string; label: string; sectionLabel: string }>,
     values: Record<string, unknown>,
-    meta: { unitName: string; submitter: string; title: string; submittedAt: string },
+    meta: {
+      churchName: string;
+      timezone: string;
+      unitName: string;
+      submitter: string;
+      title: string;
+      submittedAt: Date;
+    },
   ) {
-    const lines = [
-      `RTP Request: ${meta.title}`,
-      `Service Unit: ${meta.unitName}`,
-      `Submitted by: ${meta.submitter}`,
-      `Submitted at: ${meta.submittedAt}`,
-      ``,
-      `Field | Value`,
-      `---|---`,
-    ];
+    const submittedAt = formatMailStamp(meta.submittedAt, meta.timezone);
     const skipKeys = new Set(['item_description', 'quantity', 'unit_cost', 'line_items']);
+    const displayOf = (raw: unknown) =>
+      raw === undefined || raw === null || String(raw).trim() === '' ? '—' : String(raw);
+
+    const sections = new Map<string, Array<{ label: string; value: string }>>();
     for (const field of fields) {
       if (skipKeys.has(field.fieldKey)) continue;
-      const raw = values[field.fieldKey];
-      const display =
-        raw === undefined || raw === null || String(raw).trim() === ''
-          ? '—'
-          : String(raw).replace(/\n/g, ' ');
-      lines.push(`${field.label} | ${display}`);
+      const rows = sections.get(field.sectionLabel) ?? [];
+      rows.push({ label: field.label, value: displayOf(values[field.fieldKey]) });
+      sections.set(field.sectionLabel, rows);
     }
 
     const items = this.normalizeLineItems(values.line_items);
-    if (items.length > 0) {
-      lines.push(``);
-      lines.push(`Items to purchase`);
-      lines.push(`# | Description | Qty | Unit cost | Line total | Website`);
-      lines.push(`---|---|---|---|---|---`);
-      items.forEach((item, idx) => {
-        lines.push(
-          `${idx + 1} | ${item.description.replace(/\|/g, '/')} | ${item.quantity} | ${item.unitCost} | ${item.lineTotal} | ${item.websiteUrl || '—'}`,
-        );
-      });
-      lines.push(`Estimated total (from items) | ${this.sumLineItems(items)}`);
+    const total = items.length > 0 ? this.sumLineItems(items) : null;
+    const blocks = [
+      mailKvTable([
+        { label: 'Service unit', value: meta.unitName },
+        { label: 'Submitted by', value: meta.submitter },
+        { label: 'Submitted', value: submittedAt },
+      ]),
+    ];
+    for (const [section, rows] of sections) {
+      blocks.push(
+        `<p style="margin:8px 0;font-size:13px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:#1e3a5f;">${escapeMailHtml(section)}</p>`,
+      );
+      blocks.push(mailKvTable(rows));
     }
-    return lines.join('\n');
+    if (items.length > 0) {
+      blocks.push(
+        `<p style="margin:8px 0;font-size:13px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:#1e3a5f;">Items to purchase</p>`,
+      );
+      blocks.push(
+        mailDataTable(
+          ['#', 'Description', 'Qty', 'Unit cost', 'Line total', 'Website'],
+          items.map((item, idx) => [
+            String(idx + 1),
+            item.description || '—',
+            formatMailAmount(item.quantity),
+            formatMailAmount(item.unitCost),
+            formatMailAmount(item.lineTotal),
+            { html: mailLinkCell(item.websiteUrl) },
+          ]),
+        ),
+      );
+      blocks.push(mailKvTable([{ label: 'Estimated total', value: formatMailAmount(total ?? 0) }]));
+    }
+    blocks.push(
+      `<p style="margin:18px 0 0;font-size:13px;color:#64748b;">Open Admin/Pastor Reports → RTP Requests to review.</p>`,
+    );
+
+    const plain = [
+      `New purchase request: ${meta.title}`,
+      `${meta.unitName} · submitted by ${meta.submitter}`,
+      submittedAt,
+      total !== null ? `Estimated total: ${formatMailAmount(total)}` : '',
+      'Open Admin/Pastor Reports → RTP Requests to review.',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    return {
+      plain,
+      emailHtml: operationalEmailShell({
+        churchName: meta.churchName,
+        eyebrow: 'RTP request',
+        headline: meta.title,
+        subhead: meta.unitName,
+        bodyHtml: blocks.join(''),
+      }),
+    };
   }
 
   async remindLeadership(userId: string, churchId: string, requestId: string) {
@@ -540,19 +595,26 @@ export class RtpService {
       throw new BadRequestException('No church admin or pastor available to remind');
     }
 
+    const brand = await loadChurchMailBrand(this.prisma, churchId);
     const submitter = `${row.submittedBy.firstName} ${row.submittedBy.lastName}`.trim();
     const title = `Manual reminder: RTP — ${row.title}`;
     const body = [
       `A service unit admin requested a reminder on this Request to Purchase.`,
       ``,
-      `Service Unit: ${row.serviceUnit.name}`,
+      `Service unit: ${row.serviceUnit.name}`,
       `Title: ${row.title}`,
       `Status: ${row.status}`,
       `Submitted by: ${submitter}`,
-      `Submitted at: ${row.createdAt.toISOString()}`,
-      ``,
-      `Open Admin/Pastor Reports → RTP Requests to review.`,
+      `Submitted: ${formatMailStamp(row.createdAt, brand.timezone)}`,
     ].join('\n');
+    const emailHtml = brandPlainUpdate({
+      churchName: brand.name,
+      eyebrow: 'RTP reminder',
+      headline: row.title,
+      subhead: row.serviceUnit.name,
+      plain: body,
+      footerNote: 'Open Admin/Pastor Reports → RTP Requests to review.',
+    });
 
     for (const staff of staffUsers) {
       await this.commQueue.enqueue(churchId, {
@@ -565,6 +627,7 @@ export class RtpService {
           reportType: 'RTP Reminder',
           rtpRequestId: row.id,
           reminderType: 'RTP_MANUAL',
+          emailHtml,
         },
       });
     }
@@ -598,13 +661,16 @@ export class RtpService {
       row.fieldValues && typeof row.fieldValues === 'object' && !Array.isArray(row.fieldValues)
         ? (row.fieldValues as Record<string, unknown>)
         : {};
+    const brand = await loadChurchMailBrand(this.prisma, churchId);
     const submitter = `${row.submittedBy.firstName} ${row.submittedBy.lastName}`.trim();
     const title = `[RTP Request] ${row.serviceUnit.name} — ${row.title}`;
-    const body = this.buildTabularBody(fields, values, {
+    const mail = this.buildSubmissionMail(fields, values, {
+      churchName: brand.name,
+      timezone: brand.timezone,
       unitName: row.serviceUnit.name,
       submitter,
       title: row.title,
-      submittedAt: row.createdAt.toISOString(),
+      submittedAt: row.createdAt,
     });
 
     const staffUsers = await this.prisma.user.findMany({
@@ -620,13 +686,14 @@ export class RtpService {
       await this.commQueue.enqueue(churchId, {
         kind: 'DIRECT_ALERT',
         title,
-        body,
+        body: mail.plain,
         channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
         targetUserId: staff.id,
         metadata: {
           reportType: 'RTP Request',
           rtpRequestId: row.id,
           reminderType: 'RTP_SUBMITTED',
+          emailHtml: mail.emailHtml,
         },
       });
     }
@@ -658,22 +725,31 @@ export class RtpService {
     });
 
     try {
+      const brand = await loadChurchMailBrand(this.prisma, churchId);
+      const body = [
+        `Your Request to Purchase for "${row.serviceUnit.name}" is now being processed.`,
+        ``,
+        `Title: ${row.title}`,
+        `Status: Processing`,
+        `Updated: ${formatMailStamp(new Date(), brand.timezone)}`,
+      ].join('\n');
       await this.commQueue.enqueue(churchId, {
         kind: 'DIRECT_ALERT',
         title: `RTP status: Processing — ${row.title}`,
-        body: [
-          `Your Request to Purchase for "${row.serviceUnit.name}" is now being processed.`,
-          ``,
-          `Title: ${row.title}`,
-          `Status: Processing`,
-          `Updated: ${new Date().toISOString()}`,
-        ].join('\n'),
+        body,
         channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
         targetUserId: row.submittedByUserId,
         metadata: {
           reportType: 'RTP Status',
           rtpRequestId: row.id,
           status: 'PROCESSING',
+          emailHtml: brandPlainUpdate({
+            churchName: brand.name,
+            eyebrow: 'RTP update',
+            headline: row.title,
+            subhead: row.serviceUnit.name,
+            plain: body,
+          }),
         },
       });
     } catch (err) {
@@ -710,18 +786,31 @@ export class RtpService {
     });
 
     try {
+      const brand = await loadChurchMailBrand(this.prisma, churchId);
+      const body = [
+        `Your Request to Purchase for "${row.serviceUnit.name}" has been approved.`,
+        ``,
+        `Title: ${row.title}`,
+        `Status: Approved`,
+      ].join('\n');
       await this.commQueue.enqueue(churchId, {
         kind: 'DIRECT_ALERT',
         title: `RTP approved — ${row.title}`,
-        body: [
-          `Your Request to Purchase for "${row.serviceUnit.name}" has been approved.`,
-          ``,
-          `Title: ${row.title}`,
-          `Status: Approved`,
-        ].join('\n'),
+        body,
         channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
         targetUserId: row.submittedByUserId,
-        metadata: { reportType: 'RTP Status', rtpRequestId: row.id, status: 'APPROVED' },
+        metadata: {
+          reportType: 'RTP Status',
+          rtpRequestId: row.id,
+          status: 'APPROVED',
+          emailHtml: brandPlainUpdate({
+            churchName: brand.name,
+            eyebrow: 'RTP update',
+            headline: row.title,
+            subhead: row.serviceUnit.name,
+            plain: body,
+          }),
+        },
       });
     } catch (err) {
       this.logger.warn(
@@ -760,21 +849,34 @@ export class RtpService {
     });
 
     try {
+      const brand = await loadChurchMailBrand(this.prisma, churchId);
+      const body = [
+        `Your Request to Purchase for "${row.serviceUnit.name}" was declined.`,
+        ``,
+        `Title: ${row.title}`,
+        `Status: Declined`,
+        reason?.trim() ? `Reason: ${reason.trim()}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n');
       await this.commQueue.enqueue(churchId, {
         kind: 'DIRECT_ALERT',
         title: `RTP declined — ${row.title}`,
-        body: [
-          `Your Request to Purchase for "${row.serviceUnit.name}" was declined.`,
-          ``,
-          `Title: ${row.title}`,
-          `Status: Rejected`,
-          reason?.trim() ? `Reason: ${reason.trim()}` : '',
-        ]
-          .filter(Boolean)
-          .join('\n'),
+        body,
         channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
         targetUserId: row.submittedByUserId,
-        metadata: { reportType: 'RTP Status', rtpRequestId: row.id, status: 'REJECTED' },
+        metadata: {
+          reportType: 'RTP Status',
+          rtpRequestId: row.id,
+          status: 'REJECTED',
+          emailHtml: brandPlainUpdate({
+            churchName: brand.name,
+            eyebrow: 'RTP update',
+            headline: row.title,
+            subhead: row.serviceUnit.name,
+            plain: body,
+          }),
+        },
       });
     } catch (err) {
       this.logger.warn(
@@ -810,18 +912,25 @@ export class RtpService {
         select: { id: true },
       });
 
+      const brand = await loadChurchMailBrand(this.prisma, row.churchId);
       const submitter = `${row.submittedBy.firstName} ${row.submittedBy.lastName}`.trim();
       const title = `Reminder: RTP awaiting receipt — ${row.title}`;
       const body = [
-        `This Request to Purchase is still awaiting your "Received" action.`,
+        `This Request to Purchase is still awaiting your Received action.`,
         ``,
-        `Service Unit: ${row.serviceUnit.name}`,
+        `Service unit: ${row.serviceUnit.name}`,
         `Title: ${row.title}`,
         `Submitted by: ${submitter}`,
-        `Submitted at: ${row.createdAt.toISOString()}`,
-        ``,
-        `Open Admin/Pastor Reports → RTP Requests and click Received.`,
+        `Submitted: ${formatMailStamp(row.createdAt, brand.timezone)}`,
       ].join('\n');
+      const emailHtml = brandPlainUpdate({
+        churchName: brand.name,
+        eyebrow: 'RTP reminder',
+        headline: row.title,
+        subhead: row.serviceUnit.name,
+        plain: body,
+        footerNote: 'Open Admin/Pastor Reports → RTP Requests and click Received.',
+      });
 
       const reminderKey = `rtp-sla:${row.id}:${now.toISOString().slice(0, 16)}`;
 
@@ -837,6 +946,7 @@ export class RtpService {
             rtpRequestId: row.id,
             reminderKey,
             reminderType: 'RTP_SLA',
+            emailHtml,
           },
         });
         reminded++;

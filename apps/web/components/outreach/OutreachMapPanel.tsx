@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { Loader2 } from 'lucide-react';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
+import { useOutreachRange } from '@/components/outreach/use-outreach-range';
 import type { OutreachMapPointDto } from '@church-hub/shared-types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -20,12 +21,11 @@ export function OutreachMapPanel({
   dateFrom: string;
   dateTo: string;
 }) {
-  const from = dateFrom || new Date(Date.now() - 30 * 86400000).toISOString();
-  const to = dateTo || new Date().toISOString();
+  const { from, to } = useOutreachRange(dateFrom, dateTo);
   const params = new URLSearchParams({ from, to });
   if (campaignId) params.set('campaignId', campaignId);
 
-  const { data, isLoading } = useApiQuery<OutreachMapPointDto[]>(
+  const { data, isLoading, isError, refetch } = useApiQuery<OutreachMapPointDto[]>(
     ['outreach-map', from, to, campaignId],
     `/outreach/map-points?${params.toString()}`,
   );
@@ -39,6 +39,10 @@ export function OutreachMapPanel({
       <CardContent>
         {isLoading ? (
           <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
+        ) : isError ? (
+          <button type="button" className="text-sm text-primary hover:underline" onClick={() => refetch()}>
+            Territory map could not be loaded. Retry
+          </button>
         ) : !data?.length ? (
           <p className="text-sm text-muted-foreground">No geo-tagged captures in this range.</p>
         ) : (

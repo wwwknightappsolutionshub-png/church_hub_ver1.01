@@ -69,6 +69,7 @@ export interface FollowUpCard {
   notes?: string | null;
   referredBy?: string | null;
   archiveRequestedAt?: string | null;
+  journeyDiscontinuedAt?: string | null;
   archiveRequestReason?: string | null;
   member?: { id: string; firstName: string; lastName: string } | null;
   assignedTo?: { id: string; firstName: string; lastName: string } | null;
@@ -147,6 +148,7 @@ function LeadCard({
   onDeclineClick?: () => void;
 }) {
   const archiveRequested = !!item.archiveRequestedAt;
+  const discontinued = !!item.journeyDiscontinuedAt;
   const referred = item.referredBy?.trim() || null;
   const captured = formatCapturedAt(item.createdAt);
   const archiveBlocked = pipeline
@@ -185,7 +187,8 @@ function LeadCard({
         highlightClass,
         selected &&
           'border-2 border-amber-500 bg-gradient-to-br from-amber-50 via-amber-100/80 to-orange-50 shadow-md ring-2 ring-amber-400/50',
-        archiveRequested && !selected && 'ring-1 ring-destructive/40',
+        discontinued && 'border-red-400 bg-red-50 ring-2 ring-red-500',
+        archiveRequested && !discontinued && !selected && 'ring-1 ring-destructive/40',
       )}
       data-stage={item.stage}
     >
@@ -257,7 +260,11 @@ function LeadCard({
               {shortLabel}
             </Badge>
           </div>
-          {archiveRequested ? (
+          {discontinued ? (
+            <Badge variant="destructive" className="mt-1 w-fit text-[10px]">
+              Discontinue journey
+            </Badge>
+          ) : archiveRequested ? (
             <Badge variant="destructive" className="mt-1 w-fit text-[10px]">
               Archive requested
             </Badge>

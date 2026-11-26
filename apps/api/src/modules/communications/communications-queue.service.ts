@@ -3,6 +3,7 @@ import { CommunicationQueueKind, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.module';
 import { EmailAdapter, EmailPurpose } from '../notifications/adapters/email.adapter';
 import { SmsAdapter } from '../notifications/adapters/sms.adapter';
+import { emailDeliveryParts, expandsToServiceUnit, externalChannelBody } from './operational-email';
 
 export type CommChannel = 'IN_APP' | 'EMAIL' | 'WHATSAPP';
 
@@ -155,13 +156,13 @@ export class CommunicationsQueueService {
     }
 
     if (channels.includes('EMAIL')) {
+      const emailParts = emailDeliveryParts(item.body, item.metadata);
       for (const email of recipients.emails) {
-        const isHtml = /<[a-z][\s\S]*>/i.test(item.body);
         await this.email.send({
           to: email,
           subject: item.title,
-          body: isHtml ? item.body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : item.body,
-          html: isHtml ? item.body : undefined,
+          body: emailParts.text,
+          html: emailParts.html,
           churchId: item.churchId,
           purpose: emailPurpose,
         });
@@ -169,9 +170,7 @@ export class CommunicationsQueueService {
     }
 
     if (channels.includes('WHATSAPP')) {
-      const waBody = /<[a-z][\s\S]*>/i.test(item.body)
-        ? item.body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-        : item.body;
+      const waBody = externalChannelBody(item.body, item.metadata);
       for (const phone of recipients.phones) {
         await this.sms.sendWhatsApp({
           to: phone,
@@ -212,7 +211,7 @@ export class CommunicationsQueueService {
       if (m?.phone) phones.add(m.phone);
     }
 
-    if (item.serviceUnitId) {
+    if (expandsToServiceUnit(item)) {
       const members = await this.prisma.serviceUnitMember.findMany({
         where: { serviceUnitId: item.serviceUnitId },
         include: {

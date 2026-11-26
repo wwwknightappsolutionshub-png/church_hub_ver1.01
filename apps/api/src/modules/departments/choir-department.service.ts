@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DepartmentAccessService } from './department-access.service';
 import { CommunicationsQueueService } from '../communications/communications-queue.service';
+import { brandPlainUpdate, loadChurchMailBrand } from '../communications/operational-email';
 import { UploadsService } from '../uploads/uploads.service';
 import { resolveDeptModuleCode } from '../../../prisma/dept-module-catalog';
 import {
@@ -170,6 +171,7 @@ export class ChoirDepartmentService {
     } else {
       where.startsAt = { gte: new Date() };
     }
+    const brand = await loadChurchMailBrand(this.prisma, churchId);
     const rows = await this.prisma.deptChoirRosterEntry.findMany({
       where,
       include: { member: { select: memberSelect } },
@@ -192,6 +194,15 @@ export class ChoirDepartmentService {
         serviceUnitId,
         targetUserId: row.member.userId,
         targetMemberId: row.member.id,
+        metadata: {
+          emailHtml: brandPlainUpdate({
+            churchName: brand.name,
+            eyebrow: 'Department message',
+            headline: 'Rehearsal / ministration',
+            subhead: unit.name,
+            plain: msg,
+          }),
+        },
       });
       sent += 1;
       await this.prisma.deptChoirRosterEntry.update({
@@ -585,19 +596,29 @@ export class ChoirDepartmentService {
       include: { member: { select: memberSelect } },
       take: 50,
     });
+    const brand = await loadChurchMailBrand(this.prisma, churchId);
     let sent = 0;
     for (const row of rows) {
       if (!row.member.userId) continue;
       const reason = row.attended
         ? `You were ${row.minutesLate} minutes late`
         : 'You were marked absent';
+      const body = `${reason} for ${row.eventType.replace('_', ' ').toLowerCase()}. Please connect with your section leader.`;
       await this.commQueue.enqueue(churchId, {
         kind: 'DIRECT_ALERT',
         title: 'Choir — attendance follow-up',
-        body: `${reason} for ${row.eventType.replace('_', ' ').toLowerCase()}. Please connect with your section leader.`,
+        body,
         channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
         serviceUnitId,
         targetUserId: row.member.userId,
+        metadata: {
+          emailHtml: brandPlainUpdate({
+            churchName: brand.name,
+            eyebrow: 'Department message',
+            headline: 'Attendance follow-up',
+            plain: body,
+          }),
+        },
       });
       await this.prisma.deptChoirAttendance.update({
         where: { id: row.id },

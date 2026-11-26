@@ -11,6 +11,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { FollowUpAutomationTrigger } from '@prisma/client';
 import { FollowUpService } from './follow-up.service';
 import { FollowUpAutomationService } from './follow-up-automation.service';
@@ -389,6 +390,18 @@ export class FollowUpController {
     @Body() body: { reason?: string },
   ) {
     return this.followUpService.archive(churchId, id, user.userId, body.reason ?? '');
+  }
+
+  @Post(':id/discontinue-journey')
+  @Throttle({ default: { limit: 6, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Discontinue the membership journey and ask the unit leader to archive' })
+  discontinueJourney(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { whatWasDone?: string; whatNext?: string; dueAt?: string | null },
+  ) {
+    return this.followUpService.discontinueJourney(churchId, id, user.userId, body);
   }
 
   @Post(':id/archive-request')

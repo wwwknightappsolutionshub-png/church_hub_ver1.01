@@ -12,6 +12,7 @@ type MedicalRecoveryStatus =
 import { PrismaService } from '../../prisma/prisma.module';
 import { DepartmentAccessService } from './department-access.service';
 import { CommunicationsQueueService } from '../communications/communications-queue.service';
+import { brandPlainUpdate, loadChurchMailBrand } from '../communications/operational-email';
 import { ServiceUnitsDepartmentService } from '../service-units/service-units-department.service';
 import {
   isSeriousIncident,
@@ -128,6 +129,15 @@ export class MedicalDepartmentService {
       `Member: ${memberLabel}`,
       'Review in Medical department → Incidents.',
     ].join('\n');
+    const externalBody =
+      'A serious medical incident was recorded. Open Medical department → Incidents in Church Hub. Do not forward member health details.';
+    const brand = await loadChurchMailBrand(this.prisma, churchId);
+    const emailHtml = brandPlainUpdate({
+      churchName: brand.name,
+      eyebrow: 'Department alert',
+      headline: 'Serious medical incident',
+      plain: externalBody,
+    });
 
     for (const staff of staffUsers) {
       await this.commQueue.enqueue(churchId, {
@@ -137,7 +147,7 @@ export class MedicalDepartmentService {
         channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
         serviceUnitId,
         targetUserId: staff.id,
-        metadata: { incidentId: incident.id },
+        metadata: { incidentId: incident.id, externalBody, emailHtml },
       });
       await this.prisma.notification.create({
         data: {

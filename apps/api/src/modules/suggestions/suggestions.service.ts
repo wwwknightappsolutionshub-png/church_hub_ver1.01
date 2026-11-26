@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { SuggestionTopic } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.module';
 import { CommunicationsQueueService } from '../communications/communications-queue.service';
+import { brandPlainUpdate, formatMailStamp, loadChurchMailBrand } from '../communications/operational-email';
 
 const TOPIC_LABELS: Record<SuggestionTopic, string> = {
   CHURCH_SERVICE: 'Church service',
@@ -85,6 +86,7 @@ export class SuggestionsService {
     },
     author: { firstName: string; lastName: string; email: string | null },
   ) {
+    const brand = await loadChurchMailBrand(this.prisma, churchId);
     const topicLabel = TOPIC_LABELS[row.topic];
     const authorName = `${author.firstName} ${author.lastName}`.trim();
     const subjectLine = row.subject?.trim() || `${topicLabel} suggestion`;
@@ -93,10 +95,17 @@ export class SuggestionsService {
       `Topic: ${topicLabel}`,
       `From: ${authorName}${author.email ? ` (${author.email})` : ''}`,
       `Subject: ${subjectLine}`,
-      `Submitted: ${row.createdAt.toISOString()}`,
+      `Submitted: ${formatMailStamp(row.createdAt, brand.timezone)}`,
       ``,
       row.body,
     ].join('\n');
+    const emailHtml = brandPlainUpdate({
+      churchName: brand.name,
+      eyebrow: 'Suggestion',
+      headline: subjectLine,
+      subhead: topicLabel,
+      plain: body,
+    });
 
     try {
       const staffUsers = await this.prisma.user.findMany({
@@ -121,6 +130,7 @@ export class SuggestionsService {
             topic: row.topic,
             topicLabel,
             authorName,
+            emailHtml,
           },
         });
       }

@@ -24,6 +24,7 @@ import {
 import { DepartmentAccessService } from './department-access.service';
 import { checkedInAtForServiceDay, parseServiceDateInput } from './children.constants';
 import { CommunicationsQueueService } from '../communications/communications-queue.service';
+import { brandPlainUpdate, loadChurchMailBrand } from '../communications/operational-email';
 import { MedicalDepartmentService } from './medical-department.service';
 
 const memberSelect = {
@@ -1146,6 +1147,13 @@ export class DepartmentModulesService {
       select: { id: true },
     });
 
+    const brand = await loadChurchMailBrand(this.prisma, churchId);
+    const emailHtml = brandPlainUpdate({
+      churchName: brand.name,
+      eyebrow: 'Quick report',
+      headline: `${label} quick report`,
+      plain: body,
+    });
     let notified = 0;
     for (const staff of staffUsers) {
       await this.commQueue.enqueue(churchId, {
@@ -1156,6 +1164,19 @@ export class DepartmentModulesService {
         serviceUnitId,
         targetUserId: staff.id,
         metadata: { reportId: report.id, quickReport: true },
+      });
+      await this.commQueue.enqueue(churchId, {
+        kind: 'DEPARTMENT_WEEKLY_REPORT',
+        title: `${label} — quick report for pastors`,
+        body,
+        channels: ['EMAIL'],
+        targetUserId: staff.id,
+        metadata: {
+          reportId: report.id,
+          quickReport: true,
+          emailPurpose: 'reports',
+          emailHtml,
+        },
       });
       notified++;
     }
@@ -1181,16 +1202,25 @@ export class DepartmentModulesService {
           include: { member: { select: { email: true, firstName: true } } },
         });
 
+    const brand = await loadChurchMailBrand(this.prisma, churchId);
+    const alertTitle = `[${unit.name}] ${body.subject}`;
+    const emailHtml = brandPlainUpdate({
+      churchName: brand.name,
+      eyebrow: 'Department message',
+      headline: body.subject,
+      subhead: unit.name,
+      plain: body.message,
+    });
     let queued = 0;
     for (const m of members) {
       await this.commQueue.enqueue(churchId, {
         kind: 'DEPARTMENT_ABSENTEE',
-        title: `[${unit.name}] ${body.subject}`,
+        title: alertTitle,
         body: body.message,
         channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
         serviceUnitId,
         targetMemberId: m.memberId,
-        metadata: { alertType: 'department_module' },
+        metadata: { alertType: 'department_module', emailHtml },
       });
       queued++;
     }

@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DepartmentAccessService } from './department-access.service';
 import { CommunicationsQueueService } from '../communications/communications-queue.service';
+import { brandPlainUpdate, loadChurchMailBrand } from '../communications/operational-email';
 import { PastoralCareService } from '../pastoral-care/pastoral-care.service';
 import { resolveDeptModuleCode } from '../../../prisma/dept-module-catalog';
 import {
@@ -385,6 +386,15 @@ export class PrayerDepartmentService {
       `Category: ${cat}`,
       item.content.slice(0, 500),
     ].join('\n');
+    const externalBody = `A ${cat} prayer request was escalated. Open Pastoral Care in Church Hub to read it. Do not forward the request.`;
+    const brand = await loadChurchMailBrand(this.prisma, churchId);
+    const emailHtml = brandPlainUpdate({
+      churchName: brand.name,
+      eyebrow: 'Department alert',
+      headline: 'Prayer request escalated',
+      subhead: cat,
+      plain: externalBody,
+    });
 
     for (const staff of staffUsers) {
       await this.commQueue.enqueue(churchId, {
@@ -394,7 +404,7 @@ export class PrayerDepartmentService {
         channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
         serviceUnitId,
         targetUserId: staff.id,
-        metadata: { prayerItemId: item.id },
+        metadata: { prayerItemId: item.id, emailHtml, externalBody },
       });
     }
 

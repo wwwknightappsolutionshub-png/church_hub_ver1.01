@@ -297,13 +297,22 @@ function FollowUpPageContent() {
   const advanceStage = async (id: string, payload: ProgressAdvancePayload) => {
     setAdvancing(true);
     try {
-      await api.patch(`/follow-up/${id}/stage`, {
-        stage: payload.stage,
-        whatWasDone: payload.whatWasDone,
-        whatNext: payload.whatNext,
-        dueAt: payload.dueAt ? new Date(payload.dueAt).toISOString() : undefined,
-      });
-      toast.success('Advanced to next stage');
+      if (payload.discontinueJourney) {
+        await api.post(`/follow-up/${id}/discontinue-journey`, {
+          whatWasDone: payload.whatWasDone,
+          whatNext: payload.whatNext,
+          dueAt: payload.dueAt ? new Date(payload.dueAt).toISOString() : null,
+        });
+        toast.success('Discontinue request sent. The unit leader will confirm archiving.');
+      } else {
+        await api.patch(`/follow-up/${id}/stage`, {
+          stage: payload.stage,
+          whatWasDone: payload.whatWasDone,
+          whatNext: payload.whatNext,
+          dueAt: payload.dueAt ? new Date(payload.dueAt).toISOString() : undefined,
+        });
+        toast.success('Advanced to next stage');
+      }
       queryClient.invalidateQueries({ queryKey: ['pastoral-notes', id] });
       refresh();
     } catch {

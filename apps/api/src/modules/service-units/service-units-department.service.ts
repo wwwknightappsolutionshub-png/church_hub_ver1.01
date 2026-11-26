@@ -23,6 +23,7 @@ import {
   escapeHtml,
   findOneAdminAndOnePastor,
 } from '../notifications/report-digest.util';
+import { brandPlainUpdate, loadChurchMailBrand, operationalEmailShell } from '../communications/operational-email';
 import { isoWeekKey, weekStartUtc } from './service-units-department.util';
 import {
   isDepartmentModuleEnabled,
@@ -419,16 +420,26 @@ export class ServiceUnitsDepartmentService {
     }
 
     const label = this.unitDisplayName(unit);
+    const brand = await loadChurchMailBrand(this.prisma, churchId);
+    const title = `${label} — we missed you`;
+    const body = `You were marked absent for ${label} on ${targetDate}. Reply to your unit leader if you need support.`;
+    const emailHtml = brandPlainUpdate({
+      churchName: brand.name,
+      eyebrow: 'Department message',
+      headline: 'We missed you',
+      subhead: label,
+      plain: body,
+    });
     let enqueued = 0;
     for (const memberId of absentIds) {
       await this.commQueue.enqueue(churchId, {
         kind: 'DEPARTMENT_ABSENTEE',
-        title: `${label} — we missed you`,
-        body: `You were marked absent for ${label} on ${targetDate}. Reply to your unit leader if you need support.`,
+        title,
+        body,
         channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
         serviceUnitId,
         targetMemberId: memberId,
-        metadata: { serviceDate: targetDate, departmentCode: unit.departmentCode },
+        metadata: { serviceDate: targetDate, departmentCode: unit.departmentCode, emailHtml },
       });
       enqueued++;
     }
@@ -602,6 +613,14 @@ export class ServiceUnitsDepartmentService {
     });
 
     if (notifyInApp && userId) {
+      const brand = await loadChurchMailBrand(this.prisma, churchId);
+      const emailHtml = brandPlainUpdate({
+        churchName: brand.name,
+        eyebrow: 'Weekly report',
+        headline: `${label} weekly report`,
+        subhead: rangeLabel,
+        plain: body,
+      });
       for (const staff of leadershipRecipients) {
         const metadata = {
           reportId: report.id,
@@ -625,7 +644,7 @@ export class ServiceUnitsDepartmentService {
           body,
           channels: ['EMAIL'],
           targetUserId: staff.id,
-          metadata,
+          metadata: { ...metadata, emailHtml },
         });
       }
     } else if (notifyInApp) {
@@ -725,25 +744,31 @@ export class ServiceUnitsDepartmentService {
       )
       .join('');
 
-    const html = `
-      <p>Department weekly summary for <strong>${escapeHtml(churchName)}</strong> (week ${escapeHtml(weekKey)}).</p>
-      <table style="border-collapse:collapse;width:100%;font-family:sans-serif;font-size:14px">
+    const html = operationalEmailShell({
+      churchName,
+      eyebrow: 'Weekly digest',
+      headline: 'Department weekly digest',
+      subhead: weekKey,
+      bodyHtml: `
+      <p style="margin:0 0 16px;">Department weekly summary for <strong>${escapeHtml(churchName)}</strong>.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;font-family:system-ui,sans-serif;font-size:13px">
         <thead>
-          <tr style="background:#f5f5f5">
-            <th style="padding:8px;border:1px solid #ddd;text-align:left">Department</th>
-            <th style="padding:8px;border:1px solid #ddd;text-align:right">Members</th>
-            <th style="padding:8px;border:1px solid #ddd;text-align:right">Sessions</th>
-            <th style="padding:8px;border:1px solid #ddd;text-align:right">Present</th>
-            <th style="padding:8px;border:1px solid #ddd;text-align:right">Absent</th>
-            <th style="padding:8px;border:1px solid #ddd;text-align:right">Consistent (≥80%)</th>
+          <tr style="background:#f8fafc">
+            <th style="padding:8px;border:1px solid #e2e8f0;text-align:left">Department</th>
+            <th style="padding:8px;border:1px solid #e2e8f0;text-align:right">Members</th>
+            <th style="padding:8px;border:1px solid #e2e8f0;text-align:right">Sessions</th>
+            <th style="padding:8px;border:1px solid #e2e8f0;text-align:right">Present</th>
+            <th style="padding:8px;border:1px solid #e2e8f0;text-align:right">Absent</th>
+            <th style="padding:8px;border:1px solid #e2e8f0;text-align:right">Consistent</th>
           </tr>
         </thead>
         <tbody>
-          ${tableRows || `<tr><td colspan="6" style="padding:8px;border:1px solid #ddd">No department units</td></tr>`}
+          ${tableRows || `<tr><td colspan="6" style="padding:8px;border:1px solid #e2e8f0">No department units</td></tr>`}
         </tbody>
       </table>
-      <p style="color:#666;font-size:12px;margin-top:16px">Sent automatically Mondays at 10:00 Europe/London, or on demand from Church Hub.</p>
-    `;
+      <p style="color:#64748b;font-size:12px;margin-top:16px">Sent automatically Mondays at 10:00 Europe/London, or on demand from Church Hub.</p>
+    `,
+    });
 
     const text = [
       `Department weekly summary for ${churchName} (week ${weekKey})`,

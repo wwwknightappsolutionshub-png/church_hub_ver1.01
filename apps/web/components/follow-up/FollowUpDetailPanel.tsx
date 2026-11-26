@@ -76,6 +76,7 @@ interface FollowUpDetail {
   dueAt?: string | null;
   member?: { id: string; firstName: string; lastName: string; email?: string | null } | null;
   assignedTo?: { id: string; firstName: string; lastName: string } | null;
+  journeyDiscontinuedAt?: string | null;
   reminders: Array<{
     id: string;
     remindAt: string;
@@ -413,7 +414,12 @@ export function FollowUpDetailPanel({
         role="dialog"
         aria-modal
         aria-label={`${followUp.contactName} details`}
-        className="fixed inset-y-0 right-0 z-[110] flex h-[100dvh] w-full max-w-lg flex-col border-l border-border bg-card shadow-2xl"
+        className={cn(
+          'fixed inset-y-0 right-0 z-[110] flex h-[100dvh] w-full max-w-lg flex-col border-l shadow-2xl',
+          followUp.journeyDiscontinuedAt
+            ? 'border-red-400 bg-red-50'
+            : 'border-border bg-card',
+        )}
       >
         <div className="shrink-0 border-b border-border bg-gradient-to-br from-primary/10 via-card to-card px-5 py-5">
           <div className="flex items-start gap-4">
@@ -495,56 +501,6 @@ export function FollowUpDetailPanel({
               {followUp.notes ? <OutreachNotesBlock notes={followUp.notes} /> : null}
             </div>
 
-            <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-4">
-              <p className="flex items-center gap-2 text-sm font-medium">
-                <Users className="h-4 w-4 text-primary" />
-                Membership
-              </p>
-              {followUp.member ? (
-                <div className="text-sm">
-                  <p className="font-medium text-foreground">
-                    {followUp.member.firstName} {followUp.member.lastName}
-                  </p>
-                  <Button size="sm" variant="link" className="h-auto p-0" asChild>
-                    <Link href={`/dashboard/membership`}>Open in Membership →</Link>
-                  </Button>
-                </div>
-              ) : canManageMembers ? (
-                <>
-                  <p className="text-xs text-muted-foreground">
-                    {graduated || followUp.stage === 'JOINED_GROUP'
-                      ? 'Convert to Members within 7 days. On day 6 leaders are reminded; on day 7 this contact leaves the belonging stage automatically.'
-                      : 'Link this new contact to an existing member or create a new visitor record.'}
-                  </p>
-                  <FormSelect
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                    value={linkMemberId}
-                    onChange={(e) => setLinkMemberId(e.target.value)}
-                  >
-                    <option value="">Select member…</option>
-                    {members.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.firstName} {m.lastName}
-                      </option>
-                    ))}
-                  </FormSelect>
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" disabled={busy || !linkMemberId} onClick={linkToMember}>
-                      Link member
-                    </Button>
-                    <Button size="sm" variant="outline" disabled={busy} onClick={createMemberFromLead}>
-                      <UserPlus className="mr-1.5 h-4 w-4" />
-                      Create member
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Not linked to membership yet. Ask a Member Admin to connect this lead.
-                </p>
-              )}
-            </div>
-
             {canAssign ? (
               <div className="space-y-3 rounded-lg border border-border p-4">
                 <p className="text-sm font-medium">Assign A Follow Up Manager</p>
@@ -574,6 +530,56 @@ export function FollowUpDetailPanel({
                 </p>
               </div>
             ) : null}
+
+            <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-4">
+              <p className="flex items-center gap-2 text-sm font-medium">
+                <Users className="h-4 w-4 text-primary" />
+                Membership
+              </p>
+              {followUp.member ? (
+                <div className="text-sm">
+                  <p className="font-medium text-foreground">
+                    {followUp.member.firstName} {followUp.member.lastName}
+                  </p>
+                  <Button size="sm" variant="link" className="h-auto p-0" asChild>
+                    <Link href={`/dashboard/membership`}>Open in Membership →</Link>
+                  </Button>
+                </div>
+              ) : canManageMembers ? (
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    {graduated || followUp.stage === 'JOINED_GROUP'
+                      ? 'Convert to Members within 7 days. On day 6 leaders are reminded; on day 7 this contact leaves the belonging stage automatically.'
+                      : 'Link this contact to an existing member for association only. The contact keeps its own name and details.'}
+                  </p>
+                  <FormSelect
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    value={linkMemberId}
+                    onChange={(e) => setLinkMemberId(e.target.value)}
+                  >
+                    <option value="">Select member…</option>
+                    {members.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.firstName} {m.lastName}
+                      </option>
+                    ))}
+                  </FormSelect>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" disabled={busy || !linkMemberId} onClick={linkToMember}>
+                      Link member
+                    </Button>
+                    <Button size="sm" variant="outline" disabled={busy} onClick={createMemberFromLead}>
+                      <UserPlus className="mr-1.5 h-4 w-4" />
+                      Create member
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Not linked to membership yet. Ask a Member Admin to connect this lead.
+                </p>
+              )}
+            </div>
 
             {nxt && onAdvance && canMutate && !readOnly ? (
               <Button

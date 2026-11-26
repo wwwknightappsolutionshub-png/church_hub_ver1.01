@@ -2,6 +2,7 @@
 
 import { Loader2 } from 'lucide-react';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
+import { useOutreachRange } from '@/components/outreach/use-outreach-range';
 import type { OutreachTeamScorecardDto } from '@church-hub/shared-types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -14,12 +15,11 @@ export function OutreachScorecardPanel({
   dateFrom: string;
   dateTo: string;
 }) {
-  const from = dateFrom || new Date(Date.now() - 30 * 86400000).toISOString();
-  const to = dateTo || new Date().toISOString();
+  const { from, to } = useOutreachRange(dateFrom, dateTo);
   const params = new URLSearchParams({ from, to });
   if (campaignId) params.set('campaignId', campaignId);
 
-  const { data, isLoading } = useApiQuery<OutreachTeamScorecardDto>(
+  const { data, isLoading, isError, refetch } = useApiQuery<OutreachTeamScorecardDto>(
     ['outreach-scorecard', from, to, campaignId],
     `/outreach/team-scorecard?${params.toString()}`,
   );
@@ -31,8 +31,12 @@ export function OutreachScorecardPanel({
         <CardDescription>Evangelist captures, handoffs, and 72h first progress.</CardDescription>
       </CardHeader>
       <CardContent>
-        {isLoading || !data ? (
+        {isLoading ? (
           <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
+        ) : isError || !data ? (
+          <button type="button" className="text-sm text-primary hover:underline" onClick={() => refetch()}>
+            Team scorecard could not be loaded. Retry
+          </button>
         ) : (
           <div className="overflow-auto rounded-md border">
             <table className="w-full text-left text-xs">

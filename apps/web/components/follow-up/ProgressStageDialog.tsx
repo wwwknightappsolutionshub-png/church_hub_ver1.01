@@ -11,6 +11,7 @@ export interface ProgressFormValues {
   whatWasDone: string;
   whatNext: string;
   dueAt: string;
+  discontinueJourney: boolean;
 }
 
 interface ProgressStageDialogProps {
@@ -36,12 +37,14 @@ export function ProgressStageDialog({
   const [whatWasDone, setWhatWasDone] = useState('');
   const [whatNext, setWhatNext] = useState('');
   const [dueAt, setDueAt] = useState('');
+  const [discontinueJourney, setDiscontinueJourney] = useState(false);
 
   useEffect(() => {
     if (open) {
       setWhatWasDone('');
       setWhatNext('');
       setDueAt('');
+      setDiscontinueJourney(false);
     }
   }, [open]);
 
@@ -52,7 +55,7 @@ export function ProgressStageDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await onSubmit({ whatWasDone, whatNext, dueAt });
+    await onSubmit({ whatWasDone, whatNext, dueAt, discontinueJourney });
   };
 
   return (
@@ -70,7 +73,7 @@ export function ProgressStageDialog({
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <h2 id="progress-stage-title" className="font-heading text-lg font-bold">
-              Advance to next stage
+              Membership Journey Trails
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {contactName} → {stageLabel}
@@ -93,6 +96,15 @@ export function ProgressStageDialog({
               required
             />
           </div>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={discontinueJourney}
+              onChange={(e) => setDiscontinueJourney(e.target.checked)}
+            />
+            <span>Discontinue Journey</span>
+          </label>
           <div className="space-y-1.5">
             <Label htmlFor="what-next">What should be done next</Label>
             <textarea

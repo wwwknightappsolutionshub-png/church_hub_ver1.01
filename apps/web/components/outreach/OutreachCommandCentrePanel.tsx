@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
+import { useOutreachRange } from '@/components/outreach/use-outreach-range';
 import type { OutreachCommandCentreDto } from '@church-hub/shared-types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,9 +25,8 @@ export function OutreachCommandCentrePanel({
   dateFrom: string;
   dateTo: string;
 }) {
-  const from = dateFrom || new Date(Date.now() - 30 * 86400000).toISOString();
-  const to = dateTo || new Date().toISOString();
-  const { data, isLoading } = useApiQuery<OutreachCommandCentreDto>(
+  const { from, to } = useOutreachRange(dateFrom, dateTo);
+  const { data, isLoading, isError, refetch } = useApiQuery<OutreachCommandCentreDto>(
     ['outreach-command-centre', from, to, campaignId],
     queryUrl(from, to, campaignId),
   );
@@ -38,8 +38,12 @@ export function OutreachCommandCentrePanel({
         <CardDescription>Capture source, Establishment handoff, and stuck leads.</CardDescription>
       </CardHeader>
       <CardContent>
-        {isLoading || !data ? (
+        {isLoading ? (
           <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
+        ) : isError || !data ? (
+          <button type="button" className="text-sm text-primary hover:underline" onClick={() => refetch()}>
+            Command centre could not be loaded. Retry
+          </button>
         ) : (
           <div className="space-y-3">
             <div className="flex flex-wrap gap-2 text-xs">

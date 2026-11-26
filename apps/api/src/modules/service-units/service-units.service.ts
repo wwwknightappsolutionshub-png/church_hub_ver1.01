@@ -19,6 +19,11 @@ import { trySendWhatsApp } from '../notifications/try-send-whatsapp';
 import { MembershipService } from '../membership/membership.service';
 import { MembershipRegistryService } from '../membership/membership-registry.service';
 import { CommunicationsQueueService } from '../communications/communications-queue.service';
+import {
+  brandPlainUpdate,
+  formatMailStamp,
+  loadChurchMailBrand,
+} from '../communications/operational-email';
 import { AuthService } from '../auth/auth.service';
 import { AutomationEmailTemplatesService } from '../automation/automation-email-templates.service';
 import type { AssignServiceUnitMemberDto, UpdateServiceUnitMemberDto } from './dto/assign-service-unit-member.dto';
@@ -749,17 +754,25 @@ export class ServiceUnitsService {
         });
     const unitName = row.serviceUnit.name;
     const authorName = `${row.author.firstName} ${row.author.lastName}`.trim();
-    const timestamp = new Date().toISOString();
+    const brand = await loadChurchMailBrand(this.prisma, churchId);
+    const timestamp = formatMailStamp(new Date(), brand.timezone);
     const title = `[Meeting Summary] ${unitName} — ${row.title}`;
     const body = [
-      `Service Unit: ${unitName}`,
+      `Service unit: ${unitName}`,
       `Title: ${row.title}`,
       `Date: ${dateLabel}`,
       `Author: ${authorName}`,
-      `Timestamp: ${timestamp}`,
+      `Submitted: ${timestamp}`,
       ``,
       row.body,
     ].join('\n');
+    const emailHtml = brandPlainUpdate({
+      churchName: brand.name,
+      eyebrow: 'Meeting summary',
+      headline: row.title,
+      subhead: unitName,
+      plain: body,
+    });
 
     const staffUsers = await this.prisma.user.findMany({
       where: {
@@ -784,6 +797,7 @@ export class ServiceUnitsService {
           summaryId: row.id,
           date: dateLabel,
           timestamp,
+          emailHtml,
         },
       });
     }
@@ -1749,7 +1763,8 @@ export class ServiceUnitsService {
       month: 'short',
       day: 'numeric',
     });
-    const timestamp = new Date().toISOString();
+    const brand = await loadChurchMailBrand(this.prisma, churchId);
+    const timestamp = formatMailStamp(new Date(), brand.timezone);
     const title = `[Attendance Report] ${unitName} — ${dateLabel}`;
     const body = [
       `Tags: Service Unit Name · Date · Attendance Report · Timestamp`,
@@ -1757,7 +1772,7 @@ export class ServiceUnitsService {
       `Service Unit Name: ${unitName}`,
       `Date: ${dateLabel}`,
       `Attendance Report: ${action === 'created' ? 'New' : 'Updated'} weekly attendance`,
-      `Timestamp: ${timestamp}`,
+      `Submitted: ${timestamp}`,
       ``,
       `Male: ${row.maleCount}`,
       `Female: ${row.femaleCount}`,
@@ -1777,6 +1792,13 @@ export class ServiceUnitsService {
       select: { id: true },
     });
 
+    const emailHtml = brandPlainUpdate({
+      churchName: brand.name,
+      eyebrow: 'Attendance report',
+      headline: `${unitName} attendance`,
+      subhead: dateLabel,
+      plain: body,
+    });
     for (const staff of staffUsers) {
       await this.commQueue.enqueue(churchId, {
         kind: 'DEPARTMENT_WEEKLY_REPORT',
@@ -1801,6 +1823,19 @@ export class ServiceUnitsService {
           girlsCount: row.girlsCount,
           firstTimersCount: row.firstTimersCount,
           testifiersCount: row.testifiersCount,
+        },
+      });
+      await this.commQueue.enqueue(churchId, {
+        kind: 'DEPARTMENT_WEEKLY_REPORT',
+        title,
+        body,
+        channels: ['EMAIL'],
+        targetUserId: staff.id,
+        metadata: {
+          reportType: 'Attendance Report',
+          serviceUnitId,
+          emailPurpose: 'reports',
+          emailHtml,
         },
       });
     }
@@ -1901,6 +1936,13 @@ export class ServiceUnitsService {
               serviceUnitId: unit.id,
               serviceUnitName: unit.name,
               sundayDate: sundayYmd,
+              emailHtml: brandPlainUpdate({
+                churchName: church.name,
+                eyebrow: 'Attendance reminder',
+                headline: unit.name,
+                subhead: sundayYmd,
+                plain: body,
+              }),
             },
           });
           reminded++;

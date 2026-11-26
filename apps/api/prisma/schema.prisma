@@ -1338,6 +1338,8 @@ model FollowUp {
   archiveRequestedAt      DateTime?
   archiveRequestedById    String?
   archiveRequestReason    String?
+  /// Set when Discontinue Journey is submitted. Stays set if the leader declines, until archive.
+  journeyDiscontinuedAt   DateTime?
   /// Day-6 leader alert for Joined Group → convert to Member (once).
   joinedGroupDay6NotifiedAt DateTime?
   createdAt    DateTime      @default(now())

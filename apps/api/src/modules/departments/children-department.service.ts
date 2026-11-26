@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.module';
 import { DepartmentAccessService } from './department-access.service';
 import { CommunicationsQueueService } from '../communications/communications-queue.service';
+import { brandPlainUpdate, loadChurchMailBrand } from '../communications/operational-email';
 import { PastoralCareService } from '../pastoral-care/pastoral-care.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { resolveDeptModuleCode } from '../../../prisma/dept-module-catalog';
@@ -189,6 +190,7 @@ export class ChildrenDepartmentService {
       },
     });
 
+    const brand = await loadChurchMailBrand(this.prisma, churchId);
     let sent = 0;
     for (const row of rows) {
       const targets = [row.teacher, row.assistant].filter(Boolean) as Array<{
@@ -213,15 +215,27 @@ export class ChildrenDepartmentService {
       for (const member of targets) {
         if (!member.userId) continue;
         const role = member.id === row.teacherMemberId ? 'Lead teacher' : 'Assistant';
+        const dutyBody = msg.replace('{{role}}', role);
         await this.commQueue.enqueue(churchId, {
           kind: 'DIRECT_ALERT',
           title: "Children's ministry — teaching duty",
-          body: msg.replace('{{role}}', role),
+          body: dutyBody,
           channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
           serviceUnitId,
           targetUserId: member.userId,
           targetMemberId: member.id,
-          metadata: { rosterId: row.id, classGroup: row.classGroup, weekKey: weekLabel },
+          metadata: {
+            rosterId: row.id,
+            classGroup: row.classGroup,
+            weekKey: weekLabel,
+            emailHtml: brandPlainUpdate({
+              churchName: brand.name,
+              eyebrow: 'Department message',
+              headline: 'Teaching duty',
+              subhead: groupLabel,
+              plain: dutyBody,
+            }),
+          },
         });
         await this.prisma.notification.create({
           data: {
@@ -488,12 +502,21 @@ export class ChildrenDepartmentService {
 
     const alertBody = [
       "Children's class report flagged for pastoral care.",
-      groupLabel,
+      `Class: ${groupLabel}`,
       report.attentionNotes ? `Attention: ${report.attentionNotes}` : '',
       'Review in Pastoral Care dashboard.',
     ]
       .filter(Boolean)
       .join('\n');
+    const externalBody = `A children's class report for ${groupLabel} needs pastoral care. Open Pastoral Care in Church Hub. Do not forward details about the children.`;
+    const brand = await loadChurchMailBrand(this.prisma, churchId);
+    const emailHtml = brandPlainUpdate({
+      churchName: brand.name,
+      eyebrow: 'Department alert',
+      headline: "Children's ministry escalation",
+      subhead: groupLabel,
+      plain: externalBody,
+    });
 
     for (const staff of staffUsers) {
       await this.commQueue.enqueue(churchId, {
@@ -503,7 +526,7 @@ export class ChildrenDepartmentService {
         channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
         serviceUnitId,
         targetUserId: staff.id,
-        metadata: { classReportId: report.id },
+        metadata: { classReportId: report.id, emailHtml, externalBody },
       });
       await this.prisma.notification.create({
         data: {
