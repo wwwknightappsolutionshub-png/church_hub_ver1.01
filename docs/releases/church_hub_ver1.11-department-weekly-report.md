@@ -10,7 +10,7 @@ The send path checks unit membership, keeps member emails off the dashboard, and
 cd /www/wwwroot/church-hub.wazconnect.com
 git fetch origin && git reset --hard origin/feat/pwa-install-gate-mobile
 GIT_BRANCH=feat/pwa-install-gate-mobile ./scripts/deploy/vps-update.sh
-cd apps/api && pnpm exec ts-node --transpile-only scripts/seed-department-report-release.ts
+pnpm --dir apps/api exec ts-node --transpile-only scripts/seed-department-report-release.ts
 ```
 
 Health `build` should be this commit. The release seed is safe to run once.

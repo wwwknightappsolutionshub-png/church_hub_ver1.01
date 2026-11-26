@@ -2,8 +2,32 @@
  * One-shot: PlatformBroadcast kind=RELEASE for department weekly reports.
  * Run: pnpm exec ts-node --transpile-only scripts/seed-department-report-release.ts
  */
+import { existsSync, readFileSync } from 'fs';
+import { resolve } from 'path';
 import { randomUUID } from 'crypto';
 import { PrismaClient } from '@prisma/client';
+
+function loadEnvFile(path: string) {
+  if (!existsSync(path)) return;
+  for (const line of readFileSync(path, 'utf8').split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq <= 0) continue;
+    const key = trimmed.slice(0, eq).trim();
+    let val = trimmed.slice(eq + 1).trim();
+    if (
+      (val.startsWith('"') && val.endsWith('"')) ||
+      (val.startsWith("'") && val.endsWith("'"))
+    ) {
+      val = val.slice(1, -1);
+    }
+    if (process.env[key] === undefined) process.env[key] = val;
+  }
+}
+
+loadEnvFile(resolve(__dirname, '../../../.env'));
+loadEnvFile(resolve(__dirname, '../../.env'));
 
 const VERSION = '2026.11.26-department-weekly-report';
 
