@@ -27,6 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface PaginatedPlans {
   items: DevotionalPlanDto[];
@@ -260,7 +261,7 @@ export function DevotionalRemindersPanel() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>Devotional plan</Label>
-            <select
+            <FormSelect
               className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={selectedPlanId}
               onChange={(e) => setSelectedPlanId(e.target.value)}
@@ -270,7 +271,7 @@ export function DevotionalRemindersPanel() {
                   {p.title}
                 </option>
               ))}
-            </select>
+            </FormSelect>
           </div>
 
           <div className="flex flex-wrap gap-3">

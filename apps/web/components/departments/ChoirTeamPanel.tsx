@@ -27,9 +27,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { DateTimeField } from '@/components/ui/date-field';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 type MemberRef = { id: string; firstName: string; lastName: string };
 
@@ -426,7 +428,7 @@ export function ChoirTeamPanel({
                 <CardTitle className="text-sm">{rosterForm.id ? 'Edit roster slot' : 'Add roster slot'}</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-2 sm:grid-cols-2">
-                <select
+                <FormSelect
                   className="h-10 rounded-md border bg-background px-3 text-sm"
                   value={rosterForm.eventType}
                   onChange={(e) => setRosterForm({ ...rosterForm, eventType: e.target.value })}
@@ -436,13 +438,13 @@ export function ChoirTeamPanel({
                       {x.label}
                     </option>
                   ))}
-                </select>
-                <Input
-                  type="datetime-local"
+                </FormSelect>
+                <DateTimeField
                   value={rosterForm.startsAt}
-                  onChange={(e) => setRosterForm({ ...rosterForm, startsAt: e.target.value })}
+                  onChange={(startsAt) => setRosterForm({ ...rosterForm, startsAt })}
+                  aria-label="Roster start"
                 />
-                <select
+                <FormSelect
                   className="h-10 rounded-md border bg-background px-3 text-sm"
                   value={rosterForm.voicePart}
                   onChange={(e) => setRosterForm({ ...rosterForm, voicePart: e.target.value })}
@@ -452,8 +454,8 @@ export function ChoirTeamPanel({
                       {x.label}
                     </option>
                   ))}
-                </select>
-                <select
+                </FormSelect>
+                <FormSelect
                   className="h-10 rounded-md border bg-background px-3 text-sm"
                   value={rosterForm.memberId}
                   onChange={(e) => setRosterForm({ ...rosterForm, memberId: e.target.value })}
@@ -463,7 +465,7 @@ export function ChoirTeamPanel({
                       {formatMemberName(m.member)}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
                 <Button
                   type="button"
                   className="sm:col-span-2"
@@ -634,7 +636,7 @@ export function ChoirTeamPanel({
                   <CardTitle className="text-sm">Upload files</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <select
+                  <FormSelect
                     className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                     value={uploadSongId}
                     onChange={(e) => setUploadSongId(e.target.value)}
@@ -645,7 +647,7 @@ export function ChoirTeamPanel({
                         {s.title}
                       </option>
                     ))}
-                  </select>
+                  </FormSelect>
                   <input ref={audioFileRef} type="file" accept="audio/*,.mp3,.wav,.m4a" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadSongFile(f, 'audio'); e.target.value = ''; }} />
                   <input ref={sheetFileRef} type="file" accept=".pdf,image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadSongFile(f, 'sheet'); e.target.value = ''; }} />
                   <input ref={practiceFileRef} type="file" accept="audio/*,.mp3,.wav,.m4a" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadSongFile(f, 'practice'); e.target.value = ''; }} />
@@ -670,14 +672,14 @@ export function ChoirTeamPanel({
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-wrap gap-2">
-                  <select className="h-10 flex-1 rounded-md border bg-background px-3 text-sm" value={transposeId} onChange={(e) => setTransposeId(e.target.value)}>
+                  <FormSelect className="h-10 flex-1 rounded-md border bg-background px-3 text-sm" value={transposeId} onChange={(e) => setTransposeId(e.target.value)}>
                     <option value="">Select song…</option>
                     {songs.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.title}
                       </option>
                     ))}
-                  </select>
+                  </FormSelect>
                   <Input type="number" className="w-24" value={semitones} onChange={(e) => setSemitones(e.target.value)} placeholder="± semitones" />
                   <Button
                     type="button"
@@ -754,14 +756,14 @@ export function ChoirTeamPanel({
                 >
                   Create setlist
                 </Button>
-                <select className="h-10 rounded-md border bg-background px-3 text-sm" value={setlistForm.songId} onChange={(e) => setSetlistForm({ ...setlistForm, songId: e.target.value })}>
+                <FormSelect className="h-10 rounded-md border bg-background px-3 text-sm" value={setlistForm.songId} onChange={(e) => setSetlistForm({ ...setlistForm, songId: e.target.value })}>
                   <option value="">Add song to latest setlist…</option>
                   {songs.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.title}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <Input placeholder="Key override" value={setlistForm.key} onChange={(e) => setSetlistForm({ ...setlistForm, key: e.target.value })} />
                   <Input type="number" placeholder="Tempo" value={setlistForm.tempo} onChange={(e) => setSetlistForm({ ...setlistForm, tempo: e.target.value })} />
@@ -792,14 +794,14 @@ export function ChoirTeamPanel({
                 </Button>
                 <hr />
                 <p className="text-xs font-medium text-muted-foreground">Choir feedback (all members)</p>
-                <select className="h-10 rounded-md border bg-background px-3 text-sm" value={feedbackForm.songId} onChange={(e) => setFeedbackForm({ ...feedbackForm, songId: e.target.value })}>
+                <FormSelect className="h-10 rounded-md border bg-background px-3 text-sm" value={feedbackForm.songId} onChange={(e) => setFeedbackForm({ ...feedbackForm, songId: e.target.value })}>
                   <option value="">Song…</option>
                   {songs.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.title}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
                 <Textarea placeholder="Comment" value={feedbackForm.comment} onChange={(e) => setFeedbackForm({ ...feedbackForm, comment: e.target.value })} rows={2} />
                 <Button
                   type="button"
@@ -926,13 +928,13 @@ export function ChoirTeamPanel({
                 <CardTitle className="text-sm">{attForm.id ? 'Edit attendance' : 'Log attendance (multi-select)'}</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-2">
-                <select className="h-10 rounded-md border bg-background px-3 text-sm" value={attForm.eventType} onChange={(e) => setAttForm({ ...attForm, eventType: e.target.value })}>
+                <FormSelect className="h-10 rounded-md border bg-background px-3 text-sm" value={attForm.eventType} onChange={(e) => setAttForm({ ...attForm, eventType: e.target.value })}>
                   {ATTENDANCE_EVENTS.map((x) => (
                     <option key={x.value} value={x.value}>
                       {x.label}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
                 <Input type="date" value={attForm.eventDate} onChange={(e) => setAttForm({ ...attForm, eventDate: e.target.value })} />
                 {!attForm.id && (
                   <>
@@ -1184,28 +1186,28 @@ export function ChoirTeamPanel({
               <CardContent className="grid gap-3">
                 <div className="space-y-2 rounded-lg border p-3">
                   <Label className="text-xs font-semibold">{auditionForm.id ? 'Edit audition' : 'New audition'}</Label>
-                  <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={auditionForm.memberId} onChange={(e) => setAuditionForm({ ...auditionForm, memberId: e.target.value })}>
+                  <FormSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={auditionForm.memberId} onChange={(e) => setAuditionForm({ ...auditionForm, memberId: e.target.value })}>
                     {members.map((m) => (
                       <option key={m.memberId} value={m.memberId}>
                         {formatMemberName(m.member)}
                       </option>
                     ))}
-                  </select>
+                  </FormSelect>
                   <div className="grid gap-2 sm:grid-cols-2">
-                    <select className="h-10 rounded-md border bg-background px-3 text-sm" value={auditionForm.status} onChange={(e) => setAuditionForm({ ...auditionForm, status: e.target.value })}>
+                    <FormSelect className="h-10 rounded-md border bg-background px-3 text-sm" value={auditionForm.status} onChange={(e) => setAuditionForm({ ...auditionForm, status: e.target.value })}>
                       {AUDITION_STATUSES.map((s) => (
                         <option key={s.value} value={s.value}>
                           {s.label}
                         </option>
                       ))}
-                    </select>
-                    <select className="h-10 rounded-md border bg-background px-3 text-sm" value={auditionForm.voicePart} onChange={(e) => setAuditionForm({ ...auditionForm, voicePart: e.target.value })}>
+                    </FormSelect>
+                    <FormSelect className="h-10 rounded-md border bg-background px-3 text-sm" value={auditionForm.voicePart} onChange={(e) => setAuditionForm({ ...auditionForm, voicePart: e.target.value })}>
                       {VOICE_PARTS.map((x) => (
                         <option key={x.value} value={x.value}>
                           {x.label}
                         </option>
                       ))}
-                    </select>
+                    </FormSelect>
                   </div>
                   <Input type="date" value={auditionForm.auditionDate} onChange={(e) => setAuditionForm({ ...auditionForm, auditionDate: e.target.value })} />
                   <Textarea placeholder="Notes" rows={2} value={auditionForm.notes} onChange={(e) => setAuditionForm({ ...auditionForm, notes: e.target.value })} />
@@ -1278,13 +1280,13 @@ export function ChoirTeamPanel({
 
                 <div className="space-y-2 rounded-lg border p-3">
                   <Label className="text-xs font-semibold">Vocal improvement note</Label>
-                  <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={noteForm.memberId} onChange={(e) => setNoteForm({ ...noteForm, memberId: e.target.value })}>
+                  <FormSelect className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={noteForm.memberId} onChange={(e) => setNoteForm({ ...noteForm, memberId: e.target.value })}>
                     {members.map((m) => (
                       <option key={m.memberId} value={m.memberId}>
                         {formatMemberName(m.member)}
                       </option>
                     ))}
-                  </select>
+                  </FormSelect>
                   <Textarea value={noteForm.body} onChange={(e) => setNoteForm({ ...noteForm, body: e.target.value })} rows={2} />
                   <Button
                     type="button"

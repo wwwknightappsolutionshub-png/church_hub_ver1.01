@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 export function ProvincesSetupPanel({
   onChanged,
@@ -174,7 +175,7 @@ export function ProvincesSetupPanel({
           </div>
           <div className="space-y-1">
             <Label htmlFor="province-leader">Provincial leader</Label>
-            <select
+            <FormSelect
               id="province-leader"
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={leaderUserId}
@@ -187,7 +188,7 @@ export function ProvincesSetupPanel({
                   {c.name} ({c.email})
                 </option>
               ))}
-            </select>
+            </FormSelect>
             {candidates.length === 0 && (
               <p className="text-[11px] text-amber-700">
                 Create a staff user with the PROVINCIAL_LEADER role first (Church Officers).

@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -228,7 +229,7 @@ export function MembershipImportWizard({
             <div className="flex flex-wrap gap-4">
               <div className="space-y-1">
                 <Label className="text-xs">Import mode</Label>
-                <select
+                <FormSelect
                   className="h-9 rounded-md border border-input bg-background px-2 text-sm"
                   value={options.mode}
                   onChange={(e) =>
@@ -240,7 +241,7 @@ export function MembershipImportWizard({
                 >
                   <option value="MEMBERS">Members (profiles)</option>
                   <option value="LEADS">Outreach leads only</option>
-                </select>
+                </FormSelect>
               </div>
               <label className="flex items-center gap-2 text-sm">
                 <input
@@ -258,7 +259,7 @@ export function MembershipImportWizard({
                     {MEMBERSHIP_IMPORT_FIELD_LABELS[field]}
                     {(field === 'firstName' || field === 'lastName') && ' *'}
                   </Label>
-                  <select
+                  <FormSelect
                     className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
                     value={mapping[field] ?? ''}
                     onChange={(e) =>
@@ -274,7 +275,7 @@ export function MembershipImportWizard({
                         {h}
                       </option>
                     ))}
-                  </select>
+                  </FormSelect>
                 </div>
               ))}
             </div>

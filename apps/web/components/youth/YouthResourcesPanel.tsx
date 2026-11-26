@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface Resource {
   id: string;
@@ -72,7 +73,7 @@ export function YouthResourcesPanel() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <select
+        <FormSelect
           className="h-10 rounded-md border border-input bg-background px-3 text-sm"
           value={category}
           onChange={(e) => setCategory(e.target.value)}
@@ -83,7 +84,7 @@ export function YouthResourcesPanel() {
               {c.label}
             </option>
           ))}
-        </select>
+        </FormSelect>
         {canManage && (
           <Button size="sm" onClick={() => setShowForm((v) => !v)}>
             <Plus className="mr-1.5 h-4 w-4" />
@@ -97,7 +98,7 @@ export function YouthResourcesPanel() {
           <CardContent className="pt-6">
             <form onSubmit={createResource} className="grid gap-3 sm:grid-cols-2">
               <Input placeholder="Title *" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
-              <select
+              <FormSelect
                 className="h-10 rounded-md border border-input bg-background px-3 text-sm"
                 value={form.category}
                 onChange={(e) => setForm({ ...form, category: e.target.value })}
@@ -107,7 +108,7 @@ export function YouthResourcesPanel() {
                     {c.label}
                   </option>
                 ))}
-              </select>
+              </FormSelect>
               <Input className="sm:col-span-2" placeholder="URL (optional)" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} />
               <Input className="sm:col-span-2" placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
               <textarea

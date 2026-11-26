@@ -32,12 +32,14 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateTimeField } from '@/components/ui/date-field';
 import { cn } from '@/lib/utils';
 import {
   ProgressStageDialog,
   type ProgressFormValues,
 } from '@/components/follow-up/ProgressStageDialog';
 import type { ProgressAdvancePayload } from '@/components/follow-up/FollowUpPipeline';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface Assignee {
   id: string;
@@ -514,7 +516,7 @@ export function FollowUpDetailPanel({
                       ? 'Convert to Members within 7 days. On day 6 leaders are reminded; on day 7 this contact leaves the belonging stage automatically.'
                       : 'Link this new contact to an existing member or create a new visitor record.'}
                   </p>
-                  <select
+                  <FormSelect
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                     value={linkMemberId}
                     onChange={(e) => setLinkMemberId(e.target.value)}
@@ -525,7 +527,7 @@ export function FollowUpDetailPanel({
                         {m.firstName} {m.lastName}
                       </option>
                     ))}
-                  </select>
+                  </FormSelect>
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" disabled={busy || !linkMemberId} onClick={linkToMember}>
                       Link member
@@ -546,7 +548,7 @@ export function FollowUpDetailPanel({
             {canAssign ? (
               <div className="space-y-3 rounded-lg border border-border p-4">
                 <p className="text-sm font-medium">Assign A Follow Up Manager</p>
-                <select
+                <FormSelect
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={assigneeId}
                   onChange={(e) => setAssigneeId(e.target.value)}
@@ -557,13 +559,9 @@ export function FollowUpDetailPanel({
                       {a.firstName} {a.lastName}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
                 <label className="text-xs text-muted-foreground">Follow-up due</label>
-                <Input
-                  type="datetime-local"
-                  value={dueAt}
-                  onChange={(e) => setDueAt(e.target.value)}
-                />
+                <DateTimeField value={dueAt} onChange={setDueAt} aria-label="Follow-up due" />
                 <Button size="sm" disabled={busy} onClick={saveAssignment}>
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save assignment'}
                 </Button>
@@ -630,12 +628,8 @@ export function FollowUpDetailPanel({
                   <Bell className="h-4 w-4 text-primary" />
                   Schedule reminder
                 </p>
-                <Input
-                  type="datetime-local"
-                  value={remindAt}
-                  onChange={(e) => setRemindAt(e.target.value)}
-                />
-                <select
+                <DateTimeField value={remindAt} onChange={setRemindAt} aria-label="Reminder time" />
+                <FormSelect
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={remindChannel}
                   onChange={(e) => setRemindChannel(e.target.value)}
@@ -645,8 +639,8 @@ export function FollowUpDetailPanel({
                       {CHANNEL_LABELS[c]}
                     </option>
                   ))}
-                </select>
-                <select
+                </FormSelect>
+                <FormSelect
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={selectedTemplate}
                   onChange={(e) => {
@@ -663,7 +657,7 @@ export function FollowUpDetailPanel({
                       {t.name} ({t.channel})
                     </option>
                   ))}
-                </select>
+                </FormSelect>
                 <textarea
                   className="flex min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={remindMessage}

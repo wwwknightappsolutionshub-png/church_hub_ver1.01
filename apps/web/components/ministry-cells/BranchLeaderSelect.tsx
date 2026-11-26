@@ -2,6 +2,7 @@
 
 import { Label } from '@/components/ui/label';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
+import { FormSelect } from '@/components/ui/form-select';
 
 export interface LeaderCandidate {
   id: string;
@@ -36,7 +37,7 @@ export function BranchLeaderSelect({
   return (
     <div>
       <Label htmlFor={id}>{label}</Label>
-      <select
+      <FormSelect
         id={id}
         className="mt-1 flex h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
         value={value}
@@ -50,7 +51,7 @@ export function BranchLeaderSelect({
             {u.email ? ` (${u.email})` : ''}
           </option>
         ))}
-      </select>
+      </FormSelect>
       {isLoading && (
         <p className="mt-1 text-xs text-muted-foreground">Loading users…</p>
       )}

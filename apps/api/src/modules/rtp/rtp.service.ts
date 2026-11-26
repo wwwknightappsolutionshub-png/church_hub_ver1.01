@@ -343,13 +343,43 @@ export class RtpService {
     if (lineItems.length === 0) {
       throw new BadRequestException('Add at least one item to purchase');
     }
+    const descriptionOk = /^[\p{L}\p{N}\s.,;:'"()\-\/&%!?]+$/u;
     for (const [idx, item] of lineItems.entries()) {
-      if (!item.description.trim()) {
-        throw new BadRequestException(`Item ${idx + 1}: description is required`);
+      const description = item.description.trim();
+      const words = description.split(/\s+/).filter(Boolean);
+      if (!description) {
+        throw new BadRequestException(`Item ${idx + 1}: enter an item or service description`);
       }
-      if (!(item.quantity > 0)) {
-        throw new BadRequestException(`Item ${idx + 1}: quantity must be greater than 0`);
+      if (words.length > 300) {
+        throw new BadRequestException(`Item ${idx + 1}: description must be 300 words or fewer`);
       }
+      if (!descriptionOk.test(description)) {
+        throw new BadRequestException(
+          `Item ${idx + 1}: description can only use letters, numbers, and normal punctuation`,
+        );
+      }
+      if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+        throw new BadRequestException(`Item ${idx + 1}: quantity must be a whole number`);
+      }
+      const cents = Math.round(item.unitCost * 100);
+      if (!(item.unitCost >= 0) || Math.abs(item.unitCost * 100 - cents) > 0.001) {
+        throw new BadRequestException(`Item ${idx + 1}: estimated cost must be numbers only`);
+      }
+      if (item.websiteUrl) {
+        let parsed: URL;
+        try {
+          parsed = new URL(item.websiteUrl);
+        } catch {
+          throw new BadRequestException(`Item ${idx + 1}: enter a full website address`);
+        }
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          throw new BadRequestException(`Item ${idx + 1}: website must start with http or https`);
+        }
+      }
+    }
+    const budgetLine = String(values.budget_line ?? '').trim();
+    if (budgetLine && !/^\d+(\.\d{1,2})?$/.test(budgetLine)) {
+      throw new BadRequestException('Budget line must be numbers only');
     }
     const estimatedTotal = this.sumLineItems(lineItems);
     values.line_items = lineItems;

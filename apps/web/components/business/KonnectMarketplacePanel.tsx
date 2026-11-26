@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface MarketplaceItem {
   id: string;
@@ -94,7 +95,7 @@ export function KonnectMarketplacePanel() {
     <div className="space-y-6">
       <div className="flex flex-wrap gap-3">
         <Input className="max-w-xs" placeholder="Search listings…" value={search} onChange={(e) => setSearch(e.target.value)} />
-        <select
+        <FormSelect
           className="h-10 rounded-md border border-input bg-background px-3 text-sm"
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
@@ -102,7 +103,7 @@ export function KonnectMarketplacePanel() {
           <option value="">Services & products</option>
           <option value="SERVICE">Services</option>
           <option value="PRODUCT">Products</option>
-        </select>
+        </FormSelect>
         <Button size="sm" onClick={() => setShowForm((v) => !v)}>
           <Plus className="mr-1.5 h-4 w-4" />
           Add listing
@@ -113,7 +114,7 @@ export function KonnectMarketplacePanel() {
         <Card>
           <CardContent className="grid gap-3 pt-6 sm:grid-cols-2">
             <form onSubmit={createListing} className="contents">
-              <select
+              <FormSelect
                 className="h-10 rounded-md border border-input bg-background px-3 text-sm sm:col-span-2"
                 value={form.businessId}
                 onChange={(e) => setForm({ ...form, businessId: e.target.value })}
@@ -125,16 +126,16 @@ export function KonnectMarketplacePanel() {
                     {p.businessName}
                   </option>
                 ))}
-              </select>
+              </FormSelect>
               <Input placeholder="Title *" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
-              <select
+              <FormSelect
                 className="h-10 rounded-md border border-input bg-background px-3 text-sm"
                 value={form.itemType}
                 onChange={(e) => setForm({ ...form, itemType: e.target.value })}
               >
                 <option value="SERVICE">Service</option>
                 <option value="PRODUCT">Product</option>
-              </select>
+              </FormSelect>
               <Input placeholder="Price (GBP)" type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
               <Input className="sm:col-span-2" placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
               <Button type="submit" disabled={saving} className="sm:col-span-2">

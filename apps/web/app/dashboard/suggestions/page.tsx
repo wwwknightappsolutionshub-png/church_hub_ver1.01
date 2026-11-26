@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { FormSelect } from '@/components/ui/form-select';
 
 const TOPICS = [
   { value: 'CHURCH_SERVICE', label: 'Church service' },
@@ -103,7 +104,7 @@ export default function SuggestionsPage() {
               <form onSubmit={submit} className="space-y-4 rounded-lg border border-border bg-muted/20 p-4">
                 <div>
                   <Label htmlFor="suggestion-topic">Topic</Label>
-                  <select
+                  <FormSelect
                     id="suggestion-topic"
                     className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                     value={topic}
@@ -115,7 +116,7 @@ export default function SuggestionsPage() {
                         {t.label}
                       </option>
                     ))}
-                  </select>
+                  </FormSelect>
                 </div>
                 <div>
                   <Label htmlFor="suggestion-subject">Subject (optional)</Label>

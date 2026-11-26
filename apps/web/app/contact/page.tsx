@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 type FormKind = 'contact' | 'feedback';
 
@@ -197,7 +198,7 @@ export default function ContactPage() {
                 {kind === 'feedback' ? (
                   <div className="space-y-2">
                     <Label htmlFor="rating">Overall rating (optional)</Label>
-                    <select
+                    <FormSelect
                       id="rating"
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                       value={rating}
@@ -211,7 +212,7 @@ export default function ContactPage() {
                           {n} — {n === 5 ? 'Excellent' : n === 4 ? 'Good' : n === 3 ? 'Okay' : n === 2 ? 'Fair' : 'Poor'}
                         </option>
                       ))}
-                    </select>
+                    </FormSelect>
                   </div>
                 ) : null}
 

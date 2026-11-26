@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface PaginatedJobs {
   items: JobPosting[];
@@ -210,7 +211,7 @@ export function LoungeJobsPanel({ canManage }: LoungeJobsPanelProps) {
               onChange={(e) => setForm({ ...form, title: e.target.value })}
               required
             />
-            <select
+            <FormSelect
               className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm"
               value={form.jobType}
               onChange={(e) => setForm({ ...form, jobType: e.target.value })}
@@ -220,7 +221,7 @@ export function LoungeJobsPanel({ canManage }: LoungeJobsPanelProps) {
                   {t}
                 </option>
               ))}
-            </select>
+            </FormSelect>
             <Input
               className="h-9 text-sm"
               placeholder="Location (optional)"

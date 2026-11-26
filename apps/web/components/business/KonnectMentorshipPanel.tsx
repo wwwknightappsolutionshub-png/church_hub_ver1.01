@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface PublicMentor {
   id: string;
@@ -316,7 +317,7 @@ export function KonnectMentorshipPanel() {
                 </div>
               )}
               <form noValidate onSubmit={submitMentorApplication} className="space-y-3">
-                <select
+                <FormSelect
                   className="h-10 w-full rounded-md border px-3 text-sm"
                   value={mentorApply.specialty}
                   onChange={(e) => setMentorApply({ ...mentorApply, specialty: e.target.value })}
@@ -326,7 +327,7 @@ export function KonnectMentorshipPanel() {
                       {f}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
                 <textarea
                   className="min-h-[80px] w-full rounded-md border px-3 py-2 text-sm"
                   placeholder="Mission statement — how you will serve mentees (min. 10 characters)"
@@ -387,7 +388,7 @@ export function KonnectMentorshipPanel() {
           <Card>
             <CardContent className="pt-6">
               <form onSubmit={createAdminMentor} className="grid gap-3 sm:grid-cols-2">
-                <select
+                <FormSelect
                   className="h-10 rounded-md border px-3 text-sm sm:col-span-2"
                   value={adminMentor.memberId}
                   onChange={(e) => setAdminMentor({ ...adminMentor, memberId: e.target.value })}
@@ -399,8 +400,8 @@ export function KonnectMentorshipPanel() {
                       {m.firstName} {m.lastName}
                     </option>
                   ))}
-                </select>
-                <select
+                </FormSelect>
+                <FormSelect
                   className="h-10 rounded-md border px-3 text-sm"
                   value={adminMentor.specialty}
                   onChange={(e) => setAdminMentor({ ...adminMentor, specialty: e.target.value })}
@@ -410,7 +411,7 @@ export function KonnectMentorshipPanel() {
                       {f}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
                 <Input
                   placeholder="Mission statement"
                   value={adminMentor.missionStatement}
@@ -476,7 +477,7 @@ export function KonnectMentorshipPanel() {
                 </div>
               )}
               <form noValidate onSubmit={submitMenteeRequest} className="space-y-3">
-                <select
+                <FormSelect
                   className="h-10 w-full rounded-md border px-3 text-sm"
                   value={menteePost.requestedMentorType}
                   onChange={(e) => setMenteePost({ ...menteePost, requestedMentorType: e.target.value })}
@@ -486,7 +487,7 @@ export function KonnectMentorshipPanel() {
                       {f}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
                 <textarea
                   className="min-h-[80px] w-full rounded-md border px-3 py-2 text-sm"
                   placeholder="Your goals — what you hope to achieve (min. 10 characters)"

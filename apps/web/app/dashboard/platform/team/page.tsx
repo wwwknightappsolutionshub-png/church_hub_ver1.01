@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 type PermissionDef = {
   key: string;
@@ -389,7 +390,7 @@ export default function PlatformTeamPage() {
                     value={inviteForm.lastName}
                     onChange={(e) => setInviteForm((f) => ({ ...f, lastName: e.target.value }))}
                   />
-                  <select
+                  <FormSelect
                     className="h-10 rounded-md border border-input bg-background px-3 text-sm"
                     value={inviteForm.roleId}
                     onChange={(e) => setInviteForm((f) => ({ ...f, roleId: e.target.value }))}
@@ -399,7 +400,7 @@ export default function PlatformTeamPage() {
                         {r.name}
                       </option>
                     ))}
-                  </select>
+                  </FormSelect>
                   <Button
                     type="button"
                     disabled={
@@ -445,7 +446,7 @@ export default function PlatformTeamPage() {
                           <td className="px-3 py-2 text-muted-foreground">{s.email}</td>
                           <td className="px-3 py-2">
                             {canWrite && !isOwner ? (
-                              <select
+                              <FormSelect
                                 className="h-8 rounded-md border border-input bg-background px-2 text-xs"
                                 value={role?.id ?? ''}
                                 disabled={busy}
@@ -456,7 +457,7 @@ export default function PlatformTeamPage() {
                                     {r.name}
                                   </option>
                                 ))}
-                              </select>
+                              </FormSelect>
                             ) : (
                               <Badge variant={isOwner ? 'secondary' : 'outline'}>
                                 {role?.name ?? '—'}

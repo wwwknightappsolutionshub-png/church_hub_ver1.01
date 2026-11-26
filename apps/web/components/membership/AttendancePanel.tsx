@@ -10,6 +10,7 @@ import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface AttendancePanelProps {
   members: Array<{ id: string; firstName: string; lastName: string; familyId?: string | null }>;
@@ -87,7 +88,7 @@ export function AttendancePanel({ members }: AttendancePanelProps) {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid gap-2 sm:grid-cols-2">
-            <select
+            <FormSelect
               className="h-10 rounded-md border border-input bg-background px-3 text-sm"
               value={churchServiceId}
               onChange={(e) => setChurchServiceId(e.target.value)}
@@ -99,7 +100,7 @@ export function AttendancePanel({ members }: AttendancePanelProps) {
                   {s.startTime ? ` · ${s.startTime}` : ''}
                 </option>
               ))}
-            </select>
+            </FormSelect>
             <Input
               type="date"
               value={serviceDate}

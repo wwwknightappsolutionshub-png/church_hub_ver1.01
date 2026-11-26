@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { LandingMessageMp3Field } from './LandingMessageMp3Field';
+import { FormSelect } from '@/components/ui/form-select';
 
 function ensureFeed(draft: ChurchLandingContent, churchName: string): LandingSocialFeed {
   return (
@@ -225,7 +226,7 @@ export function ChurchLandingSocialFeedTab({
                 </div>
                 <div>
                   <Label>Media type</Label>
-                  <select
+                  <FormSelect
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                     value={item.mediaType}
                     onChange={(e) =>
@@ -239,7 +240,7 @@ export function ChurchLandingSocialFeedTab({
                         {t === 'mp3' ? 'Local MP3 (URL)' : t.charAt(0).toUpperCase() + t.slice(1)}
                       </option>
                     ))}
-                  </select>
+                  </FormSelect>
                 </div>
               </div>
               <div className="mt-3">

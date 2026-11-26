@@ -12,7 +12,6 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { StaffUnitFeedbackCompose } from '@/components/departments/DepartmentFeedbacksSection';
-import { showDepartmentToolsTab } from '@/lib/dept-module-catalog';
 
 interface JoinRequest {
   id: string;
@@ -48,8 +47,8 @@ interface UnitMemberRow {
 export function ServiceUnitAdminPanel({
   unitId,
   unitName,
-  departmentCode,
-  isChurchStaff,
+  departmentCode: _departmentCode,
+  isChurchStaff: _isChurchStaff,
   canManageLeaders = false,
   onOpenAddLeader,
   onOpenAssignAssistants,
@@ -62,7 +61,6 @@ export function ServiceUnitAdminPanel({
   onOpenAddLeader?: () => void;
   onOpenAssignAssistants?: () => void;
 }) {
-  const hasDeptTools = showDepartmentToolsTab(departmentCode, unitName);
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [leaderBusyId, setLeaderBusyId] = useState<string | null>(null);
@@ -169,9 +167,7 @@ export function ServiceUnitAdminPanel({
 
   return (
     <div className="space-y-6">
-      {(hasDeptTools || isChurchStaff) ? (
-        <StaffUnitFeedbackCompose unitId={unitId} unitName={unitName} />
-      ) : null}
+      <StaffUnitFeedbackCompose unitId={unitId} unitName={unitName} />
 
       <Card>
         <CardHeader>

@@ -31,6 +31,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { FormSelect } from '@/components/ui/form-select';
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 
@@ -367,7 +368,7 @@ export function CongregantsMembersView() {
           <div className="flex flex-wrap items-center gap-2">
             <label className="flex items-center gap-2 text-sm text-muted-foreground">
               Per page
-              <select
+              <FormSelect
                 className="h-9 rounded-md border border-input bg-background px-2 text-sm"
                 value={pageSize}
                 onChange={(e) => setPageSize(Number(e.target.value))}
@@ -378,7 +379,7 @@ export function CongregantsMembersView() {
                     {n}
                   </option>
                 ))}
-              </select>
+              </FormSelect>
             </label>
             <Button
               variant="outline"

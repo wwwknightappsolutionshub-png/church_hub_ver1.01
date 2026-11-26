@@ -26,6 +26,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ChildrenCheckInBoard } from '@/components/departments/ChildrenCheckInBoard';
+import { FormSelect } from '@/components/ui/form-select';
 
 type MemberRef = {
   id: string;
@@ -375,7 +376,7 @@ export function ChildrenTeachersPanel({
               <CardTitle className="text-sm">Assign teacher</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-2 sm:grid-cols-2">
-              <select
+              <FormSelect
                 className="h-10 rounded-md border bg-background px-3 text-sm"
                 value={rosterForm.classGroup}
                 onChange={(e) => setRosterForm({ ...rosterForm, classGroup: e.target.value as ClassGroup })}
@@ -385,8 +386,8 @@ export function ChildrenTeachersPanel({
                     {g.label}
                   </option>
                 ))}
-              </select>
-              <select
+              </FormSelect>
+              <FormSelect
                 className="h-10 rounded-md border bg-background px-3 text-sm"
                 value={rosterForm.teacherMemberId}
                 onChange={(e) => setRosterForm({ ...rosterForm, teacherMemberId: e.target.value })}
@@ -396,8 +397,8 @@ export function ChildrenTeachersPanel({
                     {formatMemberName(m.member)} (lead)
                   </option>
                 ))}
-              </select>
-              <select
+              </FormSelect>
+              <FormSelect
                 className="h-10 rounded-md border bg-background px-3 text-sm sm:col-span-2"
                 value={rosterForm.assistantMemberId}
                 onChange={(e) => setRosterForm({ ...rosterForm, assistantMemberId: e.target.value })}
@@ -408,7 +409,7 @@ export function ChildrenTeachersPanel({
                     {formatMemberName(m.member)} (assistant)
                   </option>
                 ))}
-              </select>
+              </FormSelect>
               <Input
                 placeholder="Notes"
                 value={rosterForm.notes}
@@ -476,7 +477,7 @@ export function ChildrenTeachersPanel({
                   rows={3}
                 />
                 <div className="flex flex-wrap gap-2">
-                  <select
+                  <FormSelect
                     className="h-10 flex-1 rounded-md border bg-background px-3 text-sm"
                     value={curriculumForm.source}
                     onChange={(e) =>
@@ -488,7 +489,7 @@ export function ChildrenTeachersPanel({
                   >
                     <option value="OFFICIAL_WEEKLY">Official weekly pack</option>
                     <option value="CUSTOM_UPLOAD">Custom material</option>
-                  </select>
+                  </FormSelect>
                   <Input
                     type="date"
                     value={curriculumForm.weekStart}
@@ -533,7 +534,7 @@ export function ChildrenTeachersPanel({
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex flex-wrap gap-2">
-                <select
+                <FormSelect
                   className="h-10 flex-1 rounded-md border bg-background px-3 text-sm"
                   value={simplifyId}
                   onChange={(e) => setSimplifyId(e.target.value)}
@@ -544,8 +545,8 @@ export function ChildrenTeachersPanel({
                       {c.title}
                     </option>
                   ))}
-                </select>
-                <select
+                </FormSelect>
+                <FormSelect
                   className="h-10 w-32 rounded-md border bg-background px-3 text-sm"
                   value={simplifyGroup}
                   onChange={(e) => setSimplifyGroup(e.target.value as ClassGroup)}
@@ -555,7 +556,7 @@ export function ChildrenTeachersPanel({
                       {g.label}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
                 <Button type="button" onClick={simplifyLesson} disabled={busy} variant="secondary">
                   Simplify
                 </Button>
@@ -602,7 +603,7 @@ export function ChildrenTeachersPanel({
             </CardHeader>
             <CardContent className="grid gap-2">
               <div className="grid gap-2 sm:grid-cols-2">
-                <select
+                <FormSelect
                   className="h-10 rounded-md border bg-background px-3 text-sm"
                   value={reportForm.classGroup}
                   onChange={(e) =>
@@ -614,8 +615,8 @@ export function ChildrenTeachersPanel({
                       {g.label}
                     </option>
                   ))}
-                </select>
-                <select
+                </FormSelect>
+                <FormSelect
                   className="h-10 rounded-md border bg-background px-3 text-sm"
                   value={reportForm.teacherMemberId}
                   onChange={(e) => setReportForm({ ...reportForm, teacherMemberId: e.target.value })}
@@ -625,9 +626,9 @@ export function ChildrenTeachersPanel({
                       {formatMemberName(m.member)}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
               </div>
-              <select
+              <FormSelect
                 className="h-10 rounded-md border bg-background px-3 text-sm"
                 value={reportForm.curriculumId}
                 onChange={(e) => setReportForm({ ...reportForm, curriculumId: e.target.value })}
@@ -638,7 +639,7 @@ export function ChildrenTeachersPanel({
                     {c.title}
                   </option>
                 ))}
-              </select>
+              </FormSelect>
               <Textarea
                 placeholder="What was taught?"
                 value={reportForm.lessonTaught}

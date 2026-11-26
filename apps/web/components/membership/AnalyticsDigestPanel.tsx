@@ -10,6 +10,7 @@ import type { AnalyticsDigestSettingsDto } from '@church-hub/shared-types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { FormSelect } from '@/components/ui/form-select';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -63,7 +64,7 @@ export function AnalyticsDigestPanel({ canEdit }: { canEdit: boolean }) {
             <div className="grid gap-2 sm:grid-cols-2">
               <label className="text-xs">
                 Weekday (UTC)
-                <select
+                <FormSelect
                   className="mt-1 h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
                   value={data.weekday}
                   onChange={(e) => void save({ weekday: Number(e.target.value) })}
@@ -74,7 +75,7 @@ export function AnalyticsDigestPanel({ canEdit }: { canEdit: boolean }) {
                       {d}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
               </label>
               <label className="text-xs">
                 Hour (UTC)

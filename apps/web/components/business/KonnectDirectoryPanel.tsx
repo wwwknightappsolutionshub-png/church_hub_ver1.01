@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface MemberRef {
   id: string;
@@ -137,7 +138,7 @@ export function KonnectDirectoryPanel() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input className="pl-9" placeholder="Search businesses…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <select
+        <FormSelect
           className="h-10 rounded-md border border-input bg-background px-3 text-sm"
           value={category}
           onChange={(e) => setCategory(e.target.value)}
@@ -148,7 +149,7 @@ export function KonnectDirectoryPanel() {
               {c}
             </option>
           ))}
-        </select>
+        </FormSelect>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={verifiedOnly} onChange={(e) => setVerifiedOnly(e.target.checked)} />
           Verified only
@@ -163,7 +164,7 @@ export function KonnectDirectoryPanel() {
         <Card>
           <CardContent className="grid gap-3 pt-6 sm:grid-cols-2">
             <form onSubmit={createProfile} className="contents">
-              <select
+              <FormSelect
                 className="h-10 rounded-md border border-input bg-background px-3 text-sm sm:col-span-2"
                 value={form.memberId}
                 onChange={(e) => setForm({ ...form, memberId: e.target.value })}
@@ -177,9 +178,9 @@ export function KonnectDirectoryPanel() {
                       {m.firstName} {m.lastName}
                     </option>
                   ))}
-              </select>
+              </FormSelect>
               <Input placeholder="Business name *" value={form.businessName} onChange={(e) => setForm({ ...form, businessName: e.target.value })} required />
-              <select
+              <FormSelect
                 className="h-10 rounded-md border border-input bg-background px-3 text-sm"
                 value={form.category}
                 onChange={(e) => setForm({ ...form, category: e.target.value })}
@@ -189,7 +190,7 @@ export function KonnectDirectoryPanel() {
                     {c}
                   </option>
                 ))}
-              </select>
+              </FormSelect>
               <Input placeholder="Tagline" value={form.tagline} onChange={(e) => setForm({ ...form, tagline: e.target.value })} />
               <Input placeholder="Website" value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} />
               <Input placeholder="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />

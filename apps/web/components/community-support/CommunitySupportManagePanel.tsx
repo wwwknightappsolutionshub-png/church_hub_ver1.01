@@ -11,7 +11,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { DateTimeField } from '@/components/ui/date-field';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface ManageRequest {
   id: string;
@@ -203,7 +205,7 @@ export function CommunitySupportManagePanel() {
           <CardContent>
             <form onSubmit={save} className="grid gap-3 sm:grid-cols-2">
               {!editingId && (
-                <select
+                <FormSelect
                   className="h-10 rounded-md border px-3 text-sm sm:col-span-2"
                   value={form.memberId}
                   onChange={(e) => setForm({ ...form, memberId: e.target.value })}
@@ -215,9 +217,9 @@ export function CommunitySupportManagePanel() {
                       {m.firstName} {m.lastName}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
               )}
-              <select
+              <FormSelect
                 className="h-10 rounded-md border px-3 text-sm"
                 value={form.requestType}
                 onChange={(e) =>
@@ -226,8 +228,8 @@ export function CommunitySupportManagePanel() {
               >
                 <option value="JOB_SEARCH">Job search</option>
                 <option value="BUSINESS_SEARCH">Business search</option>
-              </select>
-              <select
+              </FormSelect>
+              <FormSelect
                 className="h-10 rounded-md border px-3 text-sm"
                 value={form.status}
                 onChange={(e) =>
@@ -237,7 +239,7 @@ export function CommunitySupportManagePanel() {
                 <option value="PENDING">Pending</option>
                 <option value="APPROVED">Approved</option>
                 <option value="REJECTED">Rejected</option>
-              </select>
+              </FormSelect>
               <Input
                 className="sm:col-span-2"
                 placeholder="Title"
@@ -256,10 +258,10 @@ export function CommunitySupportManagePanel() {
               <Input placeholder="Skills / hint" value={form.skills} onChange={(e) => setForm({ ...form, skills: e.target.value })} />
               <div className="sm:col-span-2">
                 <label className="text-xs text-muted-foreground">Valid until (when approved)</label>
-                <Input
-                  type="datetime-local"
+                <DateTimeField
                   value={form.validUntil}
-                  onChange={(e) => setForm({ ...form, validUntil: e.target.value })}
+                  onChange={(validUntil) => setForm({ ...form, validUntil })}
+                  aria-label="Valid until"
                 />
               </div>
               <Button type="submit" disabled={!!busyId} className="sm:col-span-2">

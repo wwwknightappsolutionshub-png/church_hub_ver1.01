@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 export function DevotionalActionPointsPanel() {
   const queryClient = useQueryClient();
@@ -122,14 +123,14 @@ export function DevotionalActionPointsPanel() {
           </label>
           {remindersEnabled && (
             <div className="grid gap-2 sm:grid-cols-3">
-              <select
+              <FormSelect
                 className="h-10 rounded-md border border-input bg-background px-3 text-sm"
                 value={frequency}
                 onChange={(e) => setFrequency(e.target.value as 'HOURLY' | 'DAILY')}
               >
                 <option value="DAILY">Daily</option>
                 <option value="HOURLY">Hourly</option>
-              </select>
+              </FormSelect>
               <Input
                 type="number"
                 min={0}

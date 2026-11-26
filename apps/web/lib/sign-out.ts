@@ -66,11 +66,6 @@ export function getChurchLoginPath(slug?: string | null): string {
 export async function signOutAndRedirect(): Promise<void> {
   if (typeof window === 'undefined') return;
 
-  const refreshToken = localStorage.getItem('refreshToken');
-  if (refreshToken) {
-    void api.post('/auth/logout', { refreshToken }).catch(() => {});
-  }
-
   let me: SignOutMe | null = null;
   try {
     const { data } = await api.get<SignOutMe>('/auth/me', { timeout: ME_TIMEOUT_MS });
@@ -80,6 +75,11 @@ export async function signOutAndRedirect(): Promise<void> {
     }
   } catch {
     /* fall back to cached role bucket */
+  }
+
+  const refreshToken = localStorage.getItem('refreshToken');
+  if (refreshToken) {
+    await api.post('/auth/logout', { refreshToken }, { timeout: 8000 });
   }
 
   const destination = resolvePostLogoutPath(me);

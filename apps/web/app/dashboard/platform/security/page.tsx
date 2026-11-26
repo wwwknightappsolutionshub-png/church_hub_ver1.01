@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 type AuditItem = {
   id: string;
@@ -114,7 +115,7 @@ export default function PlatformSecurityAuditPage() {
       }
     >
       <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <select
+        <FormSelect
           className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
           value={churchId}
           onChange={(e) => {
@@ -128,7 +129,7 @@ export default function PlatformSecurityAuditPage() {
               {c.name}
             </option>
           ))}
-        </select>
+        </FormSelect>
         <Input
           placeholder="Action (e.g. AUTHZ_ABUSE_DETECTED)"
           value={action}

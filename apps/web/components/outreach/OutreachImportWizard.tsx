@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 const API_BASE = '/outreach/import';
@@ -231,7 +232,7 @@ export function OutreachImportWizard({ onComplete }: { onComplete?: () => void }
                     {OUTREACH_IMPORT_FIELD_LABELS[field]}
                     {(field === 'firstName' || field === 'phone') && ' *'}
                   </Label>
-                  <select
+                  <FormSelect
                     className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
                     value={mapping[field] ?? ''}
                     onChange={(e) =>
@@ -247,7 +248,7 @@ export function OutreachImportWizard({ onComplete }: { onComplete?: () => void }
                         {h}
                       </option>
                     ))}
-                  </select>
+                  </FormSelect>
                 </div>
               ))}
             </div>

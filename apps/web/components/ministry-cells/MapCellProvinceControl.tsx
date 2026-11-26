@@ -10,6 +10,7 @@ import type { BranchRow, CellProvinceRow } from '@/components/ministry-cells/typ
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 export function MapCellProvinceControl({
   branch,
@@ -107,7 +108,7 @@ export function MapCellProvinceControl({
             <p className="text-[11px] text-amber-700">Create a province first, then map this cell.</p>
           ) : (
             <>
-              <select
+              <FormSelect
                 className="h-8 min-w-[10rem] flex-1 rounded-md border border-input bg-background px-2 text-xs"
                 value={provinceId}
                 onChange={(e) => setProvinceId(e.target.value)}
@@ -122,7 +123,7 @@ export function MapCellProvinceControl({
                     </option>
                   );
                 })}
-              </select>
+              </FormSelect>
               <Button
                 type="button"
                 size="sm"

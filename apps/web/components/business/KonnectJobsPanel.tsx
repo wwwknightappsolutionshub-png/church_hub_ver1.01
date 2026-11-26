@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { FormSelect } from '@/components/ui/form-select';
 
 const JOBS_PAGE_SIZE = 20;
 
@@ -134,7 +135,7 @@ export function KonnectJobsPanel() {
           <CardContent className="grid gap-3 pt-6 sm:grid-cols-2">
             <form onSubmit={createJob} className="contents">
               <Input className="sm:col-span-2" placeholder="Job title *" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
-              <select
+              <FormSelect
                 className="h-10 rounded-md border border-input bg-background px-3 text-sm"
                 value={form.businessId}
                 onChange={(e) => setForm({ ...form, businessId: e.target.value })}
@@ -145,8 +146,8 @@ export function KonnectJobsPanel() {
                     {p.businessName}
                   </option>
                 ))}
-              </select>
-              <select
+              </FormSelect>
+              <FormSelect
                 className="h-10 rounded-md border border-input bg-background px-3 text-sm"
                 value={form.jobType}
                 onChange={(e) => setForm({ ...form, jobType: e.target.value })}
@@ -156,7 +157,7 @@ export function KonnectJobsPanel() {
                     {t}
                   </option>
                 ))}
-              </select>
+              </FormSelect>
               <Input placeholder="Location" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
               <Input placeholder="Salary range" value={form.salaryRange} onChange={(e) => setForm({ ...form, salaryRange: e.target.value })} />
               <Input placeholder="Contact email" value={form.contactEmail} onChange={(e) => setForm({ ...form, contactEmail: e.target.value })} />

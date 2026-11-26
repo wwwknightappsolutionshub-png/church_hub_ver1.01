@@ -10,6 +10,7 @@ import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 export type FieldVisibility = 'VISIBLE' | 'RESTRICTED' | 'HIDDEN';
 export type FieldEditability = 'EDITABLE' | 'READ_ONLY' | 'LOCKED';
@@ -258,7 +259,7 @@ export function MemberFieldAccessEditor({
                         </div>
                         <label className="block text-xs">
                           <span className="mb-1 block text-muted-foreground">Visibility (ops)</span>
-                          <select
+                          <FormSelect
                             className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
                             value={d.visibility}
                             disabled={!canWrite || isCapability}
@@ -277,11 +278,11 @@ export function MemberFieldAccessEditor({
                                 {o.label}
                               </option>
                             ))}
-                          </select>
+                          </FormSelect>
                         </label>
                         <label className="block text-xs">
                           <span className="mb-1 block text-muted-foreground">Editability (ops)</span>
-                          <select
+                          <FormSelect
                             className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
                             value={d.editability}
                             disabled={!canWrite || isCapability}
@@ -296,7 +297,7 @@ export function MemberFieldAccessEditor({
                                 {o.label}
                               </option>
                             ))}
-                          </select>
+                          </FormSelect>
                         </label>
                       </div>
                     );

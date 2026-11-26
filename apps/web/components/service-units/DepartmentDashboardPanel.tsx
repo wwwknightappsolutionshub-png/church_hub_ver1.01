@@ -17,7 +17,9 @@ import { formatMemberName } from '@/lib/service-unit-utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { DateField } from '@/components/ui/date-field';
+import { apiErrorMessage } from '@/lib/api-errors';
+import type { AxiosError } from 'axios';
 import { cn } from '@/lib/utils';
 
 interface MemberRef {
@@ -53,6 +55,8 @@ interface DepartmentDashboardPanelProps {
   /** Unit members may record roll call without being unit admin */
   canRecordAttendance?: boolean;
   members: Array<{ memberId: string; member: MemberRef }>;
+  /** Current service unit name shown on the roll-call card. */
+  unitName?: string;
   /** Hide top summary cards when parent already shows them */
   showSummaryCards?: boolean;
 }
@@ -77,6 +81,7 @@ export function DepartmentDashboardPanel({
   canManage,
   canRecordAttendance,
   members,
+  unitName,
   showSummaryCards = true,
 }: DepartmentDashboardPanelProps) {
   const queryClient = useQueryClient();
@@ -97,9 +102,9 @@ export function DepartmentDashboardPanel({
     return {
       unit: {
         id: unitId,
-        name: 'Department',
+        name: unitName || 'This unit',
         departmentCode: '',
-        departmentLabel: 'Department',
+        departmentLabel: unitName || 'This unit',
       },
       memberCount: rollMembers.length,
       attendanceSessions: [],
@@ -114,7 +119,7 @@ export function DepartmentDashboardPanel({
       })),
       weeklyReports: [],
     };
-  }, [dashboard, unitId, rollMembers]);
+  }, [dashboard, unitId, unitName, rollMembers]);
 
   const saveRoll = async () => {
     setBusy(true);
@@ -126,10 +131,10 @@ export function DepartmentDashboardPanel({
           present: presence[m.id] ?? true,
         })),
       });
-      toast.success('Department attendance saved');
+      toast.success('Attendance marked');
       queryClient.invalidateQueries({ queryKey: ['department-dashboard', unitId] });
-    } catch {
-      toast.error('Could not save attendance');
+    } catch (err) {
+      toast.error(apiErrorMessage(err as AxiosError, 'Attendance could not be saved. Check the date and try again.'));
     } finally {
       setBusy(false);
     }
@@ -154,10 +159,15 @@ export function DepartmentDashboardPanel({
     setBusy(true);
     try {
       await api.post(`/service-units/departments/${unitId}/weekly-reports/generate`, {});
-      toast.success('Weekly report saved (in-app). Email digests from Admin/Pastor Reports.');
+      toast.success('Weekly report saved. Pastors and admins can read it in Reports.');
       queryClient.invalidateQueries({ queryKey: ['department-dashboard', unitId] });
-    } catch {
-      toast.error('Could not generate report');
+    } catch (err) {
+      toast.error(
+        apiErrorMessage(
+          err as AxiosError,
+          'The weekly report could not be created. Mark attendance first, then try again.',
+        ),
+      );
     } finally {
       setBusy(false);
     }
@@ -168,7 +178,9 @@ export function DepartmentDashboardPanel({
       {isError && (
         <Card className="border-amber-500/40 bg-amber-500/5">
           <CardContent className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
-            <span>Could not load full attendance stats. You can still record roll call below.</span>
+            <span>
+              Attendance history could not be loaded. You can still mark who was present below.
+            </span>
             <Button type="button" variant="outline" size="sm" onClick={() => refetch()}>
               Retry
             </Button>
@@ -183,8 +195,8 @@ export function DepartmentDashboardPanel({
           <div className="grid gap-3 sm:grid-cols-3">
             <Card>
               <CardHeader className="pb-1">
-                <CardDescription>Department</CardDescription>
-                <CardTitle className="text-lg">{summary.unit.departmentLabel}</CardTitle>
+                <CardDescription>Weekly Roll Call</CardDescription>
+                <CardTitle className="text-lg">{unitName || summary.unit.name || summary.unit.departmentLabel}</CardTitle>
               </CardHeader>
             </Card>
             <Card>
@@ -211,14 +223,14 @@ export function DepartmentDashboardPanel({
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
               <CalendarCheck className="h-4 w-4" />
-              Department roll call
+              Weekly Roll Call
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Input
-              type="date"
+            <DateField
+              aria-label="Roll call date"
               value={serviceDate}
-              onChange={(e) => setServiceDate(e.target.value)}
+              onChange={setServiceDate}
             />
             <ul className="max-h-64 space-y-2 overflow-y-auto">
               {rollMembers.map((m) => (
@@ -242,7 +254,7 @@ export function DepartmentDashboardPanel({
             </ul>
             <div className="flex flex-wrap gap-2">
               <Button onClick={saveRoll} disabled={busy || rollMembers.length === 0}>
-                Save roll
+                Mark Attendance
               </Button>
               {canManage && (
                 <>

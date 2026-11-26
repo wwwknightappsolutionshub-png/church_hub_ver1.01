@@ -27,8 +27,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { DateTimeField } from '@/components/ui/date-field';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 const RECURRENCE_OPTIONS: Array<{ value: DevotionalMeetupRecurrence; label: string }> = [
   { value: 'NONE', label: 'One-time' },
@@ -297,15 +299,11 @@ export function DevotionalGroupMeetups({ groupId, isAdmin }: DevotionalGroupMeet
             </div>
             <div>
               <Label>Date & time</Label>
-              <Input
-                type="datetime-local"
-                value={startsAt}
-                onChange={(e) => setStartsAt(e.target.value)}
-              />
+              <DateTimeField value={startsAt} onChange={setStartsAt} aria-label="Date and time" />
             </div>
             <div>
               <Label>Recurrence</Label>
-              <select
+              <FormSelect
                 className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 value={recurrence}
                 onChange={(e) => setRecurrence(e.target.value as DevotionalMeetupRecurrence)}
@@ -315,11 +313,11 @@ export function DevotionalGroupMeetups({ groupId, isAdmin }: DevotionalGroupMeet
                     {o.label}
                   </option>
                 ))}
-              </select>
+              </FormSelect>
             </div>
             <div>
               <Label>Location type</Label>
-              <select
+              <FormSelect
                 className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 value={locationType}
                 onChange={(e) =>
@@ -329,7 +327,7 @@ export function DevotionalGroupMeetups({ groupId, isAdmin }: DevotionalGroupMeet
                 <option value="PHYSICAL">Physical</option>
                 <option value="ONLINE">Online</option>
                 <option value="HYBRID">Hybrid</option>
-              </select>
+              </FormSelect>
             </div>
             <div>
               <Label>Physical location</Label>

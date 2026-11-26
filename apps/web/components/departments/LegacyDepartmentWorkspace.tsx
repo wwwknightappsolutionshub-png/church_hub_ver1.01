@@ -84,7 +84,7 @@ export function LegacyDepartmentWorkspace({
   return (
     <DepartmentLayout
       title={unitName}
-      subtitle="Service unit workspace"
+      subtitle=""
       departmentCode="OTHER"
       accessLabel={
         access?.canManage
@@ -103,6 +103,7 @@ export function LegacyDepartmentWorkspace({
           canManage={canManage}
           canRecordAttendance={canManage || (access?.canLead ?? false)}
           members={members}
+          unitName={unitName}
           showSummaryCards
         />
       )}

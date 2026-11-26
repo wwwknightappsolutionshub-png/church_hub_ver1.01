@@ -10,6 +10,7 @@ import { LazyCongregantEditorForm } from '@/lib/membership-lazy';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface BranchMember {
   id: string;
@@ -166,7 +167,7 @@ export function BranchMembersPanel({
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <select
+            <FormSelect
               className="flex h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
               value={selectedMemberId}
               onChange={(e) => setSelectedMemberId(e.target.value)}
@@ -186,7 +187,7 @@ export function BranchMembersPanel({
                   </option>
                 );
               })}
-            </select>
+            </FormSelect>
           )}
           {noSearchMatch && (
             <p className="text-xs text-muted-foreground">

@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   BarChart3,
   Calendar,
-  ClipboardList,
   Loader2,
   MessageSquare,
   Pin,
@@ -36,8 +35,9 @@ import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { ServiceUnitJoinSheet } from '@/components/service-units/ServiceUnitJoinSheet';
 import { ServiceUnitAdminPanel } from '@/components/service-units/ServiceUnitAdminPanel';
 import { ServiceUnitMembersPanel } from '@/components/service-units/ServiceUnitMembersPanel';
-import { ServiceUnitWeeklyAttendancePanel } from '@/components/service-units/ServiceUnitWeeklyAttendancePanel';
 import { ServiceUnitRtpPanel } from '@/components/service-units/ServiceUnitRtpPanel';
+import { DateTimeField } from '@/components/ui/date-field';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { UnitLeadershipModal } from '@/components/service-units/UnitLeadershipModal';
 import {
   DepartmentToolsRouter,
@@ -122,10 +122,9 @@ const baseTabs: { id: Tab; label: string; icon: typeof Users }[] = [
   { id: 'department', label: 'Department', icon: BarChart3 },
   { id: 'meetings', label: 'Meetings', icon: Calendar },
   { id: 'leaders', label: 'Members', icon: Users },
-  { id: 'weekly', label: 'Attendance', icon: ClipboardList },
   { id: 'rtp', label: 'RTP', icon: FileSpreadsheet },
   { id: 'forum', label: 'Forum', icon: MessageSquare },
-  { id: 'admin', label: 'Unit admin', icon: Shield },
+  { id: 'admin', label: 'Connect With Admin', icon: Shield },
 ];
 
 export default function ServiceUnitDetailPage() {
@@ -140,6 +139,8 @@ export default function ServiceUnitDetailPage() {
     unitMembershipIds,
     isChurchStaff,
   } = useModuleAccess();
+  const isUnitOfficer =
+    unitAdminUnitIds.includes(id) || unitDeputyUnitIds.includes(id);
   const [accessDenied, setAccessDenied] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
   const [leadershipModal, setLeadershipModal] = useState<'add-leader' | 'assign-assistants' | null>(
@@ -210,15 +211,18 @@ export default function ServiceUnitDetailPage() {
 
     return baseTabs.filter((t) => {
       if (t.id === 'department') return showDeptTab;
-      if (t.id === 'admin' || t.id === 'rtp') return canManage;
+      if (t.id === 'admin') return isUnitOfficer;
+      if (t.id === 'rtp') return canManage;
       return true;
     });
-  }, [unit.data, canViewDepartmentTab, canManage]);
+  }, [unit.data, canViewDepartmentTab, canManage, isUnitOfficer]);
 
   useEffect(() => {
     if (tab === 'department' && !canViewDepartmentTab) setTab('overview');
-    if ((tab === 'admin' || tab === 'rtp') && !canManage) setTab('overview');
-  }, [tab, canViewDepartmentTab, canManage]);
+    if (tab === 'admin' && !isUnitOfficer) setTab('overview');
+    if (tab === 'rtp' && !canManage) setTab('overview');
+    if (tab === 'weekly') setTab('overview');
+  }, [tab, canViewDepartmentTab, canManage, isUnitOfficer]);
 
   const [unitEditForm, setUnitEditForm] = useState({
     name: '',
@@ -304,6 +308,10 @@ export default function ServiceUnitDetailPage() {
 
   const addMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!meetingForm.startsAt) {
+      toast.error('Choose a date and time for the meeting');
+      return;
+    }
     try {
       await api.post(`/service-units/${id}/meetings`, meetingForm);
       toast.success('Meeting scheduled');
@@ -650,8 +658,8 @@ export default function ServiceUnitDetailPage() {
             <CardHeader>
               <CardTitle className="text-base">Schedule meeting</CardTitle>
               <CardDescription>
-                After the meeting, publish a summary below — it stays on this page and is sent to pastors
-                and admins.
+                Create an upcoming general meeting here and publish the outcome of the meeting for all
+                members of the unit, pastorate and leaders to see
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -662,11 +670,10 @@ export default function ServiceUnitDetailPage() {
                   onChange={(e) => setMeetingForm({ ...meetingForm, title: e.target.value })}
                   required
                 />
-                <Input
-                  type="datetime-local"
+                <DateTimeField
+                  aria-label="Meeting date and time"
                   value={meetingForm.startsAt}
-                  onChange={(e) => setMeetingForm({ ...meetingForm, startsAt: e.target.value })}
-                  required
+                  onChange={(startsAt) => setMeetingForm({ ...meetingForm, startsAt })}
                 />
                 <Input
                   placeholder="Location"
@@ -759,36 +766,35 @@ export default function ServiceUnitDetailPage() {
                     onChange={(e) => setSummaryForm({ ...summaryForm, title: e.target.value })}
                     required
                   />
-                  <select
-                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                    value={summaryForm.meetingId}
-                    onChange={(e) => {
-                      const meetingId = e.target.value;
-                      const meeting = data.meetings.find((m) => m.id === meetingId);
+                  <Select
+                    value={summaryForm.meetingId || 'none'}
+                    onValueChange={(meetingId) => {
+                      const id = meetingId === 'none' ? '' : meetingId;
+                      const meeting = data.meetings.find((m) => m.id === id);
                       setSummaryForm({
                         ...summaryForm,
-                        meetingId,
+                        meetingId: id,
                         meetingDate: meeting
                           ? new Date(meeting.startsAt).toISOString().slice(0, 16)
-                          : summaryForm.meetingDate,
+                          : '',
                         title:
                           summaryForm.title ||
                           (meeting ? `${meeting.title} — summary` : summaryForm.title),
                       });
                     }}
                   >
-                    <option value="">Link to scheduled meeting (optional)</option>
-                    {data.meetings.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.title} · {formatDateTime(m.startsAt)}
-                      </option>
-                    ))}
-                  </select>
-                  <Input
-                    type="datetime-local"
-                    value={summaryForm.meetingDate}
-                    onChange={(e) => setSummaryForm({ ...summaryForm, meetingDate: e.target.value })}
-                  />
+                    <SelectTrigger aria-label="Link to scheduled meeting">
+                      <SelectValue placeholder="Link to scheduled meeting (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Link to scheduled meeting (optional)</SelectItem>
+                      {data.meetings.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.title} · {formatDateTime(m.startsAt)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <textarea
                     className="min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                     placeholder="Key decisions, attendance notes, action items…"
@@ -885,19 +891,11 @@ export default function ServiceUnitDetailPage() {
         />
       )}
 
-      {tab === 'weekly' && unit.data && (
-        <ServiceUnitWeeklyAttendancePanel
-          unitId={id}
-          unitName={unit.data.name}
-          canManage={canManage}
-        />
-      )}
-
       {tab === 'rtp' && canManage && unit.data && (
         <ServiceUnitRtpPanel unitId={id} unitName={unit.data.name} />
       )}
 
-      {tab === 'admin' && canManage && unit.data && (
+      {tab === 'admin' && isUnitOfficer && unit.data && (
         <ServiceUnitAdminPanel
           unitId={id}
           unitName={unit.data.name}

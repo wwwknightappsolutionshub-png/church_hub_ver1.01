@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface Announcement {
   id: string;
@@ -74,7 +75,7 @@ export function CommAnnouncementsPanel() {
           <CardContent className="grid gap-3 pt-6">
             <form onSubmit={create} className="space-y-3">
               <Input placeholder="Title *" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
-              <select
+              <FormSelect
                 className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 value={form.category}
                 onChange={(e) => setForm({ ...form, category: e.target.value })}
@@ -82,7 +83,7 @@ export function CommAnnouncementsPanel() {
                 {ANNOUNCEMENT_CATEGORIES.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
-              </select>
+              </FormSelect>
               <textarea
                 className="min-h-[120px] w-full rounded-md border border-input px-3 py-2 text-sm"
                 placeholder="Content *"

@@ -412,7 +412,7 @@ export default function LoginPage() {
                 <p className="mt-3 font-semibold">Check your email</p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   If an account exists for <strong>{getValues('email')}</strong>, we sent a
-                  one-time sign-in link.
+                  one-time sign-in link. It expires in 5 minutes.
                 </p>
                 <Button
                   type="button"

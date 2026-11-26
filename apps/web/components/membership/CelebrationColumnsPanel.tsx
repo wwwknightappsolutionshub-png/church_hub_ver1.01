@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DashboardPageSkeleton } from '@/components/dashboard/DashboardPageSkeleton';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface Props {
   days?: number;
@@ -154,7 +155,7 @@ function CelebrationColumn<T>({
             <div className="flex flex-wrap items-center gap-2">
               <label className="flex items-center gap-2 text-xs text-muted-foreground sm:text-sm">
                 Per page
-                <select
+                <FormSelect
                   className="h-8 rounded-md border border-input bg-background px-2 text-xs sm:text-sm"
                   value={pageSize}
                   onChange={(e) => onPageSizeChange(Number(e.target.value))}
@@ -165,7 +166,7 @@ function CelebrationColumn<T>({
                       {n}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
               </label>
               <Button
                 variant="outline"

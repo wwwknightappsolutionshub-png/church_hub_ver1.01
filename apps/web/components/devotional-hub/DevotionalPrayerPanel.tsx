@@ -29,6 +29,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 export function DevotionalPrayerPanel() {
   const queryClient = useQueryClient();
@@ -212,7 +213,7 @@ export function DevotionalPrayerPanel() {
             Share with group
           </label>
           {shareGroup && (
-            <select
+            <FormSelect
               className="h-10 max-w-[220px] rounded-md border border-input bg-background px-3 text-sm"
               value={groupId}
               onChange={(e) => setGroupId(e.target.value)}
@@ -223,7 +224,7 @@ export function DevotionalPrayerPanel() {
                   {g.name}
                 </option>
               ))}
-            </select>
+            </FormSelect>
           )}
           <Button size="sm" onClick={createList} disabled={busy}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}

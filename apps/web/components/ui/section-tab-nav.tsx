@@ -5,6 +5,7 @@ import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 export type SectionTabItem = {
   id: string;
@@ -90,7 +91,7 @@ export function SectionTabNav({
           <label htmlFor={selectId} className="sr-only">
             {ariaLabel}
           </label>
-          <select
+          <FormSelect
             id={selectId}
             data-testid={selectTestId}
             className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm font-medium shadow-sm"
@@ -112,7 +113,7 @@ export function SectionTabNav({
                 {item.badge != null && Number(item.badge) > 0 ? ` (${item.badge})` : ''}
               </option>
             ))}
-          </select>
+          </FormSelect>
         </div>
       )}
 

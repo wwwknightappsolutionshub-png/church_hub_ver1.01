@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const createPrayerSchema = z.object({
   subject: z.string().min(1).max(200),
   description: z.string().min(1).max(5000),
-  displayName: z.string().max(120).optional(),
+  showOnBoard: z.boolean().optional(),
   memberId: z.string().uuid().optional(),
 });
 
@@ -11,6 +11,7 @@ export const createPraiseSchema = z.object({
   subject: z.string().min(1).max(200),
   testimony: z.string().min(1).max(5000),
   displayName: z.string().max(120).optional(),
+  showDisplayName: z.boolean().optional(),
   memberId: z.string().uuid().optional(),
 });
 

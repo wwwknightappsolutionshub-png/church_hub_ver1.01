@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface IdeaMessage {
   id: string;
@@ -123,7 +124,7 @@ export function IdeaHub() {
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             required
           />
-          <select
+          <FormSelect
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
             value={form.category}
             onChange={(e) => setForm({ ...form, category: e.target.value })}
@@ -133,7 +134,7 @@ export function IdeaHub() {
                 {c}
               </option>
             ))}
-          </select>
+          </FormSelect>
           <Button type="submit" size="sm" disabled={submitting} className="shadow-brand">
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}
             Submit for advice
@@ -173,7 +174,7 @@ export function IdeaHub() {
                       </p>
                     </div>
                     {isChurchStaff ? (
-                      <select
+                      <FormSelect
                         className="h-8 rounded-md border border-input bg-background px-2 text-xs"
                         value={idea.status}
                         onClick={(e) => e.stopPropagation()}
@@ -192,7 +193,7 @@ export function IdeaHub() {
                             {STATUS_LABELS[s] ?? s}
                           </option>
                         ))}
-                      </select>
+                      </FormSelect>
                     ) : (
                       <Badge variant={STATUS_VARIANT[idea.status] ?? 'outline'}>
                         {STATUS_LABELS[idea.status] ?? idea.status}

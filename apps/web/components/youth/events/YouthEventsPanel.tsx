@@ -13,7 +13,9 @@ import { PageHeader } from '@/components/dashboard/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { DateTimeField } from '@/components/ui/date-field';
 import { YouthEventCard } from './YouthEventCard';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface YouthGroup {
   id: string;
@@ -146,11 +148,10 @@ export function YouthEventsPanel() {
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
                   required
                 />
-                <Input
-                  type="datetime-local"
+                <DateTimeField
                   value={form.startsAt}
-                  onChange={(e) => setForm({ ...form, startsAt: e.target.value })}
-                  required
+                  onChange={(startsAt) => setForm({ ...form, startsAt })}
+                  aria-label="Starts at"
                 />
                 <Input
                   placeholder="Location"
@@ -169,7 +170,7 @@ export function YouthEventsPanel() {
                   onChange={(e) => setForm({ ...form, coverImageUrl: e.target.value })}
                   className="sm:col-span-2"
                 />
-                <select
+                <FormSelect
                   className="h-10 rounded-md border border-input bg-background px-3 text-sm"
                   value={form.youthGroupId}
                   onChange={(e) => setForm({ ...form, youthGroupId: e.target.value })}
@@ -180,7 +181,7 @@ export function YouthEventsPanel() {
                       {g.name}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
                 <Input
                   placeholder="Description"
                   value={form.description}

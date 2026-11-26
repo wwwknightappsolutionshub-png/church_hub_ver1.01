@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface ContentRow {
   id: string;
@@ -173,7 +174,7 @@ export function Wisdom365ContentManager({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap gap-2">
-          <select
+          <FormSelect
             className="rounded-lg border bg-background px-3 py-2 text-sm"
             value={variantId}
             onChange={(e) => {
@@ -186,7 +187,7 @@ export function Wisdom365ContentManager({
                 {v.name}
               </option>
             ))}
-          </select>
+          </FormSelect>
           <Button size="sm" variant="outline" onClick={() => setCreating(true)}>
             <Plus className="mr-1 h-4 w-4" /> New entry
           </Button>
@@ -260,14 +261,14 @@ export function Wisdom365ContentManager({
                 <Textarea value={draft.passage} onChange={(e) => setDraft({ ...draft, passage: e.target.value })} rows={3} placeholder="Passage" />
                 <Textarea value={draft.wisdom} onChange={(e) => setDraft({ ...draft, wisdom: e.target.value })} rows={2} placeholder="Wisdom" />
                 <Textarea value={draft.application} onChange={(e) => setDraft({ ...draft, application: e.target.value })} rows={2} placeholder="Application" />
-                <select
+                <FormSelect
                   className="w-full rounded-lg border px-3 py-2 text-sm"
                   value={draft.status}
                   onChange={(e) => setDraft({ ...draft, status: e.target.value as 'DRAFT' | 'PUBLISHED' })}
                 >
                   <option value="DRAFT">DRAFT</option>
                   <option value="PUBLISHED">PUBLISHED</option>
-                </select>
+                </FormSelect>
                 <Button onClick={createEntry} disabled={busy}>Create</Button>
               </>
             ) : editor ? (
@@ -277,14 +278,14 @@ export function Wisdom365ContentManager({
                 <Textarea value={editor.wisdom} onChange={(e) => setEditor({ ...editor, wisdom: e.target.value })} rows={3} />
                 <Textarea value={editor.application} onChange={(e) => setEditor({ ...editor, application: e.target.value })} rows={3} />
                 <Textarea value={editor.prayer} onChange={(e) => setEditor({ ...editor, prayer: e.target.value })} rows={2} />
-                <select
+                <FormSelect
                   className="w-full rounded-lg border px-3 py-2 text-sm"
                   value={editor.status}
                   onChange={(e) => setEditor({ ...editor, status: e.target.value })}
                 >
                   <option value="DRAFT">DRAFT</option>
                   <option value="PUBLISHED">PUBLISHED</option>
-                </select>
+                </FormSelect>
                 <div className="flex gap-2">
                   <Button onClick={saveEditor} disabled={busy}>Save</Button>
                   <Button variant="destructive" onClick={() => void deleteEntry(editor.id)}>

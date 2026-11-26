@@ -33,6 +33,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 const REACTIONS: YouthChatReactionType[] = ['LIKE', 'LOVE', 'AMEN', 'FIRE'];
 
@@ -332,7 +333,7 @@ export function YouthChatPanel() {
                 <CardTitle className="text-sm">New DM</CardTitle>
               </CardHeader>
               <CardContent>
-                <select
+                <FormSelect
                   className="w-full rounded-md border px-2 py-2 text-sm"
                   value={activePeer}
                   onChange={(e) => setActivePeer(e.target.value)}
@@ -343,7 +344,7 @@ export function YouthChatPanel() {
                       {m.firstName} {m.lastName}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
               </CardContent>
             </Card>
           )}

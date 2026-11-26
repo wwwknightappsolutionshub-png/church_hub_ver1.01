@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AnalyticsPanel } from '@/components/membership/AnalyticsPanel';
+import { FormSelect } from '@/components/ui/form-select';
 
 type ProvinceRow = { id: string; name: string };
 type BranchRow = { id: string; name: string; provinceId?: string | null; province?: { id: string } | null };
@@ -135,7 +136,7 @@ export function AnalyticsFiltersBar({
           <Label htmlFor="analytics-months" className="text-[11px]">
             Preset months
           </Label>
-          <select
+          <FormSelect
             id="analytics-months"
             className={selectClass}
             value={draft.months}
@@ -146,7 +147,7 @@ export function AnalyticsFiltersBar({
                 {m} months
               </option>
             ))}
-          </select>
+          </FormSelect>
         </div>
         <div className="flex items-end gap-2 pb-1">
           <label className="flex items-center gap-2 text-xs font-medium">
@@ -165,7 +166,7 @@ export function AnalyticsFiltersBar({
           <Label htmlFor="analytics-status" className="text-[11px]">
             Member status
           </Label>
-          <select
+          <FormSelect
             id="analytics-status"
             className={selectClass}
             value={draft.status}
@@ -176,13 +177,13 @@ export function AnalyticsFiltersBar({
                 {o.label}
               </option>
             ))}
-          </select>
+          </FormSelect>
         </div>
         <div className="space-y-1">
           <Label htmlFor="analytics-fu-stage" className="text-[11px]">
             Follow-up stage
           </Label>
-          <select
+          <FormSelect
             id="analytics-fu-stage"
             className={selectClass}
             value={draft.followUpStage}
@@ -193,13 +194,13 @@ export function AnalyticsFiltersBar({
                 {o.label}
               </option>
             ))}
-          </select>
+          </FormSelect>
         </div>
         <div className="space-y-1">
           <Label htmlFor="analytics-out-stage" className="text-[11px]">
             Outreach stage
           </Label>
-          <select
+          <FormSelect
             id="analytics-out-stage"
             className={selectClass}
             value={draft.outreachStage}
@@ -210,13 +211,13 @@ export function AnalyticsFiltersBar({
                 {o.label}
               </option>
             ))}
-          </select>
+          </FormSelect>
         </div>
         <div className="space-y-1">
           <Label htmlFor="analytics-unit" className="text-[11px]">
             Department / unit
           </Label>
-          <select
+          <FormSelect
             id="analytics-unit"
             className={selectClass}
             value={draft.serviceUnitId}
@@ -228,14 +229,14 @@ export function AnalyticsFiltersBar({
                 {u.name}
               </option>
             ))}
-          </select>
+          </FormSelect>
         </div>
 
         <div className="space-y-1">
           <Label htmlFor="analytics-province" className="text-[11px]">
             Province
           </Label>
-          <select
+          <FormSelect
             id="analytics-province"
             className={selectClass}
             value={draft.provinceId}
@@ -249,13 +250,13 @@ export function AnalyticsFiltersBar({
                 {p.name}
               </option>
             ))}
-          </select>
+          </FormSelect>
         </div>
         <div className="space-y-1">
           <Label htmlFor="analytics-branch" className="text-[11px]">
             Cell / branch
           </Label>
-          <select
+          <FormSelect
             id="analytics-branch"
             className={selectClass}
             value={draft.branchId}
@@ -267,13 +268,13 @@ export function AnalyticsFiltersBar({
                 {b.name}
               </option>
             ))}
-          </select>
+          </FormSelect>
         </div>
         <div className="space-y-1">
           <Label htmlFor="analytics-service-type" className="text-[11px]">
             Service type
           </Label>
-          <select
+          <FormSelect
             id="analytics-service-type"
             className={selectClass}
             value={draft.serviceType}
@@ -283,13 +284,13 @@ export function AnalyticsFiltersBar({
             <option value="all">All services</option>
             <option value="sunday">Sunday</option>
             <option value="chop">CHOP</option>
-          </select>
+          </FormSelect>
         </div>
         <div className="space-y-1">
           <Label htmlFor="analytics-gender" className="text-[11px]">
             Gender
           </Label>
-          <select
+          <FormSelect
             id="analytics-gender"
             className={selectClass}
             value={draft.gender}
@@ -299,13 +300,13 @@ export function AnalyticsFiltersBar({
             <option value="MALE">Male</option>
             <option value="FEMALE">Female</option>
             <option value="UNKNOWN">Unknown</option>
-          </select>
+          </FormSelect>
         </div>
         <div className="space-y-1">
           <Label htmlFor="analytics-age" className="text-[11px]">
             Age band
           </Label>
-          <select
+          <FormSelect
             id="analytics-age"
             className={selectClass}
             value={draft.ageBand}
@@ -316,13 +317,13 @@ export function AnalyticsFiltersBar({
                 {o.label}
               </option>
             ))}
-          </select>
+          </FormSelect>
         </div>
         <div className="space-y-1">
           <Label htmlFor="analytics-family" className="text-[11px]">
             Family
           </Label>
-          <select
+          <FormSelect
             id="analytics-family"
             className={selectClass}
             value={draft.family}
@@ -331,7 +332,7 @@ export function AnalyticsFiltersBar({
             <option value="all">All members</option>
             <option value="with_family">With family</option>
             <option value="no_family">No family link</option>
-          </select>
+          </FormSelect>
         </div>
       </div>
     </AnalyticsPanel>

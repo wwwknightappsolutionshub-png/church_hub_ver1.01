@@ -9,6 +9,7 @@ import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface ParentLink {
   id: string;
@@ -74,7 +75,7 @@ export function YouthParentsPanel() {
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
-          <select
+          <FormSelect
             className="h-10 min-w-[200px] flex-1 rounded-md border border-input bg-background px-3 text-sm"
             value={parentId}
             onChange={(e) => setParentId(e.target.value)}
@@ -85,8 +86,8 @@ export function YouthParentsPanel() {
                 {m.firstName} {m.lastName}
               </option>
             ))}
-          </select>
-          <select
+          </FormSelect>
+          <FormSelect
             className="h-10 min-w-[200px] flex-1 rounded-md border border-input bg-background px-3 text-sm"
             value={childId}
             onChange={(e) => setChildId(e.target.value)}
@@ -97,7 +98,7 @@ export function YouthParentsPanel() {
                 {m.firstName} {m.lastName}
               </option>
             ))}
-          </select>
+          </FormSelect>
           <Button onClick={linkParent} disabled={linking}>
             {linking ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Link'}
           </Button>

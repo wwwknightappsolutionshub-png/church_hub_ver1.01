@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface BadgeDef {
   id: string;
@@ -96,7 +97,7 @@ export function YouthGamificationPanel() {
           <CardTitle className="text-base">Award points or badges</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
-          <select
+          <FormSelect
             className="h-10 min-w-[180px] flex-1 rounded-md border border-input bg-background px-3 text-sm"
             value={awardMemberId}
             onChange={(e) => setAwardMemberId(e.target.value)}
@@ -107,7 +108,7 @@ export function YouthGamificationPanel() {
                 {m.firstName} {m.lastName}
               </option>
             ))}
-          </select>
+          </FormSelect>
           <Input className="w-24" type="number" value={points} onChange={(e) => setPoints(e.target.value)} />
           <Button onClick={awardPoints}>Award points</Button>
         </CardContent>

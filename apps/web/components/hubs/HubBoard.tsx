@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Heart,
   Loader2,
@@ -16,9 +16,11 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateTimeField } from '@/components/ui/date-field';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
+import { isChurchAdminRole, isPastorRole } from '@/lib/session-role';
 import { useModuleHeroStickyTitle } from '@/components/layout/useStickyModuleTitle';
 import type { HubCardItem, HubKind, HubListResponse } from './hub-types';
 import { HUB_THEMES } from './hub-themes';
@@ -36,7 +38,9 @@ export function HubBoard({ type, title, description, hubPath }: HubBoardProps) {
   const headerRef = useModuleHeroStickyTitle<HTMLDivElement>(title);
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
-  const { isChurchStaff } = useModuleAccess();
+  const access = useModuleAccess();
+  const userRoles = access.userRoles ?? [];
+  const canModerateHub = isPastorRole(userRoles) || isChurchAdminRole(userRoles);
   const [showForm, setShowForm] = useState(false);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -47,7 +51,7 @@ export function HubBoard({ type, title, description, hubPath }: HubBoardProps) {
   const [prayerForm, setPrayerForm] = useState({
     subject: '',
     description: '',
-    displayName: '',
+    showOnBoard: false,
   });
   const [praiseForm, setPraiseForm] = useState({
     testimony: '',
@@ -76,6 +80,26 @@ export function HubBoard({ type, title, description, hubPath }: HubBoardProps) {
 
   const items = data?.pages.flatMap((p) => p.items) ?? [];
 
+  const pendingQuery = useQuery({
+    queryKey: ['hub', type, 'pastor-pending'],
+    enabled: type === 'prayer' && canModerateHub,
+    queryFn: async () => {
+      const { data: rows } = await api.get<
+        Array<{
+          id: string;
+          subject: string | null;
+          description: string;
+          status: string;
+          showOnBoard: boolean;
+          createdAt: string;
+        }>
+      >('/community-hub/pastor/prayer?status=PENDING');
+      return rows;
+    },
+  });
+  const pendingBoard = (pendingQuery.data ?? []).filter((row) => row.showOnBoard);
+  const pendingPrivate = (pendingQuery.data ?? []).filter((row) => !row.showOnBoard);
+
   useEffect(() => {
     const postId = searchParams.get('post');
     if (!postId || !items.length) return;
@@ -96,7 +120,9 @@ export function HubBoard({ type, title, description, hubPath }: HubBoardProps) {
     return () => observer.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['hub', type] });
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: ['hub', type] });
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,23 +132,27 @@ export function HubBoard({ type, title, description, hubPath }: HubBoardProps) {
         await api.post(endpoint, {
           subject: prayerForm.subject.trim(),
           description: prayerForm.description.trim(),
-          ...(prayerForm.displayName.trim()
-            ? { displayName: prayerForm.displayName.trim() }
-            : {}),
+          showOnBoard: prayerForm.showOnBoard,
         });
       } else {
         await api.post(endpoint, {
-          testimony: praiseForm.testimony.trim(),
-          description: praiseForm.description.trim(),
+          subject: praiseForm.testimony.trim(),
+          testimony: praiseForm.description.trim(),
           showDisplayName: praiseForm.showDisplayName,
           ...(praiseForm.displayName.trim()
             ? { displayName: praiseForm.displayName.trim() }
             : {}),
         });
       }
-      toast.success('Posted — visible to the community after quick review (~30 min)');
+      toast.success(
+        type === 'prayer'
+          ? prayerForm.showOnBoard
+            ? 'Sent to your pastor. It will appear on the prayer board after they confirm it. Your name stays hidden.'
+            : 'Sent privately for spiritual support. It will not appear on the prayer board, and your name stays hidden.'
+          : 'Posted — visible to the community after quick review (~30 min)',
+      );
       setShowForm(false);
-      setPrayerForm({ subject: '', description: '', displayName: '' });
+      setPrayerForm({ subject: '', description: '', showOnBoard: false });
       setPraiseForm({ testimony: '', description: '', displayName: '', showDisplayName: false });
       invalidate();
     } catch (err: unknown) {
@@ -202,7 +232,7 @@ export function HubBoard({ type, title, description, hubPath }: HubBoardProps) {
               onClick={() => setShowForm(true)}
             >
               <Plus className="mr-1.5 h-4 w-4" />
-              {type === 'prayer' ? 'Share prayer' : 'Share testimony'}
+              {type === 'prayer' ? 'Request Prayer Support' : 'Share testimony'}
             </Button>
           </div>
         </div>
@@ -210,19 +240,19 @@ export function HubBoard({ type, title, description, hubPath }: HubBoardProps) {
 
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 md:px-8">
         <div className="flex flex-wrap items-center gap-2">
-          <Input
-            type="datetime-local"
-            className="h-9 w-full min-w-0 flex-1 text-xs sm:max-w-[180px]"
+          <DateTimeField
+            className="min-w-0 flex-1 sm:max-w-xs"
             value={from}
-            onChange={(e) => setFrom(e.target.value)}
+            onChange={setFrom}
             aria-label="From date"
+            placeholder="From"
           />
-          <Input
-            type="datetime-local"
-            className="h-9 w-full min-w-0 flex-1 text-xs sm:max-w-[180px]"
+          <DateTimeField
+            className="min-w-0 flex-1 sm:max-w-xs"
             value={to}
-            onChange={(e) => setTo(e.target.value)}
+            onChange={setTo}
             aria-label="To date"
+            placeholder="To"
           />
           <Button variant="outline" size="sm" onClick={invalidate}>
             Refresh
@@ -239,11 +269,12 @@ export function HubBoard({ type, title, description, hubPath }: HubBoardProps) {
             />
             <div className="fixed inset-x-3 bottom-3 z-50 mx-auto max-h-[85dvh] max-w-lg overflow-y-auto rounded-2xl border bg-card p-5 shadow-2xl sm:inset-x-auto sm:bottom-auto sm:top-[10%]">
               <h2 className="font-heading text-lg font-bold">
-                New {type === 'prayer' ? 'prayer request' : 'testimony'}
+                {type === 'prayer' ? 'Request Prayer Support' : 'New testimony'}
               </h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                Everyone in your church can read approved posts. Names stay anonymous unless you opt
-                in.
+                {type === 'prayer'
+                  ? 'Your identity will not be revealed. A pastor receives this request for spiritual support.'
+                  : 'Everyone in your church can read approved posts. Names stay anonymous unless you opt in.'}
               </p>
               <form onSubmit={submit} className="mt-4 space-y-3">
                 {type === 'prayer' ? (
@@ -263,13 +294,21 @@ export function HubBoard({ type, title, description, hubPath }: HubBoardProps) {
                       }
                       required
                     />
-                    <Input
-                      placeholder="Display as (optional — leave blank for anonymous)"
-                      value={prayerForm.displayName}
-                      onChange={(e) =>
-                        setPrayerForm({ ...prayerForm, displayName: e.target.value })
-                      }
-                    />
+                    <label className="flex items-start gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        className="mt-1"
+                        checked={prayerForm.showOnBoard}
+                        onChange={(e) =>
+                          setPrayerForm({ ...prayerForm, showOnBoard: e.target.checked })
+                        }
+                      />
+                      <span>Do you want this to be displayed on the prayer board?</span>
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      If you tick this, the request is shown on the board only after a pastor
+                      confirms it. Your name is not shown.
+                    </p>
                   </>
                 ) : (
                   <>
@@ -308,11 +347,49 @@ export function HubBoard({ type, title, description, hubPath }: HubBoardProps) {
                   </>
                 )}
                 <Button type="submit" className="w-full" disabled={busy}>
-                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Post to community'}
+                  {busy ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : type === 'prayer' ? (
+                    'Request Prayer Support'
+                  ) : (
+                    'Post to community'
+                  )}
                 </Button>
               </form>
             </div>
           </>
+        )}
+
+        {canModerateHub && type === 'prayer' && (pendingBoard.length > 0 || pendingPrivate.length > 0) && (
+          <div className="space-y-3 rounded-2xl border bg-card p-4">
+            <h2 className="font-heading text-sm font-semibold">Pastor review</h2>
+            {pendingBoard.map((row) => (
+              <div key={row.id} className="rounded-xl border p-3">
+                <p className="text-sm font-medium">{row.subject}</p>
+                <p className="mt-1 line-clamp-3 text-xs text-muted-foreground">{row.description}</p>
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  Anonymous · waiting to go on the prayer board
+                </p>
+                <div className="mt-2 flex gap-2">
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => pastorAction(row.id, 'approve')}>
+                    Confirm for board
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => pastorAction(row.id, 'delete')}>
+                    Remove
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {pendingPrivate.map((row) => (
+              <div key={row.id} className="rounded-xl border border-dashed p-3">
+                <p className="text-sm font-medium">{row.subject}</p>
+                <p className="mt-1 line-clamp-3 text-xs text-muted-foreground">{row.description}</p>
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  Private spiritual support · not for the prayer board · identity hidden
+                </p>
+              </div>
+            ))}
+          </div>
         )}
 
         {isLoading && (
@@ -389,7 +466,7 @@ export function HubBoard({ type, title, description, hubPath }: HubBoardProps) {
                   </button>
                 </div>
               )}
-              {isChurchStaff && card.status === 'PENDING' && (
+              {canModerateHub && card.status === 'PENDING' && (
                 <div className="mt-2 flex gap-1" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                   <Button
                     size="sm"
@@ -415,7 +492,9 @@ export function HubBoard({ type, title, description, hubPath }: HubBoardProps) {
 
         {!isLoading && items.length === 0 && (
           <p className="py-12 text-center text-sm text-muted-foreground">
-            No posts yet — be the first to share with your church family.
+            {type === 'prayer'
+              ? 'No requests on the prayer board yet.'
+              : 'No posts yet — be the first to share with your church family.'}
           </p>
         )}
 

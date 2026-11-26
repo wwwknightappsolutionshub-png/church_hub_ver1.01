@@ -34,6 +34,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 function scopeLabel(scope: DevotionalChallengeDto['scope'], groupName?: string | null) {
   if (scope === 'INDIVIDUAL') {
@@ -285,7 +286,7 @@ export function DevotionalChallengesPanel() {
               <div className="grid gap-2 sm:grid-cols-2">
                 <div className="space-y-1">
                   <Label>Scope</Label>
-                  <select
+                  <FormSelect
                     className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                     value={scope}
                     onChange={(e) => setScope(e.target.value as typeof scope)}
@@ -293,7 +294,7 @@ export function DevotionalChallengesPanel() {
                     <option value="INDIVIDUAL">Personal</option>
                     <option value="GROUP">Group</option>
                     {ctx?.isLeader && <option value="CHURCH">Church-wide</option>}
-                  </select>
+                  </FormSelect>
                 </div>
                 <div className="space-y-1">
                   <Label>Goal (check-ins)</Label>
@@ -306,7 +307,7 @@ export function DevotionalChallengesPanel() {
                 </div>
               </div>
               {scope === 'GROUP' && (
-                <select
+                <FormSelect
                   className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={groupId}
                   onChange={(e) => setGroupId(e.target.value)}
@@ -317,7 +318,7 @@ export function DevotionalChallengesPanel() {
                       {g.name}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
               )}
               <Button
                 size="sm"

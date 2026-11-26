@@ -29,6 +29,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 type TabId = 'feed' | 'share' | 'mine';
 
@@ -315,7 +316,7 @@ export function YouthPrayerPanel() {
 
         {tab === 'feed' && (
           <div className="space-y-4">
-            <select
+            <FormSelect
               className="h-9 rounded-md border border-input bg-background px-3 text-sm"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
@@ -326,7 +327,7 @@ export function YouthPrayerPanel() {
                   {c.label}
                 </option>
               ))}
-            </select>
+            </FormSelect>
             {feed.isLoading && (
               <div className="flex justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -349,7 +350,7 @@ export function YouthPrayerPanel() {
             </CardHeader>
             <CardContent>
               <form onSubmit={submitRequest} className="space-y-3">
-                <select
+                <FormSelect
                   className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={form.category}
                   onChange={(e) => setForm({ ...form, category: e.target.value })}
@@ -359,7 +360,7 @@ export function YouthPrayerPanel() {
                       {c.label}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
                 <label className="flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"

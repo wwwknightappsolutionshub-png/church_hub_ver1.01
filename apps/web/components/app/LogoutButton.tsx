@@ -3,9 +3,7 @@
 import { useState } from 'react';
 import { LogOut } from 'lucide-react';
 import { toast } from 'sonner';
-import { clearAuthTokens } from '@/lib/api';
 import { signOutAndRedirect } from '@/lib/sign-out';
-import { clearSessionRoleBucket } from '@/lib/session-role';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -25,10 +23,7 @@ export function LogoutButton({ variant = 'sidebar', className, iconOnly }: Logou
     try {
       await signOutAndRedirect();
     } catch {
-      clearAuthTokens();
-      clearSessionRoleBucket();
-      toast.error('Sign-out had a problem — session cleared. Redirecting…');
-      window.location.replace('/login');
+      toast.error('Could not end the session on the server. Try again.');
     } finally {
       setBusy(false);
     }

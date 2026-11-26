@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 type DsarRow = {
   id: string;
@@ -130,7 +131,7 @@ export default function PlatformPrivacyPage() {
       {tab === 'dsar' ? (
         <>
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            <select
+            <FormSelect
               className="h-9 rounded-md border border-input bg-background px-3 text-sm"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -140,7 +141,7 @@ export default function PlatformPrivacyPage() {
               <option value="IN_PROGRESS">In progress</option>
               <option value="COMPLETED">Completed</option>
               <option value="REJECTED">Rejected</option>
-            </select>
+            </FormSelect>
             <Badge variant="outline">{rows.length} requests</Badge>
           </div>
 
@@ -303,7 +304,7 @@ export default function PlatformPrivacyPage() {
             <div className="flex flex-wrap items-end gap-3">
               <label className="block min-w-[16rem] flex-1 text-xs">
                 <span className="mb-1 block text-muted-foreground">Tenant</span>
-                <select
+                <FormSelect
                   className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={tenantId}
                   onChange={(e) => setTenantId(e.target.value)}
@@ -314,7 +315,7 @@ export default function PlatformPrivacyPage() {
                       {t.name} ({t.slug})
                     </option>
                   ))}
-                </select>
+                </FormSelect>
               </label>
               <Input
                 className="max-w-xs"

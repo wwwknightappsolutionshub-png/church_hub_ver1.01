@@ -198,7 +198,7 @@ export function DepartmentLayout({
                 Department workspace
               </p>
               <h2 className="font-display truncate text-xl font-semibold tracking-tight">{title}</h2>
-              <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>
+              {subtitle ? <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p> : null}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">

@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface HelpResponse {
   id: string;
@@ -102,7 +103,7 @@ export function YouthHelpPanel() {
         </CardHeader>
         <CardContent>
           <form onSubmit={submitAnonymous} className="space-y-3">
-            <select
+            <FormSelect
               className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={submitForm.category}
               onChange={(e) => setSubmitForm({ ...submitForm, category: e.target.value })}
@@ -112,7 +113,7 @@ export function YouthHelpPanel() {
                   {c.label}
                 </option>
               ))}
-            </select>
+            </FormSelect>
             <Input
               placeholder="Display alias (optional)"
               value={submitForm.alias}
@@ -139,7 +140,7 @@ export function YouthHelpPanel() {
 
       <div className="space-y-4">
         <div className="flex flex-wrap gap-2">
-          <select
+          <FormSelect
             className="h-9 rounded-md border border-input bg-background px-3 text-sm"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -150,7 +151,7 @@ export function YouthHelpPanel() {
                 {v}
               </option>
             ))}
-          </select>
+          </FormSelect>
         </div>
 
         {requests.isLoading ? (

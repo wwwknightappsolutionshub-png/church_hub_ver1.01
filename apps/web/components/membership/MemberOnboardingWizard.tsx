@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface FamilyOption {
   id: string;
@@ -367,7 +368,7 @@ export function MemberOnboardingWizard({
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-medium">Link to family household</label>
-                <select
+                <FormSelect
                   className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={form.familyId}
                   onChange={(e) => setForm({ ...form, familyId: e.target.value })}
@@ -378,7 +379,7 @@ export function MemberOnboardingWizard({
                       {f.name}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
               </div>
               <textarea
                 className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"

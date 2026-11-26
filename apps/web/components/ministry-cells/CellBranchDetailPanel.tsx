@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 type WorkspaceSection = 'overview' | 'members' | 'weekly' | 'connect' | 'analytics';
 
@@ -186,7 +187,7 @@ export function CellBranchDetailPanel({
           <div className="flex shrink-0 flex-col gap-2 sm:items-end">
             {branchOptions.length > 1 && onSwitchBranch && (
               <div className="relative w-full sm:w-48">
-                <select
+                <FormSelect
                   className="h-9 w-full appearance-none rounded-lg border border-white/20 bg-white/10 pl-3 pr-8 text-sm text-white"
                   value={selectedBranchId}
                   onChange={(e) => onSwitchBranch(e.target.value)}
@@ -197,7 +198,7 @@ export function CellBranchDetailPanel({
                       {b.name}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
                 <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               </div>
             )}
@@ -345,7 +346,7 @@ export function CellBranchDetailPanel({
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap items-center gap-2">
-                  <select
+                  <FormSelect
                     className="h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm sm:max-w-xs"
                     value={reportFormId}
                     onChange={(e) => onReportFormId(e.target.value)}
@@ -357,7 +358,7 @@ export function CellBranchDetailPanel({
                         {f.name}
                       </option>
                     ))}
-                  </select>
+                  </FormSelect>
                   <Button
                     type="button"
                     className="h-10"

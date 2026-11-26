@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { FormSelect } from '@/components/ui/form-select';
 
 type SubmissionRow = {
   id: string;
@@ -92,7 +93,7 @@ export function PlatformMarketingSubmissionsPanel({ canWrite }: { canWrite: bool
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <select
+        <FormSelect
           className="h-9 rounded-md border border-input bg-background px-3 text-sm"
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
@@ -100,8 +101,8 @@ export function PlatformMarketingSubmissionsPanel({ canWrite }: { canWrite: bool
           <option value="">All types</option>
           <option value="CONTACT">Contact</option>
           <option value="FEEDBACK">Feedback</option>
-        </select>
-        <select
+        </FormSelect>
+        <FormSelect
           className="h-9 rounded-md border border-input bg-background px-3 text-sm"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
@@ -110,7 +111,7 @@ export function PlatformMarketingSubmissionsPanel({ canWrite }: { canWrite: bool
           <option value="NEW">New</option>
           <option value="READ">Read</option>
           <option value="ARCHIVED">Archived</option>
-        </select>
+        </FormSelect>
         <Badge variant="outline">{rows.length} submissions</Badge>
         {newCount > 0 ? <Badge>{newCount} new</Badge> : null}
       </div>

@@ -54,6 +54,7 @@ import {
 } from '@/components/layout/EnterpriseModuleShell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface FollowUpStats {
   assigned?: number;
@@ -418,7 +419,7 @@ function FollowUpPageContent() {
                     <div className="space-y-2.5">
                       <label className="block space-y-1">
                         <span className="text-xs font-medium text-foreground">Assignee</span>
-                        <select
+                        <FormSelect
                           className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm text-foreground"
                           value={assigneeFilter}
                           onChange={(e) => setAssigneeFilter(e.target.value)}
@@ -430,7 +431,7 @@ function FollowUpPageContent() {
                               {a.firstName} {a.lastName}
                             </option>
                           ))}
-                        </select>
+                        </FormSelect>
                       </label>
                       <div className="space-y-1">
                         <span className="text-xs font-medium text-foreground">Captured date</span>

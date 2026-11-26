@@ -12,6 +12,7 @@ import type { CellProvinceRow } from '@/components/ministry-cells/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { FormSelect } from '@/components/ui/form-select';
 
 type LeaderCandidate = { id: string; name: string; email: string; phone?: string | null };
 
@@ -134,7 +135,7 @@ export function ProvinceEditPanel({
           </div>
           <div className="space-y-1">
             <Label htmlFor="edit-province-leader">Provincial leader</Label>
-            <select
+            <FormSelect
               id="edit-province-leader"
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={leaderUserId}
@@ -146,7 +147,7 @@ export function ProvinceEditPanel({
                   {c.name} ({c.email})
                 </option>
               ))}
-            </select>
+            </FormSelect>
           </div>
           <div className="space-y-1">
             <Label htmlFor="edit-leader-phone">Leader phone</Label>

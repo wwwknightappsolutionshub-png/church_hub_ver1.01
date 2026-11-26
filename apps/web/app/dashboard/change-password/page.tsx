@@ -5,9 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Lock } from 'lucide-react';
 import { toast } from 'sonner';
-import { api } from '@/lib/api';
+import { api, clearAuthTokens } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-errors';
-import { applyAuthSessionFromApi } from '@/lib/apply-auth-session';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,10 +37,10 @@ export default function ChangePasswordPage() {
         currentPassword: form.currentPassword,
         newPassword: form.newPassword,
       });
-      toast.success('Password updated — welcome to Church_Hub');
-      await queryClient.invalidateQueries({ queryKey: ['auth-me'] });
-      const path = await applyAuthSessionFromApi();
-      router.replace(path);
+      clearAuthTokens();
+      queryClient.clear();
+      toast.success('Password updated. Sign in again. Other devices have been signed out.');
+      router.replace('/login');
     } catch (err) {
       toast.error(apiErrorMessage(err, 'Could not update password'));
     } finally {

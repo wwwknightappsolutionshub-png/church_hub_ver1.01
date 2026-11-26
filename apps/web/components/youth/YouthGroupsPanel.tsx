@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface YouthGroup {
   id: string;
@@ -184,7 +185,7 @@ export function YouthGroupsPanel() {
       {canManage && addMemberGroupId && (
         <Card className="border-primary/30">
           <CardContent className="flex flex-wrap gap-2 pt-6">
-            <select
+            <FormSelect
               className="h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm"
               value={addMemberId}
               onChange={(e) => setAddMemberId(e.target.value)}
@@ -195,7 +196,7 @@ export function YouthGroupsPanel() {
                   {m.firstName} {m.lastName}
                 </option>
               ))}
-            </select>
+            </FormSelect>
             <Button size="sm" onClick={addMember}>
               Add to group
             </Button>

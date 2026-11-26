@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 type Tab = 'support' | 'broadcasts';
 
@@ -278,7 +279,7 @@ export default function PlatformInboxInner() {
                 <CardTitle className="text-base">Start support thread</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <select
+                <FormSelect
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={compose.churchId}
                   onChange={(e) => setCompose({ ...compose, churchId: e.target.value })}
@@ -291,7 +292,7 @@ export default function PlatformInboxInner() {
                         {c.name}
                       </option>
                     ))}
-                </select>
+                </FormSelect>
                 <Input
                   placeholder="Subject"
                   value={compose.subject}
@@ -449,7 +450,7 @@ export default function PlatformInboxInner() {
                 />
                 {broadcastForm.kind === 'RELEASE' ? (
                   <div className="grid gap-2 sm:grid-cols-2">
-                    <select
+                    <FormSelect
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                       value={broadcastForm.category}
                       onChange={(e) =>
@@ -461,7 +462,7 @@ export default function PlatformInboxInner() {
                       <option value="SECURITY">Security</option>
                       <option value="IMPROVEMENT">Improvement</option>
                       <option value="MAINTENANCE">Maintenance</option>
-                    </select>
+                    </FormSelect>
                     <Input
                       placeholder="Version (e.g. 1.4.0)"
                       value={broadcastForm.version}

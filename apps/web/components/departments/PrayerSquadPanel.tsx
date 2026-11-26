@@ -24,9 +24,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { DateTimeField } from '@/components/ui/date-field';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 type MemberRef = { id: string; firstName: string; lastName: string };
 
@@ -415,7 +417,7 @@ export function PrayerSquadPanel({
               </CardTitle>
             </CardHeader>
             <CardContent className="grid gap-2 sm:grid-cols-2">
-              <select
+              <FormSelect
                 className="h-10 rounded-md border bg-background px-3 text-sm"
                 value={assignmentForm.burdenType}
                 onChange={(e) => setAssignmentForm({ ...assignmentForm, burdenType: e.target.value })}
@@ -425,8 +427,8 @@ export function PrayerSquadPanel({
                     {b.label}
                   </option>
                 ))}
-              </select>
-              <select
+              </FormSelect>
+              <FormSelect
                 className="h-10 rounded-md border bg-background px-3 text-sm"
                 value={assignmentForm.confidentiality}
                 onChange={(e) => setAssignmentForm({ ...assignmentForm, confidentiality: e.target.value })}
@@ -436,7 +438,7 @@ export function PrayerSquadPanel({
                     {c.label}
                   </option>
                 ))}
-              </select>
+              </FormSelect>
               <Input
                 placeholder="Title"
                 value={assignmentForm.title}
@@ -450,7 +452,7 @@ export function PrayerSquadPanel({
                 rows={3}
                 className="sm:col-span-2"
               />
-              <select
+              <FormSelect
                 className="h-10 rounded-md border bg-background px-3 text-sm"
                 value={assignmentForm.assignedMemberId}
                 onChange={(e) => setAssignmentForm({ ...assignmentForm, assignedMemberId: e.target.value })}
@@ -461,8 +463,8 @@ export function PrayerSquadPanel({
                     {formatMemberName(m.member)}
                   </option>
                 ))}
-              </select>
-              <select
+              </FormSelect>
+              <FormSelect
                 className="h-10 rounded-md border bg-background px-3 text-sm"
                 value={assignmentForm.relatedMemberId}
                 onChange={(e) => setAssignmentForm({ ...assignmentForm, relatedMemberId: e.target.value })}
@@ -473,7 +475,7 @@ export function PrayerSquadPanel({
                     {formatMemberName(m.member)}
                   </option>
                 ))}
-              </select>
+              </FormSelect>
               <Button type="button" onClick={saveAssignment} disabled={busy} className="sm:col-span-2">
                 Save to board
               </Button>
@@ -589,7 +591,7 @@ export function PrayerSquadPanel({
                 <CardTitle className="text-sm">Schedule session</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-2 sm:grid-cols-2">
-                <select
+                <FormSelect
                   className="h-10 rounded-md border bg-background px-3 text-sm"
                   value={scheduleForm.eventType}
                   onChange={(e) => setScheduleForm({ ...scheduleForm, eventType: e.target.value })}
@@ -599,10 +601,10 @@ export function PrayerSquadPanel({
                       {t.label}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
                 <Input placeholder="Title (optional)" value={scheduleForm.title} onChange={(e) => setScheduleForm({ ...scheduleForm, title: e.target.value })} />
-                <Input type="datetime-local" value={scheduleForm.startsAt} onChange={(e) => setScheduleForm({ ...scheduleForm, startsAt: e.target.value })} />
-                <Input type="datetime-local" placeholder="End (optional)" value={scheduleForm.endsAt} onChange={(e) => setScheduleForm({ ...scheduleForm, endsAt: e.target.value })} />
+                <DateTimeField value={scheduleForm.startsAt} onChange={(startsAt) => setScheduleForm({ ...scheduleForm, startsAt })} aria-label="Starts" />
+                <DateTimeField value={scheduleForm.endsAt} onChange={(endsAt) => setScheduleForm({ ...scheduleForm, endsAt })} placeholder="End (optional)" aria-label="Ends" />
                 <Textarea
                   placeholder="Notes"
                   value={scheduleForm.notes}
@@ -621,7 +623,7 @@ export function PrayerSquadPanel({
                 <CardTitle className="text-sm">Attendance tracking</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <select
+                <FormSelect
                   className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                   value={attendanceSessionId}
                   onChange={(e) => setAttendanceSessionId(e.target.value)}
@@ -632,7 +634,7 @@ export function PrayerSquadPanel({
                       {SCHEDULE_TYPES.find((t) => t.value === s.eventType)?.label} · {new Date(s.startsAt).toLocaleString()}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
                 {members.length > 0 && (
                   <MemberMultiSelect members={members} selected={attendanceMemberIds} onChange={setAttendanceMemberIds} />
                 )}
@@ -715,7 +717,7 @@ export function PrayerSquadPanel({
               </CardTitle>
             </CardHeader>
             <CardContent className="grid gap-2">
-              <select
+              <FormSelect
                 className="h-10 rounded-md border bg-background px-3 text-sm"
                 value={intakeForm.intakeCategory}
                 onChange={(e) => setIntakeForm({ ...intakeForm, intakeCategory: e.target.value })}
@@ -725,8 +727,8 @@ export function PrayerSquadPanel({
                     {c.label}
                   </option>
                 ))}
-              </select>
-              <select
+              </FormSelect>
+              <FormSelect
                 className="h-10 rounded-md border bg-background px-3 text-sm"
                 value={intakeForm.confidentiality}
                 onChange={(e) => setIntakeForm({ ...intakeForm, confidentiality: e.target.value })}
@@ -736,7 +738,7 @@ export function PrayerSquadPanel({
                     {c.label}
                   </option>
                 ))}
-              </select>
+              </FormSelect>
               <Textarea
                 placeholder="Prayer need (share only what is appropriate)"
                 value={intakeForm.content}
@@ -891,7 +893,7 @@ export function PrayerSquadPanel({
                   <CardTitle className="text-sm">Prayer notes (leaders)</CardTitle>
                 </CardHeader>
                 <CardContent className="grid gap-2">
-                  <select
+                  <FormSelect
                     className="h-10 rounded-md border bg-background px-3 text-sm"
                     value={progressNote.prayerItemId}
                     onChange={(e) => setProgressNote({ ...progressNote, prayerItemId: e.target.value })}
@@ -902,8 +904,8 @@ export function PrayerSquadPanel({
                         {i.content.slice(0, 60)}…
                       </option>
                     ))}
-                  </select>
-                  <select
+                  </FormSelect>
+                  <FormSelect
                     className="h-10 rounded-md border bg-background px-3 text-sm"
                     value={progressNote.statusAfter}
                     onChange={(e) => setProgressNote({ ...progressNote, statusAfter: e.target.value })}
@@ -913,7 +915,7 @@ export function PrayerSquadPanel({
                         Status after note: {s.label}
                       </option>
                     ))}
-                  </select>
+                  </FormSelect>
                   <Textarea
                     placeholder="Prayer note for pastors / intercessors"
                     value={progressNote.body}

@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { UserAvatar } from '@/components/app/UserAvatar';
 import { ModuleGate } from '@/components/app/ModuleGate';
 import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
+import { FormSelect } from '@/components/ui/form-select';
 import {
   EnterpriseContent,
   EnterpriseHero,
@@ -370,7 +371,7 @@ function ProfilePageContent() {
                 Submit a request for the church community. After admin and pastor approval, it appears
                 anonymously on the landing page and Kingdom Konnect Job Board.
               </p>
-              <select
+              <FormSelect
                 className="h-10 w-full rounded-md border px-3 text-sm"
                 value={supportForm.requestType}
                 onChange={(e) =>
@@ -382,7 +383,7 @@ function ProfilePageContent() {
               >
                 <option value="JOB_SEARCH">Job search</option>
                 <option value="BUSINESS_SEARCH">Business search / opportunity</option>
-              </select>
+              </FormSelect>
               <Input
                 placeholder="Title *"
                 value={supportForm.title}
@@ -453,7 +454,7 @@ function ProfilePageContent() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <select
+              <FormSelect
                 className="h-10 w-full rounded-md border px-3 text-sm"
                 value={msgForm.recipientId}
                 onChange={(e) => setMsgForm({ ...msgForm, recipientId: e.target.value })}
@@ -473,7 +474,7 @@ function ProfilePageContent() {
                     </option>
                   ))}
                 </optgroup>
-              </select>
+              </FormSelect>
               <Input
                 placeholder="Subject"
                 value={msgForm.subject}

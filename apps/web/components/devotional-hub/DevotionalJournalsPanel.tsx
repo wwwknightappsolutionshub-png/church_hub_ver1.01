@@ -35,6 +35,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 const MOOD_TAGS = [
   'grateful',
@@ -388,7 +389,7 @@ export function DevotionalJournalsPanel() {
       {mode === 'team' && (
         <div>
           <Label>Devotional group</Label>
-          <select
+          <FormSelect
             className="mt-1 h-10 w-full max-w-md rounded-md border border-input bg-background px-3 text-sm"
             value={groupId}
             onChange={(e) => {
@@ -402,7 +403,7 @@ export function DevotionalJournalsPanel() {
                 {g.name}
               </option>
             ))}
-          </select>
+          </FormSelect>
           <p className="mt-1 text-xs text-muted-foreground">
             Team journals are automatically linked to your selected group.
           </p>

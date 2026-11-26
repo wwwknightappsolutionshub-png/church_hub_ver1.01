@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { YouthEventSocialProof } from './YouthEventSocialProof';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface MemberOption {
   id: string;
@@ -189,7 +190,7 @@ export function YouthEventDetailPanel({ eventId }: { eventId: string }) {
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
-          <select
+          <FormSelect
             className="h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm"
             value={checkInMember}
             onChange={(e) => setCheckInMember(e.target.value)}
@@ -200,7 +201,7 @@ export function YouthEventDetailPanel({ eventId }: { eventId: string }) {
                 {m.firstName} {m.lastName}
               </option>
             ))}
-          </select>
+          </FormSelect>
           <Button type="button" onClick={checkIn}>
             Check in (+25 pts)
           </Button>

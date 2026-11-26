@@ -5516,6 +5516,8 @@ model CommunityHubPost {
   description     String
   displayName     String?
   showDisplayName Boolean            @default(false)
+  /// Prayer only: member opted in to the public board (still requires pastor approval).
+  showOnBoard     Boolean            @default(true)
   status          CommunityHubStatus @default(PENDING)
   approvedById    String?
   approvedAt      DateTime?

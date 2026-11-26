@@ -23,6 +23,7 @@ import {
   phoneFormatError,
 } from '@/lib/contact-validation';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 const CONGREGANT_STEPS = [
   {
@@ -504,7 +505,7 @@ export function CongregantEditorForm({
               </label>
               <label className="sm:col-span-2">
                 <FieldLabel>Gender</FieldLabel>
-                <select
+                <FormSelect
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={form.gender ?? 'UNKNOWN'}
                   onChange={(e) => setField('gender', e.target.value as FormState['gender'])}
@@ -512,7 +513,7 @@ export function CongregantEditorForm({
                   <option value="UNKNOWN">—</option>
                   <option value="MALE">Male</option>
                   <option value="FEMALE">Female</option>
-                </select>
+                </FormSelect>
               </label>
             </div>
           </WizardSection>
@@ -527,7 +528,7 @@ export function CongregantEditorForm({
             <div className="grid gap-3 sm:grid-cols-6">
               <label className="sm:col-span-1">
                 <FieldLabel>Birth Month</FieldLabel>
-                <select
+                <FormSelect
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={form.birthMonth}
                   onChange={(e) => setField('birthMonth', e.target.value)}
@@ -541,11 +542,11 @@ export function CongregantEditorForm({
                       </option>
                     );
                   })}
-                </select>
+                </FormSelect>
               </label>
               <label className="sm:col-span-1">
                 <FieldLabel>Day</FieldLabel>
-                <select
+                <FormSelect
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={form.birthDay}
                   onChange={(e) => setField('birthDay', e.target.value)}
@@ -559,7 +560,7 @@ export function CongregantEditorForm({
                       </option>
                     );
                   })}
-                </select>
+                </FormSelect>
               </label>
               <label className="sm:col-span-1">
                 <FieldLabel>Year</FieldLabel>
@@ -580,7 +581,7 @@ export function CongregantEditorForm({
               </label>
               <label className="sm:col-span-3">
                 <FieldLabel>Family</FieldLabel>
-                <select
+                <FormSelect
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={form.familyChoice}
                   onChange={(e) => setField('familyChoice', e.target.value)}
@@ -593,11 +594,11 @@ export function CongregantEditorForm({
                       {f.name}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
               </label>
               <label className="sm:col-span-3">
                 <FieldLabel>Family Role</FieldLabel>
-                <select
+                <FormSelect
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={form.familyRoleId ?? ''}
                   disabled={form.familyChoice === '0'}
@@ -609,7 +610,7 @@ export function CongregantEditorForm({
                       {r.name}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
               </label>
             </div>
           </WizardSection>
@@ -765,7 +766,7 @@ export function CongregantEditorForm({
                     No cell groups are configured for this church yet.
                   </p>
                 ) : (
-                  <select
+                  <FormSelect
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-70"
                     value={form.cellBranchId}
                     onChange={(e) => setField('cellBranchId', e.target.value)}
@@ -777,7 +778,7 @@ export function CongregantEditorForm({
                         {branch.name}
                       </option>
                     ))}
-                  </select>
+                  </FormSelect>
                 )}
               </div>
             </div>
@@ -790,7 +791,7 @@ export function CongregantEditorForm({
               <div className="grid gap-3 sm:grid-cols-3">
                 <label>
                   <FieldLabel>Classification</FieldLabel>
-                  <select
+                  <FormSelect
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                     value={form.classificationId ?? ''}
                     onChange={(e) => setField('classificationId', e.target.value)}
@@ -801,7 +802,7 @@ export function CongregantEditorForm({
                         {c.name}
                       </option>
                     ))}
-                  </select>
+                  </FormSelect>
                 </label>
                 <label>
                   <FieldLabel>Friend Date</FieldLabel>

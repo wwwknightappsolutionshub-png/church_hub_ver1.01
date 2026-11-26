@@ -39,6 +39,7 @@ export class CommunityHubService {
   ) {}
 
   private async processAutoApprovals(churchId: string, type: CommunityHubType) {
+    if (type === 'PRAYER') return;
     const now = new Date();
     await this.prisma.communityHubPost.updateMany({
       where: {
@@ -122,6 +123,7 @@ export class CommunityHubService {
       churchId,
       type,
       status: 'APPROVED',
+      ...(type === 'PRAYER' ? { showOnBoard: true } : {}),
       ...(createdAt ? { createdAt } : {}),
     };
   }
@@ -305,7 +307,7 @@ export class CommunityHubService {
     churchId: string,
     userId: string,
     memberId: string | null,
-    data: { subject: string; description: string; displayName?: string },
+    data: { subject: string; description: string; showOnBoard?: boolean },
   ) {
     const autoApproveAt = new Date(Date.now() + AUTO_APPROVE_MS);
     const post = await this.prisma.communityHubPost.create({
@@ -316,8 +318,9 @@ export class CommunityHubService {
         authorMemberId: memberId,
         subject: data.subject.trim(),
         description: data.description.trim(),
-        displayName: data.displayName?.trim() || null,
+        displayName: null,
         showDisplayName: false,
+        showOnBoard: data.showOnBoard === true,
         autoApproveAt,
       },
     });
@@ -330,6 +333,7 @@ export class CommunityHubService {
     userId: string,
     memberId: string | null,
     data: {
+      subject: string;
       testimony: string;
       description: string;
       displayName?: string;
@@ -343,6 +347,7 @@ export class CommunityHubService {
         type: 'PRAISE',
         authorUserId: userId,
         authorMemberId: memberId,
+        subject: data.subject.trim(),
         testimony: data.testimony.trim(),
         description: data.description.trim(),
         displayName: data.displayName?.trim() || null,
@@ -350,7 +355,7 @@ export class CommunityHubService {
         autoApproveAt,
       },
     });
-    await this.notifyPastors(churchId, 'PRAISE', post.id, data.testimony);
+    await this.notifyPastors(churchId, 'PRAISE', post.id, data.subject);
     return post;
   }
 
@@ -405,6 +410,15 @@ export class CommunityHubService {
   }
 
   async approveNow(churchId: string, id: string, pastorUserId: string) {
+    const post = await this.prisma.communityHubPost.findFirst({
+      where: { id, churchId },
+    });
+    if (!post) throw new NotFoundException('Post not found');
+    if (post.type === 'PRAYER' && !post.showOnBoard) {
+      throw new ForbiddenException(
+        'This request is private and is not published on the prayer board',
+      );
+    }
     return this.updatePost(churchId, id, { status: 'APPROVED' }, pastorUserId);
   }
 

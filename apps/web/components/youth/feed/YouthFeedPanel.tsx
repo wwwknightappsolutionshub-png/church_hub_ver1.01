@@ -12,6 +12,7 @@ import { useYouthContext } from '@/components/youth/YouthProvider';
 import { YouthFeedList } from './YouthFeedList';
 import { YouthFeedModeration } from './YouthFeedModeration';
 import { YouthPostComposer } from './YouthPostComposer';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface YouthGroup {
   id: string;
@@ -65,7 +66,7 @@ export function YouthFeedPanel() {
             <TrendingUp className="mr-1 h-3.5 w-3.5" />
             Top
           </Button>
-          <select
+          <FormSelect
             value={youthGroupId}
             onChange={(e) => setYouthGroupId(e.target.value)}
             className="h-9 rounded-md border border-input bg-background px-3 text-sm"
@@ -76,7 +77,7 @@ export function YouthFeedPanel() {
                 {g.name}
               </option>
             ))}
-          </select>
+          </FormSelect>
           {canModerate && (
             <Button
               type="button"

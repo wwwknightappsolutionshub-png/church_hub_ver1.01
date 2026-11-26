@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 type MemberMode = 'roster' | 'new' | 'import';
 
@@ -516,7 +517,7 @@ export function CreateServiceUnitWizard({
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <div className="min-w-0 flex-1 space-y-2">
                 <Label htmlFor="su-roster">Select church member</Label>
-                <select
+                <FormSelect
                   id="su-roster"
                   className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={rosterMemberId}
@@ -529,7 +530,7 @@ export function CreateServiceUnitWizard({
                       {m.email ? ` (${m.email})` : ''}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
               </div>
               <Button type="button" onClick={addFromRoster} className="gap-1">
                 <Plus className="h-4 w-4" />

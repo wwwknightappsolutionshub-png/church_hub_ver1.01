@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 export const OUTREACH_JOURNEY_STAGES = [
   'CAPTURED',
@@ -123,7 +124,7 @@ export function OutreachAdvancedFiltersPanel({
         <Label htmlFor="outreach-stage-filter" className="sr-only">
           Journey / stage
         </Label>
-        <select
+        <FormSelect
           id="outreach-stage-filter"
           aria-label="Journey / stage"
           className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
@@ -136,11 +137,11 @@ export function OutreachAdvancedFiltersPanel({
               {OUTREACH_STAGE_LABELS[s] ?? s}
             </option>
           ))}
-        </select>
+        </FormSelect>
         <Label htmlFor="outreach-month-filter" className="sr-only">
           Month
         </Label>
-        <select
+        <FormSelect
           id="outreach-month-filter"
           aria-label="Month"
           className="h-7 rounded-md border border-input bg-background px-2 text-[11px]"
@@ -153,7 +154,7 @@ export function OutreachAdvancedFiltersPanel({
               {m.label}
             </option>
           ))}
-        </select>
+        </FormSelect>
         <Button
           type="button"
           size="sm"

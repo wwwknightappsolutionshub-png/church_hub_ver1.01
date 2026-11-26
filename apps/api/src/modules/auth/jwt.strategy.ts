@@ -25,6 +25,21 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
+    if (!payload.sid) {
+      throw new UnauthorizedException('Session expired');
+    }
+    const session = await this.prisma.refreshToken.findUnique({
+      where: { id: payload.sid },
+      select: { userId: true, revokedAt: true, expiresAt: true },
+    });
+    if (
+      !session ||
+      session.userId !== payload.sub ||
+      session.revokedAt ||
+      session.expiresAt.getTime() <= Date.now()
+    ) {
+      throw new UnauthorizedException('Session ended');
+    }
     const active = await this.isUserActive(payload.sub);
     if (!active) {
       throw new UnauthorizedException('Account is inactive');
@@ -33,6 +48,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       userId: payload.sub,
       churchId: payload.churchId,
       email: payload.email,
+      sid: payload.sid,
     };
   }
 

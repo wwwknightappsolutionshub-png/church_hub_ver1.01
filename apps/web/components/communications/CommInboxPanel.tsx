@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface InAppMessage {
   id: string;
@@ -92,7 +93,7 @@ export function CommInboxPanel() {
         <Card>
           <CardContent className="grid gap-3 pt-6">
             <form onSubmit={send} className="space-y-3">
-              <select
+              <FormSelect
                 className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 value={form.recipientId}
                 onChange={(e) => setForm({ ...form, recipientId: e.target.value })}
@@ -104,7 +105,7 @@ export function CommInboxPanel() {
                     {r.firstName} {r.lastName} ({r.email})
                   </option>
                 ))}
-              </select>
+              </FormSelect>
               <Input placeholder="Subject (optional)" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} />
               <textarea
                 className="min-h-[100px] w-full rounded-md border border-input px-3 py-2 text-sm"

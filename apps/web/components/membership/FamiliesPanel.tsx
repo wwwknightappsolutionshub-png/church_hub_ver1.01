@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FamilyDetailDialog } from '@/components/membership/FamilyDetailDialog';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface FamilyRow {
   id: string;
@@ -176,7 +177,7 @@ export function FamiliesPanel({
             data-testid="families-search"
           />
         </div>
-        <select
+        <FormSelect
           className="h-10 rounded-md border border-input bg-background px-3 text-sm sm:min-w-[220px]"
           value={serviceUnitId}
           onChange={(e) => setServiceUnitId(e.target.value)}
@@ -188,7 +189,7 @@ export function FamiliesPanel({
               {u.name}
             </option>
           ))}
-        </select>
+        </FormSelect>
       </div>
 
       {isLoading ? (

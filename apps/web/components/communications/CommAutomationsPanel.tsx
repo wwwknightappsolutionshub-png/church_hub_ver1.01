@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface ServiceUnit {
   id: string;
@@ -121,7 +122,7 @@ export function CommAutomationsPanel() {
         </CardHeader>
         <CardContent>
           <form onSubmit={deptBroadcast} className="space-y-3">
-            <select
+            <FormSelect
               className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={deptForm.serviceUnitId}
               onChange={(e) => setDeptForm({ ...deptForm, serviceUnitId: e.target.value })}
@@ -133,7 +134,7 @@ export function CommAutomationsPanel() {
                   {u.name}
                 </option>
               ))}
-            </select>
+            </FormSelect>
             <Input
               placeholder="Title"
               value={deptForm.title}

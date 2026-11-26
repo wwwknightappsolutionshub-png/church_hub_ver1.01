@@ -44,6 +44,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 type AiToolSection = 'outline' | 'prayer' | 'scripture' | 'pdf';
 
@@ -404,7 +405,7 @@ export function DevotionalAiToolsPanel({ activePlanId }: DevotionalAiToolsPanelP
             {sourceType === 'BIBLE_BOOK' && (
               <div>
                 <Label>Book of the Bible</Label>
-                <select
+                <FormSelect
                   className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={bibleBook}
                   onChange={(e) => setBibleBook(e.target.value)}
@@ -414,7 +415,7 @@ export function DevotionalAiToolsPanel({ activePlanId }: DevotionalAiToolsPanelP
                       {b}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
               </div>
             )}
             {sourceType === 'TOPICAL_BOOK' && (
@@ -447,7 +448,7 @@ export function DevotionalAiToolsPanel({ activePlanId }: DevotionalAiToolsPanelP
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <Label>Tone</Label>
-                <select
+                <FormSelect
                   className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={tone}
                   onChange={(e) => setTone(e.target.value as DevotionalPlanTone)}
@@ -457,7 +458,7 @@ export function DevotionalAiToolsPanel({ activePlanId }: DevotionalAiToolsPanelP
                       {t.label}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
               </div>
               <div>
                 <Label>Duration (days)</Label>

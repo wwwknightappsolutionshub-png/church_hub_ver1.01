@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 type UnitRole = 'MEMBER' | 'UNIT_ADMIN' | 'ASSISTANT' | 'SECRETARY';
 type AddMode = 'existing' | 'new' | 'import';
@@ -313,7 +314,7 @@ export function ServiceUnitMembersPanel({
 
             {mode === 'existing' ? (
               <form onSubmit={addExistingMember} className="space-y-3">
-                <select
+                <FormSelect
                   className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={existingMemberId}
                   onChange={(e) => setExistingMemberId(e.target.value)}
@@ -326,7 +327,7 @@ export function ServiceUnitMembersPanel({
                       {m.email ? ` (${m.email})` : ''}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
                 <RoleFields
                   unitRole={existingRole}
                   designation={existingDesignation}
@@ -613,14 +614,14 @@ function RoleFields({
 }) {
   return (
     <div className={`grid gap-3 md:grid-cols-2 ${className ?? ''}`}>
-      <select
+      <FormSelect
         className="h-10 rounded-md border border-input bg-background px-3 text-sm"
         value={unitRole === 'ASSISTANT' || unitRole === 'SECRETARY' ? 'MEMBER' : unitRole}
         onChange={(e) => onRoleChange(e.target.value as UnitRole)}
       >
         <option value="MEMBER">Unit member</option>
         {allowAssignUnitAdmin ? <option value="UNIT_ADMIN">Unit admin</option> : null}
-      </select>
+      </FormSelect>
       {unitRole === 'UNIT_ADMIN' && allowAssignUnitAdmin ? (
         <Input
           placeholder="Designation (optional)"

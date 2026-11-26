@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { FormSelect } from '@/components/ui/form-select';
 
 export function CongregantsCommunicationsView() {
   const { data: emailLinks } = useApiQuery<MembershipEmailLinksDto>(
@@ -78,7 +79,7 @@ export function CongregantsCommunicationsView() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="comm-recipient">Recipients</Label>
-                <select
+                <FormSelect
                   id="comm-recipient"
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={recipient}
@@ -87,7 +88,7 @@ export function CongregantsCommunicationsView() {
                 >
                   <option value="bcc">All congregants (BCC)</option>
                   <option value="all">All congregants (individual sends)</option>
-                </select>
+                </FormSelect>
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="comm-subject">Subject</Label>

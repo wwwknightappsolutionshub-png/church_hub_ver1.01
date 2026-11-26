@@ -8,8 +8,10 @@ import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateTimeField } from '@/components/ui/date-field';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface ReminderRow {
   id: string;
@@ -114,17 +116,11 @@ export function CellRemindersPanel({ branches }: CellRemindersPanelProps) {
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <Label htmlFor="rem-at">Remind at</Label>
-              <Input
-                id="rem-at"
-                type="datetime-local"
-                value={remindAt}
-                onChange={(e) => setRemindAt(e.target.value)}
-                required
-              />
+              <DateTimeField id="rem-at" value={remindAt} onChange={setRemindAt} aria-label="Remind at" />
             </div>
             <div>
               <Label htmlFor="rem-branch">Branch (optional)</Label>
-              <select
+              <FormSelect
                 id="rem-branch"
                 className="flex h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
                 value={branchId}
@@ -136,7 +132,7 @@ export function CellRemindersPanel({ branches }: CellRemindersPanelProps) {
                     {b.name}
                   </option>
                 ))}
-              </select>
+              </FormSelect>
             </div>
           </div>
           <div className="flex gap-2">

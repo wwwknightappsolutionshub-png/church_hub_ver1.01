@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 type CmsPage = {
   id: string;
@@ -300,7 +301,7 @@ export default function PlatformContentPage() {
                 </div>
                 <div>
                   <Label>Status</Label>
-                  <select
+                  <FormSelect
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                     value={status}
                     disabled={!canWrite}
@@ -308,7 +309,7 @@ export default function PlatformContentPage() {
                   >
                     <option value="DRAFT">Draft</option>
                     <option value="PUBLISHED">Published</option>
-                  </select>
+                  </FormSelect>
                 </div>
               </div>
               <div>

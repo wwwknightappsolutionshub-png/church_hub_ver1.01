@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 type BackupStatus = {
   fullDb: { status: string; lastAt: string | null; job: BackupJob | null };
@@ -304,7 +305,7 @@ export default function PlatformBackupsPage() {
               <div className="flex flex-wrap items-end gap-2">
                 <label className="text-xs text-muted-foreground">
                   Tenant
-                  <select
+                  <FormSelect
                     className="mt-1 block h-9 min-w-[14rem] rounded-md border border-input bg-background px-2 text-sm"
                     value={tenantId}
                     onChange={(e) => setTenantId(e.target.value)}
@@ -315,7 +316,7 @@ export default function PlatformBackupsPage() {
                         {c.name}
                       </option>
                     ))}
-                  </select>
+                  </FormSelect>
                 </label>
                 <Button
                   size="sm"
@@ -395,7 +396,7 @@ export default function PlatformBackupsPage() {
             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <label className="text-xs text-muted-foreground">
                 Scope
-                <select
+                <FormSelect
                   className="mt-1 block h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
                   value={scheduleForm.scope}
                   onChange={(e) =>
@@ -407,12 +408,12 @@ export default function PlatformBackupsPage() {
                 >
                   <option value="FULL_DB">Global full DB</option>
                   <option value="TENANT">Tenant export</option>
-                </select>
+                </FormSelect>
               </label>
               {scheduleForm.scope === 'TENANT' ? (
                 <label className="text-xs text-muted-foreground">
                   Church
-                  <select
+                  <FormSelect
                     className="mt-1 block h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
                     value={scheduleForm.churchId}
                     onChange={(e) =>
@@ -425,12 +426,12 @@ export default function PlatformBackupsPage() {
                         {c.name}
                       </option>
                     ))}
-                  </select>
+                  </FormSelect>
                 </label>
               ) : null}
               <label className="text-xs text-muted-foreground">
                 Frequency
-                <select
+                <FormSelect
                   className="mt-1 block h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
                   value={scheduleForm.frequency}
                   onChange={(e) =>
@@ -443,7 +444,7 @@ export default function PlatformBackupsPage() {
                   <option value="DAILY">Daily</option>
                   <option value="WEEKLY">Weekly</option>
                   <option value="MONTHLY">Monthly</option>
-                </select>
+                </FormSelect>
               </label>
               <label className="text-xs text-muted-foreground">
                 Hour (UTC)

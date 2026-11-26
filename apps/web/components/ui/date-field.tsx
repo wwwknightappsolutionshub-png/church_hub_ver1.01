@@ -40,6 +40,10 @@ function toIsoDate(d: Date) {
   return format(d, 'yyyy-MM-dd');
 }
 
+function toLocalDateTimeValue(d: Date) {
+  return format(d, "yyyy-MM-dd'T'HH:mm");
+}
+
 export function DateField({
   id,
   value,
@@ -228,6 +232,83 @@ export function DateField({
           </div>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+const MINUTES = ['00', '15', '30', '45'];
+
+/** Date and time picker that matches the app calendar, instead of the browser control. */
+export function DateTimeField({
+  id,
+  value,
+  onChange,
+  className,
+  placeholder = 'Select date and time',
+  disabled = false,
+  'aria-label': ariaLabel,
+}: DateFieldProps) {
+  const datePart = value.includes('T') ? value.slice(0, 10) : value.slice(0, 10);
+  const timePart = value.includes('T') ? value.slice(11, 16) : '09:00';
+  const [hour, minute] = (timePart || '09:00').split(':');
+
+  const commit = (nextDate: string, nextHour: string, nextMinute: string) => {
+    if (!nextDate) {
+      onChange('');
+      return;
+    }
+    onChange(`${nextDate}T${nextHour || '09'}:${nextMinute || '00'}`);
+  };
+
+  return (
+    <div className={cn('space-y-2', className)}>
+      <DateField
+        id={id}
+        value={datePart.length === 10 ? datePart : ''}
+        onChange={(d) => commit(d, hour || '09', minute || '00')}
+        placeholder={placeholder}
+        disabled={disabled}
+        aria-label={ariaLabel}
+      />
+      <div className="rounded-xl border border-border bg-card p-2">
+        <p className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Time</p>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="max-h-28 space-y-1 overflow-y-auto pr-1">
+            {HOURS.map((h) => (
+              <button
+                key={h}
+                type="button"
+                disabled={disabled}
+                className={cn(
+                  'w-full rounded-md px-2 py-1 text-left text-xs tabular-nums',
+                  (hour || '09') === h ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
+                )}
+                onClick={() => commit(datePart, h, minute || '00')}
+              >
+                {h}
+              </button>
+            ))}
+          </div>
+          <div className="space-y-1">
+            {MINUTES.map((m) => (
+              <button
+                key={m}
+                type="button"
+                disabled={disabled}
+                className={cn(
+                  'w-full rounded-md px-2 py-1 text-left text-xs tabular-nums',
+                  (minute || '00') === m ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
+                )}
+                onClick={() => commit(datePart, hour || '09', m)}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      <span className="sr-only">{toLocalDateTimeValue(new Date())}</span>
     </div>
   );
 }

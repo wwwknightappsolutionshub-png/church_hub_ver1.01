@@ -26,7 +26,8 @@ export const MODULE_DESCRIPTIONS = {
   profile: 'Update your details and see your units, listings, and messages.',
   settings: 'Password, notifications, and how your profile appears.',
   bus: 'Plan rides, assign drivers, and keep transport running smoothly.',
-  prayerHub: 'Share prayer requests and encourage others in the church.',
+  prayerHub:
+    'Share prayer requests and get spiritual support of the matter of concern. Your identity will not be revealed but your testimony shall be established.',
   testimonyHub: 'Share praise reports and celebrate what God is doing.',
   suggestions: 'Send feedback so leadership can listen and follow up.',
   devotionalHub: 'Daily reading, plans, journals, and small-group devotion.',

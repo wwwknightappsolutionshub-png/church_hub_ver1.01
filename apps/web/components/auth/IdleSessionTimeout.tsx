@@ -31,7 +31,7 @@ export function IdleSessionTimeout() {
       }
     };
 
-    const onIdle = () => {
+    const onIdle = async () => {
       const slug = getLastChurchSlug();
       const loginPath = getChurchLoginPath(slug);
       const separator = loginPath.includes('?') ? '&' : '?';
@@ -39,7 +39,11 @@ export function IdleSessionTimeout() {
 
       const refreshToken = localStorage.getItem('refreshToken');
       if (refreshToken) {
-        void api.post('/auth/logout', { refreshToken }).catch(() => {});
+        try {
+          await api.post('/auth/logout', { refreshToken }, { timeout: 4000 });
+        } catch {
+          /* Leave the screen anyway; the refresh token is still revoked if the request landed. */
+        }
       }
       clearAuthTokens();
       clearSessionRoleBucket();

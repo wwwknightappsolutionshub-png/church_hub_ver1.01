@@ -46,6 +46,7 @@ import { Input } from '@/components/ui/input';
 import { useMediaQuery } from '@/lib/hooks/use-media-query';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 export interface BranchMetric {
   branchId: string;
@@ -407,7 +408,7 @@ export function MinistryCellsAnalyticsPanel({
               placeholder="To date"
             />
             <div className="min-w-0">
-              <select
+              <FormSelect
                 id="filter-branch"
                 aria-label="Branch"
                 className="flex h-9 w-full min-w-0 appearance-none rounded-md border border-border bg-background bg-[length:1rem] bg-[position:right_0.75rem_center] bg-no-repeat px-3 pr-9 text-sm"
@@ -423,7 +424,7 @@ export function MinistryCellsAnalyticsPanel({
                     {b.name}
                   </option>
                 ))}
-              </select>
+              </FormSelect>
             </div>
             <div className="min-w-0">
               <Input

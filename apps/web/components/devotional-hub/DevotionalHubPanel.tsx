@@ -53,6 +53,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MODULE_DESCRIPTIONS } from '@/lib/module-descriptions';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface PaginatedPlans {
   items: DevotionalPlanDto[];
@@ -216,7 +217,7 @@ export function DevotionalHubPanel() {
             <label htmlFor="devotional-plan-select" className="sr-only">
               Active reading plan
             </label>
-            <select
+            <FormSelect
               id="devotional-plan-select"
               className="h-10 w-full max-w-md rounded-md border border-input bg-background px-3 text-sm"
               value={activePlanId ?? ''}
@@ -227,7 +228,7 @@ export function DevotionalHubPanel() {
                   {p.title}
                 </option>
               ))}
-            </select>
+            </FormSelect>
 
             {showTodayLoading && (
               <div className="space-y-3" aria-busy="true" aria-label="Loading today&apos;s reading">

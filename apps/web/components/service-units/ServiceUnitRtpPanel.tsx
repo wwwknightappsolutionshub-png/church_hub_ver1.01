@@ -22,8 +22,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 type RtpFieldType = 'TEXT' | 'TEXTAREA' | 'NUMBER' | 'DATE' | 'SELECT' | 'CURRENCY';
 
@@ -96,8 +98,23 @@ function statusBadgeClass(status: RtpRequestRow['status']) {
   }
 }
 
-function formatMoney(n: number) {
-  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function formatMoney(n: number, symbol = '£') {
+  return `${symbol}${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+const DESC_OK = /^[\p{L}\p{N}\s.,;:'"()\-\/&%!?]+$/u;
+
+function descriptionError(value: string): string | null {
+  const text = value.trim();
+  if (!text) return 'Enter an item or service description';
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length > 300) return 'Description must be 300 words or fewer';
+  if (!DESC_OK.test(text)) return 'Description can only use letters, numbers, and normal punctuation';
+  return null;
+}
+
+function digitsOnly(value: string) {
+  return value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
 }
 
 export function ServiceUnitRtpPanel({
@@ -129,6 +146,7 @@ export function ServiceUnitRtpPanel({
   const [step, setStep] = useState(0);
   const [values, setValues] = useState<Record<string, string>>({});
   const [lineItems, setLineItems] = useState<RtpLineItem[]>([emptyLine()]);
+  const [currencySymbol, setCurrencySymbol] = useState('£');
   const [busy, setBusy] = useState(false);
   const [remindingId, setRemindingId] = useState<string | null>(null);
   const [showBuilder, setShowBuilder] = useState(false);
@@ -151,7 +169,7 @@ export function ServiceUnitRtpPanel({
 
   useEffect(() => {
     setValues((prev) => {
-      const next = formatMoney(estimatedTotal);
+      const next = estimatedTotal.toFixed(2);
       if (prev.estimated_total === next) return prev;
       return { ...prev, estimated_total: next };
     });
@@ -174,10 +192,30 @@ export function ServiceUnitRtpPanel({
         return false;
       }
       for (const [idx, item] of valid.entries()) {
-        const qty = Number(item.quantity);
-        if (!Number.isFinite(qty) || qty <= 0) {
-          toast.error(`Item ${idx + 1}: quantity must be greater than 0`);
+        const descErr = descriptionError(item.description);
+        if (descErr) {
+          toast.error(`Item ${idx + 1}: ${descErr}`);
           return false;
+        }
+        if (!/^\d+$/.test(item.quantity.trim()) || Number(item.quantity) <= 0) {
+          toast.error(`Item ${idx + 1}: quantity must be a whole number`);
+          return false;
+        }
+        if (item.unitCost.trim() && !/^\d+(\.\d{1,2})?$/.test(item.unitCost.trim())) {
+          toast.error(`Item ${idx + 1}: estimated cost must be numbers only`);
+          return false;
+        }
+        if (item.websiteUrl.trim()) {
+          try {
+            const url = new URL(item.websiteUrl.trim());
+            if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+              toast.error(`Item ${idx + 1}: website must start with http or https`);
+              return false;
+            }
+          } catch {
+            toast.error(`Item ${idx + 1}: enter a full website address`);
+            return false;
+          }
         }
       }
       return true;
@@ -277,7 +315,7 @@ export function ServiceUnitRtpPanel({
           const common = {
             id: field.fieldKey,
             value: isComputedTotal
-              ? formatMoney(estimatedTotal)
+              ? estimatedTotal.toFixed(2)
               : (values[field.fieldKey] ?? ''),
             onChange: (
               e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
@@ -305,28 +343,44 @@ export function ServiceUnitRtpPanel({
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 />
               ) : field.fieldType === 'SELECT' ? (
-                <select
-                  {...common}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                <Select
+                  value={values[field.fieldKey] || undefined}
+                  onValueChange={(v) => setValue(field.fieldKey, v)}
                 >
-                  <option value="">Select…</option>
-                  {opts.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger aria-label={field.label}>
+                    <SelectValue placeholder="Select…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {opts.map((o) => (
+                      <SelectItem key={o} value={o}>
+                        {o}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : field.fieldKey === 'budget_line' ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">{currencySymbol}</span>
+                  <Input
+                    inputMode="decimal"
+                    value={values.budget_line ?? ''}
+                    onChange={(e) => setValue('budget_line', digitsOnly(e.target.value))}
+                  />
+                </div>
+              ) : isComputedTotal ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">{currencySymbol}</span>
+                  <Input {...common} readOnly className="bg-muted/50 font-medium" />
+                </div>
               ) : (
                 <Input
                   {...common}
                   type={
-                    isComputedTotal
-                      ? 'text'
-                      : field.fieldType === 'NUMBER' || field.fieldType === 'CURRENCY'
-                        ? 'number'
-                        : field.fieldType === 'DATE'
-                          ? 'date'
-                          : 'text'
+                    field.fieldType === 'NUMBER' || field.fieldType === 'CURRENCY'
+                      ? 'number'
+                      : field.fieldType === 'DATE'
+                        ? 'date'
+                        : 'text'
                   }
                   step={field.fieldType === 'CURRENCY' ? '0.01' : undefined}
                   className={cn(isComputedTotal && 'bg-muted/50 font-medium')}
@@ -375,10 +429,7 @@ export function ServiceUnitRtpPanel({
                   {current.key === 'items' ? (
                     <div className="space-y-3">
                       {lineItems.map((item, index) => (
-                        <div
-                          key={item.id}
-                          className="space-y-3 rounded-lg border border-border bg-card p-3"
-                        >
+                        <div key={item.id} className="space-y-3 border-t border-border pt-3 first:border-t-0 first:pt-0">
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                               Item {index + 1}
@@ -402,7 +453,8 @@ export function ServiceUnitRtpPanel({
                               Item / service description *
                             </span>
                             <textarea
-                              rows={2}
+                              rows={3}
+                              maxLength={4500}
                               value={item.description}
                               onChange={(e) => updateLine(item.id, { description: e.target.value })}
                               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
@@ -414,24 +466,27 @@ export function ServiceUnitRtpPanel({
                                 Quantity *
                               </span>
                               <Input
-                                type="number"
-                                min={0}
-                                step={1}
+                                inputMode="numeric"
                                 value={item.quantity}
-                                onChange={(e) => updateLine(item.id, { quantity: e.target.value })}
+                                onChange={(e) =>
+                                  updateLine(item.id, { quantity: e.target.value.replace(/\D/g, '') })
+                                }
                               />
                             </label>
                             <label>
                               <span className="mb-1 block text-xs text-muted-foreground">
                                 Estimated unit cost
                               </span>
-                              <Input
-                                type="number"
-                                min={0}
-                                step="0.01"
-                                value={item.unitCost}
-                                onChange={(e) => updateLine(item.id, { unitCost: e.target.value })}
-                              />
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-muted-foreground">{currencySymbol}</span>
+                                <Input
+                                  inputMode="decimal"
+                                  value={item.unitCost}
+                                  onChange={(e) =>
+                                    updateLine(item.id, { unitCost: digitsOnly(e.target.value) })
+                                  }
+                                />
+                              </div>
                             </label>
                             <label className="sm:col-span-2">
                               <span className="mb-1 block text-xs text-muted-foreground">
@@ -448,7 +503,7 @@ export function ServiceUnitRtpPanel({
                             </label>
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            Line total: {formatMoney(lineTotal(item))}
+                            Line total: {formatMoney(lineTotal(item), currencySymbol)}
                           </p>
                         </div>
                       ))}
@@ -463,8 +518,18 @@ export function ServiceUnitRtpPanel({
                           <Plus className="h-4 w-4" />
                           Add another item
                         </Button>
+                        <label className="flex items-center gap-2 text-sm">
+                          <span className="text-muted-foreground">Currency</span>
+                          <Input
+                            className="h-8 w-16"
+                            maxLength={3}
+                            value={currencySymbol}
+                            onChange={(e) => setCurrencySymbol(e.target.value.slice(0, 3) || '£')}
+                            aria-label="Currency symbol"
+                          />
+                        </label>
                         <p className="text-sm font-medium">
-                          Running total: {formatMoney(estimatedTotal)}
+                          Running total: {formatMoney(estimatedTotal, currencySymbol)}
                         </p>
                       </div>
                     </div>
@@ -610,7 +675,7 @@ export function ServiceUnitRtpPanel({
                 </label>
                 <label>
                   <Label>Type</Label>
-                  <select
+                  <FormSelect
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                     value={newField.fieldType}
                     onChange={(e) =>
@@ -624,7 +689,7 @@ export function ServiceUnitRtpPanel({
                         </option>
                       ),
                     )}
-                  </select>
+                  </FormSelect>
                 </label>
                 <label>
                   <Label>Section key</Label>

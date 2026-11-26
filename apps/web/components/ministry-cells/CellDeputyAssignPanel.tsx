@@ -10,6 +10,7 @@ import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { FormSelect } from '@/components/ui/form-select';
 
 type DeputyRole = 'ASSISTANT' | 'SECRETARY';
 
@@ -156,7 +157,7 @@ export function CellDeputyAssignPanel({
         <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-end">
           <div className="space-y-1">
             <Label htmlFor={`deputy-user-${scopeId}`}>Person</Label>
-            <select
+            <FormSelect
               id={`deputy-user-${scopeId}`}
               className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
               value={userId}
@@ -169,11 +170,11 @@ export function CellDeputyAssignPanel({
                   {c.email ? ` (${c.email})` : ''}
                 </option>
               ))}
-            </select>
+            </FormSelect>
           </div>
           <div className="space-y-1">
             <Label htmlFor={`deputy-role-${scopeId}`}>Role</Label>
-            <select
+            <FormSelect
               id={`deputy-role-${scopeId}`}
               className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
               value={role}
@@ -185,7 +186,7 @@ export function CellDeputyAssignPanel({
               <option value="SECRETARY" disabled={taken.has('SECRETARY')}>
                 Secretary
               </option>
-            </select>
+            </FormSelect>
           </div>
           <Button type="button" size="sm" disabled={busy} onClick={() => void assign()} className="gap-1">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}

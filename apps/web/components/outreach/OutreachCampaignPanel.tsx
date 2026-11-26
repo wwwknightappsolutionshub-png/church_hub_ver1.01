@@ -10,6 +10,7 @@ import type { OutreachCampaignDto } from '@church-hub/shared-types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { FormSelect } from '@/components/ui/form-select';
 
 export function OutreachCampaignPanel({
   selectedCampaignId,
@@ -50,7 +51,7 @@ export function OutreachCampaignPanel({
         <CardDescription>Tag captures by crusade, Sunday desk, or outreach week.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        <select
+        <FormSelect
           className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
           value={selectedCampaignId}
           onChange={(e) => onSelectCampaign(e.target.value)}
@@ -64,7 +65,7 @@ export function OutreachCampaignPanel({
               {c.isDefault ? ' ★ default' : ''}
             </option>
           ))}
-        </select>
+        </FormSelect>
         {canManage ? (
           <div className="flex gap-2">
             <Input

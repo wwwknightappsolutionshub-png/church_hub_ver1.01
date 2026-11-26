@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { CreateYouthPostInput, YouthFeedPost } from '@church-hub/shared-types';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface YouthGroup {
   id: string;
@@ -98,7 +99,7 @@ export function YouthPostComposer({ groups, onPosted }: Props) {
               <Label htmlFor="feed-group" className="text-xs text-muted-foreground">
                 Group (optional)
               </Label>
-              <select
+              <FormSelect
                 id="feed-group"
                 value={youthGroupId}
                 onChange={(e) => setYouthGroupId(e.target.value)}
@@ -110,7 +111,7 @@ export function YouthPostComposer({ groups, onPosted }: Props) {
                     {g.name}
                   </option>
                 ))}
-              </select>
+              </FormSelect>
             </div>
             <div className="flex flex-1 items-end gap-2">
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />

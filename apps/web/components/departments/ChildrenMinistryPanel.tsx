@@ -39,6 +39,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { FormSelect } from '@/components/ui/form-select';
 
 const FALLBACK_CLASS_GROUPS = [
   { value: 'AGES_3_5', label: 'Ages 3–5' },
@@ -609,7 +610,7 @@ export function ChildrenMinistryPanel({
                         value={guardianSearch}
                         onChange={(e) => setGuardianSearch(e.target.value)}
                       />
-                      <select
+                      <FormSelect
                         className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                         value={selectedMemberId}
                         onChange={(e) => setSelectedMemberId(e.target.value)}
@@ -621,7 +622,7 @@ export function ChildrenMinistryPanel({
                             {m.email ? ` · ${m.email}` : ''}
                           </option>
                         ))}
-                      </select>
+                      </FormSelect>
                     </div>
                   ) : (
                     <div className="grid gap-2 sm:grid-cols-2">
@@ -730,7 +731,7 @@ export function ChildrenMinistryPanel({
                   </p>
                 ) : (
                   <div className="grid gap-2 sm:grid-cols-2" data-testid="children-roster-assign-form">
-                    <select
+                    <FormSelect
                       className="h-10 rounded-md border bg-background px-3 text-sm"
                       value={rosterForm.classGroup}
                       onChange={(e) => setRosterForm({ ...rosterForm, classGroup: e.target.value })}
@@ -740,8 +741,8 @@ export function ChildrenMinistryPanel({
                           {g.label}
                         </option>
                       ))}
-                    </select>
-                    <select
+                    </FormSelect>
+                    <FormSelect
                       className="h-10 rounded-md border bg-background px-3 text-sm"
                       value={rosterForm.teacherMemberId}
                       onChange={(e) => setRosterForm({ ...rosterForm, teacherMemberId: e.target.value })}
@@ -751,8 +752,8 @@ export function ChildrenMinistryPanel({
                           {formatMemberName(m.member)} (lead)
                         </option>
                       ))}
-                    </select>
-                    <select
+                    </FormSelect>
+                    <FormSelect
                       className="h-10 rounded-md border bg-background px-3 text-sm sm:col-span-2"
                       value={rosterForm.assistantMemberId}
                       onChange={(e) => setRosterForm({ ...rosterForm, assistantMemberId: e.target.value })}
@@ -763,7 +764,7 @@ export function ChildrenMinistryPanel({
                           {formatMemberName(m.member)} (assistant)
                         </option>
                       ))}
-                    </select>
+                    </FormSelect>
                     <Input
                       placeholder="Notes"
                       value={rosterForm.notes}

@@ -26,6 +26,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 import {
   CellAttendanceInbox,
   DepartmentReportsInbox,
@@ -1171,7 +1172,7 @@ export function ReportsInboxPanel({
                         <Label htmlFor={`${replyFormId}-target-ov`} className="text-xs text-muted-foreground">
                           Recipient (member, leader, or pastor)
                         </Label>
-                        <select
+                        <FormSelect
                           id={`${replyFormId}-target-ov`}
                           className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                           value={reply.recipientId}
@@ -1183,7 +1184,7 @@ export function ReportsInboxPanel({
                               {t.label} — {t.source}
                             </option>
                           ))}
-                        </select>
+                        </FormSelect>
                       </div>
                       <Input
                         placeholder="Subject"
@@ -1478,7 +1479,7 @@ export function ReportsInboxPanel({
                       <Label htmlFor={`${replyFormId}-target`} className="text-xs text-muted-foreground">
                         Recipient (member, leader, or pastor)
                       </Label>
-                      <select
+                      <FormSelect
                         id={`${replyFormId}-target`}
                         className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                         value={reply.recipientId}
@@ -1490,7 +1491,7 @@ export function ReportsInboxPanel({
                             {t.label} — {t.source}
                           </option>
                         ))}
-                      </select>
+                      </FormSelect>
                       {selectedTarget && (
                         <p className="text-xs text-muted-foreground">{selectedTarget.source}</p>
                       )}

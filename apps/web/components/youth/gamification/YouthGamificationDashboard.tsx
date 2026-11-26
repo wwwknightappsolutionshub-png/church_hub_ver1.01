@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface MemberOption {
   id: string;
@@ -305,7 +306,7 @@ export function YouthGamificationDashboard() {
                 <CardTitle className="text-base">Leader tools</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <select
+                <FormSelect
                   className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={awardMemberId}
                   onChange={(e) => setAwardMemberId(e.target.value)}
@@ -316,7 +317,7 @@ export function YouthGamificationDashboard() {
                       {m.firstName} {m.lastName}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
                 <div className="flex gap-2">
                   <Input
                     type="number"

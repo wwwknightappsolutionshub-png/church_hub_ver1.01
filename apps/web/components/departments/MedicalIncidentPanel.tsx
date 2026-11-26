@@ -22,6 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { FormSelect } from '@/components/ui/form-select';
 
 type MemberRef = { id: string; firstName: string; lastName: string; phone?: string | null };
 
@@ -225,7 +226,7 @@ export function MedicalIncidentPanel({
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label>Category</Label>
-                <select
+                <FormSelect
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={form.category}
                   onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
@@ -235,11 +236,11 @@ export function MedicalIncidentPanel({
                       {c.label}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
               </div>
               <div className="space-y-1">
                 <Label>Severity</Label>
-                <select
+                <FormSelect
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={form.severity}
                   onChange={(e) => setForm((f) => ({ ...f, severity: e.target.value }))}
@@ -248,7 +249,7 @@ export function MedicalIncidentPanel({
                   <option value="MEDIUM">Medium</option>
                   <option value="HIGH">High</option>
                   <option value="CRITICAL">Critical</option>
-                </select>
+                </FormSelect>
               </div>
             </div>
             <Input
@@ -265,7 +266,7 @@ export function MedicalIncidentPanel({
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label>Link member (profile)</Label>
-                <select
+                <FormSelect
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={form.subjectMemberId || ''}
                   onChange={(e) => setForm((f) => ({ ...f, subjectMemberId: e.target.value }))}
@@ -276,7 +277,7 @@ export function MedicalIncidentPanel({
                       {formatMemberName(m.member)}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
               </div>
               <div className="space-y-1">
                 <Label>Or auto-link by phone</Label>
@@ -395,7 +396,7 @@ export function MedicalIncidentPanel({
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="grid gap-2 sm:grid-cols-3">
-                <select
+                <FormSelect
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={teamForm.memberId}
                   onChange={(e) => setTeamForm((f) => ({ ...f, memberId: e.target.value }))}
@@ -406,7 +407,7 @@ export function MedicalIncidentPanel({
                       {formatMemberName(m.member)}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
                 <Input
                   type="date"
                   value={teamForm.serviceDate}

@@ -9,6 +9,7 @@ import { formatPence } from '@/lib/wisdom365-api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface SubscriptionItem {
   id: string;
@@ -64,7 +65,7 @@ export function Wisdom365SubscriptionsTab() {
         <CardTitle>Subscriptions</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <select
+        <FormSelect
           className="rounded-lg border bg-background px-3 py-2 text-sm"
           value={status}
           onChange={(e) => {
@@ -77,7 +78,7 @@ export function Wisdom365SubscriptionsTab() {
           <option value="PENDING">PENDING</option>
           <option value="CANCELLED">CANCELLED</option>
           <option value="EXPIRED">EXPIRED</option>
-        </select>
+        </FormSelect>
 
         {loading ? (
           <Loader2 className="h-6 w-6 animate-spin" />

@@ -55,6 +55,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { DateTimeField } from '@/components/ui/date-field';
 import { cn } from '@/lib/utils';
 
 type DeptTab =
@@ -710,7 +711,7 @@ function SchedulesSection({
         <Card>
           <CardContent className="grid gap-2 pt-4 sm:grid-cols-3">
             <Input placeholder="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-            <Input type="datetime-local" value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} />
+            <DateTimeField value={form.startsAt} onChange={(startsAt) => setForm({ ...form, startsAt })} aria-label="Starts at" />
             <Button onClick={add} disabled={busy} className="gap-1">
               <Plus className="h-4 w-4" />
               Add

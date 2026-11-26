@@ -12,6 +12,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { DateTimeField } from '@/components/ui/date-field';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface KonnectEvent {
   id: string;
@@ -119,10 +121,10 @@ export function KonnectEventsPanel() {
           <CardContent className="grid gap-3 pt-6 sm:grid-cols-2">
             <form onSubmit={createEvent} className="contents">
               <Input placeholder="Event title *" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
-              <Input type="datetime-local" value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} required />
+              <DateTimeField value={form.startsAt} onChange={(startsAt) => setForm({ ...form, startsAt })} aria-label="Starts at" />
               <Input placeholder="Location" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
               <Input placeholder="Max attendees" type="number" value={form.maxAttendees} onChange={(e) => setForm({ ...form, maxAttendees: e.target.value })} />
-              <select
+              <FormSelect
                 className="h-10 rounded-md border border-input bg-background px-3 text-sm"
                 value={form.businessId}
                 onChange={(e) => setForm({ ...form, businessId: e.target.value })}
@@ -133,8 +135,8 @@ export function KonnectEventsPanel() {
                     {p.businessName}
                   </option>
                 ))}
-              </select>
-              <select
+              </FormSelect>
+              <FormSelect
                 className="h-10 rounded-md border border-input bg-background px-3 text-sm"
                 value={form.hostMemberId}
                 onChange={(e) => setForm({ ...form, hostMemberId: e.target.value })}
@@ -145,7 +147,7 @@ export function KonnectEventsPanel() {
                     {m.firstName} {m.lastName}
                   </option>
                 ))}
-              </select>
+              </FormSelect>
               <textarea
                 className="min-h-[80px] rounded-md border border-input px-3 py-2 text-sm sm:col-span-2"
                 placeholder="Description"
@@ -163,7 +165,7 @@ export function KonnectEventsPanel() {
       {rsvpEventId && (
         <Card className="border-primary/30">
           <CardContent className="flex flex-wrap gap-2 pt-6">
-            <select
+            <FormSelect
               className="h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm"
               value={rsvpEventId === 'pick' ? '' : rsvpEventId}
               onChange={(e) => setRsvpEventId(e.target.value)}
@@ -174,8 +176,8 @@ export function KonnectEventsPanel() {
                   {ev.title}
                 </option>
               ))}
-            </select>
-            <select
+            </FormSelect>
+            <FormSelect
               className="h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm"
               value={rsvpMemberId}
               onChange={(e) => setRsvpMemberId(e.target.value)}
@@ -186,7 +188,7 @@ export function KonnectEventsPanel() {
                   {m.firstName} {m.lastName}
                 </option>
               ))}
-            </select>
+            </FormSelect>
             <Button size="sm" onClick={rsvp}>
               RSVP
             </Button>

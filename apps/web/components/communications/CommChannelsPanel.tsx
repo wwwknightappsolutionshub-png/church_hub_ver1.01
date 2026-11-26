@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface Channel {
   id: string;
@@ -119,14 +120,14 @@ export function CommChannelsPanel() {
             <CardContent className="pt-4">
               <form onSubmit={createChannel} className="space-y-2">
                 <Input placeholder="Channel name *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-                <select
+                <FormSelect
                   className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={form.channelType}
                   onChange={(e) => setForm({ ...form, channelType: e.target.value })}
                 >
                   <option value="CHURCH">Church-wide</option>
                   <option value="SERVICE_UNIT">Service unit (link via API)</option>
-                </select>
+                </FormSelect>
                 <Input placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
                 <Button type="submit" size="sm" className="w-full">Create</Button>
               </form>

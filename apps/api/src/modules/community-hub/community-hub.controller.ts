@@ -82,12 +82,13 @@ export class CommunityHubController {
     @CurrentUser() user: AuthUser,
     @ZodBody(createPraiseSchema) body: z.infer<typeof createPraiseSchema>,
   ) {
-    const { memberId, subject, testimony, displayName } = body;
+    const { memberId, subject, testimony, displayName, showDisplayName } = body;
     return this.hub.createPraise(churchId, user.userId, memberId ?? null, {
+      subject,
       testimony,
-      description: subject.trim() ? `${subject.trim()}\n\n${testimony}` : testimony,
+      description: testimony,
       displayName,
-      showDisplayName: Boolean(displayName?.trim()),
+      showDisplayName: showDisplayName ?? Boolean(displayName?.trim()),
     });
   }
 

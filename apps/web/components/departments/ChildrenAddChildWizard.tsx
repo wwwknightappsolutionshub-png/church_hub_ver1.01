@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 const WIZARD_STEPS = [
   { id: 'personal', label: 'Personal & Class', shortLabel: '1' },
@@ -428,7 +429,7 @@ export function ChildrenAddChildWizard({
               </label>
               <label>
                 <span className="mb-1 block text-xs text-muted-foreground">Gender</span>
-                <select
+                <FormSelect
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={form.gender}
                   onChange={(e) => setField('gender', e.target.value as WizardForm['gender'])}
@@ -436,11 +437,11 @@ export function ChildrenAddChildWizard({
                   <option value="UNKNOWN">Unknown</option>
                   <option value="MALE">Male</option>
                   <option value="FEMALE">Female</option>
-                </select>
+                </FormSelect>
               </label>
               <label>
                 <span className="mb-1 block text-xs text-muted-foreground">Birth month</span>
-                <select
+                <FormSelect
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={form.birthMonth}
                   onChange={(e) => setField('birthMonth', e.target.value)}
@@ -454,11 +455,11 @@ export function ChildrenAddChildWizard({
                       </option>
                     );
                   })}
-                </select>
+                </FormSelect>
               </label>
               <label>
                 <span className="mb-1 block text-xs text-muted-foreground">Birth day</span>
-                <select
+                <FormSelect
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={form.birthDay}
                   onChange={(e) => setField('birthDay', e.target.value)}
@@ -472,7 +473,7 @@ export function ChildrenAddChildWizard({
                       </option>
                     );
                   })}
-                </select>
+                </FormSelect>
               </label>
               <label>
                 <span className="mb-1 block text-xs text-muted-foreground">Birth year</span>
@@ -485,7 +486,7 @@ export function ChildrenAddChildWizard({
               </label>
               <label>
                 <span className="mb-1 block text-xs text-muted-foreground">Classification</span>
-                <select
+                <FormSelect
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={form.classificationId}
                   onChange={(e) => setField('classificationId', e.target.value)}
@@ -496,7 +497,7 @@ export function ChildrenAddChildWizard({
                       {c.name}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
               </label>
               <label>
                 <span className="mb-1 block text-xs text-muted-foreground">Mobile phone</span>
@@ -516,7 +517,7 @@ export function ChildrenAddChildWizard({
             <CardContent className="grid gap-3 sm:grid-cols-2">
               <label className="sm:col-span-2">
                 <span className="mb-1 block text-xs text-muted-foreground">Children&apos;s Church class *</span>
-                <select
+                <FormSelect
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={form.classGroup}
                   onChange={(e) => setField('classGroup', e.target.value)}
@@ -527,7 +528,7 @@ export function ChildrenAddChildWizard({
                       {g.label} ({g.ages})
                     </option>
                   ))}
-                </select>
+                </FormSelect>
               </label>
               <label>
                 <span className="mb-1 block text-xs text-muted-foreground">School name</span>
@@ -786,7 +787,7 @@ export function ChildrenAddChildWizard({
             <CardContent>
               <label className="block max-w-md">
                 <span className="mb-1 block text-xs text-muted-foreground">Family role</span>
-                <select
+                <FormSelect
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={form.familyRoleId}
                   onChange={(e) => setField('familyRoleId', e.target.value)}
@@ -797,7 +798,7 @@ export function ChildrenAddChildWizard({
                       {r.name}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
               </label>
             </CardContent>
           </Card>
@@ -873,7 +874,7 @@ export function ChildrenAddChildWizard({
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label>
                       <span className="mb-1 block text-xs text-muted-foreground">Relation</span>
-                      <select
+                      <FormSelect
                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                         value={guardian.relation}
                         onChange={(e) =>
@@ -889,7 +890,7 @@ export function ChildrenAddChildWizard({
                             {r.label}
                           </option>
                         ))}
-                      </select>
+                      </FormSelect>
                     </label>
                     {guardian.mode === 'existing' ? (
                       <label className="sm:col-span-2">

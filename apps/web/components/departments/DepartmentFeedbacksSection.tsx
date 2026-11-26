@@ -182,7 +182,7 @@ export function DepartmentFeedbacksSection({
 /** Pastor / church admin compose (unit admin tab or staff tools). */
 export function StaffUnitFeedbackCompose({
   unitId,
-  unitName,
+  unitName: _unitName,
 }: {
   unitId: string;
   unitName: string;
@@ -204,7 +204,7 @@ export function StaffUnitFeedbackCompose({
         subject: subject.trim() || undefined,
         body: body.trim(),
       });
-      toast.success(`Message sent to ${unitName} leadership`);
+      toast.success('Message sent to Church Admin');
       setSubject('');
       setBody('');
       qc.invalidateQueries({ queryKey: ['dept-feedbacks', unitId] });
@@ -218,9 +218,9 @@ export function StaffUnitFeedbackCompose({
   return (
     <Card className={cn('border-primary/20')}>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm">Message unit leadership (Feedbacks)</CardTitle>
+        <CardTitle className="text-sm">Message Church Admin</CardTitle>
         <CardDescription>
-          Sends to the unit Feedbacks hub (visible to service unit leaders and unit admins only).
+          This form is to be used to communicate with the Church Admin.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -237,7 +237,7 @@ export function StaffUnitFeedbackCompose({
         />
         <Button size="sm" disabled={busy} onClick={send}>
           {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-          Send to Feedbacks hub
+          Message Admin
         </Button>
       </CardContent>
     </Card>

@@ -33,6 +33,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface ProvisionedStaff {
   email: string;
@@ -465,7 +466,7 @@ export default function PlatformConsolePage() {
                 onChange={(e) => setTenantQuery(e.target.value)}
               />
             </div>
-            <select
+            <FormSelect
               className="h-9 rounded-md border border-input bg-background px-2 text-sm"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
@@ -473,7 +474,7 @@ export default function PlatformConsolePage() {
               <option value="all">All statuses</option>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
-            </select>
+            </FormSelect>
           </div>
         </div>
 

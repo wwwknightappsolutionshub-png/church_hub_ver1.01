@@ -38,6 +38,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { MemberTimelinePanel } from '@/components/membership/MemberTimelinePanel';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface MemberDetail {
   id: string;
@@ -499,7 +500,7 @@ export function MemberDetailPanel({
             </div>
           )}
           <div className="mt-3 flex gap-2">
-            <select
+            <FormSelect
               className="flex h-9 flex-1 rounded-md border border-input bg-background px-2 text-sm"
               value={linkChildId}
               onChange={(e) => setLinkChildId(e.target.value)}
@@ -512,7 +513,7 @@ export function MemberDetailPanel({
                     {m.firstName} {m.lastName}
                   </option>
                 ))}
-            </select>
+            </FormSelect>
             <Button
               type="button"
               size="sm"

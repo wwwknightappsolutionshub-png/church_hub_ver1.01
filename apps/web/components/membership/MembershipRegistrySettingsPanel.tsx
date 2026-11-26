@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { FormSelect } from '@/components/ui/form-select';
 
 type SettingsSection =
   | 'classifications'
@@ -387,7 +388,7 @@ function CustomFieldsSection({
           </label>
           <label className="space-y-1">
             <span className="text-xs text-muted-foreground">Type</span>
-            <select
+            <FormSelect
               className="flex h-9 rounded-md border border-input bg-background px-2 text-sm"
               value={fieldType}
               onChange={(e) => setFieldType(e.target.value as MembershipCustomFieldTypeDto)}
@@ -397,7 +398,7 @@ function CustomFieldsSection({
                   {t}
                 </option>
               ))}
-            </select>
+            </FormSelect>
           </label>
           <Button size="sm" onClick={add} disabled={saving}>
             <Plus className="mr-1 h-4 w-4" />

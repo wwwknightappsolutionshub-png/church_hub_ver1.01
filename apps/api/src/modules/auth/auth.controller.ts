@@ -198,8 +198,12 @@ export class AuthController {
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @Post('logout')
   @ApiOperation({ summary: 'Revoke refresh token' })
-  logout(@Body() body: RefreshTokenDto) {
-    return this.authService.logout(body.refreshToken);
+  logout(@Req() req: Request, @Body() body: RefreshTokenDto) {
+    const authorization = req.headers.authorization;
+    return this.authService.logout(
+      body.refreshToken,
+      typeof authorization === 'string' ? authorization : undefined,
+    );
   }
 
   @Post('change-password')

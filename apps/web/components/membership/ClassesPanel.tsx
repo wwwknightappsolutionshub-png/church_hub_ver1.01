@@ -9,6 +9,7 @@ import { useClassDefinitions, useClassEnrollments } from '@/lib/hooks/use-member
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface ClassesPanelProps {
   canManage: boolean;
@@ -95,7 +96,7 @@ export function ClassesPanel({ canManage, members }: ClassesPanelProps) {
             <CardTitle className="text-base">Enroll member</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2 sm:flex-row sm:items-end">
-            <select
+            <FormSelect
               className="h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm"
               value={memberId}
               onChange={(e) => setMemberId(e.target.value)}
@@ -106,8 +107,8 @@ export function ClassesPanel({ canManage, members }: ClassesPanelProps) {
                   {m.firstName} {m.lastName}
                 </option>
               ))}
-            </select>
-            <select
+            </FormSelect>
+            <FormSelect
               className="h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm"
               value={classId}
               onChange={(e) => setClassId(e.target.value)}
@@ -118,7 +119,7 @@ export function ClassesPanel({ canManage, members }: ClassesPanelProps) {
                   {d.code} — {d.name}
                 </option>
               ))}
-            </select>
+            </FormSelect>
             <Button onClick={enroll} disabled={busy}>
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Enroll'}
             </Button>

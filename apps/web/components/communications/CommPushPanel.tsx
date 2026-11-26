@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { FormSelect } from '@/components/ui/form-select';
 
 interface NotificationRecord {
   id: string;
@@ -107,7 +108,7 @@ export function CommPushPanel() {
                 required
               />
             </div>
-            <select
+            <FormSelect
               className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={form.type}
               onChange={(e) => setForm({ ...form, type: e.target.value })}
@@ -116,7 +117,7 @@ export function CommPushPanel() {
               <option value="REMINDER">Reminder</option>
               <option value="EVENT">Event</option>
               <option value="PASTORAL">Pastoral</option>
-            </select>
+            </FormSelect>
             <div className="flex flex-wrap gap-4">
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={form.sendPush} onChange={(e) => setForm({ ...form, sendPush: e.target.checked })} />

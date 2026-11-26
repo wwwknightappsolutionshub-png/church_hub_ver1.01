@@ -31,10 +31,18 @@ export interface JwtPayload {
   sub: string;
   churchId: string | null;
   email: string;
+  /** Server session row. Access tokens without this are rejected. */
+  sid?: string;
 }
 
-/** Password reset / magic-login / setup-invite links. */
+/** Password reset and staff setup links. */
 const AUTH_LINK_TTL_MINUTES = 45;
+/** Magic sign-in links. Hard cap: 5 minutes, one use. */
+const MAGIC_LINK_TTL_MINUTES = 5;
+/** Access tokens cannot outlive this, even if JWT_ACCESS_EXPIRES_IN is longer. */
+const ACCESS_TOKEN_MAX_SEC = 15 * 60;
+/** Refresh tokens cannot outlive this, even if JWT_REFRESH_EXPIRES_IN is longer. */
+const REFRESH_TOKEN_MAX_MS = 12 * 60 * 60 * 1000;
 /** Staff + unit-leader set-password invites (same window as reset page countdown). */
 export const PASSWORD_SETUP_TTL_MINUTES = 45;
 const REGISTER_OTP_TTL_SEC = 15 * 60;
@@ -498,12 +506,27 @@ export class AuthService {
     this.assertStrongPassword(newPassword);
 
     const passwordHash = await bcrypt.hash(newPassword, 12);
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { passwordHash, mustChangePassword: false },
-    });
+    const now = new Date();
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { passwordHash, mustChangePassword: false },
+      }),
+      this.prisma.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: now },
+      }),
+      this.prisma.authLinkToken.updateMany({
+        where: {
+          userId,
+          purpose: AuthLinkPurpose.MAGIC_LOGIN,
+          consumedAt: null,
+        },
+        data: { consumedAt: now },
+      }),
+    ]);
 
-    return { success: true, mustChangePassword: false };
+    return { success: true, mustChangePassword: false, sessionsRevoked: true };
   }
 
   /** Request a password-reset email. Always returns the same message (no email enumeration). */
@@ -668,7 +691,7 @@ export class AuthService {
       `Hi ${firstName},`,
       isReset
         ? 'We sent a one-time set-password link to your email. It expires in 45 minutes.'
-        : 'We sent a one-time sign-in link to your email. It expires in 45 minutes.',
+        : 'We sent a one-time sign-in link to your email. It expires in 5 minutes.',
       'Open that email on this device to continue. If you did not request this, ignore this message.',
     ].join('\n');
   }
@@ -717,6 +740,14 @@ export class AuthService {
         await tx.refreshToken.updateMany({
           where: { userId: record.userId, revokedAt: null },
           data: { revokedAt: now },
+        });
+        await tx.authLinkToken.updateMany({
+          where: {
+            userId: record.userId,
+            purpose: AuthLinkPurpose.MAGIC_LOGIN,
+            consumedAt: null,
+          },
+          data: { consumedAt: now },
         });
       });
     } catch (err) {
@@ -778,7 +809,9 @@ export class AuthService {
     });
 
     const rawToken = randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + AUTH_LINK_TTL_MINUTES * 60 * 1000);
+    const ttlMinutes =
+      purpose === AuthLinkPurpose.MAGIC_LOGIN ? MAGIC_LINK_TTL_MINUTES : AUTH_LINK_TTL_MINUTES;
+    const expiresAt = new Date(Date.now() + ttlMinutes * 60 * 1000);
     await this.prisma.authLinkToken.create({
       data: {
         userId: user.id,
@@ -802,7 +835,7 @@ export class AuthService {
       firstName: user.firstName || 'there',
       purpose,
       actionUrl,
-      expiresMinutes: AUTH_LINK_TTL_MINUTES,
+      expiresMinutes: ttlMinutes,
     });
 
     try {
@@ -834,7 +867,7 @@ export class AuthService {
     if (process.env.NODE_ENV !== 'production' && !this.email.isConfigured('auth')) {
       // Never log the bearer token — even in non-prod shared environments.
       this.logger.log(
-        `[auth-link:${purpose}] issued for ${user.email} (token redacted, expires ${AUTH_LINK_TTL_MINUTES}m)`,
+        `[auth-link:${purpose}] issued for ${user.email} (token redacted, expires ${ttlMinutes}m)`,
       );
     }
   }
@@ -906,13 +939,35 @@ export class AuthService {
     });
   }
 
-  async logout(refreshToken: string) {
-    const tokenHash = this.hashToken(refreshToken);
+  async logout(refreshToken: string, authorization?: string) {
+    const now = new Date();
     await this.prisma.refreshToken.updateMany({
-      where: { tokenHash, revokedAt: null },
-      data: { revokedAt: new Date() },
+      where: { tokenHash: this.hashToken(refreshToken), revokedAt: null },
+      data: { revokedAt: now },
     });
+    const sid = this.sessionIdFromAuthorization(authorization);
+    if (sid) {
+      await this.prisma.refreshToken.updateMany({
+        where: { id: sid, revokedAt: null },
+        data: { revokedAt: now },
+      });
+    }
     return { success: true };
+  }
+
+  /** Verify the bearer access token and return its server session id. Invalid tokens yield null. */
+  private sessionIdFromAuthorization(header?: string): string | null {
+    if (!header || !header.toLowerCase().startsWith('bearer ')) return null;
+    const token = header.slice(7).trim();
+    if (!token) return null;
+    try {
+      const payload = this.jwt.verify<JwtPayload>(token, {
+        secret: this.config.getOrThrow('JWT_ACCESS_SECRET'),
+      });
+      return payload.sid ?? null;
+    } catch {
+      return null;
+    }
   }
 
   /** Revoke all active refresh tokens for a user (role change, deactivate, password reset). */
@@ -1108,30 +1163,42 @@ export class AuthService {
   }
 
   private async issueTokens(userId: string, churchId: string | null, email: string) {
-    const payload: JwtPayload = { sub: userId, churchId, email };
-
-    const accessToken = await this.jwt.signAsync(payload, {
-      secret: this.config.getOrThrow('JWT_ACCESS_SECRET'),
-      expiresIn: this.config.get('JWT_ACCESS_EXPIRES_IN', '15m'),
-    });
-
     const refreshToken = randomBytes(48).toString('hex');
-    const expiresIn = this.config.get('JWT_REFRESH_EXPIRES_IN', '7d');
-    const expiresAt = new Date(
-      Date.now() + this.parseDurationMs(expiresIn),
-    );
-
-    await this.prisma.refreshToken.create({
+    const configuredRefresh = this.config.get('JWT_REFRESH_EXPIRES_IN', '12h');
+    const refreshMs = Math.min(this.parseDurationMs(configuredRefresh), REFRESH_TOKEN_MAX_MS);
+    const session = await this.prisma.refreshToken.create({
       data: {
         userId,
         tokenHash: this.hashToken(refreshToken),
-        expiresAt,
+        expiresAt: new Date(Date.now() + refreshMs),
       },
     });
 
-    return { accessToken, refreshToken, expiresIn: this.config.get('JWT_ACCESS_EXPIRES_IN', '15m') };
+    const accessSeconds = this.accessTokenTtlSeconds();
+    const accessToken = await this.jwt.signAsync(
+      { sub: userId, churchId, email, sid: session.id } satisfies JwtPayload,
+      {
+        secret: this.config.getOrThrow('JWT_ACCESS_SECRET'),
+        expiresIn: accessSeconds,
+      },
+    );
+
+    return { accessToken, refreshToken, expiresIn: `${accessSeconds}s` };
   }
 
+  /** Clamp configured access lifetime to 15 minutes. Unparseable values stay at 15 minutes. */
+  private accessTokenTtlSeconds(): number {
+    const configured = this.config.get('JWT_ACCESS_EXPIRES_IN', '15m');
+    const match = /^(\d+)([smhd])$/.exec(configured);
+    if (!match) return ACCESS_TOKEN_MAX_SEC;
+    const value = parseInt(match[1], 10);
+    const unit = match[2];
+    const seconds =
+      unit === 's' ? value : unit === 'm' ? value * 60 : unit === 'h' ? value * 3600 : value * 86400;
+    return Math.min(Math.max(seconds, 60), ACCESS_TOKEN_MAX_SEC);
+  }
+
+  /** SHA-256 of a high-entropy bearer. The raw token is never written to the database. */
   private hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
   }

@@ -28,6 +28,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useYouthContext } from '@/components/youth/YouthProvider';
+import { FormSelect } from '@/components/ui/form-select';
 
 type TabId = 'ask' | 'board' | 'mine' | 'leader';
 
@@ -207,7 +208,7 @@ export function YouthQaPanel() {
             </CardHeader>
             <CardContent>
               <form onSubmit={submitQuestion} className="space-y-3">
-                <select
+                <FormSelect
                   className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={form.category}
                   onChange={(e) => setForm({ ...form, category: e.target.value })}
@@ -217,7 +218,7 @@ export function YouthQaPanel() {
                       {c.label}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
                 <Input
                   placeholder="Display alias (e.g. Anonymous)"
                   value={form.alias}
@@ -244,7 +245,7 @@ export function YouthQaPanel() {
 
         {tab === 'board' && (
           <div className="space-y-4">
-            <select
+            <FormSelect
               className="h-9 rounded-md border border-input bg-background px-3 text-sm"
               value={boardCategory}
               onChange={(e) => setBoardCategory(e.target.value)}
@@ -255,7 +256,7 @@ export function YouthQaPanel() {
                   {c.label}
                 </option>
               ))}
-            </select>
+            </FormSelect>
             {board.isLoading && (
               <div className="flex justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -334,7 +335,7 @@ export function YouthQaPanel() {
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="space-y-3">
               <div className="flex flex-wrap gap-2">
-                <select
+                <FormSelect
                   className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm"
                   value={queueStatus}
                   onChange={(e) => setQueueStatus(e.target.value)}
@@ -345,7 +346,7 @@ export function YouthQaPanel() {
                       {v}
                     </option>
                   ))}
-                </select>
+                </FormSelect>
               </div>
               {queue.isLoading && (
                 <Loader2 className="mx-auto h-6 w-6 animate-spin text-primary" />

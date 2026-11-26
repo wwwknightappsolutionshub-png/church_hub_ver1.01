@@ -164,10 +164,14 @@ export class ServiceUnitsDepartmentService {
       where: { id: serviceUnitId, churchId, isActive: true },
     });
     if (!unit) throw new NotFoundException('Service unit not found');
-    if (!unit.departmentCode || !PHASE8_DEPARTMENT_CODES.includes(unit.departmentCode)) {
-      throw new BadRequestException('Unit is not a Phase 8 department');
-    }
     return unit;
+  }
+
+  private unitDisplayName(unit: { name: string; departmentCode: DepartmentCode | null }) {
+    if (unit.departmentCode && unit.departmentCode !== 'OTHER' && DEPARTMENT_LABEL[unit.departmentCode]) {
+      return DEPARTMENT_LABEL[unit.departmentCode];
+    }
+    return unit.name;
   }
 
   private async assertManage(userId: string, churchId: string, serviceUnitId: string) {
@@ -285,7 +289,7 @@ export class ServiceUnitsDepartmentService {
         id: unit.id,
         name: unit.name,
         departmentCode: unit.departmentCode,
-        departmentLabel: DEPARTMENT_LABEL[unit.departmentCode!],
+        departmentLabel: this.unitDisplayName(unit),
       },
       memberCount: members.length,
       attendanceSessions: sessionDates.map((date) => ({
@@ -380,7 +384,7 @@ export class ServiceUnitsDepartmentService {
       if (!rec || !rec.present) absentIds.add(m.memberId);
     }
 
-    const label = DEPARTMENT_LABEL[unit.departmentCode!];
+    const label = this.unitDisplayName(unit);
     let enqueued = 0;
     for (const memberId of absentIds) {
       await this.commQueue.enqueue(churchId, {
@@ -425,7 +429,7 @@ export class ServiceUnitsDepartmentService {
       (v) => v.status === 'consistent',
     ).length;
 
-    const label = DEPARTMENT_LABEL[unit.departmentCode!];
+    const label = this.unitDisplayName(unit);
     let body = [
       `${label} weekly report (${isoWeekKey(weekStart)})`,
       `Members: ${dashboard.memberCount}`,
@@ -559,7 +563,7 @@ export class ServiceUnitsDepartmentService {
       );
       const stats = (report.stats ?? {}) as Record<string, unknown>;
       const label =
-        (unit.departmentCode && DEPARTMENT_LABEL[unit.departmentCode]) || unit.name;
+        this.unitDisplayName(unit);
       rows.push({
         label,
         memberCount: Number(stats.memberCount ?? 0),

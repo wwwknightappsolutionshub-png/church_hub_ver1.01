@@ -16,6 +16,7 @@ import {
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { formatMemberName } from '@/lib/service-unit-utils';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -60,7 +61,7 @@ export function UnitLeadershipModal({
   const [mode, setMode] = useState<Mode>('roster');
   const [busy, setBusy] = useState(false);
   const [memberId, setMemberId] = useState('');
-  const [deputySlot, setDeputySlot] = useState<DeputySlot>('ASSISTANT');
+  const [deputySlot, setDeputySlot] = useState<DeputySlot | 'LEADER'>('LEADER');
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -80,9 +81,10 @@ export function UnitLeadershipModal({
     { enabled: open },
   );
 
-  const takenDeputySlots = useMemo(() => {
-    const taken = new Set<DeputySlot>();
+  const takenRoles = useMemo(() => {
+    const taken = new Set<'LEADER' | DeputySlot>();
     for (const row of unitMembers) {
+      if (row.unitRole === 'UNIT_ADMIN') taken.add('LEADER');
       if (row.unitRole === 'ASSISTANT') taken.add('ASSISTANT');
       if (row.unitRole === 'SECRETARY') taken.add('SECRETARY');
     }
@@ -173,24 +175,34 @@ export function UnitLeadershipModal({
             return;
           }
         }
+        if (takenRoles.has(deputySlot)) {
+          toast.error('That role is already assigned in this unit');
+          setBusy(false);
+          return;
+        }
+        const asLeader = deputySlot === 'LEADER';
         const payload =
           mode === 'roster'
-            ? { memberId, isUnitAdmin: true, role: 'LEADER' }
+            ? {
+                memberId,
+                isUnitAdmin: asLeader,
+                role: asLeader ? 'LEADER' : deputySlot,
+                ...(asLeader ? {} : { deputyRole: deputySlot }),
+              }
             : {
                 firstName: form.firstName.trim(),
                 lastName: form.lastName.trim(),
                 email: form.email.trim().toLowerCase(),
                 phone: parseOptionalFlexiblePhone(form.phone),
-                isUnitAdmin: true,
-                role: 'LEADER',
+                isUnitAdmin: asLeader,
+                role: asLeader ? 'LEADER' : deputySlot,
+                ...(asLeader ? {} : { deputyRole: deputySlot }),
               };
         await api.post(`/service-units/${unitId}/leaders`, payload);
         toast.success('Unit Leader assigned — welcome email sent');
       } else {
-        if (takenDeputySlots.has(deputySlot)) {
-          toast.error(
-            `This unit already has a ${deputySlot === 'ASSISTANT' ? 'Assistant' : 'Secretary'}`,
-          );
+        if (deputySlot !== 'LEADER' && takenRoles.has(deputySlot)) {
+          toast.error('That role is already assigned in this unit');
           setBusy(false);
           return;
         }
@@ -199,11 +211,12 @@ export function UnitLeadershipModal({
           setBusy(false);
           return;
         }
+        const asLeader = deputySlot === 'LEADER';
         await api.post(`/service-units/${unitId}/leaders`, {
           memberId,
-          isUnitAdmin: false,
-          deputyRole: deputySlot,
-          role: deputySlot,
+          isUnitAdmin: asLeader,
+          ...(asLeader ? {} : { deputyRole: deputySlot, role: deputySlot }),
+          role: asLeader ? 'LEADER' : deputySlot,
         });
         toast.success(
           `${deputySlot === 'ASSISTANT' ? 'Assistant' : 'Secretary'} assigned`,
@@ -259,48 +272,65 @@ export function UnitLeadershipModal({
                 New person
               </Button>
             </div>
-          ) : (
-            <div className="space-y-2">
-              <Label>Role to assign</Label>
-              <div className="flex flex-wrap gap-2">
-                {(['ASSISTANT', 'SECRETARY'] as const).map((slot) => (
-                  <Button
-                    key={slot}
-                    type="button"
-                    size="sm"
-                    variant={deputySlot === slot ? 'default' : 'outline'}
-                    disabled={takenDeputySlots.has(slot) && deputySlot !== slot}
-                    onClick={() => setDeputySlot(slot)}
-                  >
-                    {slot === 'ASSISTANT' ? 'Assistant' : 'Secretary'}
-                    {takenDeputySlots.has(slot) ? ' (filled)' : ''}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
+          ) : null}
+
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium">Role</legend>
+            {(
+              [
+                ['LEADER', 'Unit Leader'],
+                ['ASSISTANT', 'Asst Leader'],
+                ['SECRETARY', 'Secretary'],
+              ] as const
+            ).map(([slot, label]) => {
+              const filled = takenRoles.has(slot);
+              return (
+                <label
+                  key={slot}
+                  className={cn(
+                    'flex items-center gap-2 text-sm',
+                    filled && 'cursor-not-allowed text-muted-foreground',
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={filled || deputySlot === slot}
+                    disabled={filled}
+                    onChange={() => {
+                      if (!filled) setDeputySlot(slot);
+                    }}
+                  />
+                  <span>
+                    {label}
+                    {filled ? ' (already assigned)' : ''}
+                  </span>
+                </label>
+              );
+            })}
+          </fieldset>
 
           {variant === 'assign-assistants' || mode === 'roster' ? (
             <div className="space-y-2">
               <Label htmlFor="ul-roster">
                 {variant === 'add-leader' ? 'Select church member' : 'Select unit member'}
               </Label>
-              <select
-                id="ul-roster"
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={memberId}
-                onChange={(e) => setMemberId(e.target.value)}
-              >
-                <option value="">
-                  {variant === 'add-leader' ? 'Select church member…' : 'Select unit member…'}
-                </option>
-                {rosterOptions.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {formatMemberName(m)}
-                    {m.email ? ` (${m.email})` : ''}
-                  </option>
-                ))}
-              </select>
+              <Select value={memberId || undefined} onValueChange={setMemberId}>
+                <SelectTrigger id="ul-roster" aria-label="Select member">
+                  <SelectValue
+                    placeholder={
+                      variant === 'add-leader' ? 'Select church member…' : 'Select unit member…'
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {rosterOptions.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {formatMemberName(m)}
+                      {m.email ? ` (${m.email})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
