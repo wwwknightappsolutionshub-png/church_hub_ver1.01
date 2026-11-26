@@ -26,6 +26,10 @@ import {
 import { brandPlainUpdate, loadChurchMailBrand, operationalEmailShell } from '../communications/operational-email';
 import { isoWeekKey, weekStartUtc } from './service-units-department.util';
 import {
+  isExactHourDue,
+  readOperationalEmailSchedules,
+} from '../notifications/operational-email-schedule';
+import {
   isDepartmentModuleEnabled,
   parseDepartmentModuleSettings,
 } from '../../common/department-module-settings';
@@ -47,6 +51,7 @@ const DEPARTMENT_LABEL: Record<DepartmentCode, string> = {
 @Injectable()
 export class ServiceUnitsDepartmentService {
   private readonly logger = new Logger(ServiceUnitsDepartmentService.name);
+  private readonly departmentDigestSent = new Set<string>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -841,6 +846,25 @@ export class ServiceUnitsDepartmentService {
     });
     let digests = 0;
     for (const church of churches) {
+      await this.sendFullDepartmentDigest(church.id);
+      digests++;
+    }
+    return { churches: churches.length, digests };
+  }
+
+  /** Monday 10:00 Europe/London unless a platform owner set another window. */
+  async runDueDepartmentDigests(now = new Date()) {
+    const churches = await this.prisma.church.findMany({
+      where: { isActive: true },
+      select: { id: true, timezone: true, settings: true },
+    });
+    let digests = 0;
+    for (const church of churches) {
+      const schedule = readOperationalEmailSchedules(church.settings, church.timezone).departmentDigest;
+      const slot = isExactHourDue(now, schedule);
+      const key = `${church.id}:${slot.dateKey}`;
+      if (!slot.due || this.departmentDigestSent.has(key)) continue;
+      this.departmentDigestSent.add(key);
       await this.sendFullDepartmentDigest(church.id);
       digests++;
     }

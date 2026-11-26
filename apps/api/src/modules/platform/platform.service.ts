@@ -31,6 +31,16 @@ import { UploadsService } from '../uploads/uploads.service';
 import { PurgeChurchDto } from './dto/purge-church.dto';
 import { UpdateTenantUserEmailDto } from './dto/update-tenant-user-email.dto';
 import { detachUserReferences } from '../../common/detach-user-references';
+import { SecurityAuditService } from '../../common/security/security-audit.service';
+import {
+  isValidTimeZone,
+  mergeOperationalEmailSchedules,
+  OPERATIONAL_EMAIL_KINDS,
+  readOperationalEmailSchedules,
+  type OperationalEmailKind,
+  type OperationalEmailSchedule,
+} from '../notifications/operational-email-schedule';
+import { UpdateOperationalEmailSchedulesDto } from './dto/operational-email-schedule.dto';
 
 const STAFF_ROLE_NAMES = [
   'ADMIN',
@@ -51,6 +61,7 @@ export class PlatformService {
     private readonly membershipConfig: MembershipConfigService,
     private readonly email: EmailAdapter,
     private readonly uploads: UploadsService,
+    private readonly securityAudit: SecurityAuditService,
   ) {}
 
   getModuleCatalog() {
@@ -598,6 +609,71 @@ export class PlatformService {
       emailSent,
       /** Only returned when a temporary password was generated (so the operator can copy it). */
       temporaryPassword: generated ? plainPassword : undefined,
+    };
+  }
+
+  async listOperationalEmailSchedules() {
+    const churches = await this.prisma.church.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, slug: true, timezone: true, settings: true },
+      orderBy: { name: 'asc' },
+    });
+    return churches.map((church) => ({
+      id: church.id,
+      name: church.name,
+      slug: church.slug,
+      timezone: church.timezone,
+      schedules: readOperationalEmailSchedules(church.settings, church.timezone),
+    }));
+  }
+
+  async updateOperationalEmailSchedules(
+    churchId: string,
+    patch: UpdateOperationalEmailSchedulesDto,
+    actorId: string,
+  ) {
+    const church = await this.prisma.church.findFirst({
+      where: { id: churchId },
+      select: { id: true, timezone: true, settings: true },
+    });
+    if (!church) throw new NotFoundException('Church not found');
+
+    const nextPatch: Partial<Record<OperationalEmailKind, OperationalEmailSchedule>> = {};
+    for (const kind of OPERATIONAL_EMAIL_KINDS) {
+      const row = patch[kind];
+      if (!row) continue;
+      if (!isValidTimeZone(row.timeZone)) {
+        throw new BadRequestException(`Invalid timezone for ${kind}`);
+      }
+      nextPatch[kind] = {
+        enabled: row.enabled,
+        weekday: row.weekday,
+        hour: row.hour,
+        timeZone: row.timeZone.trim(),
+      };
+    }
+    if (Object.keys(nextPatch).length === 0) {
+      throw new BadRequestException('No schedule changes were sent');
+    }
+
+    const before = readOperationalEmailSchedules(church.settings, church.timezone);
+    const settings = mergeOperationalEmailSchedules(church.settings, nextPatch, church.timezone);
+    await this.prisma.church.update({
+      where: { id: church.id },
+      data: { settings: settings as Prisma.InputJsonValue },
+    });
+    await this.securityAudit.append({
+      churchId: church.id,
+      actorId,
+      action: 'OPERATIONAL_EMAIL_SCHEDULE_UPDATED',
+      targetType: 'CHURCH',
+      targetId: church.id,
+      metadata: { before, after: readOperationalEmailSchedules(settings, church.timezone) },
+    });
+    return {
+      id: church.id,
+      timezone: church.timezone,
+      schedules: readOperationalEmailSchedules(settings, church.timezone),
     };
   }
 

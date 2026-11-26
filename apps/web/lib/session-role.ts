@@ -164,15 +164,14 @@ export function postLoginPath(
 
 export function postLogoutPath(
   bucket: SessionRoleBucket,
-  churchSlug: string | null | undefined,
+  _churchSlug: string | null | undefined,
 ): string {
   switch (bucket) {
     case 'platform':
       return '/';
     case 'church_admin':
     case 'pastor':
-      return churchSlug ? `/login?church=${encodeURIComponent(churchSlug)}` : '/login';
     default:
-      return churchSlug ? `/c/${encodeURIComponent(churchSlug)}` : '/login';
+      return '/login';
   }
 }

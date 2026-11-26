@@ -24,6 +24,10 @@ import {
   formatMailStamp,
   loadChurchMailBrand,
 } from '../communications/operational-email';
+import {
+  isFromHourDue,
+  readOperationalEmailSchedules,
+} from '../notifications/operational-email-schedule';
 import { AuthService } from '../auth/auth.service';
 import { AutomationEmailTemplatesService } from '../automation/automation-email-templates.service';
 import type { AssignServiceUnitMemberDto, UpdateServiceUnitMemberDto } from './dto/assign-service-unit-member.dto';
@@ -1848,17 +1852,19 @@ export class ServiceUnitsService {
   async runSundayAttendanceReminders(now = new Date()) {
     const churches = await this.prisma.church.findMany({
       where: { isActive: true },
-      select: { id: true, timezone: true, name: true },
+      select: { id: true, timezone: true, name: true, settings: true },
     });
 
     let reminded = 0;
     for (const church of churches) {
-      const timezone = church.timezone?.trim() || 'UTC';
-      const local = this.localClockParts(now, timezone);
-      if (local.weekday !== 0) continue; // Sunday
-      if (local.hour < 15) continue; // after 3 PM
+      const schedule = readOperationalEmailSchedules(
+        church.settings,
+        church.timezone?.trim() || 'UTC',
+      ).sundayAttendance;
+      const slot = isFromHourDue(now, schedule);
+      if (!slot.due) continue;
 
-      const sundayYmd = local.ymd;
+      const sundayYmd = slot.dateKey;
       const dayStart = new Date(`${sundayYmd}T00:00:00.000Z`);
       const dayEnd = new Date(`${sundayYmd}T23:59:59.999Z`);
       const weekStart = this.startOfWeek(new Date(`${sundayYmd}T12:00:00`));

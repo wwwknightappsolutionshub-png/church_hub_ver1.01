@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { churchPublicPath } from '@/lib/church-slug';
 import { applyAuthSessionFromMe } from '@/lib/apply-auth-session';
 import { LoginCredentialsSchema, MagicLinkRequestSchema } from '@church-hub/shared-types';
 import { ArrowRight, Loader2, Mail } from 'lucide-react';
@@ -300,14 +299,6 @@ export default function LoginPage() {
               after build).
             </div>
           ) : null}
-          {churchFromUrl && (
-            <div className="mt-4">
-              <Button variant="outline" className="w-full" asChild>
-                <Link href={churchPublicPath(churchFromUrl)}>Visit church home page</Link>
-              </Button>
-            </div>
-          )}
-
           {justRegistered && (
             <div
               className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm"

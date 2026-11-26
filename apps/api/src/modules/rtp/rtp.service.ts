@@ -21,6 +21,9 @@ import {
   operationalEmailShell,
 } from '../communications/operational-email';
 
+/** Automatic RTP reminders wait this long after the submission or the previous reminder. */
+const RTP_AUTO_REMINDER_MS = 72 * 60 * 60 * 1000;
+
 const DEFAULT_FIELDS: Array<{
   fieldKey: string;
   label: string;
@@ -429,7 +432,7 @@ export class RtpService {
         title,
         status: 'SUBMITTED',
         fieldValues: values as Prisma.InputJsonValue,
-        nextReminderAt: new Date(now.getTime() + 15 * 60 * 1000),
+        nextReminderAt: new Date(now.getTime() + RTP_AUTO_REMINDER_MS),
       },
       include: {
         serviceUnit: { select: { id: true, name: true } },
@@ -582,6 +585,10 @@ export class RtpService {
     if (row.status === 'APPROVED' || row.status === 'REJECTED') {
       throw new BadRequestException('Closed RTP requests cannot be reminded');
     }
+    const inAppOnly =
+      row.status === 'SUBMITTED' &&
+      !!row.nextReminderAt &&
+      row.nextReminderAt.getTime() > Date.now();
 
     const staffUsers = await this.prisma.user.findMany({
       where: {
@@ -621,28 +628,30 @@ export class RtpService {
         kind: 'DIRECT_ALERT',
         title,
         body,
-        channels: ['IN_APP', 'EMAIL', 'WHATSAPP'],
+        channels: inAppOnly ? ['IN_APP'] : ['IN_APP', 'EMAIL', 'WHATSAPP'],
         targetUserId: staff.id,
         metadata: {
           reportType: 'RTP Reminder',
           rtpRequestId: row.id,
           reminderType: 'RTP_MANUAL',
-          emailHtml,
+          ...(inAppOnly ? {} : { emailHtml }),
         },
       });
     }
 
-    const now = new Date();
-    await this.prisma.rtpRequest.update({
-      where: { id: row.id },
-      data: {
-        lastReminderAt: now,
-        nextReminderAt:
-          row.status === 'SUBMITTED' ? new Date(now.getTime() + 15 * 60 * 1000) : row.nextReminderAt,
-      },
-    });
+    if (!inAppOnly) {
+      const now = new Date();
+      await this.prisma.rtpRequest.update({
+        where: { id: row.id },
+        data: {
+          lastReminderAt: now,
+          nextReminderAt:
+            row.status === 'SUBMITTED' ? new Date(now.getTime() + RTP_AUTO_REMINDER_MS) : row.nextReminderAt,
+        },
+      });
+    }
 
-    return { ok: true, reminded: staffUsers.length };
+    return { ok: true, reminded: staffUsers.length, inAppOnly };
   }
 
   private async notifyLeadershipOfSubmission(
@@ -956,7 +965,7 @@ export class RtpService {
         where: { id: row.id },
         data: {
           lastReminderAt: now,
-          nextReminderAt: new Date(now.getTime() + 15 * 60 * 1000),
+          nextReminderAt: new Date(now.getTime() + RTP_AUTO_REMINDER_MS),
         },
       });
     }

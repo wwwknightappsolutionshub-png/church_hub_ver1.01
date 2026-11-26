@@ -3,8 +3,6 @@
 import { useEffect, useRef } from 'react';
 import { clearAuthTokens, api } from '@/lib/api';
 import { clearSessionRoleBucket } from '@/lib/session-role';
-import { getChurchLoginPath } from '@/lib/sign-out';
-import { getLastChurchSlug } from '@/lib/church-slug';
 
 const IDLE_MS = 300_000; // 5 minutes
 const ACTIVITY_EVENTS: Array<keyof WindowEventMap> = [
@@ -18,7 +16,7 @@ const ACTIVITY_EVENTS: Array<keyof WindowEventMap> = [
 
 /**
  * Signs the user out after 300s of no interaction on the dashboard.
- * Redirects to /login?reason=idle (with church slug when known).
+ * Redirects to the default login page.
  */
 export function IdleSessionTimeout() {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -32,10 +30,7 @@ export function IdleSessionTimeout() {
     };
 
     const onIdle = async () => {
-      const slug = getLastChurchSlug();
-      const loginPath = getChurchLoginPath(slug);
-      const separator = loginPath.includes('?') ? '&' : '?';
-      const destination = `${loginPath}${separator}reason=idle`;
+      const destination = '/login';
 
       const refreshToken = localStorage.getItem('refreshToken');
       if (refreshToken) {

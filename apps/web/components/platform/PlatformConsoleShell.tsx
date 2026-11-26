@@ -39,6 +39,12 @@ const PLATFORM_NAV: PlatformNavItem[] = [
     exact: true,
   },
   {
+    href: '/dashboard/platform/email-schedules',
+    label: 'Email schedules',
+    icon: Mail,
+    permission: 'platform.tenants:read',
+  },
+  {
     href: '/dashboard/platform/team',
     label: 'Team',
     icon: Users,

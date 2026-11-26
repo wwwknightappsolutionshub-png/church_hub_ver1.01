@@ -1,13 +1,10 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ServiceUnitsDepartmentService } from './service-units-department.service';
-import { isLondonMondayDigestWindow } from '../notifications/report-digest.util';
-
-/** Phase 8 — Monday 10:00 Europe/London full department digests. */
+/** Phase 8 — department digests. Default Monday 10:00 Europe/London, per church. */
 @Injectable()
 export class ServiceUnitsDepartmentScheduler implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ServiceUnitsDepartmentScheduler.name);
   private weeklyTimer?: NodeJS.Timeout;
-  private lastDigestKey?: string;
 
   constructor(private readonly departments: ServiceUnitsDepartmentService) {}
 
@@ -19,7 +16,7 @@ export class ServiceUnitsDepartmentScheduler implements OnModuleInit, OnModuleDe
     }, 15 * 60 * 1000);
     void this.tickWeekly();
     this.logger.log(
-      'Department digest scheduler started (Mon 10:00 Europe/London, check every 15m)',
+      'Department digest scheduler started (per church, default Mon 10:00 Europe/London, check every 15m)',
     );
   }
 
@@ -28,13 +25,9 @@ export class ServiceUnitsDepartmentScheduler implements OnModuleInit, OnModuleDe
   }
 
   private async tickWeekly() {
-    const { due, dateKey } = isLondonMondayDigestWindow();
-    if (!due) return;
-    if (this.lastDigestKey === dateKey) return;
-    this.lastDigestKey = dateKey;
-    const result = await this.departments.runDepartmentDigestsForAllChurches();
-    this.logger.log(
-      `Phase 8 department digests: ${result.digests} churches (week of ${dateKey} Europe/London)`,
-    );
+    const result = await this.departments.runDueDepartmentDigests();
+    if (result.digests > 0) {
+      this.logger.log(`Phase 8 department digests: ${result.digests} churches`);
+    }
   }
 }

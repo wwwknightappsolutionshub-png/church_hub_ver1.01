@@ -26,6 +26,10 @@ import {
   findOneAdminAndOnePastor,
 } from '../notifications/report-digest.util';
 import {
+  isExactHourDue,
+  readOperationalEmailSchedules,
+} from '../notifications/operational-email-schedule';
+import {
   MinistryCellsAccessService,
   type MinistryCellsRole,
 } from './ministry-cells-access.service';
@@ -79,6 +83,7 @@ const branchListInclude = {
 @Injectable()
 export class MinistryCellsService {
   private readonly logger = new Logger(MinistryCellsService.name);
+  private readonly cellDigestSent = new Set<string>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -1534,6 +1539,31 @@ export class MinistryCellsService {
         if (err instanceof ForbiddenException || err instanceof NotFoundException) {
           continue;
         }
+        throw err;
+      }
+    }
+    return { churches: churches.length, digests };
+  }
+
+  /** Saturday 21:00 Europe/London unless a platform owner set another window. */
+  async runDueCellDigests(now = new Date()) {
+    const churches = await this.prisma.church.findMany({
+      where: { isActive: true },
+      select: { id: true, timezone: true, settings: true },
+    });
+    let digests = 0;
+    for (const church of churches) {
+      const schedule = readOperationalEmailSchedules(church.settings, church.timezone).cellDigest;
+      const slot = isExactHourDue(now, schedule);
+      const key = `${church.id}:${slot.dateKey}`;
+      if (!slot.due || this.cellDigestSent.has(key)) continue;
+      this.cellDigestSent.add(key);
+      try {
+        await this.sendFullCellDigest(church.id);
+        digests++;
+      } catch (err) {
+        this.cellDigestSent.delete(key);
+        if (err instanceof ForbiddenException || err instanceof NotFoundException) continue;
         throw err;
       }
     }

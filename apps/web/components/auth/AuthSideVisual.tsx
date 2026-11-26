@@ -12,7 +12,7 @@ const LOGIN_FEATURES = [
 ];
 
 const REGISTER_FEATURES = [
-  'Free trial — no card required',
+  'Free trial. No card required',
   'Your branded church home page',
   'Role-based staff & member access',
   'Modules you can enable as you grow',
@@ -23,14 +23,14 @@ const COPY = {
     eyebrow: 'Trusted by growing congregations',
     title: 'Manage your church with clarity',
     description:
-      'One secure workspace for pastors, leaders, and members — membership, discipleship, outreach, and operations without spreadsheet chaos.',
+      'One secure workspace for pastors, leaders, and members: membership, discipleship, outreach, and operations without spreadsheet chaos.',
     features: LOGIN_FEATURES,
   },
   register: {
     eyebrow: 'Built for ministry teams',
     title: 'Launch a modern church workspace',
     description:
-      'Stand up a branded, role-based platform in days — then enable modules as your ministry grows.',
+      'Stand up a branded, role-based platform in days, then enable modules as your ministry grows.',
     features: REGISTER_FEATURES,
   },
 } as const;

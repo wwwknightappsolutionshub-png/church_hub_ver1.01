@@ -7,8 +7,6 @@ export class MembershipAutomationScheduler implements OnModuleInit, OnModuleDest
   private readonly logger = new Logger(MembershipAutomationScheduler.name);
   private syncTimer?: NodeJS.Timeout;
   private dailyTimer?: NodeJS.Timeout;
-  private lastWeeklyKey?: string;
-
   constructor(private readonly automation: MembershipAutomationService) {}
 
   onModuleInit() {
@@ -27,7 +25,9 @@ export class MembershipAutomationScheduler implements OnModuleInit, OnModuleDest
       void this.automation.runAllChurchesDaily().catch((err) =>
         this.logger.warn(`Daily automation: ${err instanceof Error ? err.message : err}`),
       );
-      void this.tickWeekly();
+      void this.automation.runAllChurchesWeekly().catch((err) =>
+        this.logger.warn(`Weekly automation: ${err instanceof Error ? err.message : err}`),
+      );
     }, 6 * 60 * 60 * 1000);
 
     void this.automation.runSyncEngine();
@@ -39,12 +39,4 @@ export class MembershipAutomationScheduler implements OnModuleInit, OnModuleDest
     if (this.dailyTimer) clearInterval(this.dailyTimer);
   }
 
-  private async tickWeekly() {
-    if (new Date().getUTCDay() !== 1) return;
-    const key = new Date().toISOString().slice(0, 10);
-    if (this.lastWeeklyKey === key) return;
-    this.lastWeeklyKey = key;
-    const result = await this.automation.runAllChurchesWeekly();
-    this.logger.log(`Weekly workflows: ${result.churches} churches`);
-  }
 }

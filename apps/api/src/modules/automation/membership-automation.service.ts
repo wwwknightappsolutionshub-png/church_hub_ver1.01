@@ -12,6 +12,10 @@ import { ServiceUnitsDepartmentService } from '../service-units/service-units-de
 import { AutomationSyncService } from './automation-sync.service';
 import { MembershipAnalyticsService } from '../membership/membership-analytics.service';
 import { MembershipAccessService } from '../membership/membership-access.service';
+import {
+  isFromHourDue,
+  readOperationalEmailSchedules,
+} from '../notifications/operational-email-schedule';
 
 function startOfUtcDay(d: Date): Date {
   const x = new Date(d);
@@ -716,20 +720,35 @@ export class MembershipAutomationService {
     return summary;
   }
 
-  async runAllChurchesWeekly() {
+  async runAllChurchesWeekly(now = new Date()) {
     const churches = await this.prisma.church.findMany({
       where: { isActive: true },
-      select: { id: true },
+      select: {
+        id: true,
+        timezone: true,
+        settings: true,
+        automationSettings: { select: { lastWeeklyRunAt: true } },
+      },
     });
+    let ran = 0;
     for (const c of churches) {
+      const schedule = readOperationalEmailSchedules(c.settings, c.timezone).membershipWeekly;
+      const slot = isFromHourDue(now, schedule);
+      if (!slot.due) continue;
+      const last = c.automationSettings?.lastWeeklyRunAt;
+      if (last) {
+        const lastSlot = isFromHourDue(last, schedule);
+        if (lastSlot.dateKey === slot.dateKey) continue;
+      }
       try {
         await this.runWeeklyWorkflow(c.id);
+        ran++;
       } catch (err) {
         this.logger.warn(
           `Weekly automation church ${c.id}: ${err instanceof Error ? err.message : err}`,
         );
       }
     }
-    return { churches: churches.length };
+    return { churches: ran };
   }
 }

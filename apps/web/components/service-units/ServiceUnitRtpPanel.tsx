@@ -268,8 +268,12 @@ export function ServiceUnitRtpPanel({
   const remind = async (requestId: string) => {
     setRemindingId(requestId);
     try {
-      await api.post(`/rtp/requests/${requestId}/remind`);
-      toast.success('Reminder sent to pastors and church admins');
+      const { data } = await api.post<{ inAppOnly?: boolean }>(`/rtp/requests/${requestId}/remind`);
+      toast.success(
+        data.inAppOnly
+          ? 'In-app reminder sent. Email waits until 72 hours after the last notice.'
+          : 'Reminder sent to pastors and church admins',
+      );
     } catch (err) {
       toast.error(apiErrorMessage(err as AxiosError, 'Could not send reminder'));
     } finally {

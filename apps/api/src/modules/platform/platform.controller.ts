@@ -8,6 +8,7 @@ import { UpdateChurchDto } from './dto/update-church.dto';
 import { ResetTenantUserPasswordDto } from './dto/reset-tenant-user-password.dto';
 import { PurgeChurchDto } from './dto/purge-church.dto';
 import { UpdateTenantUserEmailDto } from './dto/update-tenant-user-email.dto';
+import { UpdateOperationalEmailSchedulesDto } from './dto/operational-email-schedule.dto';
 
 @ApiTags('platform')
 @ApiBearerAuth()
@@ -26,6 +27,24 @@ export class PlatformController {
   @RequirePlatformPermission('platform.tenants:read')
   listChurches() {
     return this.platform.listChurches();
+  }
+
+  @Get('operational-email-schedules')
+  @RequirePlatformPermission('platform.tenants:read')
+  @ApiOperation({ summary: 'Per-church schedules for automatic operational emails' })
+  listOperationalEmailSchedules() {
+    return this.platform.listOperationalEmailSchedules();
+  }
+
+  @Patch('churches/:id/operational-email-schedules')
+  @RequirePlatformPermission('platform.tenants:write')
+  @ApiOperation({ summary: 'Update one church operational email schedule' })
+  updateOperationalEmailSchedules(
+    @Param('id') id: string,
+    @Body() body: UpdateOperationalEmailSchedulesDto,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.platform.updateOperationalEmailSchedules(id, body, actor.userId);
   }
 
   @Get('churches/:id')

@@ -1,13 +1,10 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { MinistryCellsService } from './ministry-cells.service';
-import { isLondonSaturdayCellDigestWindow } from '../notifications/report-digest.util';
-
-/** Cell/Ministry — Saturday 21:00 Europe/London full province digests. */
+/** Cell/Ministry digests. Default Saturday 21:00 Europe/London, per church. */
 @Injectable()
 export class MinistryCellsDigestScheduler implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MinistryCellsDigestScheduler.name);
   private timer?: NodeJS.Timeout;
-  private lastDigestKey?: string;
 
   constructor(private readonly cells: MinistryCellsService) {}
 
@@ -19,7 +16,7 @@ export class MinistryCellsDigestScheduler implements OnModuleInit, OnModuleDestr
     }, 15 * 60 * 1000);
     void this.tick();
     this.logger.log(
-      'Cell digest scheduler started (Sat 21:00 Europe/London, check every 15m)',
+      'Cell digest scheduler started (per church, default Sat 21:00 Europe/London, check every 15m)',
     );
   }
 
@@ -28,13 +25,9 @@ export class MinistryCellsDigestScheduler implements OnModuleInit, OnModuleDestr
   }
 
   private async tick() {
-    const { due, dateKey } = isLondonSaturdayCellDigestWindow();
-    if (!due) return;
-    if (this.lastDigestKey === dateKey) return;
-    this.lastDigestKey = dateKey;
-    const result = await this.cells.runCellDigestsForAllChurches();
-    this.logger.log(
-      `Cell/Ministry digests: ${result.digests} churches (week of ${dateKey} Europe/London)`,
-    );
+    const result = await this.cells.runDueCellDigests();
+    if (result.digests > 0) {
+      this.logger.log(`Cell/Ministry digests: ${result.digests} churches`);
+    }
   }
 }

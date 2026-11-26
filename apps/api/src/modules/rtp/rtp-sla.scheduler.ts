@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { RtpService } from './rtp.service';
 
-/** Reminds ADMIN/PASTOR every 15 minutes until an RTP is marked Received. */
+/** Reminds ADMIN/PASTOR 72 hours after the last RTP notice, until it is marked Received. */
 @Injectable()
 export class RtpSlaScheduler implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RtpSlaScheduler.name);
