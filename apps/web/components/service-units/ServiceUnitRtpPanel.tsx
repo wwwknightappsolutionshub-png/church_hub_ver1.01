@@ -407,8 +407,8 @@ export function ServiceUnitRtpPanel({
             Request to Purchase (RTP)
           </CardTitle>
           <CardDescription>
-            Submit a multi-step purchase request for {unitName}. Leadership reviews it on Admin /
-            Pastor Reports; you can track status and send reminders below.
+            Submit your purchase request for &quot;{unitName}&quot;. Church leadership will review
+            the request and respond back; you can track status and send reminders below if needed.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

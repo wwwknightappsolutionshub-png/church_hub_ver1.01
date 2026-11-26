@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ClipboardList, Inbox, LayoutDashboard, Users } from 'lucide-react';
+import { ClipboardList, FileText, Inbox, LayoutDashboard, Users } from 'lucide-react';
 import { DepartmentDashboardPanel } from '@/components/service-units/DepartmentDashboardPanel';
 import { DepartmentReportsSection } from '@/components/departments/DepartmentReportsSection';
 import { DepartmentFeedbacksSection } from '@/components/departments/DepartmentFeedbacksSection';
@@ -10,7 +10,7 @@ import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import type { ServiceUnitAccessFlags } from '@/components/departments/DepartmentToolsRouter';
 
-type LegacyTab = 'dashboard' | 'consistency' | 'reports' | 'feedbacks';
+type LegacyTab = 'dashboard' | 'consistency' | 'send-report' | 'reports' | 'feedbacks';
 
 interface MemberRef {
   id: string;
@@ -59,11 +59,14 @@ export function LegacyDepartmentWorkspace({
       { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
       { id: 'consistency', label: 'Membership Consistency', icon: Users },
     ];
+    if (canManage || access?.canManage) {
+      items.push({ id: 'send-report', label: 'Send Report', icon: FileText });
+    }
     if (canLeadershipHub) {
       items.push(...LEADERSHIP_TABS);
     }
     return items;
-  }, [canLeadershipHub]);
+  }, [canLeadershipHub, canManage, access?.canManage]);
 
   useEffect(() => {
     if (!tabs.some((t) => t.id === tab)) {
@@ -108,6 +111,17 @@ export function LegacyDepartmentWorkspace({
           unitName={unitName}
           showSummaryCards
           view="home"
+        />
+      )}
+      {tab === 'send-report' && (canManage || access?.canManage) && (
+        <DepartmentDashboardPanel
+          unitId={unitId}
+          canManage
+          canRecordAttendance={false}
+          members={members}
+          unitName={unitName}
+          showSummaryCards={false}
+          view="report"
         />
       )}
       {tab === 'consistency' && (

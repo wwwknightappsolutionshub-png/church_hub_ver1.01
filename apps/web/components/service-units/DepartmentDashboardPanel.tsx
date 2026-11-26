@@ -68,8 +68,8 @@ interface DepartmentDashboardPanelProps {
   unitName?: string;
   /** Hide top summary cards when parent already shows them */
   showSummaryCards?: boolean;
-  /** home hides membership consistency; consistency shows only that list */
-  view?: 'all' | 'home' | 'consistency';
+  /** home hides membership consistency; consistency and report show only that section */
+  view?: 'all' | 'home' | 'consistency' | 'report';
 }
 
 function SummaryCardsSkeleton() {
@@ -145,7 +145,7 @@ export function DepartmentDashboardPanel({
         serviceDate,
         entries: rollMembers.map((m) => ({
           memberId: m.id,
-          present: presence[m.id] ?? true,
+          present: presence[m.id] ?? false,
         })),
       });
       toast.success('Attendance marked');
@@ -236,9 +236,45 @@ export function DepartmentDashboardPanel({
     a.serviceDate.localeCompare(b.serviceDate),
   );
 
+  const reportForm = canManage ? (
+    <div className="space-y-3 rounded-md border p-3">
+      <p className="text-sm font-medium">Select the week range</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <DateField
+          aria-label="Week range start"
+          value={reportWeekStart}
+          onChange={(value) => {
+            setReportWeekStart(value);
+            setPreviewBody(null);
+          }}
+        />
+        <DateField
+          aria-label="Week range end"
+          value={reportWeekEnd}
+          onChange={(value) => {
+            setReportWeekEnd(value);
+            setPreviewBody(null);
+          }}
+        />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" onClick={previewReport} disabled={busy}>
+          Preview report
+        </Button>
+        <Button variant="secondary" onClick={sendReport} disabled={busy}>
+          Send Report
+        </Button>
+      </div>
+      {previewBody && (
+        <pre className="whitespace-pre-wrap rounded-md bg-muted/50 p-3 text-xs">{previewBody}</pre>
+      )}
+    </div>
+  ) : null;
+
   return (
     <div className="space-y-4">
-      {view !== 'consistency' && (<>
+      {view === 'report' && reportForm}
+      {(view === 'all' || view === 'home') && (<>
       {isError && (
         <Card className="border-amber-500/40 bg-amber-500/5">
           <CardContent className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
@@ -307,7 +343,7 @@ export function DepartmentDashboardPanel({
                     <span className="text-muted-foreground">Present</span>
                     <input
                       type="checkbox"
-                      checked={presence[m.id] ?? true}
+                      checked={presence[m.id] ?? false}
                       onChange={(e) =>
                         setPresence((p) => ({ ...p, [m.id]: e.target.checked }))
                       }
@@ -317,7 +353,7 @@ export function DepartmentDashboardPanel({
               ))}
             </ul>
             <div className="flex flex-wrap gap-2">
-              {canManage && (
+              {canManage && view === 'all' && (
                 <Button
                   variant="secondary"
                   onClick={() => {
@@ -340,40 +376,7 @@ export function DepartmentDashboardPanel({
                 </Button>
               )}
             </div>
-            {canManage && reportOpen && (
-              <div className="space-y-3 rounded-md border p-3">
-                <p className="text-sm font-medium">Select the week range</p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <DateField
-                    aria-label="Week range start"
-                    value={reportWeekStart}
-                    onChange={(value) => {
-                      setReportWeekStart(value);
-                      setPreviewBody(null);
-                    }}
-                  />
-                  <DateField
-                    aria-label="Week range end"
-                    value={reportWeekEnd}
-                    onChange={(value) => {
-                      setReportWeekEnd(value);
-                      setPreviewBody(null);
-                    }}
-                  />
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" onClick={previewReport} disabled={busy}>
-                    Preview report
-                  </Button>
-                  <Button variant="secondary" onClick={sendReport} disabled={busy}>
-                    Send Report
-                  </Button>
-                </div>
-                {previewBody && (
-                  <pre className="whitespace-pre-wrap rounded-md bg-muted/50 p-3 text-xs">{previewBody}</pre>
-                )}
-              </div>
-            )}
+            {view === 'all' && reportOpen && reportForm}
           </CardContent>
         </Card>
       )}

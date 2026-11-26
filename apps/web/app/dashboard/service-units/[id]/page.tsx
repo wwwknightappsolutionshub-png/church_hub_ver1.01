@@ -671,24 +671,27 @@ export default function ServiceUnitDetailPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={addMeeting} className="grid gap-3 md:grid-cols-3">
+              <form onSubmit={addMeeting} className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                 <Input
+                  className="w-full sm:w-44"
                   placeholder="Meeting title"
                   value={meetingForm.title}
                   onChange={(e) => setMeetingForm({ ...meetingForm, title: e.target.value })}
                   required
                 />
                 <DateTimeField
+                  className="w-full sm:w-52"
                   aria-label="Meeting date and time"
                   value={meetingForm.startsAt}
                   onChange={(startsAt) => setMeetingForm({ ...meetingForm, startsAt })}
                 />
                 <Input
+                  className="w-full sm:w-40"
                   placeholder="Location"
                   value={meetingForm.location}
                   onChange={(e) => setMeetingForm({ ...meetingForm, location: e.target.value })}
                 />
-                <Button type="submit" className="md:col-span-3 w-fit">
+                <Button type="submit" className="w-fit shrink-0 sm:ml-auto">
                   Add meeting
                 </Button>
               </form>

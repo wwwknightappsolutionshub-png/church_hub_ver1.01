@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   addMonths,
   eachDayOfInterval,
@@ -53,7 +53,7 @@ export function DateField({
   panelExtra,
   closeOnSelect = true,
 }: DateFieldProps & {
-  panelExtra?: React.ReactNode;
+  panelExtra?: ReactNode | ((close: () => void) => ReactNode);
   closeOnSelect?: boolean;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -205,7 +205,7 @@ export function DateField({
             </div>
           </div>
 
-          {panelExtra}
+          {typeof panelExtra === 'function' ? panelExtra(() => setOpen(false)) : panelExtra}
           <div className="flex items-center justify-between gap-2 border-t border-border/70 px-3 py-2.5">
             <Button
               type="button"
@@ -245,6 +245,76 @@ export function DateField({
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
 const MINUTES = ['00', '15', '30', '45'];
 
+function TimeChoices({
+  disabled,
+  datePart,
+  hour,
+  minute,
+  onCommit,
+  onClose,
+}: {
+  disabled?: boolean;
+  datePart: string;
+  hour: string;
+  minute: string;
+  onCommit: (date: string, hour: string, minute: string) => void;
+  onClose: () => void;
+}) {
+  const [pickedHour, setPickedHour] = useState<string | null>(null);
+  const [pickedMinute, setPickedMinute] = useState<string | null>(null);
+
+  const choose = (nextHour: string, nextMinute: string, which: 'hour' | 'minute') => {
+    const hourPick = which === 'hour' ? nextHour : pickedHour;
+    const minutePick = which === 'minute' ? nextMinute : pickedMinute;
+    if (which === 'hour') setPickedHour(nextHour);
+    else setPickedMinute(nextMinute);
+    if (datePart) onCommit(datePart, nextHour, nextMinute);
+    if (datePart && hourPick && minutePick) onClose();
+  };
+
+  return (
+    <div className="border-t border-border/70 px-3 py-2">
+      <p className="pb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        Time
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="max-h-28 space-y-1 overflow-y-auto pr-1">
+          {HOURS.map((h) => (
+            <button
+              key={h}
+              type="button"
+              disabled={disabled}
+              className={cn(
+                'w-full rounded-md px-2 py-1 text-left text-xs tabular-nums',
+                hour === h ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
+              )}
+              onClick={() => choose(h, minute, 'hour')}
+            >
+              {h}
+            </button>
+          ))}
+        </div>
+        <div className="space-y-1">
+          {MINUTES.map((m) => (
+            <button
+              key={m}
+              type="button"
+              disabled={disabled}
+              className={cn(
+                'w-full rounded-md px-2 py-1 text-left text-xs tabular-nums',
+                minute === m ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
+              )}
+              onClick={() => choose(hour, m, 'minute')}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Date and time picker that matches the app calendar, instead of the browser control. */
 export function DateTimeField({
   id,
@@ -277,47 +347,16 @@ export function DateTimeField({
       disabled={disabled}
       aria-label={ariaLabel}
       closeOnSelect={false}
-      panelExtra={
-        <div className="border-t border-border/70 px-3 py-2">
-          <p className="pb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Time
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="max-h-28 space-y-1 overflow-y-auto pr-1">
-              {HOURS.map((h) => (
-                <button
-                  key={h}
-                  type="button"
-                  disabled={disabled}
-                  className={cn(
-                    'w-full rounded-md px-2 py-1 text-left text-xs tabular-nums',
-                    (hour || '09') === h ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
-                  )}
-                  onClick={() => commit(datePart.length === 10 ? datePart : '', h, minute || '00')}
-                >
-                  {h}
-                </button>
-              ))}
-            </div>
-            <div className="space-y-1">
-              {MINUTES.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  disabled={disabled}
-                  className={cn(
-                    'w-full rounded-md px-2 py-1 text-left text-xs tabular-nums',
-                    (minute || '00') === m ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
-                  )}
-                  onClick={() => commit(datePart.length === 10 ? datePart : '', hour || '09', m)}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      }
+      panelExtra={(close) => (
+        <TimeChoices
+          disabled={disabled}
+          datePart={datePart.length === 10 ? datePart : ''}
+          hour={hour || '09'}
+          minute={minute || '00'}
+          onCommit={commit}
+          onClose={close}
+        />
+      )}
     />
   );
 }
