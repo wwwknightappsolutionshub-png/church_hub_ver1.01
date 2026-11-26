@@ -211,9 +211,10 @@ export class CommunicationsQueueService {
       if (m?.phone) phones.add(m.phone);
     }
 
-    if (expandsToServiceUnit(item)) {
+    const unitId = item.serviceUnitId;
+    if (unitId && expandsToServiceUnit(item)) {
       const members = await this.prisma.serviceUnitMember.findMany({
-        where: { serviceUnitId: item.serviceUnitId },
+        where: { serviceUnitId: unitId },
         include: {
           member: { select: { email: true, phone: true, userId: true } },
         },
