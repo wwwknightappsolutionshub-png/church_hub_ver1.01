@@ -732,6 +732,7 @@ export class OutreachService {
       notes?: string;
       referredBy?: string;
       confirmSameOwner?: boolean;
+      gdprConsent?: boolean;
     },
   ) {
     const qr = await this.resolveQrCode(code);

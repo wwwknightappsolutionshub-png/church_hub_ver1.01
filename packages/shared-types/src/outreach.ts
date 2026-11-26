@@ -143,7 +143,8 @@ export const PublicOutreachRegisterSchema = z.object({
     .optional(),
   /** Set after the registrant confirms they own an email already on file. */
   confirmSameOwner: z.boolean().optional(),
-});
+  gdprConsent: z.boolean().optional(),
+}).superRefine(refineGdprConsent);
 export type PublicOutreachRegisterInput = z.infer<typeof PublicOutreachRegisterSchema>;
 
 export const OutreachConvertStageSchema = z.enum([

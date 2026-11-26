@@ -1,8 +1,10 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { ServiceUnitsDepartmentService } from './service-units-department.service';
 import { ChurchId, CurrentUser, AuthUser } from '../auth/current-user.decorator';
 import { ModuleGate, Roles } from '../auth/decorators';
+import { GenerateWeeklyReportDto } from './dto/generate-weekly-report.dto';
 
 @ApiTags('service-units')
 @ApiBearerAuth()
@@ -34,10 +36,16 @@ export class ServiceUnitsDepartmentController {
   @ApiOperation({ summary: 'Department attendance dashboard + volunteer consistency' })
   dashboard(
     @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Query('weeks') weeks?: string,
   ) {
-    return this.departments.getDashboard(churchId, id, weeks ? Number(weeks) : 4);
+    return this.departments.getDashboard(
+      churchId,
+      id,
+      weeks == null || weeks === '' ? 4 : Number(weeks),
+      user.userId,
+    );
   }
 
   @Post(':id/attendance/bulk')
@@ -68,19 +76,33 @@ export class ServiceUnitsDepartmentController {
 
   @Get(':id/weekly-reports')
   @ApiOperation({ summary: 'List generated weekly reports' })
-  listReports(@ChurchId() churchId: string, @Param('id') id: string) {
-    return this.departments.listWeeklyReports(churchId, id);
+  listReports(
+    @ChurchId() churchId: string,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.departments.listWeeklyReports(churchId, id, user.userId);
   }
 
   @Post(':id/weekly-reports/generate')
-  @ApiOperation({ summary: 'Generate weekly report (stored + in-app; email via full digest)' })
+  @Throttle({ default: { limit: 6, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Preview or send a unit weekly report to one admin and one pastor' })
   generateReport(
     @ChurchId() churchId: string,
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
-    @Body() body?: { weekStart?: string },
+    @Body() body: GenerateWeeklyReportDto,
   ) {
-    return this.departments.generateWeeklyReport(churchId, id, body?.weekStart, user.userId);
+    if (body?.preview === true) {
+      return this.departments.generateWeeklyReport(churchId, id, body.weekStart, user.userId, {
+        preview: true,
+        weekEnd: body.weekEnd,
+      });
+    }
+    return this.departments.generateWeeklyReport(churchId, id, body?.weekStart, user.userId, {
+      weekEnd: body?.weekEnd,
+      notifyInApp: true,
+    });
   }
 
   @Get(':id/ushering-headcounts')

@@ -40,10 +40,6 @@ function toIsoDate(d: Date) {
   return format(d, 'yyyy-MM-dd');
 }
 
-function toLocalDateTimeValue(d: Date) {
-  return format(d, "yyyy-MM-dd'T'HH:mm");
-}
-
 export function DateField({
   id,
   value,
@@ -54,7 +50,12 @@ export function DateField({
   max,
   disabled = false,
   'aria-label': ariaLabel,
-}: DateFieldProps) {
+  panelExtra,
+  closeOnSelect = true,
+}: DateFieldProps & {
+  panelExtra?: React.ReactNode;
+  closeOnSelect?: boolean;
+}) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const selected = useMemo(() => parseValue(value), [value]);
@@ -102,7 +103,7 @@ export function DateField({
   const pick = (day: Date) => {
     if (isDisabled(day)) return;
     onChange(toIsoDate(day));
-    setOpen(false);
+    if (closeOnSelect) setOpen(false);
   };
 
   return (
@@ -126,7 +127,11 @@ export function DateField({
       >
         <CalendarDays className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
         <span className={cn('min-w-0 flex-1 truncate', !selected && 'text-muted-foreground')}>
-          {selected ? format(selected, 'dd MMM yyyy') : placeholder}
+          {selected
+            ? value.includes('T')
+              ? `${format(selected, 'dd MMM yyyy')}, ${value.slice(11, 16)}`
+              : format(selected, 'dd MMM yyyy')
+            : placeholder}
         </span>
       </button>
 
@@ -200,6 +205,7 @@ export function DateField({
             </div>
           </div>
 
+          {panelExtra}
           <div className="flex items-center justify-between gap-2 border-t border-border/70 px-3 py-2.5">
             <Button
               type="button"
@@ -262,53 +268,56 @@ export function DateTimeField({
   };
 
   return (
-    <div className={cn('space-y-2', className)}>
-      <DateField
-        id={id}
-        value={datePart.length === 10 ? datePart : ''}
-        onChange={(d) => commit(d, hour || '09', minute || '00')}
-        placeholder={placeholder}
-        disabled={disabled}
-        aria-label={ariaLabel}
-      />
-      <div className="rounded-xl border border-border bg-card p-2">
-        <p className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Time</p>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="max-h-28 space-y-1 overflow-y-auto pr-1">
-            {HOURS.map((h) => (
-              <button
-                key={h}
-                type="button"
-                disabled={disabled}
-                className={cn(
-                  'w-full rounded-md px-2 py-1 text-left text-xs tabular-nums',
-                  (hour || '09') === h ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
-                )}
-                onClick={() => commit(datePart, h, minute || '00')}
-              >
-                {h}
-              </button>
-            ))}
-          </div>
-          <div className="space-y-1">
-            {MINUTES.map((m) => (
-              <button
-                key={m}
-                type="button"
-                disabled={disabled}
-                className={cn(
-                  'w-full rounded-md px-2 py-1 text-left text-xs tabular-nums',
-                  (minute || '00') === m ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
-                )}
-                onClick={() => commit(datePart, hour || '09', m)}
-              >
-                {m}
-              </button>
-            ))}
+    <DateField
+      id={id}
+      className={className}
+      value={value}
+      onChange={(d) => commit(d, hour || '09', minute || '00')}
+      placeholder={placeholder}
+      disabled={disabled}
+      aria-label={ariaLabel}
+      closeOnSelect={false}
+      panelExtra={
+        <div className="border-t border-border/70 px-3 py-2">
+          <p className="pb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Time
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="max-h-28 space-y-1 overflow-y-auto pr-1">
+              {HOURS.map((h) => (
+                <button
+                  key={h}
+                  type="button"
+                  disabled={disabled}
+                  className={cn(
+                    'w-full rounded-md px-2 py-1 text-left text-xs tabular-nums',
+                    (hour || '09') === h ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
+                  )}
+                  onClick={() => commit(datePart.length === 10 ? datePart : '', h, minute || '00')}
+                >
+                  {h}
+                </button>
+              ))}
+            </div>
+            <div className="space-y-1">
+              {MINUTES.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  disabled={disabled}
+                  className={cn(
+                    'w-full rounded-md px-2 py-1 text-left text-xs tabular-nums',
+                    (minute || '00') === m ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
+                  )}
+                  onClick={() => commit(datePart.length === 10 ? datePart : '', hour || '09', m)}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
-      <span className="sr-only">{toLocalDateTimeValue(new Date())}</span>
-    </div>
+      }
+    />
   );
 }

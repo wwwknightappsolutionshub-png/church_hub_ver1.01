@@ -21,6 +21,15 @@ import { DateField } from '@/components/ui/date-field';
 import { apiErrorMessage } from '@/lib/api-errors';
 import type { AxiosError } from 'axios';
 import { cn } from '@/lib/utils';
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 
 interface MemberRef {
   id: string;
@@ -59,6 +68,8 @@ interface DepartmentDashboardPanelProps {
   unitName?: string;
   /** Hide top summary cards when parent already shows them */
   showSummaryCards?: boolean;
+  /** home hides membership consistency; consistency shows only that list */
+  view?: 'all' | 'home' | 'consistency';
 }
 
 function SummaryCardsSkeleton() {
@@ -83,11 +94,17 @@ export function DepartmentDashboardPanel({
   members,
   unitName,
   showSummaryCards = true,
+  view = 'all',
 }: DepartmentDashboardPanelProps) {
   const queryClient = useQueryClient();
-  const [serviceDate, setServiceDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const today = new Date().toISOString().slice(0, 10);
+  const [serviceDate, setServiceDate] = useState(() => today);
   const [presence, setPresence] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportWeekStart, setReportWeekStart] = useState(() => today);
+  const [reportWeekEnd, setReportWeekEnd] = useState(() => today);
+  const [previewBody, setPreviewBody] = useState<string | null>(null);
 
   const { data: dashboard, isLoading, isError, refetch } = useApiQuery<DepartmentDashboard>(
     ['department-dashboard', unitId],
@@ -155,17 +172,55 @@ export function DepartmentDashboardPanel({
     }
   };
 
-  const generateReport = async () => {
+  const reportRange = () => {
+    if (!reportWeekStart || !reportWeekEnd) {
+      toast.error('Select the start and end of the week range');
+      return null;
+    }
+    if (reportWeekEnd < reportWeekStart) {
+      toast.error('The end week must be the same week or a later week');
+      return null;
+    }
+    return { weekStart: reportWeekStart, weekEnd: reportWeekEnd };
+  };
+
+  const previewReport = async () => {
+    const range = reportRange();
+    if (!range) return;
     setBusy(true);
     try {
-      await api.post(`/service-units/departments/${unitId}/weekly-reports/generate`, {});
-      toast.success('Weekly report saved. Pastors and admins can read it in Reports.');
+      const res = await api.post<{ body: string }>(
+        `/service-units/departments/${unitId}/weekly-reports/generate`,
+        { ...range, preview: true },
+      );
+      setPreviewBody(res.data.body);
+    } catch (err) {
+      toast.error(
+        apiErrorMessage(err as AxiosError, 'The report could not be previewed for that week range.'),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sendReport = async () => {
+    const range = reportRange();
+    if (!range) return;
+    setBusy(true);
+    try {
+      await api.post(`/service-units/departments/${unitId}/weekly-reports/generate`, {
+        ...range,
+        preview: false,
+      });
+      toast.success('Report sent to the church admin and pastor.');
+      setPreviewBody(null);
+      setReportOpen(false);
       queryClient.invalidateQueries({ queryKey: ['department-dashboard', unitId] });
     } catch (err) {
       toast.error(
         apiErrorMessage(
           err as AxiosError,
-          'The weekly report could not be created. Mark attendance first, then try again.',
+          'The report could not be sent. Mark attendance first, then try again.',
         ),
       );
     } finally {
@@ -173,8 +228,17 @@ export function DepartmentDashboardPanel({
     }
   };
 
+  const monthPrefix = today.slice(0, 7);
+  const sessionsThisMonth = summary.attendanceSessions.filter((s) =>
+    s.serviceDate.startsWith(monthPrefix),
+  ).length;
+  const chartSessions = [...summary.attendanceSessions].sort((a, b) =>
+    a.serviceDate.localeCompare(b.serviceDate),
+  );
+
   return (
     <div className="space-y-4">
+      {view !== 'consistency' && (<>
       {isError && (
         <Card className="border-amber-500/40 bg-amber-500/5">
           <CardContent className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
@@ -210,9 +274,9 @@ export function DepartmentDashboardPanel({
             <Card>
               <CardHeader className="pb-1">
                 <CardDescription className="flex items-center gap-1">
-                  <BarChart3 className="h-3.5 w-3.5" /> Sessions (4 wk)
+                  <BarChart3 className="h-3.5 w-3.5" /> This Month
                 </CardDescription>
-                <CardTitle className="text-lg">{summary.attendanceSessions.length}</CardTitle>
+                <CardTitle className="text-lg">{sessionsThisMonth}</CardTitle>
               </CardHeader>
             </Card>
           </div>
@@ -253,22 +317,63 @@ export function DepartmentDashboardPanel({
               ))}
             </ul>
             <div className="flex flex-wrap gap-2">
+              {canManage && (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setReportOpen((open) => !open);
+                    setPreviewBody(null);
+                  }}
+                  disabled={busy}
+                >
+                  <FileText className="mr-1 h-4 w-4" />
+                  Send Report
+                </Button>
+              )}
               <Button onClick={saveRoll} disabled={busy || rollMembers.length === 0}>
                 Mark Attendance
               </Button>
               {canManage && (
-                <>
-                  <Button variant="outline" onClick={notifyAbsent} disabled={busy}>
-                    <Bell className="mr-1 h-4 w-4" />
-                    Notify absentees
-                  </Button>
-                  <Button variant="secondary" onClick={generateReport} disabled={busy}>
-                    <FileText className="mr-1 h-4 w-4" />
-                    Weekly report
-                  </Button>
-                </>
+                <Button variant="outline" onClick={notifyAbsent} disabled={busy}>
+                  <Bell className="mr-1 h-4 w-4" />
+                  Notify absentees
+                </Button>
               )}
             </div>
+            {canManage && reportOpen && (
+              <div className="space-y-3 rounded-md border p-3">
+                <p className="text-sm font-medium">Select the week range</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <DateField
+                    aria-label="Week range start"
+                    value={reportWeekStart}
+                    onChange={(value) => {
+                      setReportWeekStart(value);
+                      setPreviewBody(null);
+                    }}
+                  />
+                  <DateField
+                    aria-label="Week range end"
+                    value={reportWeekEnd}
+                    onChange={(value) => {
+                      setReportWeekEnd(value);
+                      setPreviewBody(null);
+                    }}
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" onClick={previewReport} disabled={busy}>
+                    Preview report
+                  </Button>
+                  <Button variant="secondary" onClick={sendReport} disabled={busy}>
+                    Send Report
+                  </Button>
+                </div>
+                {previewBody && (
+                  <pre className="whitespace-pre-wrap rounded-md bg-muted/50 p-3 text-xs">{previewBody}</pre>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -285,19 +390,28 @@ export function DepartmentDashboardPanel({
           ) : summary.attendanceSessions.length === 0 ? (
             <p className="text-sm text-muted-foreground">No department rolls recorded yet.</p>
           ) : (
-            <ul className="space-y-2 text-sm">
-              {summary.attendanceSessions.map((s) => (
-                <li
-                  key={s.serviceDate}
-                  className="flex justify-between rounded-md border px-3 py-2"
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={chartSessions.map((s) => ({
+                    date: new Date(`${s.serviceDate}T00:00:00`).toLocaleDateString(undefined, {
+                      day: 'numeric',
+                      month: 'short',
+                    }),
+                    present: s.present,
+                    absent: s.absent,
+                  }))}
+                  margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
                 >
-                  <span>{s.serviceDate}</span>
-                  <span>
-                    {s.present} present · {s.absent} absent
-                  </span>
-                </li>
-              ))}
-            </ul>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="date" tickLine={false} axisLine={false} fontSize={12} />
+                  <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={32} fontSize={12} />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="present" name="Present" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="absent" name="Absent" stroke="hsl(var(--destructive))" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -316,10 +430,12 @@ export function DepartmentDashboardPanel({
           </CardContent>
         </Card>
       )}
+      </>)}
 
+      {view !== 'home' && (
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Volunteer consistency</CardTitle>
+          <CardTitle className="text-base">Membership Consistency</CardTitle>
           <CardDescription>Based on department roll calls in the last 4 weeks</CardDescription>
         </CardHeader>
         <CardContent>
@@ -351,8 +467,9 @@ export function DepartmentDashboardPanel({
           )}
         </CardContent>
       </Card>
+      )}
 
-      {!isLoading && summary.weeklyReports.length > 0 && (
+      {view !== 'consistency' && !isLoading && summary.weeklyReports.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Weekly reports</CardTitle>

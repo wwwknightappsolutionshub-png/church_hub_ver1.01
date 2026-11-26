@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ClipboardList, Inbox, LayoutDashboard } from 'lucide-react';
+import { ClipboardList, Inbox, LayoutDashboard, Users } from 'lucide-react';
 import { DepartmentDashboardPanel } from '@/components/service-units/DepartmentDashboardPanel';
 import { DepartmentReportsSection } from '@/components/departments/DepartmentReportsSection';
 import { DepartmentFeedbacksSection } from '@/components/departments/DepartmentFeedbacksSection';
@@ -10,7 +10,7 @@ import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import type { ServiceUnitAccessFlags } from '@/components/departments/DepartmentToolsRouter';
 
-type LegacyTab = 'dashboard' | 'reports' | 'feedbacks';
+type LegacyTab = 'dashboard' | 'consistency' | 'reports' | 'feedbacks';
 
 interface MemberRef {
   id: string;
@@ -57,6 +57,7 @@ export function LegacyDepartmentWorkspace({
   const tabs = useMemo(() => {
     const items: DepartmentTabItem[] = [
       { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
+      { id: 'consistency', label: 'Membership Consistency', icon: Users },
     ];
     if (canLeadershipHub) {
       items.push(...LEADERSHIP_TABS);
@@ -96,6 +97,7 @@ export function LegacyDepartmentWorkspace({
       navGroups={navGroups}
       activeTab={tab}
       onTabChange={(id) => setTab(id as LegacyTab)}
+      showHeader={false}
     >
       {tab === 'dashboard' && (
         <DepartmentDashboardPanel
@@ -105,6 +107,18 @@ export function LegacyDepartmentWorkspace({
           members={members}
           unitName={unitName}
           showSummaryCards
+          view="home"
+        />
+      )}
+      {tab === 'consistency' && (
+        <DepartmentDashboardPanel
+          unitId={unitId}
+          canManage={canManage}
+          canRecordAttendance={canManage || (access?.canLead ?? false)}
+          members={members}
+          unitName={unitName}
+          showSummaryCards={false}
+          view="consistency"
         />
       )}
       {tab === 'reports' && canLeadershipHub && (

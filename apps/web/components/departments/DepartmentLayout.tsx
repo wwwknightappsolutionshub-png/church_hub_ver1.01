@@ -29,6 +29,7 @@ export function DepartmentLayout({
   activeTab,
   onTabChange,
   children,
+  showHeader = true,
 }: {
   title: string;
   subtitle: string;
@@ -38,6 +39,7 @@ export function DepartmentLayout({
   activeTab: string;
   onTabChange: (id: string) => void;
   children: ReactNode;
+  showHeader?: boolean;
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -187,7 +189,7 @@ export function DepartmentLayout({
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm">
-      <header className="border-b bg-gradient-to-r from-primary/[0.06] via-background to-background px-4 py-4 md:px-6">
+      {showHeader ? <header className="border-b bg-gradient-to-r from-primary/[0.06] via-background to-background px-4 py-4 md:px-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10">
@@ -210,7 +212,7 @@ export function DepartmentLayout({
             </Badge>
           </div>
         </div>
-      </header>
+      </header> : null}
 
       <div className="flex min-h-[560px] flex-col lg:flex-row">
         <aside className="hidden w-64 shrink-0 border-b border-border/60 bg-muted/20 p-4 lg:block lg:border-b-0 lg:border-r">

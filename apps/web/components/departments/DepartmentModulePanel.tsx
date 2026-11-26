@@ -389,6 +389,7 @@ export function DepartmentModulePanel({
         navGroups={navGroups}
         activeTab={tab}
         onTabChange={(id) => setTab(id as DeptTab)}
+        showHeader={false}
       >
       {tab === 'dashboard' && (
         <div className="space-y-6">

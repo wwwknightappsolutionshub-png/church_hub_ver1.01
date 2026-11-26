@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { AttendanceScope, DepartmentCode, Prisma } from '@prisma/client';
+import { AttendanceScope, DepartmentCode, Prisma, ServiceUnitWeeklyReport } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.module';
 import {
   PHASE8_DEPARTMENT_CODES,
@@ -174,6 +174,31 @@ export class ServiceUnitsDepartmentService {
     return unit.name;
   }
 
+  private parseWeekStart(input?: string): Date {
+    if (input == null || input === '') return weekStartUtc(new Date());
+    if (typeof input !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+      throw new BadRequestException('Choose a valid week');
+    }
+    const [year, month, day] = input.split('-').map(Number);
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    if (
+      parsed.getUTCFullYear() !== year ||
+      parsed.getUTCMonth() !== month - 1 ||
+      parsed.getUTCDate() !== day
+    ) {
+      throw new BadRequestException('Choose a valid week');
+    }
+    return weekStartUtc(parsed);
+  }
+
+  private clampWeeks(weeks: number): number {
+    if (!Number.isFinite(weeks)) return 4;
+    const whole = Math.trunc(weeks);
+    if (whole < 1) return 1;
+    if (whole > 8) return 8;
+    return whole;
+  }
+
   private async assertManage(userId: string, churchId: string, serviceUnitId: string) {
     const ctx = await this.moduleAccess.resolveContext(userId, churchId);
     if (!ctx) throw new ForbiddenException('Access denied');
@@ -194,8 +219,19 @@ export class ServiceUnitsDepartmentService {
     return ctx;
   }
 
-  async getDashboard(churchId: string, serviceUnitId: string, weeks = 4) {
+  async getDashboard(
+    churchId: string,
+    serviceUnitId: string,
+    weeks = 4,
+    userId?: string,
+  ) {
     const unit = await this.requireUnit(churchId, serviceUnitId);
+    let viewerCanManage = true;
+    if (userId) {
+      const ctx = await this.assertParticipate(userId, churchId, serviceUnitId);
+      viewerCanManage = this.moduleAccess.canManageServiceUnit(ctx, serviceUnitId);
+    }
+    weeks = this.clampWeeks(weeks);
     const since = new Date();
     since.setUTCDate(since.getUTCDate() - weeks * 7);
 
@@ -207,8 +243,6 @@ export class ServiceUnitsDepartmentService {
             id: true,
             firstName: true,
             lastName: true,
-            email: true,
-            avatarUrl: true,
           },
         },
       },
@@ -298,7 +332,7 @@ export class ServiceUnitsDepartmentService {
       })),
       latestAbsent: latestAbsent.map((m) => m.member),
       volunteerConsistency,
-      weeklyReports: reports,
+      weeklyReports: viewerCanManage ? reports : [],
       periodWeeks: weeks,
     };
   }
@@ -404,48 +438,103 @@ export class ServiceUnitsDepartmentService {
   async generateWeeklyReport(
     churchId: string,
     serviceUnitId: string,
+    weekStartInput: string | undefined,
+    userId: string | undefined,
+    options: { preview: true; weekEnd?: string; notifyInApp?: boolean },
+  ): Promise<{
+    preview: true;
+    body: string;
+    stats: Record<string, unknown>;
+    weekStart: Date;
+    weekEnd: Date;
+  }>;
+  async generateWeeklyReport(
+    churchId: string,
+    serviceUnitId: string,
     weekStartInput?: string,
     userId?: string,
-    options?: { notifyInApp?: boolean },
+    options?: { notifyInApp?: boolean; preview?: boolean; weekEnd?: string },
+  ): Promise<ServiceUnitWeeklyReport>;
+  async generateWeeklyReport(
+    churchId: string,
+    serviceUnitId: string,
+    weekStartInput?: string,
+    userId?: string,
+    options?: { notifyInApp?: boolean; preview?: boolean; weekEnd?: string },
   ) {
-    if (userId) await this.assertManage(userId, churchId, serviceUnitId);
-    const notifyInApp = options?.notifyInApp !== false;
     const unit = await this.requireUnit(churchId, serviceUnitId);
-    const weekStart = weekStartInput
-      ? weekStartUtc(new Date(weekStartInput))
-      : weekStartUtc(new Date());
-    const weekEnd = new Date(weekStart);
+    if (userId) await this.assertManage(userId, churchId, serviceUnitId);
+    const notifyInApp = options?.notifyInApp !== false && options?.preview !== true;
+    const weekStart = this.parseWeekStart(weekStartInput);
+    const rangeStart = options?.weekEnd
+      ? this.parseWeekStart(options.weekEnd)
+      : weekStart;
+    if (rangeStart.getTime() < weekStart.getTime()) {
+      throw new BadRequestException('The end week must be the same week or a later week');
+    }
+    const weekEnd = new Date(rangeStart);
     weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
+    const spanDays = (weekEnd.getTime() - weekStart.getTime()) / 86_400_000;
+    if (spanDays > 56) {
+      throw new BadRequestException('Select a range of 8 weeks or less');
+    }
 
-    const dashboard = await this.getDashboard(churchId, serviceUnitId, 1);
-    const weekAttendance = dashboard.attendanceSessions.filter((s) => {
-      const d = new Date(`${s.serviceDate}T00:00:00.000Z`);
-      return d >= weekStart && d < weekEnd;
-    });
+    const [memberCount, attendance] = await Promise.all([
+      this.prisma.serviceUnitMember.count({ where: { serviceUnitId } }),
+      this.prisma.attendanceRecord.findMany({
+        where: {
+          churchId,
+          serviceUnitId,
+          scope: AttendanceScope.DEPARTMENT,
+          serviceDate: { gte: weekStart, lt: weekEnd },
+        },
+        select: { memberId: true, present: true, serviceDate: true },
+      }),
+    ]);
 
-    const totalPresent = weekAttendance.reduce((n, s) => n + s.present, 0);
-    const totalAbsent = weekAttendance.reduce((n, s) => n + s.absent, 0);
-    const consistent = dashboard.volunteerConsistency.filter(
-      (v) => v.status === 'consistent',
+    const sessionsByDate = new Map<string, { present: number; absent: number }>();
+    for (const row of attendance) {
+      const key = row.serviceDate.toISOString().slice(0, 10);
+      const bucket = sessionsByDate.get(key) ?? { present: 0, absent: 0 };
+      if (row.present) bucket.present++;
+      else bucket.absent++;
+      sessionsByDate.set(key, bucket);
+    }
+    const sessionDates = [...sessionsByDate.keys()];
+    const totalPresent = [...sessionsByDate.values()].reduce((n, s) => n + s.present, 0);
+    const totalAbsent = [...sessionsByDate.values()].reduce((n, s) => n + s.absent, 0);
+    const presentByMember = new Map<string, number>();
+    for (const row of attendance) {
+      if (!row.present) continue;
+      presentByMember.set(row.memberId, (presentByMember.get(row.memberId) ?? 0) + 1);
+    }
+    const expected = sessionDates.length || 1;
+    const consistent = [...presentByMember.values()].filter(
+      (presentSessions) => Math.round((presentSessions / expected) * 100) >= 80,
     ).length;
 
-    const label = this.unitDisplayName(unit);
+    const label = this.unitDisplayName(unit).replace(/[<>]/g, '');
+    const rangeLabel =
+      isoWeekKey(weekStart) === isoWeekKey(rangeStart)
+        ? isoWeekKey(weekStart)
+        : `${isoWeekKey(weekStart)} to ${isoWeekKey(rangeStart)}`;
     let body = [
-      `${label} weekly report (${isoWeekKey(weekStart)})`,
-      `Members: ${dashboard.memberCount}`,
-      `Sessions: ${weekAttendance.length}`,
+      `${label} weekly report (${rangeLabel})`,
+      `Members: ${memberCount}`,
+      `Sessions: ${sessionDates.length}`,
       `Present marks: ${totalPresent}`,
       `Absent marks: ${totalAbsent}`,
       `Consistent volunteers (≥80%): ${consistent}`,
     ].join('\n');
 
     const stats: Record<string, unknown> = {
-      memberCount: dashboard.memberCount,
-      sessions: weekAttendance.length,
+      memberCount,
+      sessions: sessionDates.length,
       totalPresent,
       totalAbsent,
       consistentVolunteers: consistent,
       weekKey: isoWeekKey(weekStart),
+      weekEndKey: isoWeekKey(rangeStart),
     };
 
     if (unit.departmentCode === 'MEDICAL') {
@@ -482,6 +571,22 @@ export class ServiceUnitsDepartmentService {
       stats.medicalTeamAttendanceEntries = teamServed;
     }
 
+    if (options?.preview) {
+      return {
+        preview: true as const,
+        body,
+        stats,
+        weekStart,
+        weekEnd,
+      };
+    }
+
+    const leadershipRecipients =
+      notifyInApp && userId ? await findOneAdminAndOnePastor(this.prisma, churchId) : [];
+    if (notifyInApp && userId && leadershipRecipients.length === 0) {
+      throw new BadRequestException('No active church admin or pastor with an email address');
+    }
+
     const report = await this.prisma.serviceUnitWeeklyReport.upsert({
       where: {
         serviceUnitId_weekStart: { serviceUnitId, weekStart },
@@ -496,8 +601,34 @@ export class ServiceUnitsDepartmentService {
       update: { body, stats: stats as Prisma.InputJsonValue },
     });
 
-    // Store + optional in-app — email goes via Monday / on-demand full digests (reports SMTP).
-    if (notifyInApp) {
+    if (notifyInApp && userId) {
+      for (const staff of leadershipRecipients) {
+        const metadata = {
+          reportId: report.id,
+          serviceUnitId,
+          weekStart: weekStart.toISOString(),
+          emailPurpose: 'reports' as const,
+        };
+        // Target the staff user only. Passing serviceUnitId would also
+        // deliver the report to every member of the unit.
+        await this.commQueue.enqueue(churchId, {
+          kind: 'DEPARTMENT_WEEKLY_REPORT',
+          title: `${label} — weekly report`,
+          body,
+          channels: ['IN_APP'],
+          targetUserId: staff.id,
+          metadata,
+        });
+        await this.commQueue.enqueue(churchId, {
+          kind: 'DEPARTMENT_WEEKLY_REPORT',
+          title: `${label} — weekly report`,
+          body,
+          channels: ['EMAIL'],
+          targetUserId: staff.id,
+          metadata,
+        });
+      }
+    } else if (notifyInApp) {
       const staffUsers = await this.prisma.user.findMany({
         where: {
           churchId,
@@ -506,7 +637,6 @@ export class ServiceUnitsDepartmentService {
         },
         select: { id: true },
       });
-
       for (const staff of staffUsers) {
         await this.commQueue.enqueue(churchId, {
           kind: 'DEPARTMENT_WEEKLY_REPORT',
@@ -692,8 +822,9 @@ export class ServiceUnitsDepartmentService {
     return { churches: churches.length, digests };
   }
 
-  async listWeeklyReports(churchId: string, serviceUnitId: string) {
+  async listWeeklyReports(churchId: string, serviceUnitId: string, userId?: string) {
     await this.requireUnit(churchId, serviceUnitId);
+    if (userId) await this.assertManage(userId, churchId, serviceUnitId);
     return this.prisma.serviceUnitWeeklyReport.findMany({
       where: { churchId, serviceUnitId },
       orderBy: { weekStart: 'desc' },

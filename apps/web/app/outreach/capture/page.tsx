@@ -86,7 +86,11 @@ function CaptureForm() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<{ phone?: string; email?: string }>({});
+  const [fieldErrors, setFieldErrors] = useState<{
+    phone?: string;
+    email?: string;
+    gdprConsent?: string;
+  }>({});
   const [emailExistsOpen, setEmailExistsOpen] = useState(false);
   const [sameOwnerConfirmed, setSameOwnerConfirmed] = useState(false);
   const [checkingEmail, setCheckingEmail] = useState(false);
@@ -99,6 +103,7 @@ function CaptureForm() {
     email: '',
     referredBy: '',
     notes: '',
+    gdprConsent: false,
   });
 
   useEffect(() => {
@@ -124,6 +129,13 @@ function CaptureForm() {
       setFieldErrors((prev) => ({
         ...prev,
         phone: prev.phone ?? 'Enter a UK phone number or an email',
+      }));
+      return false;
+    }
+    if (!form.gdprConsent) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        gdprConsent: 'GDPR consent is required to save this contact',
       }));
       return false;
     }
@@ -169,6 +181,7 @@ function CaptureForm() {
       referredBy: form.referredBy.trim() || undefined,
       notes: form.notes.trim() || undefined,
       confirmSameOwner: confirmSameOwner || undefined,
+      gdprConsent: form.gdprConsent,
     });
     if (!parsed.success) {
       const first = parsed.error.issues[0];
@@ -397,10 +410,32 @@ function CaptureForm() {
                 placeholder="Anything you would like us to know? (optional)"
                 mode="append"
               />
-              <p className="text-[10px] text-muted-foreground">
-                By submitting, you agree to be contacted by {info.church.name}. A welcome message
-                will be sent automatically.
-              </p>
+              <label className="flex items-start gap-2 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 rounded"
+                  checked={form.gdprConsent}
+                  aria-invalid={!!fieldErrors.gdprConsent}
+                  onChange={(e) => {
+                    const gdprConsent = e.target.checked;
+                    setForm((f) => ({ ...f, gdprConsent }));
+                    setFieldErrors((prev) => ({ ...prev, gdprConsent: undefined }));
+                  }}
+                />
+                <span>
+                  I agree to be contacted by {info.church.name} and for my details to be stored for
+                  follow-up, in line with the{' '}
+                  <a href="/legal/privacy-policy" className="font-medium text-primary hover:underline">
+                    Privacy Policy
+                  </a>
+                  . A welcome message will be sent automatically.
+                </span>
+              </label>
+              {fieldErrors.gdprConsent ? (
+                <p className="text-xs text-destructive" role="alert">
+                  {fieldErrors.gdprConsent}
+                </p>
+              ) : null}
               <Button
                 type="submit"
                 className="w-full shadow-brand"

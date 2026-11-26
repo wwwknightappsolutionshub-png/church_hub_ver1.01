@@ -16,6 +16,7 @@ import {
   UserPlus,
   Users,
   FileSpreadsheet,
+  Layers,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { AxiosError } from 'axios';
@@ -30,7 +31,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { SectionTabNav } from '@/components/ui/section-tab-nav';
-import { cn } from '@/lib/utils';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { ServiceUnitJoinSheet } from '@/components/service-units/ServiceUnitJoinSheet';
 import { ServiceUnitAdminPanel } from '@/components/service-units/ServiceUnitAdminPanel';
@@ -468,65 +468,73 @@ export default function ServiceUnitDetailPage() {
 
   const data = unit.data;
   const moderatorIds = new Set(data.leaders.filter((l) => l.isModerator).map((l) => l.member.id));
-  const isDepartmentFocus = tab === 'department';
+  const accessLabel = data.access?.canManage
+    ? 'Unit admin'
+    : data.access?.canLead
+      ? 'Unit leader'
+      : 'Member';
 
   return (
-    <div className={cn('space-y-6', isDepartmentFocus ? 'p-4 md:p-6' : 'p-6 md:p-8')}>
-      <div
-        className={cn(
-          'flex flex-col gap-4',
-          !isDepartmentFocus && 'md:flex-row md:items-start md:justify-between',
-        )}
-      >
-        <div className="min-w-0">
-          <Button asChild variant="ghost" size="sm" className="mb-2 -ml-2">
-            <Link href="/dashboard/service-units">
-              <ArrowLeft className="mr-1 h-4 w-4" />
-              Service Unit Hub
-            </Link>
-          </Button>
-          {!isDepartmentFocus ? (
-            <>
-              <h1 className="font-heading text-2xl font-bold md:text-3xl">{data.name}</h1>
-              <p className="font-sans mt-1 max-w-2xl text-sm text-muted-foreground">{data.description}</p>
-            </>
-          ) : (
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="font-heading text-xl font-semibold md:text-2xl">{data.name}</h1>
-              <Badge variant="secondary">Department workspace</Badge>
-            </div>
-          )}
-        </div>
-        {!isDepartmentFocus ? (
-          <Badge variant="outline" className="w-fit gap-2">
-            <OnlineIndicator online={!!currentMemberId && isOnline(currentMemberId)} />
-            {data.members.filter((m) => isOnline(m.memberId)).length} members online
-          </Badge>
-        ) : null}
-      </div>
+    <div className="space-y-6 p-4 md:p-6">
+      <Button asChild variant="ghost" size="sm" className="-ml-2 w-fit">
+        <Link href="/dashboard/service-units">
+          <ArrowLeft className="mr-1 h-4 w-4" />
+          Service Unit Hub
+        </Link>
+      </Button>
 
-      <div
-        className={cn(
-          isDepartmentFocus
-            ? 'rounded-xl border border-border/60 bg-muted/20 p-2'
-            : 'border-b border-border pb-2',
-        )}
-      >
-        <SectionTabNav
-          items={visibleTabs.map(({ id: tabId, label, icon }) => ({
-            id: tabId,
-            label,
-            shortLabel: label === 'Unit admin' ? 'Admin' : label,
-            icon,
-          }))}
-          activeId={tab}
-          onChange={(id) => setTab(id as Tab)}
-          ariaLabel="Service unit sections"
-          size="sm"
-          compactSelectBelow="sm"
-          selectId={`service-unit-tabs-${id}`}
-        />
-      </div>
+      <header className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm">
+        <div className="border-b bg-gradient-to-r from-primary/[0.06] via-background to-background px-4 py-4 md:px-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10">
+                <Layers className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Service unit
+                </p>
+                <h1 className="truncate font-heading text-xl font-semibold tracking-tight md:text-2xl">
+                  {data.name}
+                </h1>
+                {data.description ? (
+                  <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">{data.description}</p>
+                ) : null}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {data.departmentCode ? (
+                <Badge variant="secondary" className="font-mono text-[10px]">
+                  {data.departmentCode}
+                </Badge>
+              ) : null}
+              <Badge variant="outline" className="text-xs">
+                {accessLabel}
+              </Badge>
+              <Badge variant="outline" className="gap-2 text-xs">
+                <OnlineIndicator online={!!currentMemberId && isOnline(currentMemberId)} />
+                {data.members.filter((m) => isOnline(m.memberId)).length} online
+              </Badge>
+            </div>
+          </div>
+        </div>
+        <div className="bg-muted/20 px-2 py-2 md:px-3">
+          <SectionTabNav
+            items={visibleTabs.map(({ id: tabId, label, icon }) => ({
+              id: tabId,
+              label,
+              shortLabel: label === 'Connect With Admin' ? 'Admin' : label,
+              icon,
+            }))}
+            activeId={tab}
+            onChange={(id) => setTab(id as Tab)}
+            ariaLabel="Service unit sections"
+            size="sm"
+            compactSelectBelow="sm"
+            selectId={`service-unit-tabs-${id}`}
+          />
+        </div>
+      </header>
 
       {tab === 'department' && unit.data && canViewDepartmentTab && showDepartmentToolsTab(unit.data.departmentCode, unit.data.name) && (
         <DepartmentToolsRouter

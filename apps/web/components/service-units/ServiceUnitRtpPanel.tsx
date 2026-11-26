@@ -26,6 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { FormSelect } from '@/components/ui/form-select';
+import { DateField } from '@/components/ui/date-field';
 
 type RtpFieldType = 'TEXT' | 'TEXTAREA' | 'NUMBER' | 'DATE' | 'SELECT' | 'CURRENCY';
 
@@ -367,6 +368,13 @@ export function ServiceUnitRtpPanel({
                     onChange={(e) => setValue('budget_line', digitsOnly(e.target.value))}
                   />
                 </div>
+              ) : field.fieldType === 'DATE' ? (
+                <DateField
+                  id={field.fieldKey}
+                  value={values[field.fieldKey] ?? ''}
+                  onChange={(next) => setValue(field.fieldKey, next)}
+                  aria-label={field.label}
+                />
               ) : isComputedTotal ? (
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">{currencySymbol}</span>
@@ -378,9 +386,7 @@ export function ServiceUnitRtpPanel({
                   type={
                     field.fieldType === 'NUMBER' || field.fieldType === 'CURRENCY'
                       ? 'number'
-                      : field.fieldType === 'DATE'
-                        ? 'date'
-                        : 'text'
+                      : 'text'
                   }
                   step={field.fieldType === 'CURRENCY' ? '0.01' : undefined}
                   className={cn(isComputedTotal && 'bg-muted/50 font-medium')}
