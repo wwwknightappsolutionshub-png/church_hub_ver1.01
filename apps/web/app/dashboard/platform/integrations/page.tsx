@@ -10,6 +10,7 @@ import { apiErrorMessage } from '@/lib/api-errors';
 import { useApiQuery } from '@/lib/hooks/use-api-query';
 import { useModuleAccess } from '@/lib/hooks/use-module-access';
 import { PlatformConsoleShell } from '@/components/platform/PlatformConsoleShell';
+import { PlatformSiteTrackingCard } from '@/components/platform/PlatformSiteTrackingCard';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -129,7 +130,7 @@ export default function PlatformIntegrationsPage() {
   return (
     <PlatformConsoleShell
       title="Integrations"
-      description="One global WhatsApp session for the whole platform. All churches send through this gateway."
+      description="One global WhatsApp session for the whole platform, and the measurement IDs for the public site."
     >
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Badge
@@ -363,6 +364,10 @@ export default function PlatformIntegrationsPage() {
             </CardContent>
           </Card>
         </div>
+      </div>
+
+      <div className="mt-4">
+        <PlatformSiteTrackingCard canWrite={canWrite} />
       </div>
     </PlatformConsoleShell>
   );

@@ -30,6 +30,11 @@ import {
 } from './platform-privacy.controller';
 import { PlatformWhatsAppConfigModule } from './platform-whatsapp-config.module';
 import { PlatformWhatsAppController } from './platform-whatsapp.controller';
+import {
+  PlatformSiteTrackingController,
+  PublicSiteTrackingController,
+} from './platform-site-tracking.controller';
+import { PlatformSiteTrackingService } from './platform-site-tracking.service';
 
 @Module({
   imports: [MembershipModule, UploadsModule, PlatformWhatsAppConfigModule, MarketingInboundModule],
@@ -45,6 +50,8 @@ import { PlatformWhatsAppController } from './platform-whatsapp.controller';
     PlatformPrivacyController,
     PrivacySelfServiceController,
     PlatformWhatsAppController,
+    PlatformSiteTrackingController,
+    PublicSiteTrackingController,
   ],
   providers: [
     PlatformService,
@@ -59,6 +66,7 @@ import { PlatformWhatsAppController } from './platform-whatsapp.controller';
     PlatformTeamService,
     PlatformCmsService,
     PlatformPrivacyService,
+    PlatformSiteTrackingService,
   ],
   exports: [
     PlatformService,

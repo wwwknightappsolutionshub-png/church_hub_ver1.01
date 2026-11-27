@@ -1,4 +1,10 @@
+import type { Metadata } from 'next';
+
 /** Always serve fresh login HTML (avoid stale script chunk hashes behind proxies). */
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
+
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 

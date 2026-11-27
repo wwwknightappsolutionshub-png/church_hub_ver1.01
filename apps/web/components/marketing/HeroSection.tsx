@@ -7,6 +7,7 @@ import { ArrowRight, CheckCircle2, Shield, Zap } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ProductPreview } from './ProductPreview';
+import { MARKETING_H1 } from '@/lib/marketing-seo';
 
 const trustItems = [
   'SOC 2 ready architecture',
@@ -103,12 +104,12 @@ export function HeroSection() {
           </Badge>
 
           <motion.h1
-            className="font-heading text-4xl font-bold leading-[1.1] text-primary sm:text-5xl lg:text-6xl"
+            className="font-heading text-3xl font-bold leading-[1.15] text-primary sm:text-4xl lg:text-5xl"
             initial={reduceMotion ? false : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.55, ease: 'easeOut' }}
           >
-            ONE PLATFORM
+            {MARKETING_H1}
           </motion.h1>
 
           <HeroTypewriter text={HERO_SUBHEADING} startDelayMs={700} />

@@ -484,6 +484,7 @@ model User {
   platformSupportMessages PlatformSupportMessage[] @relation("PlatformSupportMessageSender")
   pushSubscriptions       PushSubscription[]
   platformWhatsAppConfigsUpdated PlatformWhatsAppConfig[] @relation("PlatformWhatsAppConfigUpdater")
+  platformSiteTrackingUpdated    PlatformSiteTracking[]   @relation("PlatformSiteTrackingUpdater")
   backupJobsTriggered            BackupJob[]              @relation("BackupJobTriggeredBy")
   backupRequestsRequested        BackupRequest[]          @relation("BackupRequestRequester")
   backupRequestsReviewed         BackupRequest[]          @relation("BackupRequestReviewer")
@@ -5784,6 +5785,23 @@ model PlatformWhatsAppConfig {
   updatedBy User? @relation("PlatformWhatsAppConfigUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
 
   @@map("platform_whatsapp_config")
+}
+
+/// Singleton public-site measurement IDs (Google Tag Manager, Analytics, Pixel, Search Console).
+model PlatformSiteTracking {
+  /// Fixed singleton id — always "global".
+  id                      String   @id @default("global")
+  gtmContainerId          String?
+  gaMeasurementId         String?
+  facebookPixelId         String?
+  googleSiteVerification  String?
+  updatedByUserId         String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  updatedBy User? @relation("PlatformSiteTrackingUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@map("platform_site_tracking")
 }
 
 enum MarketingInboundType {

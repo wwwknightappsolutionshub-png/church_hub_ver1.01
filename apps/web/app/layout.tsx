@@ -3,6 +3,7 @@ import { Anek_Latin, Montserrat } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 import { getSiteUrl } from '@/lib/site-url';
+import { MARKETING_DESCRIPTION, MARKETING_TITLE } from '@/lib/marketing-seo';
 
 const montserrat = Montserrat({
   subsets: ['latin'],
@@ -21,10 +22,8 @@ const anek = Anek_Latin({
 });
 
 const siteUrl = getSiteUrl();
-const title =
-  'Church_Hub OS — Simplifying Evangelism, Follow-up, Membership, & Ministry in one place';
-const description =
-  'Stop losing first-time guests in WhatsApp groups and Excel Sheets. Church_Hub helps your team shepherd people from visit to membership. Start free — no credit card needed.';
+const title = MARKETING_TITLE;
+const description = MARKETING_DESCRIPTION;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
