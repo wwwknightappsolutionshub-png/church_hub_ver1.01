@@ -33,6 +33,23 @@ const publicSelect = {
   updatedAt: true,
 } satisfies Prisma.PlatformGuidePageSelect;
 
+function publicText(value: string, max: number) {
+  return plainGuideText(value, max);
+}
+
+function publicCard<T extends { slug: string; title: string; summary: string; coverImageAlt: string; coverImagePath: string }>(
+  row: T,
+) {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(row.slug) || row.slug.length > 80) return null;
+  return {
+    ...row,
+    title: publicText(row.title, 180),
+    summary: publicText(row.summary, 400),
+    coverImageAlt: publicText(row.coverImageAlt, 180),
+    coverImagePath: publicCoverPath(row.coverImagePath),
+  };
+}
+
 function faqsFromJson(value: Prisma.JsonValue): GuideFaq[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item) => {
@@ -76,9 +93,24 @@ export class PlatformGuideService implements OnModuleInit {
     }
   }
 
-  private present<T extends { bodyHtml: string; faqs: Prisma.JsonValue }>(row: T) {
+  private present<
+    T extends {
+      bodyHtml: string;
+      faqs: Prisma.JsonValue;
+      title: string;
+      summary: string;
+      seoTitle: string;
+      seoDescription: string;
+      coverImageAlt: string;
+    },
+  >(row: T) {
     return {
       ...row,
+      title: publicText(row.title, 180),
+      summary: publicText(row.summary, 400),
+      seoTitle: publicText(row.seoTitle, 180),
+      seoDescription: publicText(row.seoDescription, 300),
+      coverImageAlt: publicText(row.coverImageAlt, 180),
       bodyHtml: sanitizeGuideHtml(row.bodyHtml),
       faqs: faqsFromJson(row.faqs),
     };
@@ -97,7 +129,10 @@ export class PlatformGuideService implements OnModuleInit {
         publishedAt: true,
       },
     });
-    return rows.map((row) => ({ ...row, coverImagePath: publicCoverPath(row.coverImagePath) }));
+    return rows.flatMap((row) => {
+      const card = publicCard(row);
+      return card ? [card] : [];
+    });
   }
 
   async listHomepage() {
@@ -113,7 +148,10 @@ export class PlatformGuideService implements OnModuleInit {
         coverImageAlt: true,
       },
     });
-    return rows.map((row) => ({ ...row, coverImagePath: publicCoverPath(row.coverImagePath) }));
+    return rows.flatMap((row) => {
+      const card = publicCard(row);
+      return card ? [card] : [];
+    });
   }
 
   async listPaths() {
@@ -122,10 +160,15 @@ export class PlatformGuideService implements OnModuleInit {
       select: { slug: true, kind: true, updatedAt: true },
       orderBy: { slug: 'asc' },
     });
-    return rows.map((row) => ({
-      path: row.kind === 'ABOUT' ? '/about' : `/blog/${row.slug}`,
-      updatedAt: row.updatedAt.toISOString(),
-    }));
+    return rows.flatMap((row) => {
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(row.slug) || row.slug.length > 80) return [];
+      return [
+        {
+          path: row.kind === 'ABOUT' ? '/about' : `/blog/${row.slug}`,
+          updatedAt: row.updatedAt.toISOString(),
+        },
+      ];
+    });
   }
 
   async getPublished(slug: string) {
@@ -144,7 +187,10 @@ export class PlatformGuideService implements OnModuleInit {
     const page = this.present(row);
     return {
       page: { ...page, coverImagePath: publicCoverPath(page.coverImagePath) },
-      related: related.map((item) => ({ ...item, coverImagePath: publicCoverPath(item.coverImagePath) })),
+      related: related.flatMap((item) => {
+        const card = publicCard(item);
+        return card ? [card] : [];
+      }),
     };
   }
 
@@ -181,7 +227,14 @@ export class PlatformGuideService implements OnModuleInit {
     const coverImagePath = dto.coverImagePath
       ? parseCoverImagePath(dto.coverImagePath)
       : '/images/blog/church-management-software.svg';
-    const coverImageAlt = dto.coverImageAlt?.trim() || dto.title.trim();
+    const title = publicText(dto.title, 180);
+    const summary = publicText(dto.summary, 400);
+    const seoTitle = publicText(dto.seoTitle, 180);
+    const seoDescription = publicText(dto.seoDescription, 300);
+    if (title.length < 2 || summary.length < 2 || seoTitle.length < 2 || seoDescription.length < 2) {
+      throw new BadRequestException('Use plain text for the title, summary, and search fields');
+    }
+    const coverImageAlt = publicText(dto.coverImageAlt?.trim() || title, 180);
     const bodyHtml = sanitizeGuideHtml(dto.bodyHtml);
     const faqs = (dto.faqs ?? [])
       .map((faq) => ({
@@ -194,10 +247,10 @@ export class PlatformGuideService implements OnModuleInit {
         data: {
           kind: PlatformGuideKind.POST,
           slug,
-          title: dto.title.trim(),
-          summary: dto.summary.trim(),
-          seoTitle: dto.seoTitle.trim(),
-          seoDescription: dto.seoDescription.trim(),
+          title,
+          summary,
+          seoTitle,
+          seoDescription,
           coverImagePath,
           coverImageAlt,
           bodyHtml,
@@ -264,12 +317,12 @@ export class PlatformGuideService implements OnModuleInit {
 
   private toWriteData(dto: UpsertGuidePageDto, slug: string) {
     const data: Prisma.PlatformGuidePageUpdateInput = {};
-    if (dto.title !== undefined) data.title = dto.title.trim();
-    if (dto.summary !== undefined) data.summary = dto.summary.trim();
-    if (dto.seoTitle !== undefined) data.seoTitle = dto.seoTitle.trim();
-    if (dto.seoDescription !== undefined) data.seoDescription = dto.seoDescription.trim();
+    if (dto.title !== undefined) data.title = this.requirePlain(dto.title, 180, 'Title');
+    if (dto.summary !== undefined) data.summary = this.requirePlain(dto.summary, 400, 'Summary');
+    if (dto.seoTitle !== undefined) data.seoTitle = this.requirePlain(dto.seoTitle, 180, 'Search title');
+    if (dto.seoDescription !== undefined) data.seoDescription = this.requirePlain(dto.seoDescription, 300, 'Search description');
     if (dto.coverImagePath !== undefined) data.coverImagePath = parseCoverImagePath(dto.coverImagePath);
-    if (dto.coverImageAlt !== undefined) data.coverImageAlt = dto.coverImageAlt.trim();
+    if (dto.coverImageAlt !== undefined) data.coverImageAlt = publicText(dto.coverImageAlt, 180);
     if (dto.bodyHtml !== undefined) data.bodyHtml = sanitizeGuideHtml(dto.bodyHtml);
     if (dto.faqs !== undefined) {
       data.faqs = dto.faqs
@@ -283,6 +336,12 @@ export class PlatformGuideService implements OnModuleInit {
     if (dto.sortOrder !== undefined) data.sortOrder = dto.sortOrder;
     if (dto.slug !== undefined) data.slug = slug;
     return data;
+  }
+
+  private requirePlain(value: string, max: number, label: string) {
+    const text = publicText(value, max);
+    if (text.length < 2) throw new BadRequestException(`${label} needs plain text`);
+    return text;
   }
 
   private assertId(id: string) {

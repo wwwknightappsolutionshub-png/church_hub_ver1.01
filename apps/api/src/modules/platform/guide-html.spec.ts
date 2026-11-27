@@ -1,7 +1,19 @@
 import { GUIDE_SEED, guideBodyHtml } from './guide-copy';
-import { countWords, parseCoverImagePath, parseGuideSlug, sanitizeGuideHtml } from './guide-html';
+import { countWords, parseCoverImagePath, parseGuideSlug, plainGuideText, sanitizeGuideHtml } from './guide-html';
 
 describe('guide html', () => {
+  it('strips markup from a title before it is shown', () => {
+    expect(plainGuideText('<img src=x onerror=alert(1)>Hello', 180)).toBe('Hello');
+    expect(plainGuideText('a</script><script>alert(1)', 180)).not.toContain('<');
+  });
+
+  it('drops a heading handler and a broken image', () => {
+    const clean = sanitizeGuideHtml('<h2 onclick=alert(1)>Title</h2><img src=x onerror=alert(1)><p>ok</p>');
+    expect(clean).toBe('<h2>Title</h2><p>ok</p>');
+    expect(clean).not.toContain('onerror');
+    expect(clean).not.toContain('onclick');
+  });
+
   it('drops a script and a javascript link', () => {
     const clean = sanitizeGuideHtml(
       '<p>Hello</p><script>alert(1)</script><a href="javascript:alert(1)">x</a><a href="/register">Start</a>',

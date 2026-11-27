@@ -35,3 +35,17 @@ export function sanitizeGuideHtml(input: string): string {
   });
   return rebuilt.replace(/<(?!\/?(?:p|h2|h3|ul|ol|li|a|strong|em|br)(?:\s|>))/gi, '&lt;');
 }
+
+/** JSON inside a script tag. Angle brackets stay as text, not markup. */
+export function safeJsonLd(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
+
+export function safeArticleSlug(slug: string): string | null {
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) && slug.length <= 80 ? slug : null;
+}

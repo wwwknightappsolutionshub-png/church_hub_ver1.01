@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { GuideDocument } from '@/components/marketing/GuideDocument';
+import { AboutDocument } from '@/components/marketing/AboutDocument';
 import { loadGuide } from '@/lib/public-guides';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -24,5 +24,5 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function AboutPage() {
   const data = await loadGuide('about');
   if (!data || data.page.kind !== 'ABOUT') notFound();
-  return <GuideDocument page={data.page} related={data.related} />;
+  return <AboutDocument page={data.page} related={data.related} />;
 }

@@ -41,9 +41,9 @@ export function HowItWorks() {
         <div className="mt-16 grid grid-cols-2 gap-x-4 gap-y-8 sm:gap-8 lg:grid-cols-4">
           {steps.map(({ icon: Icon, step, title, description }) => (
             <div key={step} className="relative">
-              <div className="flex items-center gap-3 lg:block">
-                <span className="font-heading text-4xl font-bold text-primary/10 sm:text-5xl">{step}</span>
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary lg:mt-2">
+              <div className="flex items-center gap-3 lg:justify-between">
+                <span className="hidden font-heading text-4xl font-bold text-primary/10 sm:text-5xl lg:inline">{step}</span>
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   <Icon className="h-5 w-5" />
                 </div>
               </div>
