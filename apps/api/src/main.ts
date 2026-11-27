@@ -3,31 +3,40 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
-import { json, urlencoded } from 'express';
 import { join } from 'path';
 import { AppModule } from './app.module';
+
+function rejectOversizedContactBody(url: string, buf: Buffer) {
+  if (url.includes('/marketing/inbound') && buf.length > 24_000) {
+    const err = new Error('payload too large') as Error & { status?: number; type?: string };
+    err.status = 413;
+    err.type = 'entity.too.large';
+    throw err;
+  }
+}
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.disable('x-powered-by');
 
-  app.use(
-    '/api/v1/marketing/inbound',
-    json({ limit: '24kb' }),
-    urlencoded({ extended: false, limit: '24kb', parameterLimit: 8 }),
-  );
-
   app.useBodyParser('json', {
     limit: '12mb',
     verify: (req: import('express').Request, _res: import('express').Response, buf: Buffer) => {
       const url = req.originalUrl ?? '';
+      rejectOversizedContactBody(url, buf);
       if (url.includes('/wisdom365/webhooks/stripe')) {
         (req as import('express').Request & { rawBody?: Buffer }).rawBody = buf;
       }
     },
   });
-  app.useBodyParser('urlencoded', { limit: '12mb', extended: true });
+  app.useBodyParser('urlencoded', {
+    limit: '12mb',
+    extended: true,
+    verify: (req: import('express').Request, _res: import('express').Response, buf: Buffer) => {
+      rejectOversizedContactBody(req.originalUrl ?? '', buf);
+    },
+  });
 
   // Trust reverse-proxy hops so req.ip is the real client (never parse raw XFF in app code).
   // TRUST_PROXY: number of hops (default 1 in production), or "false" to disable.
