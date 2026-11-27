@@ -35,6 +35,8 @@ import {
   PublicSiteTrackingController,
 } from './platform-site-tracking.controller';
 import { PlatformSiteTrackingService } from './platform-site-tracking.service';
+import { PlatformGuideController, PublicGuideController } from './platform-guide.controller';
+import { PlatformGuideService } from './platform-guide.service';
 
 @Module({
   imports: [MembershipModule, UploadsModule, PlatformWhatsAppConfigModule, MarketingInboundModule],
@@ -52,6 +54,8 @@ import { PlatformSiteTrackingService } from './platform-site-tracking.service';
     PlatformWhatsAppController,
     PlatformSiteTrackingController,
     PublicSiteTrackingController,
+    PublicGuideController,
+    PlatformGuideController,
   ],
   providers: [
     PlatformService,
@@ -67,6 +71,7 @@ import { PlatformSiteTrackingService } from './platform-site-tracking.service';
     PlatformCmsService,
     PlatformPrivacyService,
     PlatformSiteTrackingService,
+    PlatformGuideService,
   ],
   exports: [
     PlatformService,

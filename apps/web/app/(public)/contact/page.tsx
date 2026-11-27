@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ChevronRight, Loader2, Mail, MessageSquareHeart } from 'lucide-react';
@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { FormSelect } from '@/components/ui/form-select';
+import { readableMessage, validateContactDraft, type ContactField } from '@/lib/contact-form';
 
 type FormKind = 'contact' | 'feedback';
 
@@ -45,8 +46,16 @@ export default function ContactPage() {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [rating, setRating] = useState<number | ''>('');
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<ContactField, string>>>({});
 
   const activeTab = useMemo(() => FORM_TABS.find((t) => t.id === kind)!, [kind]);
+
+  useEffect(() => {
+    const cleaned = readableMessage(message);
+    if (cleaned === message) return;
+    setMessage('');
+    setFieldErrors((current) => ({ ...current, message: undefined }));
+  }, [message]);
 
   const resetForm = () => {
     setName('');
@@ -59,24 +68,28 @@ export default function ContactPage() {
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    const nextMessage = readableMessage(message);
+    if (nextMessage !== message) setMessage(nextMessage);
+    const errors = validateContactDraft({ kind, name, email, organization, subject, message: nextMessage, rating });
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
     setSubmitting(true);
     try {
       await api.post('/marketing/inbound', {
         type: kind === 'contact' ? 'CONTACT' : 'FEEDBACK',
         name: name.trim(),
         email: email.trim(),
-        organization: organization.trim() || undefined,
+        organization: kind === 'contact' ? organization.trim() || undefined : undefined,
         subject: subject.trim() || undefined,
-        message: message.trim(),
-        rating: rating === '' ? undefined : Number(rating),
+        message: nextMessage.trim(),
+        rating: kind === 'feedback' && rating !== '' ? Number(rating) : undefined,
       });
       resetForm();
-      toast.success(
-        kind === 'contact' ? 'Message sent — we will reply soon' : 'Thank you for your feedback',
-        {
-          description: 'Our team at support@church-hub.online has received your submission.',
-        },
-      );
+      setFieldErrors({});
+      toast.success(kind === 'contact' ? 'Message sent. We will reply soon' : 'Thank you for your feedback', {
+        description: 'Our platform team has received your submission.',
+      });
     } catch (err) {
       toast.error(apiErrorMessage(err, 'Could not send your message. Please try again.'));
     } finally {
@@ -104,7 +117,7 @@ export default function ContactPage() {
             </h1>
             <p className="mt-3 max-w-2xl text-base leading-relaxed text-sidebar-foreground/75">
               Reach the Church Hub team for demos, support, or product feedback. Choose the form that
-              fits — both routes go to our platform team at support@church-hub.online.
+              fits. Both routes go to our platform team.
             </p>
           </div>
         </section>
@@ -151,10 +164,13 @@ export default function ContactPage() {
                       id="name"
                       required
                       minLength={2}
+                      maxLength={80}
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       autoComplete="name"
+                      aria-invalid={Boolean(fieldErrors.name)}
                     />
+                    {fieldErrors.name ? <p className="text-sm text-destructive">{fieldErrors.name}</p> : null}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
@@ -162,10 +178,13 @@ export default function ContactPage() {
                       id="email"
                       type="email"
                       required
+                      maxLength={254}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       autoComplete="email"
+                      aria-invalid={Boolean(fieldErrors.email)}
                     />
+                    {fieldErrors.email ? <p className="text-sm text-destructive">{fieldErrors.email}</p> : null}
                   </div>
                 </div>
 
@@ -174,9 +193,14 @@ export default function ContactPage() {
                     <Label htmlFor="organization">Church or organization (optional)</Label>
                     <Input
                       id="organization"
+                      maxLength={120}
                       value={organization}
                       onChange={(e) => setOrganization(e.target.value)}
+                      aria-invalid={Boolean(fieldErrors.organization)}
                     />
+                    {fieldErrors.organization ? (
+                      <p className="text-sm text-destructive">{fieldErrors.organization}</p>
+                    ) : null}
                   </div>
                 ) : null}
 
@@ -187,12 +211,15 @@ export default function ContactPage() {
                   <Input
                     id="subject"
                     required={kind === 'contact'}
+                    maxLength={120}
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
+                    aria-invalid={Boolean(fieldErrors.subject)}
                     placeholder={
                       kind === 'contact' ? 'e.g. Request a demo' : 'e.g. Mobile dashboard experience'
                     }
                   />
+                  {fieldErrors.subject ? <p className="text-sm text-destructive">{fieldErrors.subject}</p> : null}
                 </div>
 
                 {kind === 'feedback' ? (
@@ -202,6 +229,7 @@ export default function ContactPage() {
                       id="rating"
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                       value={rating}
+                      aria-invalid={Boolean(fieldErrors.rating)}
                       onChange={(e) =>
                         setRating(e.target.value === '' ? '' : Number(e.target.value))
                       }
@@ -213,6 +241,7 @@ export default function ContactPage() {
                         </option>
                       ))}
                     </FormSelect>
+                    {fieldErrors.rating ? <p className="text-sm text-destructive">{fieldErrors.rating}</p> : null}
                   </div>
                 ) : null}
 
@@ -222,15 +251,18 @@ export default function ContactPage() {
                     id="message"
                     required
                     minLength={10}
+                    maxLength={4000}
                     rows={6}
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
+                    aria-invalid={Boolean(fieldErrors.message)}
                     placeholder={
                       kind === 'contact'
                         ? 'How can we help your church community?'
                         : 'Share your experience, ideas, or issues…'
                     }
                   />
+                  {fieldErrors.message ? <p className="text-sm text-destructive">{fieldErrors.message}</p> : null}
                 </div>
 
                 <Button type="submit" disabled={submitting} className="w-full sm:w-auto">

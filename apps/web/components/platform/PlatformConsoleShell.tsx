@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import {
   BarChart3,
+  BookOpen,
   Building2,
   Database,
   FileText,
@@ -78,6 +79,12 @@ const PLATFORM_NAV: PlatformNavItem[] = [
     href: '/dashboard/platform/content',
     label: 'Legal & CMS',
     icon: FileText,
+    permission: 'platform.content:read',
+  },
+  {
+    href: '/dashboard/platform/blog',
+    label: 'About & blog',
+    icon: BookOpen,
     permission: 'platform.content:read',
   },
   {

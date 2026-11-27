@@ -485,6 +485,7 @@ model User {
   pushSubscriptions       PushSubscription[]
   platformWhatsAppConfigsUpdated PlatformWhatsAppConfig[] @relation("PlatformWhatsAppConfigUpdater")
   platformSiteTrackingUpdated    PlatformSiteTracking[]   @relation("PlatformSiteTrackingUpdater")
+  platformGuidePagesUpdated      PlatformGuidePage[]      @relation("PlatformGuidePageUpdater")
   backupJobsTriggered            BackupJob[]              @relation("BackupJobTriggeredBy")
   backupRequestsRequested        BackupRequest[]          @relation("BackupRequestRequester")
   backupRequestsReviewed         BackupRequest[]          @relation("BackupRequestReviewer")
@@ -5804,6 +5805,43 @@ model PlatformSiteTracking {
   @@map("platform_site_tracking")
 }
 
+enum PlatformGuideKind {
+  ABOUT
+  POST
+}
+
+enum PlatformGuideStatus {
+  DRAFT
+  PUBLISHED
+}
+
+/// Public About page and marketing articles. Not church data and not the legal CMS.
+model PlatformGuidePage {
+  id               String              @id @default(uuid())
+  kind             PlatformGuideKind
+  slug             String              @unique
+  title            String
+  summary          String              @db.Text
+  seoTitle         String
+  seoDescription   String
+  coverImagePath   String
+  coverImageAlt    String
+  bodyHtml         String              @db.Text
+  faqs             Json
+  showOnHomepage   Boolean             @default(false)
+  sortOrder        Int                 @default(0)
+  status           PlatformGuideStatus @default(DRAFT)
+  publishedAt      DateTime?
+  updatedByUserId  String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  updatedBy User? @relation("PlatformGuidePageUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([kind, status, showOnHomepage])
+  @@map("platform_guide_pages")
+}
+
 enum MarketingInboundType {
   CONTACT
   FEEDBACK
@@ -5820,11 +5858,11 @@ model PlatformMarketingSubmission {
   id             String                 @id @default(uuid())
   type           MarketingInboundType
   status         MarketingInboundStatus @default(NEW)
-  name           String
-  email          String
-  organization   String?
-  subject        String?
-  message        String                 @db.Text
+  name           String                 @db.VarChar(80)
+  email          String                 @db.VarChar(254)
+  organization   String?                @db.VarChar(120)
+  subject        String?                @db.VarChar(120)
+  message        String                 @db.VarChar(4000)
   rating         Int?
   internalNotes  String?                @db.Text
   handledById    String?

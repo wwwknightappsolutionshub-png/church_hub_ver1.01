@@ -70,6 +70,44 @@ describe('MarketingInboundService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('rejects encoded and lookalike markup', async () => {
+    await expect(
+      service.submit({
+        type: MarketingInboundType.CONTACT,
+        name: 'Jane Doe',
+        email: 'jane@example.com',
+        subject: 'Demo request',
+        message: 'Please ignore &amp;lt;script&amp;gt;alert(1) now',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    await service.submit({
+      type: MarketingInboundType.CONTACT,
+      name: 'Jane Doe',
+      email: 'jane@example.com',
+      subject: 'Demo\u2028request',
+      message: 'We would like a product demo please.',
+    });
+    expect(prisma.platformMarketingSubmission.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ subject: 'Demorequest' }),
+      }),
+    );
+  });
+
+  it('rejects markup and script in the message', async () => {
+    await expect(
+      service.submit({
+        type: MarketingInboundType.CONTACT,
+        name: 'Jane Doe',
+        email: 'jane@example.com',
+        subject: 'Demo request',
+        message: '<script>alert(1)</script> please ignore',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.platformMarketingSubmission.create).not.toHaveBeenCalled();
+  });
+
   it('accepts feedback with optional rating', async () => {
     await service.submit({
       type: MarketingInboundType.FEEDBACK,

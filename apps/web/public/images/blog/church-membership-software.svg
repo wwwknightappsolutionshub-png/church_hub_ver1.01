@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="Church membership software">
+  <rect width="1200" height="630" fill="#1e3a5f"/>
+  <rect y="600" width="1200" height="8" fill="#c9a227"/>
+  <circle cx="360" cy="280" r="70" fill="#c9a227"/>
+  <circle cx="520" cy="280" r="70" fill="#ffffff" opacity="0.9"/>
+  <rect x="680" y="190" width="320" height="240" rx="24" fill="#16304f"/>
+  <rect x="720" y="240" width="200" height="14" rx="7" fill="#c9a227"/>
+  <rect x="720" y="280" width="240" height="10" rx="5" fill="#ffffff" opacity="0.7"/>
+  <rect x="720" y="310" width="180" height="10" rx="5" fill="#ffffff" opacity="0.4"/>
+</svg>

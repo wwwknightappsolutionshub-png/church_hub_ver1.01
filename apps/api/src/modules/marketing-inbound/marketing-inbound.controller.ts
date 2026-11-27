@@ -1,8 +1,8 @@
 import { Body, Controller, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { MarketingInboundType } from '@prisma/client';
 import { Public } from '../auth/decorators';
+import { SubmitMarketingInboundDto } from './dto/submit-marketing-inbound.dto';
 import { MarketingInboundService } from './marketing-inbound.service';
 
 @ApiTags('marketing-inbound')
@@ -11,20 +11,11 @@ export class MarketingInboundController {
   constructor(private readonly inbound: MarketingInboundService) {}
 
   @Public()
-  @Throttle({ default: { limit: 6, ttl: 60_000 } })
+  @Throttle({ default: { limit: 5, ttl: 600_000 } })
   @Post()
   @ApiOperation({ summary: 'Submit contact or feedback from the public marketing site' })
   submit(
-    @Body()
-    body: {
-      type: MarketingInboundType;
-      name: string;
-      email: string;
-      organization?: string;
-      subject?: string;
-      message: string;
-      rating?: number;
-    },
+    @Body() body: SubmitMarketingInboundDto,
   ) {
     return this.inbound.submit(body);
   }

@@ -8,6 +8,7 @@ import { WhyChurchesSection } from '@/components/marketing/WhyChurchesSection';
 import { FeaturesGrid } from '@/components/marketing/FeaturesGrid';
 import { HowItWorks } from '@/components/marketing/HowItWorks';
 import { SecuritySection } from '@/components/marketing/SecuritySection';
+import { HomeBlogRow } from '@/components/marketing/HomeBlogRow';
 import { CTASection } from '@/components/marketing/CTASection';
 import { MarketingFooter } from '@/components/marketing/MarketingFooter';
 import { MarketingTrialModal } from '@/components/marketing/MarketingTrialModal';
@@ -39,6 +40,7 @@ export default function HomePage() {
         <FeaturesGrid />
         <HowItWorks />
         <SecuritySection />
+        <HomeBlogRow />
         <CTASection />
       </main>
       <MarketingFooter />

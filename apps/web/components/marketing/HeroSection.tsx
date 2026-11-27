@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowRight, CheckCircle2, Shield, Zap } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ProductPreview } from './ProductPreview';
 import { MARKETING_H1 } from '@/lib/marketing-seo';
@@ -16,9 +15,9 @@ const trustItems = [
   'Role-based access control',
 ];
 
-const HERO_SUBHEADING = 'For the entire church management';
+const HERO_SUBHEADING = 'In A Simple Dashboard';
 const HERO_DESCRIPTION =
-  'Church_Hub unifies managing evangelism drives, membership, discipleship, youth & teens, business networking, and unit reporting — so pastors and leaders shepherd people with clarity, not chaos.';
+  'Church_Hub unifies managing evangelism drives, membership, discipleship, youth & teens, business networking, and unit reporting, so pastors and leaders shepherd people with clarity, not chaos.';
 
 const TYPEWRITER_CHAR_MS = 62;
 
@@ -68,7 +67,7 @@ function HeroTypewriter({ text, startDelayMs }: { text: string; startDelayMs: nu
 
   return (
     <>
-      <p className="mt-3 font-heading text-2xl font-bold leading-snug text-foreground sm:text-3xl lg:text-4xl">
+      <p className="mt-3 font-heading text-4xl font-bold leading-snug text-foreground sm:text-5xl lg:text-6xl">
         <span className="text-muted-foreground">{leadShown}</span>
         <span className="text-foreground">{darkShown}</span>
         {showCursor && (
@@ -99,10 +98,6 @@ export function HeroSection() {
 
       <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-6 py-16 lg:grid-cols-2 lg:gap-16 lg:px-8 lg:py-24">
         <div>
-          <Badge variant="gold" className="mb-6">
-            Trusted by 500+ churches worldwide
-          </Badge>
-
           <motion.h1
             className="font-heading text-3xl font-bold leading-[1.15] text-primary sm:text-4xl lg:text-5xl"
             initial={reduceMotion ? false : { opacity: 0, y: 12 }}

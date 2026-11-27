@@ -14,7 +14,8 @@ const footerLinks = {
     { label: 'Demo', href: '/dashboard' },
   ],
   Company: [
-    { label: 'About', href: '/#why-churches' },
+    { label: 'About', href: '/about' },
+    { label: 'Blog', href: '/blog' },
     { label: 'Contact & feedback', href: '/contact' },
   ],
 };
@@ -63,7 +64,7 @@ export function MarketingFooter() {
             </Button>
           </div>
 
-          <div className="grid gap-10 sm:grid-cols-2 lg:col-span-6 lg:justify-items-end">
+          <div className="grid grid-cols-2 gap-6 sm:gap-10 lg:col-span-6 lg:justify-items-end">
             {Object.entries(footerLinks).map(([group, links]) => (
               <div key={group} className="lg:min-w-[9rem]">
                 <p className="font-heading text-sm font-semibold tracking-wide text-white">{group}</p>

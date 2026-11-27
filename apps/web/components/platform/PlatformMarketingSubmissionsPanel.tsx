@@ -197,6 +197,7 @@ export function PlatformMarketingSubmissionsPanel({ canWrite }: { canWrite: bool
                   <Textarea
                     id="internal-notes"
                     rows={3}
+                    maxLength={2000}
                     value={notesDraft}
                     disabled={!canWrite}
                     onChange={(e) => setNotesDraft(e.target.value)}

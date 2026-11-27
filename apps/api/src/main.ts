@@ -3,6 +3,7 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
+import { json, urlencoded } from 'express';
 import { join } from 'path';
 import { AppModule } from './app.module';
 
@@ -10,6 +11,12 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.disable('x-powered-by');
+
+  app.use(
+    '/api/v1/marketing/inbound',
+    json({ limit: '24kb' }),
+    urlencoded({ extended: false, limit: '24kb', parameterLimit: 8 }),
+  );
 
   app.useBodyParser('json', {
     limit: '12mb',

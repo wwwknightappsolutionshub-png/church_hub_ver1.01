@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import {
   MarketingInboundStatus,
   MarketingInboundType,
+  Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.module';
 import { EmailAdapter } from '../notifications/adapters/email.adapter';
@@ -15,6 +16,9 @@ import {
   DEFAULT_PLATFORM_SUPPORT_EMAIL,
   MARKETING_INBOUND_TYPE_LABEL,
 } from './marketing-inbound.constants';
+import { cleanInternalNotes, cleanMarketingSubmission } from './marketing-inbound.input';
+
+const SUBMISSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type SubmitInput = {
   type: MarketingInboundType;
@@ -36,6 +40,14 @@ export class MarketingInboundService {
     private readonly config: ConfigService,
   ) {}
 
+  private optionalEnum<T extends string>(value: string | undefined, allowed: T[], label: string): T | undefined {
+    if (value == null || value === '') return undefined;
+    if (!allowed.includes(value as T)) {
+      throw new BadRequestException(`Invalid ${label}`);
+    }
+    return value as T;
+  }
+
   private supportInbox(): string {
     return (
       this.config.get<string>('PLATFORM_SUPPORT_INBOX') ??
@@ -55,57 +67,31 @@ export class MarketingInboundService {
   }
 
   async submit(input: SubmitInput) {
-    const type = input.type;
-    if (type !== MarketingInboundType.CONTACT && type !== MarketingInboundType.FEEDBACK) {
-      throw new BadRequestException('Invalid submission type');
-    }
+    const { type, name, email, organization, subject, message, rating } = cleanMarketingSubmission(input);
 
-    const name = input.name?.trim() ?? '';
-    const email = input.email?.trim() ?? '';
-    const message = input.message?.trim() ?? '';
-    const organization = input.organization?.trim() || null;
-    const subject = input.subject?.trim() || null;
-
-    if (!name || name.length < 2) {
-      throw new BadRequestException('Enter your name');
-    }
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      throw new BadRequestException('Enter a valid email address');
-    }
-    if (!message || message.length < 10) {
-      throw new BadRequestException('Message must be at least 10 characters');
-    }
-    if (message.length > 8000) {
-      throw new BadRequestException('Message is too long');
-    }
-
-    let rating: number | null = null;
-    if (input.rating != null) {
-      const n = Number(input.rating);
-      if (!Number.isInteger(n) || n < 1 || n > 5) {
-        throw new BadRequestException('Rating must be between 1 and 5');
+    let record: { id: string };
+    try {
+      record = await this.prisma.platformMarketingSubmission.create({
+        data: {
+          type,
+          name,
+          email,
+          organization,
+          subject,
+          message,
+          rating,
+        },
+        select: { id: true },
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && (err.code === 'P2004' || err.code === 'P2000')) {
+        throw new BadRequestException('That submission could not be stored');
       }
-      rating = n;
+      throw err;
     }
-
-    if (type === MarketingInboundType.CONTACT && !subject) {
-      throw new BadRequestException('Enter a subject for your message');
-    }
-
-    const record = await this.prisma.platformMarketingSubmission.create({
-      data: {
-        type,
-        name,
-        email,
-        organization,
-        subject,
-        message,
-        rating,
-      },
-    });
 
     const typeLabel = MARKETING_INBOUND_TYPE_LABEL[type];
-    const mailSubject = `[Church Hub ${typeLabel}] ${subject ?? name}`;
+    const mailSubject = `[Church Hub ${typeLabel}] ${(subject ?? name).replace(/[\r\n\u2028\u2029]/g, ' ')}`;
     const lines = [
       `New ${typeLabel.toLowerCase()} submission from the Church Hub marketing site.`,
       '',
@@ -139,17 +125,19 @@ export class MarketingInboundService {
       );
     }
 
-    return { ok: true as const, id: record.id };
+    return { ok: true as const };
   }
 
   list(filters?: {
-    type?: MarketingInboundType;
-    status?: MarketingInboundStatus;
+    type?: MarketingInboundType | string;
+    status?: MarketingInboundStatus | string;
   }) {
+    const type = this.optionalEnum(filters?.type, Object.values(MarketingInboundType), 'type');
+    const status = this.optionalEnum(filters?.status, Object.values(MarketingInboundStatus), 'status');
     return this.prisma.platformMarketingSubmission.findMany({
       where: {
-        ...(filters?.type ? { type: filters.type } : {}),
-        ...(filters?.status ? { status: filters.status } : {}),
+        ...(type ? { type } : {}),
+        ...(status ? { status } : {}),
       },
       orderBy: { createdAt: 'desc' },
       take: 200,
@@ -166,12 +154,17 @@ export class MarketingInboundService {
     id: string,
     body: { status?: MarketingInboundStatus; internalNotes?: string | null },
   ) {
+    if (!SUBMISSION_ID.test(id)) throw new NotFoundException('Submission not found');
+    const notes = body.internalNotes === undefined ? undefined : cleanInternalNotes(body.internalNotes);
     const existing = await this.prisma.platformMarketingSubmission.findUnique({
       where: { id },
     });
     if (!existing) throw new NotFoundException('Submission not found');
 
     const status = body.status;
+    if (status != null && typeof status !== 'string') {
+      throw new BadRequestException('Invalid status');
+    }
     if (
       status &&
       status !== MarketingInboundStatus.NEW &&
@@ -189,9 +182,7 @@ export class MarketingInboundService {
       where: { id },
       data: {
         ...(status ? { status } : {}),
-        ...(body.internalNotes !== undefined
-          ? { internalNotes: body.internalNotes?.trim() || null }
-          : {}),
+        ...(notes !== undefined ? { internalNotes: notes } : {}),
         ...(markHandled
           ? { handledById: handlerId, handledAt: new Date() }
           : status === MarketingInboundStatus.NEW

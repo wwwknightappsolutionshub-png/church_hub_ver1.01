@@ -19,7 +19,7 @@ const reasons = [
     icon: HeartHandshake,
     title: 'Never lose a first-time guest',
     description:
-      'Structured discipleship pipelines, assignments, and reminders help leaders follow through — so visitors become members, not missed opportunities.',
+      'Structured discipleship pipelines, assignments, and reminders help leaders follow through, so visitors become members, not missed opportunities.',
   },
   {
     icon: ClipboardList,
@@ -31,7 +31,7 @@ const reasons = [
     icon: ShieldCheck,
     title: 'Sacred data, enterprise care',
     description:
-      'Tenant isolation, audit trails, and confidential pastoral notes — designed for governance without slowing ministry down.',
+      'Tenant isolation, audit trails, and confidential pastoral notes, designed for governance without slowing ministry down.',
   },
   {
     icon: Sparkles,
@@ -60,7 +60,7 @@ export function WhyChurchesSection() {
             Built for ministry outcomes — not just software checklists
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            Church_Hub helps congregations shepherd people, coordinate teams, and grow with clarity —
+            Church_Hub helps congregations shepherd people, coordinate teams, and grow with clarity,
             without forcing your staff into tools designed for generic businesses.
           </p>
         </div>
